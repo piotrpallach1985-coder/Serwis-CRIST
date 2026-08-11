@@ -11,7 +11,7 @@ import KPIDashboard from './manager/KPIDashboard';
 import Topics from './manager/Topics';
 import Users from './manager/Users';
 
-export default function ManagerView({ user, onLogout }) {
+export default function ManagerView({ user, onLogout, onSwitchView }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalTicketId, setGlobalTicketId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -155,12 +155,22 @@ export default function ManagerView({ user, onLogout }) {
           </ul>
         </nav>
 
-        <div className="p-6 bg-[#0f172a] min-w-[288px] border-t border-gray-800">
+        <div className="p-6 bg-[#0f172a] min-w-[288px] border-t border-gray-800 space-y-2">
+          {onSwitchView && (
+            <button 
+              onClick={onSwitchView}
+              className="w-full flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-yellow-900 font-bold px-4 py-3 rounded-lg transition-colors shadow-sm"
+            >
+              <i className="ph ph-qr-code text-xl"></i>
+              Panel Operatora
+            </button>
+          )}
           <button 
             onClick={onLogout}
             className="w-full flex items-center gap-3 text-gray-400 hover:text-white transition-colors text-sm font-medium px-4 py-2"
           >
-            <i className="ph ph-sign-out text-lg"></i> Wyloguj
+            <i className="ph ph-sign-out text-lg"></i>
+            Wyloguj się
           </button>
         </div>
       </aside>

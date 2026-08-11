@@ -153,9 +153,14 @@ export default function Tickets({ tickets, user, services, isArchive, initialTic
                     </div>
                     <div>
                       <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">INFORMACJE ZGŁOSZENIA</h3>
-                      <div className="font-bold text-[#111827] flex items-center gap-2 mb-2">
+                      <div className="font-bold text-[#111827] flex items-center gap-2 mb-1">
                         <i className="ph ph-user text-gray-400"></i> {currentTicket.reportedBy}
                       </div>
+                      {currentTicket.reporterPhone && (
+                        <div className="font-bold text-gray-600 flex items-center gap-2 mb-2 text-sm">
+                          <i className="ph ph-phone text-gray-400"></i> {currentTicket.reporterPhone}
+                        </div>
+                      )}
                       <div className="text-gray-500 text-sm mb-1">
                         Priorytet: <span className={currentTicket.isCritical ? "text-red-600 font-bold" : ""}>{currentTicket.isCritical ? "Wysoki" : "Standardowy"}</span>
                       </div>

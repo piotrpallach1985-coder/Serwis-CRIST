@@ -3,7 +3,7 @@ import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc } 
 import { db } from '../firebase';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
-export default function OperatorView({ user, onLogout, initialMachineId }) {
+export default function OperatorView({ user, onLogout, initialMachineId, onSwitchView }) {
   const [machines, setMachines] = useState([]);
   const [topicsList, setTopicsList] = useState([]);
   const [step, setStep] = useState('scan'); // 'scan', 'form', 'success'
@@ -29,6 +29,8 @@ export default function OperatorView({ user, onLogout, initialMachineId }) {
   const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
+  const [reporterName, setReporterName] = useState('');
+  const [reporterPhone, setReporterPhone] = useState('');
   const [isCritical, setIsCritical] = useState(false);
 
   // Pobieranie maszyn i tematów
@@ -119,8 +121,8 @@ export default function OperatorView({ user, onLogout, initialMachineId }) {
     if (selectedMachine.id === 'manual' && (!selectedMachine.name || !selectedMachine.name.trim())) {
       return alert('Podaj nazwę maszyny!');
     }
-    if (!topic || !description) {
-      return alert('Wypełnij temat i opis!');
+    if (!topic || !description || !reporterName.trim() || !reporterPhone.trim()) {
+      return alert('Wypełnij wszystkie wymagane pola (Imię, Telefon, Temat, Opis)!');
     }
 
     setLoading(true);
@@ -128,53 +130,50 @@ export default function OperatorView({ user, onLogout, initialMachineId }) {
     try {
       let finalMachineId = selectedMachine.id;
       
-      // Jeśli to nowa maszyna wpisana ręcznie, dodajmy ją do bazy maszyn na stałe!
-      if (selectedMachine.id === 'manual') {
-        const newMachineRef = doc(collection(db, "machines"));
+      if (finalMachineId === 'manual') {
+        const newMachineRef = doc(collection(db, 'machines'));
+        await setDoc(newMachineRef, {
+          name: selectedMachine.name,
+          department: 'Dodana z palca',
+          bay: '',
+          createdAt: new Date().toISOString()
+        });
         finalMachineId = newMachineRef.id;
-        // Zapis w tle (bez await)
-        setDoc(newMachineRef, {
-          name: selectedMachine.name.trim(),
-          department: selectedMachine.department || 'Wpisano ręcznie',
-          bay: selectedMachine.bay || ''
-        }).catch(err => console.error("Błąd w tle:", err));
       }
 
-      // 1. Zapis awarii w tle
-      const newTicketRef = doc(collection(db, "tickets"));
-      setDoc(newTicketRef, {
+      const ticketRef = doc(collection(db, 'tickets'));
+      await setDoc(ticketRef, {
         machineId: finalMachineId,
-        machineName: selectedMachine.name.trim(),
-        department: selectedMachine.department || 'Wpisano ręcznie',
+        machineName: selectedMachine.name,
+        department: selectedMachine.department || '',
         bay: selectedMachine.bay || '',
         topic,
         description,
         isCritical,
-        status: 1, // 1 = Zgłoszone
-        reportedBy: user.name,
-        assignedTo: '',
-        createdAt: serverTimestamp(),
-        closedAt: null,
-        history: [{
-          date: new Date().toISOString(),
-          user: user.name,
-          action: "Zgłoszenie awarii",
-          note: topic
+        reportedBy: reporterName.trim(),
+        reporterPhone: reporterPhone.trim(),
+        status: 'new',
+        createdAt: new Date().toISOString(),
+        updates: [{
+          timestamp: new Date().toISOString(),
+          status: 'new',
+          comment: 'Zgłoszenie awarii w systemie.',
+          author: reporterName.trim()
         }]
-      }).catch(err => console.error("Błąd zapisu zgłoszenia w tle:", err));
+      });
 
-      // 2. Zapis powiadomienia w tle
+      // Zapis powiadomienia w tle
       const newNotifRef = doc(collection(db, "notifications"));
       setDoc(newNotifRef, {
         title: isCritical ? "KRYTYCZNA AWARIA!" : "Nowe zgłoszenie awarii",
         message: `Maszyna: ${selectedMachine.name} - ${topic}`,
         isCritical: isCritical,
         read: false,
-        ticketId: newTicketRef.id,
+        ticketId: ticketRef.id,
         createdAt: serverTimestamp()
       }).catch(err => console.error("Błąd powiadomienia w tle:", err));
 
-      // Natychmiastowe przejście do ekranu sukcesu, nie czekamy na serwer
+      // Natychmiastowe przejście do ekranu sukcesu
       setStep('success');
     } catch (error) {
       console.error("Szczegóły błędu Firebase:", error);
@@ -209,12 +208,23 @@ export default function OperatorView({ user, onLogout, initialMachineId }) {
             Zgłoś Awarię
             <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></span>
           </h1>
-          <p className="text-sm text-blue-200">Operator: {user.name}</p>
         </div>
-        <button onClick={onLogout} className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded">
-          <i className="ph ph-sign-out text-xl"></i>
-          <span className="hidden sm:inline">Wyjdź</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onSwitchView && (
+            <button 
+              onClick={onSwitchView} 
+              className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-yellow-900 font-bold px-3 py-2 rounded transition-colors shadow-sm"
+              title="Wróć do Dyspozytorni"
+            >
+              <i className="ph ph-desktop text-xl"></i>
+              <span className="hidden sm:inline">Dyspozytornia</span>
+            </button>
+          )}
+          <button onClick={onLogout} className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
+            <i className="ph ph-sign-out text-xl"></i>
+            <span className="hidden sm:inline">Wyjdź</span>
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full mt-4">
@@ -291,7 +301,37 @@ export default function OperatorView({ user, onLogout, initialMachineId }) {
                 <button onClick={() => setStep('scan')} className="text-blue-600 text-sm hover:underline whitespace-nowrap">Zmień</button>
               )}
             </div>
+            
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-gray-100 pb-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Imię i Nazwisko Zgłaszającego <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={reporterName}
+                    onChange={e => setReporterName(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none"
+                    placeholder="np. Jan Kowalski"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Numer Telefonu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={reporterPhone}
+                    onChange={e => setReporterPhone(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none"
+                    placeholder="np. 500 600 700"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Co się stało? (Temat)</label>
                 {topicMode === 'select' ? (

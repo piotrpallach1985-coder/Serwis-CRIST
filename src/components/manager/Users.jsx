@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 export default function Users() {
   const [usersList, setUsersList] = useState([]);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('operator');
   const [loading, setLoading] = useState(false);
@@ -18,18 +19,20 @@ export default function Users() {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !name.trim()) return alert('Podaj e-mail i imię z nazwiskiem');
+    if (!email.trim() || !name.trim() || !password.trim()) return alert('Podaj e-mail, hasło i imię z nazwiskiem');
     
     setLoading(true);
     try {
       const newUserRef = doc(collection(db, 'users'));
       setDoc(newUserRef, {
         email: email.trim().toLowerCase(),
+        password: password.trim(),
         name: name.trim(),
         role: role
       }).catch(err => console.error(err));
       
       setEmail('');
+      setPassword('');
       setName('');
       setRole('operator');
     } catch (error) {
@@ -77,6 +80,17 @@ export default function Users() {
             />
           </div>
           <div className="flex-1 w-full">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Hasło</label>
+            <input 
+              type="text" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="np. trudnehaslo123"
+              required
+            />
+          </div>
+          <div className="flex-1 w-full">
             <label className="block text-sm font-medium text-gray-700 mb-1">Uprawnienia</label>
             <select
               value={role}
@@ -85,6 +99,7 @@ export default function Users() {
             >
               <option value="operator">Operator (Zgłaszający)</option>
               <option value="manager">Dyspozytor UT (Zarządzający)</option>
+              <option value="admin">Administrator (Pełen dostęp)</option>
             </select>
           </div>
           <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
@@ -106,6 +121,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4">Imię i Nazwisko</th>
                 <th className="px-6 py-4">E-mail (Login)</th>
+                <th className="px-6 py-4">Hasło</th>
                 <th className="px-6 py-4">Rola</th>
                 <th className="px-6 py-4 text-right">Akcje</th>
               </tr>
@@ -113,7 +129,7 @@ export default function Users() {
             <tbody className="divide-y divide-gray-100">
               {usersList.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="p-8 text-center text-gray-500">
+                  <td colSpan="5" className="p-8 text-center text-gray-500">
                     Brak użytkowników. Dodaj pierwszego powyżej.
                   </td>
                 </tr>
@@ -122,8 +138,11 @@ export default function Users() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-bold text-gray-800">{u.name}</td>
                     <td className="px-6 py-4 text-gray-600">{u.email}</td>
+                    <td className="px-6 py-4 text-gray-400 font-mono text-sm">{u.password || '---'}</td>
                     <td className="px-6 py-4">
-                      {u.role === 'manager' ? (
+                      {u.role === 'admin' ? (
+                        <span className="bg-yellow-100 text-yellow-800 font-bold px-2 py-1 rounded text-xs">Administrator</span>
+                      ) : u.role === 'manager' ? (
                         <span className="bg-purple-100 text-purple-800 font-bold px-2 py-1 rounded text-xs">Dyspozytor UT</span>
                       ) : (
                         <span className="bg-blue-100 text-blue-800 font-bold px-2 py-1 rounded text-xs">Operator</span>
