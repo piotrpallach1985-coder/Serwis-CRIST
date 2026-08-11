@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: './', // <--- TO MUSI BYĆ TUTAJ, POZA TABLICĄ PLUGINS
   plugins: [
-    base: './',
     react(),
     VitePWA({
       registerType: 'autoUpdate',
