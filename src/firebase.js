@@ -6,12 +6,13 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "TWOJ_API_KEY",
-  authDomain: "TWOJ_PROJEKT.firebaseapp.com",
-  projectId: "TWOJ_PROJEKT",
-  storageBucket: "TWOJ_PROJEKT.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyDhaAwJbcDNRp5wloQFweluHdAvbCiZ82U",
+  authDomain: "serwis-crist.firebaseapp.com",
+  databaseURL: "https://serwis-crist-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "serwis-crist",
+  storageBucket: "serwis-crist.firebasestorage.app",
+  messagingSenderId: "321327519677",
+  appId: "1:321327519677:web:107294ad94ad3eb45664d4"
 };
 
 const app = initializeApp(firebaseConfig);
