@@ -151,7 +151,13 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const relevantNotifications = notifications.filter(n => {
+    if (currentModule === 'tickets') return !!n.ticketId;
+    if (currentModule === 'planned_maintenance') return n.linkTo === 'planned_maintenance';
+    return true;
+  });
+
+  const unreadCount = relevantNotifications.filter(n => !n.read).length;
 
   let workItems = [];
   if (currentModule === 'tickets') {
@@ -330,10 +336,10 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
                   <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
                 </div>
                 <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                  {notifications.length === 0 ? (
+                  {relevantNotifications.length === 0 ? (
                     <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
                   ) : (
-                    notifications.map(n => (
+                    relevantNotifications.map(n => (
                       <div 
                         key={n.id} 
                         onClick={() => {
@@ -341,6 +347,9 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
                           if (n.ticketId) {
                             setGlobalTicketId(n.ticketId);
                             setActiveTab('tickets');
+                            setIsNotificationsOpen(false);
+                          } else if (n.linkTo === 'planned_maintenance') {
+                            setActiveTab('planned_maintenance');
                             setIsNotificationsOpen(false);
                           }
                         }}
