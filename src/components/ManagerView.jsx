@@ -315,64 +315,66 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
           </div>
 
           {/* DZWONECZEK POWIADOMIEŃ */}
-          <div className="relative">
-            <button 
-              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-              className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
-            >
-              <i className="ph ph-bell text-2xl"></i>
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
+          {currentModule !== 'master_data' && (
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+              >
+                <i className="ph ph-bell text-2xl"></i>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-            {/* Rozwijane okno powiadomień */}
-            {isNotificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-                <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
-                  <span className="font-bold text-sm">Powiadomienia systemowe</span>
-                  <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
-                </div>
-                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                  {relevantNotifications.length === 0 ? (
-                    <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
-                  ) : (
-                    relevantNotifications.map(n => (
-                      <div 
-                        key={n.id} 
-                        onClick={() => {
-                          markAsRead(n.id);
-                          if (n.ticketId) {
-                            setGlobalTicketId(n.ticketId);
-                            setActiveTab('tickets');
-                            setIsNotificationsOpen(false);
-                          } else if (n.linkTo === 'planned_maintenance') {
-                            setActiveTab('planned_maintenance');
-                            setIsNotificationsOpen(false);
-                          }
-                        }}
-                        className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.isCritical ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                          <i className={`ph ${n.isCritical ? 'ph-siren' : 'ph-info'} text-lg`}></i>
-                        </div>
-                        <div className="flex-1 text-xs">
-                          <div className="font-bold text-gray-800 mb-0.5">{n.title}</div>
-                          <div className="text-gray-600 leading-relaxed">{n.message}</div>
-                          <div className="text-[10px] text-gray-400 mt-1">
-                            {n.createdAt ? new Date(n.createdAt.toDate ? n.createdAt.toDate() : n.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : 'Przed chwilą'}
+              {/* Rozwijane okno powiadomień */}
+              {isNotificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
+                    <span className="font-bold text-sm">Powiadomienia systemowe</span>
+                    <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                    {relevantNotifications.length === 0 ? (
+                      <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
+                    ) : (
+                      relevantNotifications.map(n => (
+                        <div 
+                          key={n.id} 
+                          onClick={() => {
+                            markAsRead(n.id);
+                            if (n.ticketId) {
+                              setGlobalTicketId(n.ticketId);
+                              setActiveTab('tickets');
+                              setIsNotificationsOpen(false);
+                            } else if (n.linkTo === 'planned_maintenance') {
+                              setActiveTab('planned_maintenance');
+                              setIsNotificationsOpen(false);
+                            }
+                          }}
+                          className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.isCritical ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                            <i className={`ph ${n.isCritical ? 'ph-siren' : 'ph-info'} text-lg`}></i>
                           </div>
+                          <div className="flex-1 text-xs">
+                            <div className="font-bold text-gray-800 mb-0.5">{n.title}</div>
+                            <div className="text-gray-600 leading-relaxed">{n.message}</div>
+                            <div className="text-[10px] text-gray-400 mt-1">
+                              {n.createdAt ? new Date(n.createdAt.toDate ? n.createdAt.toDate() : n.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : 'Przed chwilą'}
+                            </div>
+                          </div>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
                         </div>
-                        {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gray-50">
