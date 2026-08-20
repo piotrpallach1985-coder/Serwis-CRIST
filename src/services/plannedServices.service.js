@@ -52,11 +52,15 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
     
     const now = new Date();
     
-    snapshot.docs.forEach(async (docSnap) => {
+    // Używamy dynamicznego importu lub zaimportowanego writeBatch, doc
+    const { writeBatch, doc, collection: firestoreCollection } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    let hasWrites = false;
+    
+    for (const docSnap of snapshot.docs) {
       const data = docSnap.data();
-      const id = docSnap.id;
       const machine = machinesMap[data.machineId];
-      if (!machine) return;
+      if (!machine) continue;
 
       let shouldAlert = false;
       let alertMessage = '';
@@ -87,19 +91,28 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
         }
 
         if (shouldAlert) {
-          // Wysyłamy powiadomienie i zaznaczamy, żeby nie spamować co odświeżenie
-          await createNotification({
+          // Wysyłamy powiadomienie do batcha
+          const newNotifRef = doc(firestoreCollection(db, 'notifications'));
+          batch.set(newNotifRef, {
             title: `Planowany Serwis: ${machine.name}`,
             message: alertMessage,
             isCritical: data.priority === 'Krytyczny',
             linkTo: 'planned_maintenance',
-            machineId: data.machineId
+            machineId: data.machineId,
+            createdAt: serverTimestamp(),
+            read: false
           });
           
-          await updateDoc(docSnap.ref, { notified: true });
+          // Aktualizujemy status dokumentu w batchu
+          batch.update(docSnap.ref, { notified: true });
+          hasWrites = true;
         }
       }
-    });
+    }
+    
+    if (hasWrites) {
+      await batch.commit();
+    }
   } catch (error) {
     console.error("Błąd przy sprawdzaniu terminów Serwisu Planowanego:", error);
   }

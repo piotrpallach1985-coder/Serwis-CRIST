@@ -34,6 +34,7 @@ export default function App() {
       localStorage.removeItem('appUser');
     }
     setUser(userData);
+    if (!userData) setUrlMachineId(null);
     
     // Update currentModule from URL after login
     const params = new URLSearchParams(window.location.search);
@@ -46,13 +47,18 @@ export default function App() {
     const machineParam = params.get('machine');
     if (machineParam) {
       setUrlMachineId(machineParam);
-      // Jeśli wejście z kodu QR, automatycznie zaloguj jako operator
+      // Jeśli wejście z kodu QR, ustaw moduł i zaloguj automatycznie
+      window.history.replaceState({ module: 'operator' }, '', `?module=operator&machine=${machineParam}`);
+      setCurrentModule('operator');
       handleSetUser({ name: 'Pracownik (QR)', role: 'operator' });
     }
   }, []);
 
   // Jeśli użytkownik nie jest zalogowany LUB jest zalogowany, ale nie wybrał modułu, pokaż portal (Login)
   if (!user || !currentModule) {
+    if (user && user.role === 'operator') {
+      setTimeout(() => handleSetUser(null), 0);
+    }
     return <Login onLogin={handleSetUser} currentUser={user} />;
   }
 

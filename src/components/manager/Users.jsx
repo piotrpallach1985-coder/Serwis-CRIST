@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function Users() {
@@ -10,6 +10,8 @@ export default function Users() {
   const [name, setName] = useState('');
   const [role, setRole] = useState('admin');
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [visiblePasswords, setVisiblePasswords] = useState({});
 
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -30,18 +32,25 @@ export default function Users() {
     
     setLoading(true);
     try {
-      const newUserRef = doc(collection(db, 'users'));
-      setDoc(newUserRef, {
+      const payload = {
         email: email.trim().toLowerCase(),
         password: password.trim(),
         name: name.trim(),
         role: role
-      }).catch(err => console.error(err));
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'users', editingId), payload);
+      } else {
+        const newUserRef = doc(collection(db, 'users'));
+        await setDoc(newUserRef, payload);
+      }
       
       setEmail('');
       setPassword('');
       setName('');
-      setRole('operator');
+      setRole('admin');
+      setEditingId(null);
     } catch (error) {
       console.error('Błąd dodawania użytkownika:', error);
       alert('Nie udało się dodać użytkownika.');
@@ -56,12 +65,25 @@ export default function Users() {
     }
   };
 
+  const togglePasswordVisibility = (id) => {
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleEdit = (u) => {
+    setEmail(u.email);
+    setPassword(u.password || '');
+    setName(u.name || '');
+    setRole(u.role || 'admin');
+    setEditingId(u.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <i className="ph ph-user-plus text-blue-600"></i>
-          Zarejestruj nowego użytkownika
+          {editingId ? 'Edytuj Użytkownika' : 'Zarejestruj nowego użytkownika'}
         </h2>
         <form onSubmit={handleAddUser} className="flex flex-col sm:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
@@ -110,9 +132,26 @@ export default function Users() {
               ))}
             </select>
           </div>
-          <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
-            {loading ? 'Dodawanie...' : 'Zapisz'}
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setEditingId(null);
+                  setEmail('');
+                  setPassword('');
+                  setName('');
+                  setRole('admin');
+                }}
+                className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded transition-colors"
+              >
+                Anuluj
+              </button>
+            )}
+            <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
+              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj')}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -146,7 +185,18 @@ export default function Users() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-bold text-gray-800">{u.name}</td>
                     <td className="px-6 py-4 text-gray-600">{u.email}</td>
-                    <td className="px-6 py-4 text-gray-400 font-mono text-sm">{u.password || '---'}</td>
+                    <td className="px-6 py-4 text-gray-800 font-mono text-sm flex items-center gap-2">
+                      {visiblePasswords[u.id] ? (u.password || '---') : '••••••••'}
+                      {u.password && (
+                        <button 
+                          onClick={() => togglePasswordVisibility(u.id)}
+                          className="text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                          title={visiblePasswords[u.id] ? "Ukryj hasło" : "Pokaż hasło"}
+                        >
+                          <i className={`ph ${visiblePasswords[u.id] ? 'ph-eye-slash' : 'ph-eye'} text-lg`}></i>
+                        </button>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
                         u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
@@ -156,14 +206,24 @@ export default function Users() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
+                    <div className="flex gap-2 justify-end">
+                      <button 
+                        onClick={() => handleEdit(u)}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
+                      >
+                        <i className="ph ph-pencil-simple"></i>
+                        Edytuj
+                      </button>
                       <button 
                         onClick={() => handleDelete(u.id)}
-                        className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
-                        title="Usuń dostęp"
+                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
+                        title="Usuń"
                       >
-                        <i className="ph ph-trash text-lg"></i>
+                        <i className="ph ph-trash"></i>
+                        Usuń
                       </button>
-                    </td>
+                    </div>
+                  </td>
                   </tr>
                 ))
               )}

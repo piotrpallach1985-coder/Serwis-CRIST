@@ -44,10 +44,11 @@ export default function Login({ onLogin, currentUser }) {
           setErrorMsg('Podano nieprawidłowe hasło.');
         } else {
           // Ustawiamy docelową zakładkę w URL aby ManagerView wiedziało, gdzie przekierować
-          if (loginModalTarget) {
+          if (loginModalTarget && loginModalTarget !== 'login_only') {
             window.history.replaceState({ module: loginModalTarget }, '', `?module=${loginModalTarget}`);
           }
-          onLogin({ name: userData.name, role: userData.role });
+          onLogin({ name: userData.name, role: userData.role, permissions: userData.permissions || [] });
+          setLoginModalTarget(null); // Close modal
         }
       }
     } catch (err) {
@@ -138,26 +139,75 @@ export default function Login({ onLogin, currentUser }) {
       </div>
 
       {/* Grid kafelków */}
-      <div className="w-full max-w-5xl animate-fade-in grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {tiles.map(tile => (
-          <div key={tile.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-between transition-transform hover:-translate-y-1 hover:shadow-md">
-            <div className="w-full flex flex-col items-center">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${tile.iconBg}`}>
-                <i className={`ph ${tile.icon} text-4xl`}></i>
-              </div>
-              <h2 className="text-xl font-bold mb-2 text-gray-800">{tile.title}</h2>
-              <p className="text-gray-500 text-sm mb-6 line-clamp-3">{tile.desc}</p>
+      {!currentUser ? (
+        <div className="w-full max-w-4xl animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div 
+            onClick={handleOperatorBypass}
+            className="cursor-pointer bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
+          >
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-yellow-50 text-yellow-500 animate-pulse">
+              <i className="ph-fill ph-warning text-5xl"></i>
             </div>
-            <button
-              onClick={tile.action}
-              className={`w-full ${tile.color} text-white font-bold text-sm py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2`}
-            >
-              Wejdź
-              <i className="ph ph-arrow-right font-bold"></i>
+            <h2 className="text-2xl font-bold mb-3 text-gray-800">Zgłoszenie Awarii</h2>
+            <p className="text-gray-500 text-base mb-6">Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.</p>
+            <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+              Zgłoś awarię <i className="ph ph-arrow-right font-bold"></i>
             </button>
           </div>
-        ))}
-      </div>
+
+          <div 
+            onClick={() => setLoginModalTarget('login_only')}
+            className="cursor-pointer bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
+          >
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-blue-50 text-blue-600">
+              <i className="ph-fill ph-gear text-5xl animate-[spin_4s_linear_infinite]"></i>
+            </div>
+            <h2 className="text-2xl font-bold mb-3 text-gray-800">Utrzymanie Ruchu</h2>
+            <p className="text-gray-500 text-base mb-6">Dostęp dla autoryzowanych pracowników działu Utrzymania Ruchu.</p>
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+              Zaloguj się <i className="ph ph-lock-key font-bold"></i>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="w-full max-w-5xl animate-fade-in">
+          <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="font-bold text-gray-800">
+              Zalogowano jako: <span className="text-blue-600">{currentUser.name}</span>
+            </div>
+            <button 
+              onClick={() => onLogin(null)} 
+              className="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            >
+              <i className="ph ph-sign-out"></i> Wyloguj
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tiles.filter(t => {
+              if (t.id === 'master_data' && currentUser.role !== 'admin') return false;
+              if (t.id === 'operator') return false; // Ukryte w widoku zalogowanym
+              return true;
+            }).map(tile => (
+              <div key={tile.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-between transition-transform hover:-translate-y-1 hover:shadow-md">
+                <div className="w-full flex flex-col items-center">
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${tile.iconBg}`}>
+                    <i className={`ph ${tile.icon} text-4xl`}></i>
+                  </div>
+                  <h2 className="text-xl font-bold mb-2 text-gray-800">{tile.title}</h2>
+                  <p className="text-gray-500 text-sm mb-6 line-clamp-3">{tile.desc}</p>
+                </div>
+                <button
+                  onClick={tile.action}
+                  className={`w-full ${tile.color} text-white font-bold text-sm py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2`}
+                >
+                  Wejdź
+                  <i className="ph ph-arrow-right font-bold"></i>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Modal logowania */}
       {loginModalTarget && (

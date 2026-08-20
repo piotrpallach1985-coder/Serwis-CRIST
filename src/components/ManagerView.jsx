@@ -49,7 +49,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    window.history.pushState({ tab: tabId, module: currentModule }, '', `?module=${currentModule}&tab=${tabId}`);
+    window.history.replaceState({ tab: tabId, module: currentModule }, '', `?module=${currentModule}&tab=${tabId}`);
   };
 
   // Stany na dane z chmury
@@ -60,8 +60,17 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
   const [roles, setRoles] = useState([]);
   const [regions, setRegions] = useState([]);
   const [archiveDelayDays, setArchiveDelayDays] = useState(14);
+  const [allowTicketDeletion, setAllowTicketDeletion] = useState(false);
   const [plannedWarningDays, setPlannedWarningDays] = useState(30);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+
+  const safeParseDate = (dateVal) => {
+    if (!dateVal) return null;
+    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
+    if (dateVal.seconds !== undefined) return new Date(dateVal.seconds * 1000);
+    const d = new Date(dateVal);
+    return isNaN(d.getTime()) ? null : d;
+  };
   
   // Stany dla powiadomień (dzwoneczek)
   const [notifications, setNotifications] = useState([]);
@@ -91,8 +100,35 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
       collection(db, 'notifications'), 
       orderBy('createdAt', 'desc')
     );
-    const unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
-      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubNotifications = onSnapshot(qNotifications, async (snapshot) => {
+      const now = new Date();
+      const notifs = [];
+      const docsToDelete = [];
+      
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const d = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        if (!isNaN(d.getTime()) && (now - d) / (1000 * 60 * 60 * 24) > 7) {
+          docsToDelete.push(docSnap.id);
+        } else {
+          notifs.push({ id: docSnap.id, ...data });
+        }
+      });
+      
+      setNotifications(notifs);
+      
+      if (docsToDelete.length > 0) {
+        try {
+          const { writeBatch, doc } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          docsToDelete.forEach(id => {
+            batch.delete(doc(db, 'notifications', id));
+          });
+          await batch.commit();
+        } catch (e) {
+          console.error('Błąd podczas usuwania starych powiadomień:', e);
+        }
+      }
     });
 
     const unsubRoles = onSnapshot(collection(db, 'roles'), (snapshot) => {
@@ -108,6 +144,9 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
         const data = docSnap.data();
         if (data.archiveDelayDays !== undefined) {
           setArchiveDelayDays(data.archiveDelayDays);
+        }
+        if (data.allowTicketDeletion !== undefined) {
+          setAllowTicketDeletion(data.allowTicketDeletion);
         }
         if (data.plannedWarningDays !== undefined) {
           setPlannedWarningDays(data.plannedWarningDays);
@@ -151,6 +190,22 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
     }
   };
 
+  const clearAllNotifications = async () => {
+    if (window.confirm("Czy na pewno chcesz usunąć wszystkie widoczne powiadomienia?")) {
+      try {
+        import('firebase/firestore').then(async ({ writeBatch, doc }) => {
+          const batch = writeBatch(db);
+          relevantNotifications.forEach(n => {
+            batch.delete(doc(db, 'notifications', n.id));
+          });
+          await batch.commit();
+        });
+      } catch (err) {
+        console.error("Błąd usuwania", err);
+      }
+    }
+  };
+
   const relevantNotifications = notifications.filter(n => {
     if (currentModule === 'tickets') return !!n.ticketId;
     if (currentModule === 'planned_maintenance') return n.linkTo === 'planned_maintenance';
@@ -165,7 +220,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
       { id: 'dashboard_tickets', label: 'Mapa Stoczni', icon: 'ph-map-trifold' },
       { id: 'tickets', label: 'Zgłoszenia Awarii', icon: 'ph-warning-circle' },
       { id: 'archive', label: 'Archiwum Awarii', icon: 'ph-archive' },
-      { id: 'kpi', label: 'Wskaźniki KPI', icon: 'ph-chart-line-up' }
+      { id: 'kpi', label: 'Analiza', icon: 'ph-chart-line-up' }
     ];
   } else if (currentModule === 'planned_maintenance') {
     workItems = [
@@ -288,13 +343,14 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
         <div className="p-6 bg-[#0f172a] min-w-[288px] border-t border-gray-800 space-y-2">
           <button 
             onClick={() => {
-              // Wróć do portalu (strony logowania) odświeżając stan
-              window.location.href = window.location.origin + window.location.pathname;
+              // Wróć do portalu
+              window.history.pushState({ module: '' }, '', window.location.pathname);
+              window.dispatchEvent(new PopStateEvent('popstate'));
             }}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-3 rounded-lg transition-colors shadow-sm mb-2"
           >
             <i className="ph ph-squares-four text-xl"></i>
-            Wróć do Portalu
+            Wróć do Panelu UR
           </button>
         </div>
       </aside>
@@ -363,7 +419,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
                             <div className="font-bold text-gray-800 mb-0.5">{n.title}</div>
                             <div className="text-gray-600 leading-relaxed">{n.message}</div>
                             <div className="text-[10px] text-gray-400 mt-1">
-                              {n.createdAt ? new Date(n.createdAt.toDate ? n.createdAt.toDate() : n.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : 'Przed chwilą'}
+                              {safeParseDate(n.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || 'Przed chwilą'}
                             </div>
                           </div>
                           {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
@@ -371,6 +427,16 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
                       ))
                     )}
                   </div>
+                  {relevantNotifications.length > 0 && (
+                    <div className="p-3 bg-gray-50 border-t border-gray-100 text-center">
+                      <button 
+                        onClick={clearAllNotifications}
+                        className="text-xs font-bold text-gray-500 hover:text-red-600 transition-colors"
+                      >
+                        Wyczyść historię powiadomień
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -410,18 +476,20 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
             if (t.isManuallyArchived) return false; // Ukryj w bieżących jeśli zarchiwizowano ręcznie
             if (t.status !== 5) return true;
             if (!t.closedAt) return true; // Jeśli brak daty zamknięcia, pokaż w bieżących
-            const closedDate = t.closedAt.toDate ? t.closedAt.toDate() : new Date(t.closedAt);
+            
+            const closedDate = safeParseDate(t.closedAt) || new Date(0);
             const daysDiff = (new Date() - closedDate) / (1000 * 60 * 60 * 24);
             return daysDiff < archiveDelayDays;
-          })} user={user} services={services} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
+          })} user={user} services={services} allowTicketDeletion={allowTicketDeletion} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
           {activeTab === 'archive' && <Tickets tickets={tickets.filter(t => {
             if (t.isManuallyArchived) return true; // Pokaż w archiwum jeśli zarchiwizowano ręcznie przez admina
             if (t.status !== 5) return false;
             if (!t.closedAt) return false;
-            const closedDate = t.closedAt.toDate ? t.closedAt.toDate() : new Date(t.closedAt);
+            
+            const closedDate = safeParseDate(t.closedAt) || new Date(0);
             const daysDiff = (new Date() - closedDate) / (1000 * 60 * 60 * 24);
             return daysDiff >= archiveDelayDays;
-          })} user={user} services={services} isArchive={true} />}
+          })} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
           {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} />}
           {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} />}
           {activeTab === 'kpi' && <KPIDashboard tickets={tickets} machines={machines} />}

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function Reporters() {
   const [reporters, setReporters] = useState([]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [position, setPosition] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -22,12 +24,20 @@ export default function Reporters() {
     setLoading(true);
     setError(null);
     try {
-      await addDoc(collection(db, 'reporters'), {
+      const payload = {
         name: name.trim(),
-        phone: phone.trim()
-      });
+        phone: phone.trim(),
+        position: position.trim()
+      };
+      if (editingId) {
+        await updateDoc(doc(db, 'reporters', editingId), payload);
+      } else {
+        await addDoc(collection(db, 'reporters'), payload);
+      }
       setName('');
       setPhone('');
+      setPosition('');
+      setEditingId(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -45,12 +55,20 @@ export default function Reporters() {
     }
   };
 
+  const handleEdit = (r) => {
+    setName(r.name);
+    setPhone(r.phone);
+    setPosition(r.position || '');
+    setEditingId(r.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <i className="ph ph-user-plus text-blue-600"></i>
-          Dodaj Nowego Pracownika do Bazy Zgłaszających
+          {editingId ? 'Edytuj Pracownika' : 'Dodaj Nowego Pracownika do Bazy Zgłaszających'}
         </h2>
         {error && <div className="mb-4 text-red-600 bg-red-50 p-3 rounded">{error}</div>}
         
@@ -63,6 +81,17 @@ export default function Reporters() {
               onChange={(e) => setName(e.target.value)} 
               className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none" 
               placeholder="np. Jan Kowalski" 
+              required
+            />
+          </div>
+          <div className="flex-1 w-full">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stanowisko</label>
+            <input 
+              type="text" 
+              value={position} 
+              onChange={(e) => setPosition(e.target.value)} 
+              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none" 
+              placeholder="np. Operator suwnicy" 
               required
             />
           </div>
@@ -89,13 +118,29 @@ export default function Reporters() {
               required
             />
           </div>
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-blue-400 text-white font-semibold py-2.5 px-6 rounded transition-colors whitespace-nowrap"
-          >
-            {loading ? 'Dodawanie...' : 'Dodaj pracownika'}
-          </button>
+          <div className="flex justify-end gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setEditingId(null);
+                  setName('');
+                  setPhone('');
+                  setPosition('');
+                }}
+                className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 px-6 rounded transition-colors whitespace-nowrap"
+              >
+                Anuluj
+              </button>
+            )}
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-blue-400 text-white font-semibold py-2.5 px-6 rounded transition-colors whitespace-nowrap"
+            >
+              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj pracownika')}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -109,6 +154,7 @@ export default function Reporters() {
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-sm">
                 <th className="p-4 border-b">Imię i Nazwisko</th>
+                <th className="p-4 border-b">Stanowisko</th>
                 <th className="p-4 border-b">Numer Telefonu</th>
                 <th className="p-4 border-b text-right">Akcje</th>
               </tr>
@@ -122,16 +168,26 @@ export default function Reporters() {
                 reporters.map(r => (
                   <tr key={r.id} className="border-b border-gray-100 hover:bg-blue-50 transition-colors">
                     <td className="p-4 font-semibold text-gray-800 text-base">{r.name}</td>
+                    <td className="p-4 text-gray-700">{r.position || '-'}</td>
                     <td className="p-4 font-mono text-gray-600">{r.phone}</td>
                     <td className="p-4 text-right">
-                      <button 
-                        onClick={() => handleDelete(r.id, r.name)}
-                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-2 px-4 rounded transition-colors inline-flex items-center gap-2"
-                        title="Usuń pracownika"
-                      >
-                        <i className="ph ph-trash"></i>
-                        Usuń
-                      </button>
+                      <div className="flex gap-2 justify-end">
+                        <button 
+                          onClick={() => handleEdit(r)}
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-2 px-4 rounded transition-colors inline-flex items-center gap-2"
+                        >
+                          <i className="ph ph-pencil-simple"></i>
+                          Edytuj
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(r.id, r.name)}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-2 px-4 rounded transition-colors inline-flex items-center gap-2"
+                          title="Usuń pracownika"
+                        >
+                          <i className="ph ph-trash"></i>
+                          Usuń
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

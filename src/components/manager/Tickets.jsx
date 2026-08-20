@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
 
-export default function Tickets({ tickets, machines = [], user, services, isArchive, initialTicketId, onClearTicketId, initialSearchQuery }) {
+export default function Tickets({ tickets, machines = [], user, services, isArchive, initialTicketId, onClearTicketId, initialSearchQuery, allowTicketDeletion }) {
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
   const [comment, setComment] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -13,7 +14,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   const [etr, setEtr] = useState('');
   const [filterMachine, setFilterMachine] = useState(initialSearchQuery || '');
   const [filterStatus, setFilterStatus] = useState('');
-  const [allowTicketDeletion, setAllowTicketDeletion] = useState(false);
+
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   
   const [toastConfig, setToastConfig] = useState({ message: '', type: 'success' });
@@ -58,14 +59,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     });
   };
 
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "general"), (snap) => {
-      if (snap.exists() && snap.data().allowTicketDeletion !== undefined) {
-        setAllowTicketDeletion(snap.data().allowTicketDeletion);
-      }
-    });
-    return () => unsub();
-  }, []);
+
 
   const handleDeleteTicket = (ticketId) => {
     setConfirmModalConfig({
@@ -138,10 +132,11 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     5: { label: 'Zakończone', color: 'bg-green-100 text-green-800 border-green-200' }
   };
 
+  // safeParseDate is now imported globally
   const calculateDuration = (createdAt, closedAt) => {
-    if (!createdAt) return 'Brak danych';
-    const start = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
-    const end = closedAt ? (closedAt.toDate ? closedAt.toDate() : new Date(closedAt)) : new Date();
+    const start = safeParseDate(createdAt);
+    const end = safeParseDate(closedAt) || new Date();
+    if (!start) return 'Brak danych';
     
     const diffMs = end - start;
     const diffMins = Math.floor(diffMs / 60000);
@@ -289,7 +284,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                         Priorytet: <span className={currentTicket.isCritical ? "text-red-600 font-bold" : ""}>{currentTicket.isCritical ? "Wysoki" : "Standardowy"}</span>
                       </div>
                       <div className="text-gray-500 text-sm">
-                        Zgłoszono: {currentTicket.createdAt?.toDate ? currentTicket.createdAt.toDate().toLocaleString('pl-PL') : new Date(currentTicket.createdAt).toLocaleString('pl-PL')}
+                        Zgłoszono: {safeParseDate(currentTicket.createdAt)?.toLocaleString('pl-PL') || 'Brak daty'}
                       </div>
                       {currentTicket.etr && (
                         <div className="text-orange-600 font-bold text-sm mt-2">
@@ -319,11 +314,12 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                 <div className="p-6 md:p-8 space-y-6 bg-gray-50/50">
                   
                   {/* POKAZYWANIE ZAMKNIĘTYCH KROKÓW (Historia Kroków) */}
-                  {currentTicket.history && [...currentTicket.history].reverse().map((entry, idx) => {
-                    const isVerification = entry.action.includes('Weryfikacja') && !entry.action.includes('Zgłoszenie awarii');
-                    const isAssignment = entry.action.includes('Przekazano do przypisania') || entry.action.includes('Wyboru Wykonawcy');
-                    const isStartWork = entry.action.includes('Rozpoczęto realizację');
-                    const isFinish = entry.action.includes('Zakończono');
+                  {Array.isArray(currentTicket.history) && [...currentTicket.history].reverse().map((entry, idx) => {
+                    const act = entry.action || '';
+                    const isVerification = act.includes('Weryfikacja') && !act.includes('Zgłoszenie awarii');
+                    const isAssignment = act.includes('Przekazano do przypisania') || act.includes('Wyboru Wykonawcy');
+                    const isStartWork = act.includes('Rozpoczęto realizację');
+                    const isFinish = act.includes('Zakończono');
                     
                     if (isVerification || isAssignment || isStartWork || isFinish) {
                       return (
@@ -334,13 +330,13 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                               {entry.action}
                             </span>
                             <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                              {new Date(entry.date).toLocaleString('pl-PL')}
+                              {safeParseDate(entry.date)?.toLocaleString('pl-PL') || 'Brak daty'}
                             </span>
                           </div>
                           <div className="text-xs text-gray-500 mb-2">Wykonał(a): <span className="font-bold text-gray-700">{entry.user}</span></div>
                           {entry.note && (
                             <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded italic border border-gray-100">
-                              Komentarz: "{entry.note}"
+                              Komentarz: &quot;{entry.note}&quot;
                             </div>
                           )}
                         </div>
@@ -517,7 +513,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                 </h4>
                 
                 <div className="relative border-l-2 border-gray-100 ml-3 space-y-8 pb-4">
-                  {currentTicket.history && [...currentTicket.history].reverse().map((entry, index) => (
+                  {Array.isArray(currentTicket.history) && [...currentTicket.history].reverse().map((entry, index) => (
                     <div key={index} className="relative pl-8">
                       {/* Punkt na osi */}
                       <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-[3px] border-[#111827]"></div>
@@ -526,13 +522,13 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-bold text-[#111827] text-sm">{entry.user || 'System'}</div>
                         <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                          {new Date(entry.date).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {safeParseDate(entry.date)?.toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || 'Brak daty'}
                         </div>
                       </div>
                       <div className="text-sm text-gray-600">{entry.action}</div>
                       {entry.note && (
                         <div className="mt-2 text-sm text-gray-500 bg-gray-50 p-3 rounded border border-gray-100 italic">
-                          "{entry.note}"
+                          &quot;{entry.note}&quot;
                         </div>
                       )}
                     </div>
@@ -549,8 +545,8 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
 
   // Sortowanie i filtrowanie
   const sortedTickets = [...tickets].sort((a, b) => {
-    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
-    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+    const timeA = safeParseDate(a.createdAt)?.getTime() || 0;
+    const timeB = safeParseDate(b.createdAt)?.getTime() || 0;
     return timeB - timeA;
   });
 
@@ -559,7 +555,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     const matchMachine = (t.machineName?.toLowerCase() || '').includes(searchStr) || 
                          (t.department?.toLowerCase() || '').includes(searchStr) ||
                          (t.regionName?.toLowerCase() || '').includes(searchStr);
-    const matchStatus = filterStatus ? t.status.toString() === filterStatus : true;
+    const matchStatus = filterStatus ? String(t.status) === filterStatus : true;
     return matchMachine && matchStatus;
   });
 
@@ -568,7 +564,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   const criticalTickets = activeTickets.filter(t => t.isCritical);
   const completedToday = tickets.filter(t => {
     if (t.status !== 5 || !t.closedAt) return false;
-    const closedDate = t.closedAt.toDate ? t.closedAt.toDate() : new Date(t.closedAt);
+    const closedDate = safeParseDate(t.closedAt) || new Date(0);
     const today = new Date();
     return closedDate.toDateString() === today.toDateString();
   });
@@ -762,10 +758,10 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                     {visibleCols.date && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-gray-800">
-                          {ticket.createdAt?.toDate ? ticket.createdAt.toDate().toLocaleDateString('pl-PL') : new Date(ticket.createdAt).toLocaleDateString('pl-PL')}
+                          {safeParseDate(ticket.createdAt)?.toLocaleDateString('pl-PL') || '-'}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {ticket.createdAt?.toDate ? ticket.createdAt.toDate().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : new Date(ticket.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                          {safeParseDate(ticket.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || '-'}
                         </div>
                       </td>
                     )}

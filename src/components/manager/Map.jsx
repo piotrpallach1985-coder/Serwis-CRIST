@@ -89,7 +89,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
       } else if (modeType === 'planned_maintenance') {
         // Find machines in this region that are NOT pinned individually
         const regionMachineIds = machines.filter(m => m.regionId === region.id && !pinnedMachineIds.has(m.id)).map(m => m.id);
-        const activePlans = plannedServices.filter(p => regionMachineIds.includes(p.machineId) && p.status === 'pending');
+        const activePlans = plannedServices.filter(p => regionMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
         
         activePlans.forEach(p => {
           let isOverdue = false;
@@ -120,8 +120,9 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
               }
             }
           }
-          if (isOverdue) status = 'critical';
-          else if (status !== 'critical' && isWarning) status = 'warning';
+          if (p.status === 'in_progress') status = 'in_progress';
+            else if (isOverdue && status !== 'in_progress') status = 'critical';
+            else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
         });
         count = activePlans.length;
       }
@@ -152,7 +153,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
         }
         count = activeTickets.length;
       } else if (modeType === 'planned_maintenance') {
-        const activePlans = plannedServices.filter(p => p.machineId === machine.id && p.status === 'pending');
+        const activePlans = plannedServices.filter(p => p.machineId === machine.id && (p.status === 'pending' || p.status === 'in_progress'));
         activePlans.forEach(p => {
           let isOverdue = false;
           let isWarning = false;
@@ -174,8 +175,9 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
               if ((p.targetWorkHours - machine.currentWorkHours) <= rbgThreshold) isWarning = true;
             }
           }
-          if (isOverdue) status = 'critical';
-          else if (status !== 'critical' && isWarning) status = 'warning';
+          if (p.status === 'in_progress') status = 'in_progress';
+            else if (isOverdue && status !== 'in_progress') status = 'critical';
+            else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
         });
         count = activePlans.length;
       }
@@ -477,12 +479,17 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                   let bgColor = 'bg-emerald-500';
                   let ringColor = 'ring-emerald-500/40';
                   let isCritical = false;
+                    let isInProgress = false;
 
                   if (pin.status === 'critical') {
                     bgColor = 'bg-red-500';
                     ringColor = 'ring-red-500/50';
                     isCritical = true;
-                  } else if (pin.status === 'warning') {
+                  } else if (pin.status === 'in_progress') {
+                      bgColor = 'bg-blue-500';
+                      ringColor = 'ring-blue-500/50';
+                      isInProgress = true;
+                    } else if (pin.status === 'warning') {
                     bgColor = 'bg-amber-500';
                     ringColor = 'ring-amber-500/40';
                   }
@@ -537,6 +544,9 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                       {isCritical && !isDraggingThis && (
                         <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75 pointer-events-none scale-[2.5]"></div>
                       )}
+                      {isInProgress && !isDraggingThis && (
+                        <div className="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-75 pointer-events-none scale-[2.5]"></div>
+                      )}
                       
                       {/* Zwykła, mała kropka */}
                       <div className={`
@@ -574,7 +584,9 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                               <span className="text-slate-400">Stan:</span>
                               {pin.status === 'critical' ? (
                                 <span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>
-                              ) : pin.status === 'warning' ? (
+                              ) : pin.status === 'in_progress' ? (
+                                  <span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>
+                                ) : pin.status === 'warning' ? (
                                 <span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>
                               ) : (
                                 <span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>
@@ -616,7 +628,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
 
           {/* Przyciski Narzędzi i Widoku (umieszczone na mapie, napis usunięty) */}
           <div className="absolute top-4 left-4 z-30 flex flex-wrap gap-2">
-            {user?.role === 'admin' && (
+            { (user?.role === 'admin' || user?.permissions?.includes('edit_map')) && (
               <>
                 <button 
                   onClick={() => setMode('view')} 

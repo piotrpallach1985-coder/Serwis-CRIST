@@ -66,7 +66,7 @@ export default function Settings() {
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-5">
             <h3 className="font-bold text-blue-900 mb-2">Automatyczna Archiwizacja</h3>
             <p className="text-sm text-blue-800 mb-4">
-              Zgłoszenia ze statusem "Zakończono" będą wyświetlane w Rejestrze Awarii przez określoną liczbę dni. 
+              Zgłoszenia ze statusem &quot;Zakończono&quot; będą wyświetlane w Rejestrze Awarii przez określoną liczbę dni. 
               Po tym czasie znikną z głównej tabeli i będą dostępne tylko w Archiwum Zgłoszeń.
             </p>
             <div>

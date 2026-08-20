@@ -3,10 +3,13 @@ import { collection, onSnapshot, query, orderBy, arrayUnion } from 'firebase/fir
 import { db } from '../../firebase';
 import { addPlannedService, updatePlannedService, deletePlannedService, markServiceCompleted } from '../../services/plannedServices.service';
 import { updateMachineWorkHours } from '../../services/machines.service';
+import ServiceCalendar from './ServiceCalendar';
+import { safeParseDate } from '../../utils/dateHelpers';
 
 export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false }) {
   const [services, setServices] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState(null);
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,9 +62,13 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
   const getMachine = (id) => machines.find(m => m.id === id);
   const getMachineName = (id) => getMachine(id)?.name || 'Nieznana maszyna';
-  const getMachineRegionName = (regionId) => regions.find(r => r.id === regionId)?.name || regionId || '-';
+  const getMachineRegionName = (regionId) => {
+    if (!regionId) return '-';
+    const found = regions.find(r => r.id === regionId || r.name === regionId);
+    return found ? found.name : regionId;
+  };
 
-  // Logika Filtrowania
+  // Logika Filtrówania
   const filteredServices = useMemo(() => {
     const now = new Date();
     const future30 = new Date(); future30.setDate(now.getDate() + 30);
@@ -83,19 +90,19 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       // Filtr Maszyna
       if (filterMachine && srv.machineId !== filterMachine) return false;
 
-      // Filtr Czasu (tylko pending bierze udzial w czasie)
+      // Filtrów czasie)
       if (filterTime !== 'all' && !isArchive) {
         let isWithinTime = false;
         
         if (srv.nextDate) {
-          const nDate = srv.nextDate.toDate ? srv.nextDate.toDate() : new Date(srv.nextDate);
+          const nDate = safeParseDate(srv.nextDate);
           if (filterTime === '30' && nDate <= future30) isWithinTime = true;
           if (filterTime === '90' && nDate <= future90) isWithinTime = true;
         }
         
         if (srv.targetWorkHours && machine) {
           const rbgThreshold = (filterTime === '30' ? 30 : 90) * 8;
-          if ((srv.targetWorkHours - machine.currentWorkHours) <= rbgThreshold) {
+          if ((srv.targetWorkHours) <= rbgThreshold) {
             isWithinTime = true;
           }
         }
@@ -129,13 +136,14 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
   const getStatusColor = (srv, machine) => {
     if (srv.status === 'completed') return 'bg-emerald-100 text-emerald-700'; // Jak w awariach "Zakończone"
+    if (srv.status === 'in_progress') return 'bg-purple-100 text-purple-700'; // W trakcie
     
     let isOverdue = false;
     let isWarning = false;
     const now = new Date();
 
     if (srv.nextDate) {
-      const nDate = srv.nextDate.toDate ? srv.nextDate.toDate() : new Date(srv.nextDate);
+      const nDate = safeParseDate(srv.nextDate);
       if (nDate < now) isOverdue = true;
       else {
         const diffDays = Math.ceil(Math.abs(nDate - now) / (1000 * 60 * 60 * 24));
@@ -143,9 +151,9 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       }
     }
     if (srv.targetWorkHours && machine) {
-      if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
+      if (machine.currentWorkHours) isOverdue = true;
       else {
-        if ((srv.targetWorkHours - machine.currentWorkHours) <= plannedWarningDays * 8) isWarning = true;
+        if ((srv.targetWorkHours) <= plannedWarningDays * 8) isWarning = true;
       }
     }
 
@@ -178,7 +186,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     setPriority(srv.priority || 'NieKrytyczny');
     setTriggerType(srv.triggerType || 'calendar');
     setCalendarIntervalDays(srv.calendarIntervalDays || 30);
-    setNextDate(srv.nextDate ? new Date(srv.nextDate.toDate ? srv.nextDate.toDate() : srv.nextDate).toISOString().slice(0,10) : '');
+    setNextDate(srv.nextDate ? safeParseDate(srv.nextDate).toISOString().slice(0,10) : '');
     setHoursInterval(srv.hoursInterval || 500);
     setTargetWorkHours(srv.targetWorkHours || '');
     setEstimatedDowntimeHours(srv.estimatedDowntimeHours || 4);
@@ -245,6 +253,29 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     } catch (err) {
       console.error(err);
       alert('Błąd aktualizacji roboczogodzin');
+    }
+  };
+
+  const handleSetInProgress = async (srv) => {
+    if (confirm('Czy na pewno chcesz oznaczyć ten serwis jako "W trakcie"?')) {
+      const historyEntry = {
+        date: new Date().toISOString(),
+        user: user?.name || 'System',
+        action: 'Zmieniono status na: W trakcie',
+        note: ''
+      };
+      
+      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
+      
+      try {
+        await updatePlannedService(srv.id, {
+          status: 'in_progress',
+          history: newHistory
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Błąd aktualizacji statusu');
+      }
     }
   };
 
@@ -358,8 +389,14 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                 </div>
 
                 <div className="flex flex-wrap gap-4 pt-6 border-t border-slate-200">
+                  {!isCompleted && srv.status !== 'in_progress' && (
+                    <button onClick={() => handleSetInProgress(srv)} className="flex-1 min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                      <i className="ph ph-play-circle text-xl"></i>
+                      W trakcie
+                    </button>
+                  )}
                   {!isCompleted && (
-                    <button onClick={() => setCompletionModal(srv)} className="flex-1 min-w-[200px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                    <button onClick={() => setCompletionModal(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
                       <i className="ph ph-check-circle text-xl"></i>
                       Zakończ Serwis
                     </button>
@@ -384,7 +421,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
           <div className="w-full lg:w-1/3">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h4 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2">
-                <i className="ph ph-clock-counter-clockwise text-lg"></i> HISTORIA ZDARZEŃ
+                <i className="ph ph-clock-counter-clockwise text-lg"></i> HISTORIA ZDARZEĹ
               </h4>
               
               <div className="relative border-l-2 border-slate-100 ml-3 space-y-8 pb-4">
@@ -400,13 +437,13 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <div className="text-sm text-slate-600 font-medium">{entry.action}</div>
                     {entry.note && (
                       <div className="mt-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
-                        "{entry.note}"
+                        &quot;{entry.note}&quot;
                       </div>
                     )}
                   </div>
                 ))}
                 {(!srv.history || srv.history.length === 0) && (
-                  <div className="text-sm text-slate-400 italic pl-6">Brak historii zdarzeń.</div>
+                  <div className="text-sm text-slate-400 italic pl-6">Brak historii zdarze�ń.</div>
                 )}
               </div>
             </div>
@@ -537,7 +574,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <option value="LOTO">LOTO (Całkowicie odłączona, Lockout/Tagout)</option>
                     <option value="Wyłączona">Wyłączona, ale zasilanie doprowadzone</option>
                     <option value="Ruch częściowy">Dopuszczony ruch częściowy (tryb serwisowy)</option>
-                    <option value="Bez wpływu">Maszyna może pracować normalnie</option>
+                    <option value="Bez wpływu">Maszyna moĹĽe pracować normalnie</option>
                   </select>
                 </div>
               </div>
@@ -553,7 +590,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   }
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
+    <div className="space-y-6 flex flex-col">
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200 shrink-0">
         <div>
@@ -590,7 +627,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
         <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Wszystkie Rejony</option>
-          {regionsInUse.map(r => <option key={r} value={r}>{r}</option>)}
+          {regions.map(r => <option key={r.id || r.name} value={r.id || r.name}>{r.name}</option>)}
         </select>
 
         <select value={filterMachine} onChange={(e) => setFilterMachine(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500">
@@ -600,7 +637,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
         {(filterTime !== 'all' || filterRegion || filterMachine) && (
           <button onClick={clearFilters} className="text-sm text-red-600 font-bold px-3 py-2 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1">
-            <i className="ph ph-x"></i> Wyczyść filtr
+            <i className="ph ph-x"></i> Wyczyść filtry
           </button>
         )}
 
@@ -622,100 +659,184 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         </div>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-sm text-left">
-            <thead className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider bg-white border-b-2 border-slate-100 sticky top-0 z-10">
-              <tr>
-                {columns.name && <th className="px-3 sm:px-6 py-4">Typ Serwisu</th>}
-                {columns.machine && <th className="px-3 sm:px-6 py-4">Maszyna</th>}
-                {columns.region && <th className="px-3 sm:px-6 py-4">Rejon</th>}
-                {columns.nextDate && <th className="px-3 sm:px-6 py-4">Termin</th>}
-                {columns.rbg && <th className="px-3 sm:px-6 py-4">Przelot/Inf.</th>}
-                {columns.priority && <th className="px-3 sm:px-6 py-4">Priorytet</th>}
-                {columns.status && <th className="px-3 sm:px-6 py-4">Status</th>}
-                {columns.actions && <th className="px-3 sm:px-6 py-4 text-right">Szczegóły</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col">
+        {/* Pasek narzędzi i filtry */}
+        <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 font-bold text-sm rounded-lg whitespace-nowrap transition-colors ${viewMode === 'list' ? 'bg-[#111827] text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              <i className="ph ph-list-dashes mr-2"></i> Lista Zadań
+            </button>
+            <button 
+              onClick={() => setViewMode('calendar')}
+              className={`px-4 py-2 font-bold text-sm rounded-lg whitespace-nowrap transition-colors ${viewMode === 'calendar' ? 'bg-[#111827] text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              <i className="ph ph-calendar-blank mr-2"></i> Kalendarz
+            </button>
+            
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto flex-wrap">
+            {/* Filtry przeniesione wyżej, tu zostawiamy puste miejsce na przyszłość */}
+          </div>
+        </div>
+
+        {viewMode === 'calendar' ? (
+          <div className="p-2 sm:p-4">
+            <ServiceCalendar services={filteredServices} machines={machines} onSelectService={setSelectedServiceId} />
+          </div>
+        ) : (
+          <div className="flex-1">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-white border-b-2 border-slate-100 sticky top-0 z-10">
+                  <tr>
+                    {columns.name && <th className="px-6 py-4">Typ Serwisu</th>}
+                    {columns.machine && <th className="px-6 py-4">Maszyna</th>}
+                    {columns.region && <th className="px-6 py-4">Rejon</th>}
+                    {columns.nextDate && <th className="px-6 py-4">Termin</th>}
+                    {columns.rbg && <th className="px-6 py-4">Termin (RBG)</th>}
+                    {columns.priority && <th className="px-6 py-4">Priorytet</th>}
+                    {columns.status && <th className="px-6 py-4">Status</th>}
+                    {columns.actions && <th className="px-6 py-4 text-right">Szczegóły</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredServices.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="px-4 py-8 text-center text-gray-400">Brak serwisów pasujących do kryteriów.</td>
+                    </tr>
+                  ) : filteredServices.map(srv => {
+                    const machine = getMachine(srv.machineId);
+                    const isCompleted = srv.status === 'completed';
+                    const rowColor = getStatusColor(srv, machine);
+
+                    return (
+                      <tr key={srv.id} className={`hover:bg-slate-50 transition-colors group ${isCompleted ? 'opacity-70' : ''}`}>
+                        {columns.name && (
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-800 text-sm">{srv.name}</div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Status maszyny: <span className="text-slate-600">{srv.machineStatus}</span></div>
+                          </td>
+                        )}
+                        {columns.machine && (
+                          <td className="px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || 'Nieznana'}</td>
+                        )}
+                        {columns.region && (
+                          <td className="px-6 py-4 font-bold text-slate-600 text-sm">{getMachineRegionName(machine?.regionId)}</td>
+                        )}
+                        {columns.nextDate && (
+                          <td className="px-6 py-4">
+                            {srv.triggerType === 'calendar' || srv.triggerType === 'mixed' ? (
+                              <div className="text-sm">
+                                <div className="font-bold text-slate-800">{srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString() : '-'}</div>
+                                <div className="text-[10px] font-bold text-slate-400 mt-0.5">CO {srv.calendarIntervalDays} DNI</div>
+                              </div>
+                            ) : <span className="text-slate-300">-</span>}
+                          </td>
+                        )}
+                        {columns.rbg && (
+                          <td className="px-6 py-4">
+                            {srv.triggerType === 'hours' || srv.triggerType === 'mixed' ? (
+                              <div className="text-sm">
+                                <div className="font-bold text-slate-800">Cel: <span className="font-mono">{srv.targetWorkHours}</span></div>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className="text-[10px] font-bold text-slate-400">OBECNIE: <span className="font-mono">{machine?.currentWorkHours || 0}</span></span>
+                                  <button onClick={() => { setRbgUpdateModal(machine); setNewRbgValue(machine?.currentWorkHours || 0); }} className="text-blue-500 hover:text-blue-700 ml-1"><i className="ph ph-pencil-simple"></i></button>
+                                </div>
+                              </div>
+                            ) : <span className="text-slate-300">-</span>}
+                          </td>
+                        )}
+                        {columns.priority && (
+                          <td className="px-6 py-4">
+                            {srv.priority === 'Krytyczny' ? <span className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border border-red-100 flex inline-flex items-center gap-1 w-max"><i className="ph ph-warning"></i> KRYTYCZNE</span> : <span className="text-slate-400 text-xs font-bold uppercase">Standard</span>}
+                          </td>
+                        )}
+                        {columns.status && (
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${rowColor}`}>
+                              {isCompleted ? 'Zakończone' : srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
+                            </span>
+                          </td>
+                        )}
+                        {columns.actions && (
+                          <td className="px-6 py-4 text-right">
+                            <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 p-2 rounded shadow-sm transition-colors">
+                              <i className="ph ph-arrow-right text-lg"></i>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="md:hidden flex flex-col gap-4 mt-2 p-2">
               {filteredServices.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-gray-400">Brak serwisów pasujących do kryteriów.</td>
-                </tr>
+                <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak serwisów pasujących do kryteriów.</div>
               ) : filteredServices.map(srv => {
                 const machine = getMachine(srv.machineId);
                 const isCompleted = srv.status === 'completed';
                 const rowColor = getStatusColor(srv, machine);
 
                 return (
-                  <tr key={srv.id} className={`hover:bg-slate-50 transition-colors group ${isCompleted ? 'opacity-70' : ''}`}>
-                    {columns.name && (
-                      <td className="px-3 sm:px-6 py-4">
-                        <div className="font-bold text-slate-800 text-sm">{srv.name}</div>
-                        <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">Status maszyny: <span className="text-slate-600">{srv.machineStatus}</span></div>
-                      </td>
-                    )}
-                    {columns.machine && (
-                      <td className="px-3 sm:px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || 'Nieznana'}</td>
-                    )}
-                    {columns.region && (
-                      <td className="px-3 sm:px-6 py-4 font-bold text-slate-600 text-sm">{getMachineRegionName(machine?.regionId)}</td>
-                    )}
-                    {columns.nextDate && (
-                      <td className="px-3 sm:px-6 py-4">
-                        {srv.triggerType === 'calendar' || srv.triggerType === 'mixed' ? (
-                          <div className="text-sm">
-                            <div className="font-bold text-slate-800">{srv.nextDate ? new Date(srv.nextDate.toDate ? srv.nextDate.toDate() : srv.nextDate).toLocaleDateString() : '-'}</div>
-                            <div className="text-[10px] font-bold text-slate-400 mt-0.5">CO {srv.calendarIntervalDays} DNI</div>
-                          </div>
-                        ) : <span className="text-slate-300">-</span>}
-                      </td>
-                    )}
-                    {columns.rbg && (
-                      <td className="px-3 sm:px-6 py-4">
-                        {srv.triggerType === 'hours' || srv.triggerType === 'mixed' ? (
-                          <div className="text-sm">
-                            <div className="font-bold text-slate-800">Cel: <span className="font-mono">{srv.targetWorkHours}</span></div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className="text-[10px] font-bold text-slate-400">OBECNIE: <span className="font-mono">{machine?.currentWorkHours || 0}</span></span>
-                              <button onClick={() => { setRbgUpdateModal(machine); setNewRbgValue(machine?.currentWorkHours || 0); }} className="text-blue-500 hover:text-blue-700 ml-1"><i className="ph ph-pencil-simple"></i></button>
-                            </div>
-                          </div>
-                        ) : <span className="text-slate-300">-</span>}
-                      </td>
-                    )}
-                    {columns.priority && (
-                      <td className="px-3 sm:px-6 py-4">
-                        {srv.priority === 'Krytyczny' ? <span className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border border-red-100 flex inline-flex items-center gap-1 w-max"><i className="ph ph-warning"></i> KRYTYCZNE</span> : <span className="text-slate-400 text-xs font-bold uppercase">Standard</span>}
-                      </td>
-                    )}
-                    {columns.status && (
-                      <td className="px-3 sm:px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider ${rowColor}`}>
-                          {isCompleted ? 'Zakończone' : 'Oczekuje'}
-                        </span>
-                      </td>
-                    )}
-                    {columns.actions && (
-                      <td className="px-3 sm:px-6 py-4 text-right">
-                        <button 
-                          onClick={() => setSelectedServiceId(srv.id)}
-                          className="px-4 py-1.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center justify-between w-full sm:w-auto"
-                        >
-                          Szczegóły <i className="ph ph-caret-right ml-2 text-slate-400"></i>
-                        </button>
-                      </td>
-                    )}
-                  </tr>
+                  <div key={srv.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col relative">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="pr-20">
+                        <h4 className="font-bold text-slate-800 text-[15px]">{srv.name}</h4>
+                        <div className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{getMachineRegionName(machine?.regionId)}</div>
+                      </div>
+                      <span className={`absolute top-4 right-4 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider ${rowColor}`}>
+                        {isCompleted ? 'Zakończone' : srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
+                      </span>
+                    </div>
+                    
+                    <div className="text-sm text-slate-600 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      <div className="font-bold text-slate-700 mb-1 flex items-center gap-2">
+                        <i className="ph ph-engine text-slate-400 text-base"></i>
+                        {machine?.name || 'Nieznana maszyna'}
+                      </div>
+                      {srv.priority === 'Krytyczny' && (
+                        <div className="mt-2 flex items-center gap-1 text-[10px] font-black text-red-600 uppercase tracking-wider bg-red-50 w-max px-2 py-1 rounded border border-red-100"><i className="ph ph-warning"></i> KRYTYCZNY</div>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-between items-end pt-3 border-t border-slate-100">
+                      <div className="flex flex-col gap-1">
+                        {(srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <i className="ph ph-calendar-blank text-slate-400"></i>
+                            {srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString() : '-'}
+                          </span>
+                        )}
+                        {(srv.triggerType === 'hours' || srv.triggerType === 'mixed') && (
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <i className="ph ph-hourglass text-slate-400"></i>
+                            Cel: {srv.targetWorkHours} <span className="text-slate-400 font-normal">({machine?.currentWorkHours || 0})</span>
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => setSelectedServiceId(srv.id)} className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm">
+                        Szczegóły
+                        <i className="ph ph-arrow-right text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Aktualizacja RBG Modal */}
+      {/* Modal - Dodaj / Edytuj */}
       {rbgUpdateModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleUpdateRbg} className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-scale-in">
@@ -838,7 +959,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                   <option value="LOTO">LOTO (Całkowicie odłączona, Lockout/Tagout)</option>
                   <option value="Wyłączona">Wyłączona, ale zasilanie doprowadzone</option>
                   <option value="Ruch częściowy">Dopuszczony ruch częściowy (tryb serwisowy)</option>
-                  <option value="Bez wpływu">Maszyna może pracować normalnie</option>
+                  <option value="Bez wpływu">Maszyna moĹĽe pracować normalnie</option>
                 </select>
               </div>
             </div>
@@ -852,3 +973,25 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

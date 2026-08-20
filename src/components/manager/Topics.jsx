@@ -6,6 +6,7 @@ export default function Topics() {
   const [topics, setTopics] = useState([]);
   const [newTopic, setNewTopic] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'topics'), (snapshot) => {
@@ -20,11 +21,18 @@ export default function Topics() {
     
     setLoading(true);
     try {
-      const newTopicRef = doc(collection(db, 'topics'));
-      setDoc(newTopicRef, {
-        text: newTopic.trim(),
-      }).catch(err => console.error(err));
+      if (editingId) {
+        import('firebase/firestore').then(({ updateDoc }) => {
+          updateDoc(doc(db, 'topics', editingId), { text: newTopic.trim() });
+        });
+      } else {
+        const newTopicRef = doc(collection(db, 'topics'));
+        setDoc(newTopicRef, {
+          text: newTopic.trim(),
+        }).catch(err => console.error(err));
+      }
       setNewTopic('');
+      setEditingId(null);
     } catch (error) {
       console.error('Błąd dodawania tematu:', error);
       alert('Nie udało się dodać tematu.');
@@ -37,6 +45,12 @@ export default function Topics() {
     if (window.confirm('Czy na pewno chcesz usunąć ten temat z listy podpowiedzi?')) {
       await deleteDoc(doc(db, 'topics', id));
     }
+  };
+
+  const handleEdit = (t) => {
+    setNewTopic(t.text);
+    setEditingId(t.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Dodajemy domyślne tematy, jeśli baza jest zupełnie pusta
@@ -60,7 +74,7 @@ export default function Topics() {
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <i className="ph ph-plus-circle text-blue-600"></i>
-          Dodaj nowy temat do podpowiedzi
+          {editingId ? 'Edytuj temat podpowiedzi' : 'Dodaj nowy temat do podpowiedzi'}
         </h2>
         <form onSubmit={handleAddTopic} className="flex flex-col sm:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
@@ -73,9 +87,20 @@ export default function Topics() {
               placeholder="np. Przepalona żarówka"
             />
           </div>
-          <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
-            {loading ? 'Dodawanie...' : 'Dodaj temat'}
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={() => { setEditingId(null); setNewTopic(''); }}
+                className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded transition-colors"
+              >
+                Anuluj
+              </button>
+            )}
+            <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
+              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz' : 'Dodaj temat')}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -95,13 +120,21 @@ export default function Topics() {
             topics.map(t => (
               <li key={t.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
                 <span className="font-medium text-gray-800">{t.text}</span>
-                <button 
-                  onClick={() => handleDelete(t.id)}
-                  className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
-                  title="Usuń"
-                >
-                  <i className="ph ph-trash text-lg"></i>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleEdit(t)}
+                    className="text-blue-500 hover:bg-blue-50 px-3 py-1.5 rounded transition-colors font-medium text-sm"
+                  >
+                    Edytuj
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(t.id)}
+                    className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
+                    title="Usuń"
+                  >
+                    <i className="ph ph-trash text-lg"></i>
+                  </button>
+                </div>
               </li>
             ))
           )}

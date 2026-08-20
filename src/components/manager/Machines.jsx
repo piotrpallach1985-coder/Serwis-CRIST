@@ -11,7 +11,12 @@ export default function Machines() {
   const [name, setName] = useState('');
   const [bay, setBay] = useState('');
   const [regionId, setRegionId] = useState('');
+  const [internalId, setInternalId] = useState('');
+  const [additionalDescription, setAdditionalDescription] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRegion, setFilterRegion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [qrModalMachine, setQrModalMachine] = useState(null);
 
   const [toastConfig, setToastConfig] = useState({ message: '', type: 'success' });
@@ -39,28 +44,52 @@ export default function Machines() {
     };
   }, []);
 
-  const handleAddMachine = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !bay.trim() || !regionId) {
-      return showToast('Proszę wypełnić wszystkie pola.', 'error');
+    if (!name.trim() || !regionId) {
+      return showToast('Proszę wypełnić nazwę i wskazać rejon.', 'error');
     }
     
     setLoading(true);
     try {
-      await addDoc(collection(db, 'machines'), {
+      const payload = {
         name: name.trim(),
         bay: bay.trim(),
-        regionId: regionId
-      });
+        regionId: regionId,
+        internalId: internalId.trim(),
+        additionalDescription: additionalDescription.trim()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, 'machines', editingId), payload);
+        showToast('Maszyna została zaktualizowana pomyślnie.');
+      } else {
+        await addDoc(collection(db, 'machines'), payload);
+        showToast('Maszyna została dodana pomyślnie.');
+      }
       setName('');
       setBay('');
       setRegionId('');
-      showToast('Maszyna została dodana pomyślnie.');
+      setInternalId('');
+      setAdditionalDescription('');
+      setAdditionalDescription('');
+      setEditingId(null);
     } catch (error) {
       console.error('Błąd dodawania maszyny:', error);
       showToast('Nie udało się dodać maszyny.', 'error');
     }
     setLoading(false);
+    setLoading(false);
+  };
+
+  const handleEdit = (m) => {
+    setName(m.name);
+    setBay(m.bay || '');
+    setRegionId(m.regionId || '');
+    setInternalId(m.internalId || '');
+    setAdditionalDescription(m.additionalDescription || '');
+    setEditingId(m.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (id, machineName) => {
@@ -99,6 +128,12 @@ export default function Machines() {
           
           await Promise.all(closePromises);
           
+          // Pobierz i usuń wszystkie plany serwisowe dla tej maszyny
+          const plannedQuery = query(collection(db, 'planned_services'), where('machineId', '==', id));
+          const plannedSnapshot = await getDocs(plannedQuery);
+          const plannedPromises = plannedSnapshot.docs.map(planDoc => deleteDoc(doc(db, 'planned_services', planDoc.id)));
+          await Promise.all(plannedPromises);
+
           // Następnie usuń samą maszynę
           await deleteDoc(doc(db, 'machines', id));
           showToast('Maszyna oraz jej aktywne zgłoszenia zostały pomyślnie usunięte.');
@@ -151,9 +186,10 @@ export default function Machines() {
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          Dodaj nową maszynę i wygeneruj kod QR
+          {editingId ? 'Edytuj maszynę' : 'Dodaj nową maszynę i wygeneruj kod QR'}
         </h2>
-        <form onSubmit={handleAddMachine} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Rejon / Numer Hali</label>
             <select value={regionId} onChange={e => setRegionId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white" required>
@@ -162,16 +198,43 @@ export default function Machines() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Przelot / Inf. dodatkowa</label>
-            <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Przelot 2 / Magazyn" required />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Przelot / Inf. dodatkowa (Opcjonalnie)</label>
+            <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Przelot 2 / Magazyn" />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Numer wew. UR (Opcjonalnie)</label>
+            <input type="text" value={internalId} onChange={(e) => setInternalId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. UR-123" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa maszyny</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Suwnica S-01" required />
           </div>
-          <button type="submit" disabled={loading} className="bg-blue-900 text-white font-semibold py-2 px-6 rounded hover:bg-blue-800">
-            {loading ? 'Dodawanie...' : 'Dodaj'}
-          </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Dodatkowy opis (Opcjonalnie)</label>
+            <input type="text" value={additionalDescription} onChange={(e) => setAdditionalDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="Opcjonalnie..." />
+          </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setEditingId(null);
+                  setName('');
+                  setBay('');
+                  setRegionId('');
+                  setInternalId('');
+                  setAdditionalDescription('');
+                }}
+                className="bg-gray-200 text-gray-700 font-semibold py-2 px-6 rounded hover:bg-gray-300"
+              >
+                Anuluj
+              </button>
+            )}
+            <button type="submit" disabled={loading} className="bg-blue-900 text-white font-semibold py-2 px-6 rounded hover:bg-blue-800">
+              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj')}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -180,11 +243,29 @@ export default function Machines() {
           <h2 className="text-lg font-bold text-gray-800">Rejestr Maszyn</h2>
           <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold">Łącznie: {machines.length}</span>
         </div>
+        <div className="p-4 bg-white border-b border-gray-100 flex flex-col sm:flex-row gap-4">
+          <input 
+            type="text" 
+            placeholder="Szukaj po nazwie lub numerze wew..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 p-2 border border-gray-300 rounded outline-none text-sm"
+          />
+          <select 
+            value={filterRegion} 
+            onChange={e => setFilterRegion(e.target.value)} 
+            className="w-full sm:w-64 p-2 border border-gray-300 rounded outline-none bg-white text-sm"
+          >
+            <option value="">Wszystkie Rejony</option>
+            {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-sm">
                 <th className="px-6 py-3 border-b">Nazwa Maszyny</th>
+                <th className="px-6 py-3 border-b">Nr wew. / Opis</th>
                 <th className="px-6 py-3 border-b">Rejon / Hala</th>
                 <th className="px-6 py-3 border-b">Przelot / Inf.</th>
                 <th className="px-6 py-3 border-b">Kod QR</th>
@@ -192,12 +273,23 @@ export default function Machines() {
               </tr>
             </thead>
             <tbody>
-              {machines.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="p-6 text-center text-gray-500">Brak maszyn w bazie. Dodaj pierwszą powyżej.</td>
-                </tr>
-              ) : (
-                machines.map(m => {
+              {(() => {
+                const filteredMachines = machines.filter(m => {
+                  const queryLower = searchQuery.toLowerCase();
+                  const matchName = m.name.toLowerCase().includes(queryLower) || (m.internalId && m.internalId.toLowerCase().includes(queryLower));
+                  const matchRegion = filterRegion ? m.regionId === filterRegion : true;
+                  return matchName && matchRegion;
+                });
+
+                if (filteredMachines.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="6" className="p-6 text-center text-gray-500">Brak maszyn spełniających kryteria.</td>
+                    </tr>
+                  );
+                }
+
+                return filteredMachines.map(m => {
                   const baseUrl = window.location.origin + window.location.pathname;
                   const qrValue = `${baseUrl}?machine=${m.id}`;
                   return (
@@ -205,6 +297,10 @@ export default function Machines() {
                       <td className="p-4">
                         <div className="font-semibold text-gray-800 text-base">{m.name}</div>
                         <div className="text-xs font-mono text-gray-400 mt-1">ID: {m.id}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-gray-700">{m.internalId || '-'}</div>
+                        {m.additionalDescription && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{m.additionalDescription}</div>}
                       </td>
                       <td className="p-4 text-gray-600">
                         {regions.find(r => r.id === m.regionId)?.name || '-'}
@@ -225,6 +321,13 @@ export default function Machines() {
                       <td className="p-4">
                         <div className="flex gap-2 justify-end">
                           <button 
+                            onClick={() => handleEdit(m)}
+                            className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-2 px-4 rounded transition-colors"
+                          >
+                            <i className="ph ph-pencil-simple"></i>
+                            Edytuj
+                          </button>
+                          <button 
                             onClick={() => handlePrint(m.id, m.name)}
                             className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300 font-semibold py-2 px-4 rounded transition-colors"
                           >
@@ -241,9 +344,9 @@ export default function Machines() {
                         </div>
                       </td>
                     </tr>
-                  )
-                })
-              )}
+                  );
+                });
+              })()}
             </tbody>
           </table>
         </div>
@@ -304,6 +407,22 @@ export default function Machines() {
           </div>
         </div>
       )}
+
+      {toastConfig.message && (
+        <Toast 
+          message={toastConfig.message} 
+          type={toastConfig.type} 
+          onClose={() => setToastConfig({ message: '', type: 'success' })} 
+        />
+      )}
+      <ConfirmModal 
+        isOpen={confirmModalConfig.isOpen}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={closeConfirmModal}
+        confirmText={confirmModalConfig.confirmText}
+      />
     </div>
   );
 }

@@ -6,19 +6,38 @@ export default function Roles() {
   const [roles, setRoles] = useState([]);
   const [name, setName] = useState('');
   
-  // Lista wszystkich dostępnych zakładek (uprawnień)
-  const availablePermissions = [
-    { id: 'dashboard', label: 'Pulpit główny' },
-    { id: 'tickets', label: 'Rejestr awarii' },
-    { id: 'kpi', label: 'Wskaźniki KPI' },
-    { id: 'archive', label: 'Archiwum zgłoszeń' },
-    { id: 'machines', label: 'Rejestr maszyn (QR)' },
-    { id: 'services', label: 'Podwykonawcy / Serwis' },
-    { id: 'topics', label: 'Tematy Zgłoszeń' },
-    { id: 'reporters', label: 'Zgłaszający' },
-    { id: 'regions', label: 'Rejony' },
-    // users i settings oraz roles są zarezerwowane tylko dla admina
+  // Lista wszystkich dostępnych zakładek (uprawnień) podzielona na moduły
+  const availablePermissionsGrouped = [
+    {
+      module: 'Awarie UR',
+      permissions: [
+        { id: 'dashboard_tickets', label: 'Mapa Stoczni' },
+        { id: 'edit_map', label: 'Edycja Mapy' },
+        { id: 'tickets', label: 'Zgłoszenia Awarii' },
+        { id: 'archive', label: 'Archiwum Awarii' },
+        { id: 'kpi', label: 'Analiza' }
+      ]
+    },
+    {
+      module: 'Serwis UR',
+      permissions: [
+        { id: 'planned_tasks', label: 'Planowane Serwisy' }
+      ]
+    },
+    {
+      module: 'Administracja',
+      permissions: [
+        { id: 'machines', label: 'Rejestr Maszyn' },
+        { id: 'regions', label: 'Rejony' },
+        { id: 'services', label: 'Podwykonawcy / Serwis' },
+        { id: 'topics', label: 'Tematy Zgłoszeń' },
+        { id: 'reporters', label: 'Zgłaszający' }
+      ]
+    }
   ];
+
+  // Helper do płaskiej listy
+  const allPermissionsFlat = availablePermissionsGrouped.flatMap(g => g.permissions);
 
   const [permissions, setPermissions] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -96,23 +115,31 @@ export default function Roles() {
             />
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-3">Dostęp do zakładek:</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {availablePermissions.map(p => (
-                <label key={p.id} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={permissions.includes(p.id)}
-                    onChange={() => handleTogglePermission(p.id)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">{p.label}</span>
-                </label>
+          <div className="mb-6 space-y-6">
+            <label className="block text-sm font-bold text-gray-700">Dostęp do zakładek według modułów:</label>
+            
+            <div className="space-y-6">
+              {availablePermissionsGrouped.map(group => (
+                <div key={group.module} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <h3 className="font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">{group.module}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {group.permissions.map(p => (
+                      <label key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={permissions.includes(p.id)}
+                          onChange={() => handleTogglePermission(p.id)}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">{p.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-3 italic">
-              Uwaga: Zakładki "Użytkownicy i Dostępy", "Role i Uprawnienia" oraz "Ustawienia Systemu" są zarezerwowane wyłącznie dla systemowego Administratora i nie można ich przydzielić do innych ról.
+              Uwaga: Zakładki &quot;Użytkownicy i Dostępy&quot;, &quot;Role i Uprawnienia&quot; oraz &quot;Ustawienia Systemu&quot; są zarezerwowane wyłącznie dla systemowego Administratora i nie można ich przydzielić do innych ról.
             </p>
           </div>
 
@@ -152,7 +179,7 @@ export default function Roles() {
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
                       {r.permissions?.map(p => {
-                        const found = availablePermissions.find(ap => ap.id === p);
+                        const found = allPermissionsFlat.find(ap => ap.id === p);
                         return found ? (
                           <span key={p} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded border border-blue-100">
                             {found.label}

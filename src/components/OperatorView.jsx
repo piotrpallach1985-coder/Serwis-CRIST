@@ -19,7 +19,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
 
   // Obsługa przycisku Wstecz (Popstate)
   useEffect(() => {
-    window.history.replaceState({ step: step }, '', `?step=${step}`);
+    window.history.replaceState({ step: step }, '', `?module=operator&step=${step}`);
     const handlePopState = (e) => {
       if (e.state && e.state.step) {
         setStep(e.state.step);
@@ -31,7 +31,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
 
   const handleStepChange = (newStep) => {
     setStep(newStep);
-    window.history.pushState({ step: newStep }, '', `?step=${newStep}`);
+    window.history.pushState({ step: newStep }, '', `?module=operator&step=${newStep}`);
   };
   const [isLiveScanning, setIsLiveScanning] = useState(false);
   const html5QrcodeRef = useRef(null);
@@ -125,7 +125,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
     setTimeout(async () => {
       try {
         if (html5QrcodeRef.current) {
-          try { await html5QrcodeRef.current.stop(); } catch(e) {}
+          try { await html5QrcodeRef.current.stop(); } catch(e) { /* ignore */ }
         }
         const html5QrCode = new Html5Qrcode("qr-reader");
         html5QrcodeRef.current = html5QrCode;
@@ -175,7 +175,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
   useEffect(() => {
     return () => {
       if (html5QrcodeRef.current) {
-        try { html5QrcodeRef.current.stop(); } catch(e) {}
+        try { html5QrcodeRef.current.stop(); } catch(e) { /* ignore */ }
       }
     };
   }, []);
