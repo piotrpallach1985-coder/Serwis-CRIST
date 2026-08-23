@@ -131,13 +131,13 @@ export default function Login({ onLogin, currentUser }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center p-4 text-[#111827] relative">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center p-4 pt-24 sm:pt-4 text-[#111827] relative">
       
       
       {/* Logo Aplikacji (Lewy Górny Róg) */}
       {branding.appLogoUrl && (
-        <div className="absolute top-4 left-4 z-50">
-          <img src={branding.appLogoUrl} alt="App Logo" className="h-40 object-contain drop-shadow-sm rounded-xl overflow-hidden" />
+        <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-50">
+          <img src={branding.appLogoUrl} alt="App Logo" className="h-12 sm:h-16 md:h-24 lg:h-28 object-contain drop-shadow-sm rounded-xl overflow-hidden" />
         </div>
       )}
 

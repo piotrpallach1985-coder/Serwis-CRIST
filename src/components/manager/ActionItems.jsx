@@ -108,9 +108,17 @@ export default function ActionItems({ machines, user }) {
                     </td>
                     <td className="px-6 py-4">
                       {item.status === 'completed' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider">
-                          <i className="ph ph-check-circle"></i> Zrealizowane
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider w-fit">
+                            <i className="ph ph-check-circle"></i> Zrealizowane
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            przez: <span className="font-bold text-slate-700">{item.completedBy || 'System'}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            dn. {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : '-'}
+                          </span>
+                        </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
                           <i className="ph ph-clock"></i> Oczekujące

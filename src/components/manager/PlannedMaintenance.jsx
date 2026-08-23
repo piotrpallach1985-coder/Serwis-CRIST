@@ -7,6 +7,7 @@ import { updateMachineWorkHours } from '../../services/machines.service';
 import { safeParseDate } from '../../utils/dateHelpers';
 import PlannedMaintenanceList from './PlannedMaintenanceList';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
+import ChecklistExecutor from '../checklists/ChecklistExecutor';
 
 export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false }) {
   const [services, setServices] = useState([]);
@@ -19,6 +20,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   const [rbgUpdateModal, setRbgUpdateModal] = useState(null);
   const [newRbgValue, setNewRbgValue] = useState('');
   const [completionModal, setCompletionModal] = useState(null);
+  const [checklistResponses, setChecklistResponses] = useState({});
   const [completionNotes, setCompletionNotes] = useState('');
   const [createNewPlan, setCreateNewPlan] = useState(true);
 
@@ -35,6 +37,8 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   const [estimatedManHours, setEstimatedManHours] = useState(8);
   const [requiredPersonnel, setRequiredPersonnel] = useState('');
   const [machineStatus, setMachineStatus] = useState('LOTO');
+  const [checklist, setChecklist] = useState([]);
+  const [lightboxImg, setLightboxImg] = useState(null);
 
   // Akcje do realizacji
   const [createActionItem, setCreateActionItem] = useState(false);
@@ -124,9 +128,62 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       return true;
     });
     return filtered.sort((a, b) => {
-      const dateA = a.nextDate ? new Date(a.nextDate).getTime() : Infinity;
-      const dateB = b.nextDate ? new Date(b.nextDate).getTime() : Infinity;
-      return dateA - dateB;
+      // 1. Status: W trakcie > Czerwony (Overdue) > Żółty (Warning) > Niebieski (Normal)
+      const getStatusScore = (srv) => {
+        if (srv.status === 'completed') return 0;
+        if (srv.status === 'in_progress') return 5;
+        
+        const machine = getMachine(srv.machineId);
+        let isOverdue = false;
+        let isWarning = false;
+        const now = new Date();
+
+        if (srv.nextDate) {
+          const nDate = safeParseDate(srv.nextDate);
+          if (nDate < now) isOverdue = true;
+          else {
+            const diffDays = Math.ceil(Math.abs(nDate - now) / (1000 * 60 * 60 * 24));
+            if (diffDays <= plannedWarningDays) isWarning = true;
+          }
+        }
+        if (srv.targetWorkHours && machine) {
+          if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
+          else {
+            if (srv.targetWorkHours - (machine.currentWorkHours || 0) <= plannedWarningDays * 8) isWarning = true;
+          }
+        }
+
+        if (isOverdue) return 4;
+        if (isWarning) return 3;
+        return 2;
+      };
+
+      const scoreA = getStatusScore(a);
+      const scoreB = getStatusScore(b);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+
+      // 2. Typ wyzwalacza (RBG > Kalendarz)
+      const isRbgA = (a.triggerType === 'hours' || a.triggerType === 'mixed') ? 1 : 0;
+      const isRbgB = (b.triggerType === 'hours' || b.triggerType === 'mixed') ? 1 : 0;
+      if (isRbgA !== isRbgB) return isRbgB - isRbgA;
+
+      // 3. Pilność (Remaining RBG lub data wymagalności)
+      if (isRbgA === 1 && isRbgB === 1) {
+         const machA = getMachine(a.machineId);
+         const machB = getMachine(b.machineId);
+         const remA = a.targetWorkHours ? a.targetWorkHours - (machA?.currentWorkHours || 0) : Infinity;
+         const remB = b.targetWorkHours ? b.targetWorkHours - (machB?.currentWorkHours || 0) : Infinity;
+         if (remA !== remB) return remA - remB;
+      } else {
+         const dateA = a.nextDate ? new Date(a.nextDate).getTime() : Infinity;
+         const dateB = b.nextDate ? new Date(b.nextDate).getTime() : Infinity;
+         if (dateA !== dateB) return dateA - dateB;
+      }
+
+      // 4. Priorytet
+      const isCritA = a.priority === 'Krytyczny' ? 1 : 0;
+      const isCritB = b.priority === 'Krytyczny' ? 1 : 0;
+      return isCritB - isCritA;
     });
   }, [services, machines, filterTime, filterRegion, filterMachine, isArchive]);
 
@@ -192,6 +249,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     setEstimatedManHours(8);
     setRequiredPersonnel('');
     setMachineStatus('LOTO');
+    setChecklist([]);
     setIsModalOpen(true);
   };
 
@@ -209,16 +267,22 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     setEstimatedManHours(srv.estimatedManHours || 8);
     setRequiredPersonnel(srv.requiredPersonnel || '');
     setMachineStatus(srv.machineStatus || 'LOTO');
+    setChecklist(srv.checklist || []);
     setIsModalOpen(true);
   };
 
   const handleSaveService = async (e) => {
     e.preventDefault();
+    if (!name || !name.trim()) return alert('Błąd: Podaj nazwę / typ serwisu.');
+    if (!machineId) return alert('Błąd: Wybierz maszynę.');
+    if ((triggerType === 'calendar' || triggerType === 'mixed') && !nextDate) return alert('Błąd: Podaj datę planowaną (Kalendarz).');
+    if ((triggerType === 'hours' || triggerType === 'mixed') && !targetWorkHours) return alert('Błąd: Podaj próg roboczogodzin (Roboczogodziny).');
+
     const serviceData = {
       name, machineId, priority, triggerType,
       estimatedDowntimeHours: Number(estimatedDowntimeHours),
       estimatedManHours: Number(estimatedManHours),
-      requiredPersonnel, machineStatus, notified: false
+      requiredPersonnel, machineStatus, notified: false, checklist
     };
 
     if (triggerType === 'calendar' || triggerType === 'mixed') {
@@ -249,7 +313,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert('Błąd podczas zapisywania');
+      alert('Błąd podczas zapisywania: ' + err.message);
     }
   };
 
@@ -308,7 +372,8 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
           estimatedDowntimeHours: completionModal.estimatedDowntimeHours,
           estimatedManHours: completionModal.estimatedManHours,
           requiredPersonnel: completionModal.requiredPersonnel,
-          machineStatus: completionModal.machineStatus, notified: false
+          machineStatus: completionModal.machineStatus, notified: false,
+          checklist: completionModal.checklist || []
         };
 
         if (completionModal.triggerType === 'calendar' || completionModal.triggerType === 'mixed') {
@@ -326,15 +391,29 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         }
       }
 
+      let checklistSummary = [];
+      if (completionModal.checklist && completionModal.checklist.length > 0) {
+         checklistSummary = completionModal.checklist.map(step => {
+            const answer = checklistResponses[step.id];
+            return {
+               taskName: step.taskName,
+               type: step.type,
+               answer: answer === undefined ? null : answer
+            };
+         });
+      }
+
       const historyEntry = {
         date: new Date().toISOString(),
         user: user.name,
         action: 'Zakończono serwis',
-        note: completionNotes
+        note: completionNotes,
+        checklistSummary: checklistSummary
       };
 
             await markServiceCompleted(completionModal.id, {
-        completedBy: user.name, notes: completionNotes, historyEntry
+        completedBy: user.name, notes: completionNotes,
+        checklistResponses: checklistResponses, historyEntry
       }, nextPlanData);
 
       if (createActionItem && actionItemProblem.trim()) {
@@ -349,7 +428,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         });
       }
 
-      setCompletionModal(null); setCompletionNotes(''); setCreateNewPlan(true);
+      setCompletionModal(null); setCompletionNotes(''); setChecklistResponses({}); setCreateNewPlan(true);
       setCreateActionItem(false); setActionItemProblem(''); setActionItemDueDate('');
     } catch (err) {
       console.error(err);
@@ -435,6 +514,34 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                   </div>
                 </div>
 
+                                <div className="mb-8 bg-blue-50/40 p-6 rounded-xl border border-blue-100">
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i className="ph ph-list-checks text-xl text-blue-600"></i> Zakres prac do wykonania
+                  </h3>
+                  {srv.checklist && srv.checklist.length > 0 ? (
+                    <ul className="space-y-3">
+                      {srv.checklist.map((step, idx) => (
+                        <li key={step.id} className="flex items-start gap-3 text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                          <span className="font-bold text-slate-400 mt-0.5">{idx + 1}.</span>
+                          <div className="flex-1">
+                            <div className="font-semibold text-slate-800">{step.taskName}</div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              Wymagane: {step.type === 'CHECKBOX' ? 'Potwierdzenie (odhaczenie)' : step.type === 'PHOTO' ? 'Zdjęcie dokumentujące' : 'Wpisanie wartości'}
+                              <span className={step.isRequired ? "text-red-500 font-medium ml-1" : "text-slate-400 ml-1"}>
+                                {step.isRequired ? '(Obowiązkowe)' : '(Opcjonalne)'}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm font-medium text-slate-600 italic bg-white p-4 rounded-lg border border-slate-200 shadow-sm text-center">
+                      Przegląd według obowiązującego standardu DTR maszyny.
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-wrap gap-4 pt-6 border-t border-slate-200">
                   {!isCompleted && srv.status !== 'in_progress' && (
                     <button onClick={() => handleSetInProgress(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
@@ -443,15 +550,29 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     </button>
                   )}
                   {!isCompleted && srv.status === 'in_progress' && (
-                    <button onClick={() => setCompletionModal(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
-                      <i className="ph ph-check-circle text-xl"></i>
-                      Zakończ Serwis
-                    </button>
+                    <>
+                      {(!srv.checklist || srv.checklist.length === 0) ? (
+                        <button onClick={() => setCompletionModal(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                          <i className="ph ph-check-circle text-xl"></i>
+                          Zakończ Serwis
+                        </button>
+                      ) : (
+                        <div className="w-full mt-6 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                          <h3 className="text-xl font-bold mb-4 text-slate-800 border-b pb-2">Lista Kontrolna (Wymagana do zamknięcia)</h3>
+                          <ChecklistExecutor 
+                            steps={srv.checklist} 
+                            onComplete={(responses) => {
+                              setChecklistResponses(responses);
+                              setCompletionModal(srv);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
-                  <button onClick={() => openModalForEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
+                  {!isCompleted && srv.status !== 'in_progress' && (<button onClick={() => openModalForEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
                     <i className="ph ph-pencil-simple text-xl"></i>
-                    Edytuj
-                  </button>
+                    Edytuj</button>)}
                   <button onClick={() => {
                     handleDelete(srv.id);
                     setSelectedServiceId(null);
@@ -483,6 +604,32 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     {entry.note && (
                       <div className="mt-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
                         &quot;{entry.note}&quot;
+                      </div>
+                    )}
+                    {entry.checklistSummary && entry.checklistSummary.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Lista Kontrolna (Checklista):</div>
+                        {entry.checklistSummary.map((item, i) => (
+                           <div key={i} className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                             <span className="font-semibold">{item.taskName}:</span>{' '}
+                             {item.type === 'CHECKBOX' ? (
+                               item.answer ? '✅ Wykonano' : '❌ Pominięto'
+                             ) : item.type === 'PHOTO' ? (
+                               item.answer && item.answer.length > 0 ? (
+                                 <div className="mt-2 flex gap-2 flex-wrap">
+                                   <img 
+                                       src={item.answer} 
+                                       alt="załącznik" 
+                                       className="w-16 h-16 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity shadow-sm"
+                                       onClick={() => setLightboxImg(item.answer)}
+                                     />
+                                 </div>
+                               ) : 'Brak zdjęć'
+                             ) : (
+                               <span className="font-mono text-blue-600">{item.answer || 'Brak danych'}</span>
+                             )}
+                           </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -580,6 +727,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
             )}
           </div>
 
+          {!isCompleted && (
           <div className="flex flex-col gap-2">
             <textarea 
               value={newFutureNote} 
@@ -598,6 +746,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
               </button>
             </div>
           </div>
+          )}
         </div>
 
       <PlannedMaintenanceFormModal 
@@ -611,8 +760,29 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         estimatedManHours={estimatedManHours} setEstimatedManHours={setEstimatedManHours}
         requiredPersonnel={requiredPersonnel} setRequiredPersonnel={setRequiredPersonnel}
         machineStatus={machineStatus} setMachineStatus={setMachineStatus}
+        checklist={checklist} setChecklist={setChecklist}
         machines={machines} handleSaveService={handleSaveService}
       />
+
+      {/* Lightbox for details view */}
+      {lightboxImg && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
+          onClick={() => setLightboxImg(null)}
+        >
+          <img 
+            src={lightboxImg} 
+            alt="Powiększenie" 
+            className="max-w-full max-h-full object-contain cursor-zoom-out"
+          />
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl font-bold p-2"
+            onClick={() => setLightboxImg(null)}
+          >
+            &times;
+          </button>
+        </div>
+      )}
   
       </div>
     );
@@ -741,9 +911,30 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         estimatedManHours={estimatedManHours} setEstimatedManHours={setEstimatedManHours}
         requiredPersonnel={requiredPersonnel} setRequiredPersonnel={setRequiredPersonnel}
         machineStatus={machineStatus} setMachineStatus={setMachineStatus}
+        checklist={checklist} setChecklist={setChecklist}
         machines={machines} handleSaveService={handleSaveService}
       />
 
+    
+      {/* Lightbox */}
+      {lightboxImg && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
+          onClick={() => setLightboxImg(null)}
+        >
+          <img 
+            src={lightboxImg} 
+            alt="Powiększenie" 
+            className="max-w-full max-h-full object-contain cursor-zoom-out"
+          />
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl font-bold p-2"
+            onClick={() => setLightboxImg(null)}
+          >
+            &times;
+          </button>
+        </div>
+      )}
     </div>
   );
 }
