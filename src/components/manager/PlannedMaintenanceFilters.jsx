@@ -18,9 +18,9 @@ export default function PlannedMaintenanceFilters({
         
         {!isArchive && (
           <div className="flex bg-slate-100 rounded-lg p-1">
-            <button onClick={() => setFilterTime('all')} className={`px-3 py-1.5 text-xs font-bold rounded \${filterTime === 'all' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-600'}`}>Wszystkie</button>
-            <button onClick={() => setFilterTime('30')} className={`px-3 py-1.5 text-xs font-bold rounded \${filterTime === '30' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-600'}`}>Najbliższe 30 dni</button>
-            <button onClick={() => setFilterTime('90')} className={`px-3 py-1.5 text-xs font-bold rounded \${filterTime === '90' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-600'}`}>Najbliższe 90 dni</button>
+            <button onClick={() => setFilterTime('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterTime === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Wszystkie</button>
+            <button onClick={() => setFilterTime('30')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterTime === '30' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Najbliższe 30 dni</button>
+            <button onClick={() => setFilterTime('90')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterTime === '90' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Najbliższe 90 dni</button>
           </div>
         )}
 

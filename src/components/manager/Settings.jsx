@@ -52,10 +52,47 @@ export default function Settings() {
     }
   };
 
-  const processFile = (file, type) => {
+    const compressImageToBase64 = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 200; // logo proportions usually wider
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/png', 0.9));
+        };
+        img.onerror = () => resolve(null);
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const processFile = async (file, type) => {
     if (!file) return;
     setUploadingLogo(type);
     
+    // Generuj Base64 od razu (aby PDF miał szybki dostęp)
+    const base64Data = await compressImageToBase64(file);
+
     const storageRef = ref(storage, 'branding/' + type + '_' + Date.now() + '_' + file.name);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -76,7 +113,8 @@ export default function Settings() {
         
         // Auto Zapis do bazy
         await setDoc(doc(db, "settings", "branding"), {
-          [type === 'app' ? 'appLogoUrl' : 'companyLogoUrl']: downloadURL
+          [type === 'app' ? 'appLogoUrl' : 'companyLogoUrl']: downloadURL,
+          [type === 'app' ? 'appLogoBase64' : 'companyLogoBase64']: base64Data || ''
         }, { merge: true });
 
         setUploadingLogo(false);
@@ -89,7 +127,8 @@ export default function Settings() {
     if (type === 'app') setAppLogoUrl('');
     if (type === 'company') setCompanyLogoUrl('');
     await setDoc(doc(db, "settings", "branding"), {
-      [type === 'app' ? 'appLogoUrl' : 'companyLogoUrl']: ''
+      [type === 'app' ? 'appLogoUrl' : 'companyLogoUrl']: '',
+      [type === 'app' ? 'appLogoBase64' : 'companyLogoBase64']: ''
     }, { merge: true });
   };
 

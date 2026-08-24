@@ -340,6 +340,8 @@ setNotifications(notifs);
   if (user.role !== 'admin') {
     const userRoleDoc = roles.find(r => r.id === user.role);
     const perms = userRoleDoc?.permissions || [];
+    const canEditPlanned = user.role === 'admin' || perms.includes('edit_planned');
+    const canDeletePlanned = user.role === 'admin' || perms.includes('delete_planned');
     visibleWorkItems = workItems.filter(item => perms.includes(item.id));
     visibleDataItems = dataItems.filter(item => perms.includes(item.id));
   }
@@ -351,6 +353,12 @@ setNotifications(notifs);
       setActiveTab(validTabIds[0]);
     }
   }, [currentModule, activeTab, visibleWorkItems, visibleDataItems]);
+
+  
+  const userRoleForPerms = roles.find(r => r.id === user.role);
+  const allUserPerms = userRoleForPerms?.permissions || [];
+  const canEditPlanned = user.role === 'admin' || allUserPerms.includes('edit_planned');
+  const canDeletePlanned = user.role === 'admin' || allUserPerms.includes('delete_planned');
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
@@ -499,11 +507,13 @@ setNotifications(notifs);
                             markAsRead(n.id);
                             if (n.ticketId) {
                               setGlobalTicketId(n.ticketId);
-                              setActiveTab('tickets');
                               setIsNotificationsOpen(false);
+                              window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
+                              window.dispatchEvent(new PopStateEvent('popstate'));
                             } else if (n.linkTo === 'planned_maintenance') {
-                              setActiveTab('planned_maintenance');
                               setIsNotificationsOpen(false);
+                              window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
+                              window.dispatchEvent(new PopStateEvent('popstate'));
                             }
                           }}
                           className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
@@ -578,13 +588,13 @@ setNotifications(notifs);
             const daysDiff = (new Date() - closedDate) / (1000 * 60 * 60 * 24);
             return daysDiff >= archiveDelayDays;
           })} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
-          {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} />}
-          {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} />}
+          {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
+          {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
           {activeTab === 'action_items' && <ActionItems machines={machines} user={user} />}
-          {activeTab === 'kpi' && <KPIDashboard tickets={tickets} machines={machines} />}
+          {activeTab === 'kpi' && <KPIDashboard tickets={tickets} machines={machines} plannedServices={plannedServices} />}
 
           {/* Master Data */}
-          {activeTab === 'machines' && <Machines />}
+          {activeTab === 'machines' && <Machines tickets={tickets} plannedServices={plannedServices} />}
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services services={services} />}
           {activeTab === 'topics' && <Topics />}

@@ -23,7 +23,9 @@ export default function Roles() {
       permissions: [
         { id: 'dashboard_planned', label: 'Mapa Serwisów' },
         { id: 'planned_maintenance', label: 'Planowane Serwisy' },
-        { id: 'archive_planned', label: 'Archiwum Serwisów' }
+        { id: 'archive_planned', label: 'Archiwum Serwisów' },
+        { id: 'edit_planned', label: 'Edycja Serwisów Planowanych' },
+        { id: 'delete_planned', label: 'Usuwanie Serwisów Planowanych' }
       ]
     },
     {

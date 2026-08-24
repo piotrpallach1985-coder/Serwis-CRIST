@@ -1,3 +1,4 @@
+import { exportToExcel } from '../../utils/reports/excelExport';
 import PlannedMaintenanceFormModal from './PlannedMaintenanceFormModal';
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, arrayUnion, doc, updateDoc, addDoc } from 'firebase/firestore';
@@ -9,8 +10,25 @@ import PlannedMaintenanceList from './PlannedMaintenanceList';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 import ChecklistExecutor from '../checklists/ChecklistExecutor';
 
-export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false }) {
+export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false, allowTicketDeletion = false, canEditPlanned = true, canDeletePlanned = true }) {
   const [services, setServices] = useState([]);
+  const handleExportExcel = () => {
+    const dataToExport = filteredServices.map(s => {
+      const targetDate = safeParseDate(s.nextDate);
+      return {
+        'ID Serwisu': s.id,
+        'Nazwa Serwisu': s.name || '-',
+        'Maszyna': s.machineName || getMachine(s.machineId)?.name || '-',
+        'Priorytet': s.priority === 'high' ? 'Wysoki (Krytyczny)' : 'Normalny',
+        'Typ Wyzwalacza': s.triggerType === 'hours' ? 'RBG' : (s.triggerType === 'calendar' ? 'Kalendarz' : 'Mieszany'),
+        'Data Wykonania/Oczekiwana': targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
+        'Cel RBG': s.targetWorkHours || '-',
+        'Status': s.status === 'completed' ? 'Zakończony' : (s.status === 'in_progress' ? 'W trakcie' : 'Oczekujący')
+      };
+    });
+    exportToExcel(dataToExport, isArchive ? 'Archiwum_Serwisow' : 'Planowane_Serwisy');
+  };
+
   const [selectedServiceId, setSelectedServiceId] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   
@@ -373,7 +391,8 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
           estimatedManHours: completionModal.estimatedManHours,
           requiredPersonnel: completionModal.requiredPersonnel,
           machineStatus: completionModal.machineStatus, notified: false,
-          checklist: completionModal.checklist || []
+          checklist: completionModal.checklist || [],
+          futureNotes: completionModal.futureNotes || []
         };
 
         if (completionModal.triggerType === 'calendar' || completionModal.triggerType === 'mixed') {
@@ -465,13 +484,22 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
     return (
       <div className="space-y-6 animate-fade-in">
-        <button 
-          onClick={() => setSelectedServiceId(null)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all mb-4 w-fit"
-        >
-          <i className="ph ph-arrow-left text-lg"></i>
-          Wróć do listy serwisów
-        </button>
+        <div className="flex gap-4 mb-4 flex-wrap">
+          <button 
+            onClick={() => setSelectedServiceId(null)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all w-fit"
+          >
+            <i className="ph ph-arrow-left text-lg"></i>
+            Wróć do listy serwisów
+          </button>
+          <button 
+            onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all w-fit"
+          >
+            <i className="ph ph-file-pdf text-xl text-red-600"></i>
+            Karta Serwisu PDF
+          </button>
+        </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* LEWA KOLUMNA (Karta Serwisu) */}
@@ -570,9 +598,10 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                       )}
                     </>
                   )}
-                  {!isCompleted && srv.status !== 'in_progress' && (<button onClick={() => openModalForEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
+                  {!isCompleted && srv.status !== 'in_progress' && canEditPlanned && (<button onClick={() => openModalForEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
                     <i className="ph ph-pencil-simple text-xl"></i>
                     Edytuj</button>)}
+                  {canDeletePlanned && (!isArchive || allowTicketDeletion) && (
                   <button onClick={() => {
                     handleDelete(srv.id);
                     setSelectedServiceId(null);
@@ -580,6 +609,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <i className="ph ph-trash text-xl"></i>
                     Usuń
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -803,6 +833,13 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+          <button 
+            onClick={handleExportExcel}
+            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-green-200 transition-colors shrink-0"
+          >
+            <i className="ph ph-file-xls text-lg"></i>
+            Eksportuj (.xlsx)
+          </button>
           {!isArchive && (
             <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
               <button 

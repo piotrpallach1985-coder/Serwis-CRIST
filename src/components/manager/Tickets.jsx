@@ -1,3 +1,4 @@
+import { exportToExcel } from '../../utils/reports/excelExport';
 import { useState, useEffect } from 'react';
 import { doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,6 +8,24 @@ import Toast from './Toast';
 import TicketDetails from './TicketDetails';
 
 export default function Tickets({ tickets, machines = [], user, services, isArchive, initialTicketId, onClearTicketId, initialSearchQuery, allowTicketDeletion }) {
+  const handleExportExcel = () => {
+    const dataToExport = filteredTickets.map(t => {
+      const openD = safeParseDate(t.createdAt);
+      const closeD = safeParseDate(t.closedAt);
+      return {
+        'ID Zgłoszenia': t.id,
+        'Data Zgłoszenia': openD ? openD.toLocaleString('pl-PL') : '-',
+        'Data Zamknięcia': closeD ? closeD.toLocaleString('pl-PL') : '-',
+        'Maszyna': t.machineName || (machines && machines.find(m => m.id === t.machineId)?.name) || '-',
+        'Temat Zgłoszenia': t.topic || '-',
+        'Opis Problemu': t.description || '-',
+        'Zgłaszający': t.reportedBy || '-',
+        'Status': (t.status === 1 ? 'Otwarte' : t.status === 2 ? 'W trakcie' : t.status === 3 ? 'Części' : t.status === 4 ? 'Zewnętrzny' : t.status === 5 ? 'Zakończone' : 'Nieznany')
+      };
+    });
+    exportToExcel(dataToExport, isArchive ? 'Archiwum_Awarii' : 'Zgloszenia_Awarii');
+  };
+
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
   const [comment, setComment] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -372,6 +391,13 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <button 
+            onClick={handleExportExcel}
+            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-green-200 transition-colors"
+          >
+            <i className="ph ph-file-xls text-lg"></i>
+            Eksportuj (.xlsx)
+          </button>
           {/* Przycisk Dostosuj Kolumny */}
           <div className="relative">
             <button 

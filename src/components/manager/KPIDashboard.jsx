@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
+import KPIReportPanel from './reports/KPIReportPanel';
 
-export default function KPIDashboard({ tickets, machines }) {
+export default function KPIDashboard({ tickets, machines, plannedServices = [] }) {
   const [period, setPeriod] = useState('all');
 
   const safeParseDate = (dateVal) => {
@@ -71,6 +72,7 @@ export default function KPIDashboard({ tickets, machines }) {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       
+      <KPIReportPanel tickets={tickets} plannedServices={plannedServices} machines={machines} />
       {/* Pasek filtrów */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap gap-4 justify-between items-center">
         <div className="font-bold text-gray-700 flex items-center gap-2">

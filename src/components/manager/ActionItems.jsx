@@ -2,10 +2,45 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { exportToExcel } from '../../utils/reports/excelExport';
+import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 
 export default function ActionItems({ machines, user }) {
   const [items, setItems] = useState([]);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const handleExportExcel = () => {
+    const dataToExport = filteredItems.map(item => {
+      const createdDate = safeParseDate(item.createdAt);
+      const dueDate = safeParseDate(item.dueDate);
+      const completedDate = safeParseDate(item.completedAt);
+      return {
+        'ID': item.id,
+        'Data Zgłoszenia': createdDate ? createdDate.toLocaleDateString('pl-PL') : '-',
+        'Maszyna': item.machineName || getMachineName(item.machineId) || '-',
+        'Problem / Zadanie': item.problem || '-',
+        'Wymagany Termin': dueDate ? dueDate.toLocaleDateString('pl-PL') : '-',
+        'Zgłaszający': item.createdBy || '-',
+        'Status': item.status === 'completed' ? 'Zrealizowane' : 'Oczekujące',
+        'Zrealizował(a)': item.completedBy || '-',
+        'Data Realizacji': completedDate ? completedDate.toLocaleDateString('pl-PL') : '-'
+      };
+    });
+    exportToExcel(dataToExport, 'Tematy_do_realizacji');
+  };
+
+  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterTime, setFilterTime] = useState('all');
+  const [filterRegion, setFilterRegion] = useState('');
+  const [filterMachine, setFilterMachine] = useState('');
+
+  // Regions list extracted from machines
+  const regions = useMemo(() => {
+    const rSet = new Map();
+    machines.forEach(m => {
+      if (m.regionId) rSet.set(m.regionId, { id: m.regionId, name: m.regionId }); // Simplified
+    });
+    return Array.from(rSet.values());
+  }, [machines]);
+
 
   useEffect(() => {
     const q = query(collection(db, 'action_items'), orderBy('createdAt', 'desc'));
@@ -19,11 +54,46 @@ export default function ActionItems({ machines, user }) {
   }, []);
 
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      if (showCompleted) return item.status === 'completed';
-      return item.status !== 'completed';
+    const now = new Date();
+    const future30 = new Date(); future30.setDate(now.getDate() + 30);
+    const future90 = new Date(); future90.setDate(now.getDate() + 90);
+
+    let filtered = items.filter(item => {
+      // 1. Status Filter
+      if (filterStatus === 'pending' && item.status === 'completed') return false;
+      if (filterStatus === 'completed' && item.status !== 'completed') return false;
+
+      const machine = machines.find(m => m.id === item.machineId);
+
+      // 2. Region Filter
+      if (filterRegion && machine?.regionId !== filterRegion) return false;
+
+      // 3. Machine Filter
+      if (filterMachine && item.machineId !== filterMachine) return false;
+
+      // 4. Time Filter
+      if (filterTime !== 'all') {
+        if (!item.dueDate) return false;
+        const dDate = safeParseDate(item.dueDate);
+        if (!dDate) return false;
+        
+        let isWithinTime = false;
+        if (filterTime === '30' && dDate <= future30) isWithinTime = true;
+        if (filterTime === '90' && dDate <= future90) isWithinTime = true;
+        
+        if (!isWithinTime) return false;
+      }
+
+      return true;
     });
-  }, [items, showCompleted]);
+    
+    // Sort logic (optional, already sorted by createdAt desc by default, but we can keep it as is or sort by dueDate)
+    return filtered.sort((a,b) => {
+       const dA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+       const dB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+       return dA - dB;
+    });
+  }, [items, filterStatus, filterTime, filterRegion, filterMachine, machines]);
 
   const getMachineName = (id) => machines.find(m => m.id === id)?.name || 'Nieznana maszyna';
 
@@ -54,18 +124,38 @@ export default function ActionItems({ machines, user }) {
             Akcje i problemy zgłoszone podczas serwisów planowanych
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-gray-700">
-            <input 
-              type="checkbox" 
-              checked={showCompleted} 
-              onChange={e => setShowCompleted(e.target.checked)} 
-              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
-            />
-            Pokaż zrealizowane
-          </label>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleExportExcel}
+            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-green-200 transition-colors"
+          >
+            <i className="ph ph-file-xls text-lg"></i>
+            Eksportuj (.xlsx)
+          </button>
+          <div className="flex bg-slate-100 rounded-lg p-1">
+          <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Wszystkie</button>
+          <button onClick={() => setFilterStatus('pending')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'pending' ? 'bg-amber-500 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Oczekujące</button>
+          <button onClick={() => setFilterStatus('completed')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'completed' ? 'bg-green-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Zrealizowane</button>
         </div>
+        </div>
+
       </div>
+
+      {/* FILTRY */}
+      <PlannedMaintenanceFilters 
+        isArchive={false}
+        filterTime={filterTime} setFilterTime={setFilterTime}
+        filterRegion={filterRegion} setFilterRegion={setFilterRegion}
+        filterMachine={filterMachine} setFilterMachine={setFilterMachine}
+        clearFilters={() => {
+          setFilterTime('all');
+          setFilterRegion('');
+          setFilterMachine('');
+          setFilterStatus('pending');
+        }}
+        machines={machines}
+        regions={regions}
+      />
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
         <div className="overflow-x-auto">

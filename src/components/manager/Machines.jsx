@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { exportToExcel } from '../../utils/reports/excelExport';
+import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { QRCodeSVG } from 'qrcode.react';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
 
-export default function Machines() {
+export default function Machines({ tickets = [], plannedServices = [] }) {
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
   const [name, setName] = useState('');
@@ -43,6 +45,31 @@ export default function Machines() {
       unsubRegions();
     };
   }, []);
+
+  
+  const handleExportExcel = () => {
+    const filteredMachines = machines.filter(m => {
+      const queryLower = searchQuery.toLowerCase();
+      const matchName = m.name.toLowerCase().includes(queryLower) || (m.internalId && m.internalId.toLowerCase().includes(queryLower));
+      const matchRegion = filterRegion ? m.regionId === filterRegion : true;
+      return matchName && matchRegion;
+    });
+    const dataToExport = filteredMachines.map(m => ({
+      'ID': m.id,
+      'Nazwa Maszyny': m.name || '-',
+      'Rejon': (regions.find(r => r.id === m.regionId)?.name || '-'),
+      'Nr Seryjny / Wewnętrzny': m.internalId || '-',
+      'Obecne RBG': m.currentWorkHours || 0,
+      'Zapasowy Opis': m.additionalDescription || '-'
+    }));
+    exportToExcel(dataToExport, 'Rejestr_Maszyn');
+  };
+
+  const handleDownloadPDF = (machine) => {
+    const mTickets = tickets.filter(t => t.machineId === machine.id);
+    const mServices = plannedServices.filter(s => s.machineId === machine.id);
+    generateMachineHistoryPDF(machine, mTickets, mServices);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -244,6 +271,13 @@ export default function Machines() {
           <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold">Łącznie: {machines.length}</span>
         </div>
         <div className="p-4 bg-white border-b border-gray-100 flex flex-col sm:flex-row gap-4">
+          <button 
+              onClick={handleExportExcel}
+              className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center justify-center gap-2 border border-green-200 transition-colors"
+            >
+              <i className="ph ph-file-xls text-lg"></i>
+              Eksportuj
+            </button>
           <input 
             type="text" 
             placeholder="Szukaj po nazwie lub numerze wew..." 
@@ -317,6 +351,15 @@ export default function Machines() {
                           <i className="ph ph-qr-code text-xl"></i>
                           <span>Pokaż QR</span>
                         </button>
+                        <button 
+                          onClick={() => handleDownloadPDF(m)}
+                          className="p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold rounded-lg text-xs flex items-center gap-2 transition-all shadow-sm"
+                          title="Generuj Kartę Maszyny w PDF"
+                        >
+                          <i className="ph ph-file-pdf text-xl"></i>
+                          <span>Karta PDF</span>
+                        </button>
+                        
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2 justify-end">

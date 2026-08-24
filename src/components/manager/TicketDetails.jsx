@@ -60,9 +60,14 @@ export default function TicketDetails({
 
         {/* Górny pasek nawigacyjny z przyciskiem powrotu */}
         <div className="p-6 border-b border-gray-200 bg-white sticky top-0 z-20 flex justify-between items-center shadow-sm">
-          <button onClick={() => setSelectedTicketId(null)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all">
-            <i className="ph ph-arrow-left text-lg"></i> Powrót do rejestru
-          </button>
+          <div className="flex gap-4">
+            <button onClick={() => setSelectedTicketId(null)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all">
+              <i className="ph ph-arrow-left text-lg"></i> Powrót do rejestru
+            </button>
+            <button onClick={() => import('../../utils/reports/pdfTicketCard').then(m => m.generateTicketPDF(currentTicket))} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all">
+              <i className="ph ph-file-pdf text-xl text-red-600"></i> Karta PDF
+            </button>
+          </div>
         </div>
 
         <div className="p-6 max-w-[1400px] mx-auto w-full">

@@ -23,6 +23,7 @@ export default function Users() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('admin');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -51,13 +52,15 @@ export default function Users() {
         await updateDoc(doc(db, 'users', editingId), {
           email: email.trim().toLowerCase(),
           name: name.trim(),
-          role: role
+          role: role,
+          phone: phone
         });
         setEditingId(null);
         setEmail('');
         setPassword('');
         setName('');
         setRole('admin');
+        setPhone('');
       } else {
         // Tworzenie NOWEGO konta w bezpiecznym module Authentication
         const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), password.trim());
@@ -67,13 +70,15 @@ export default function Users() {
         await setDoc(doc(db, 'users', newUid), {
           email: email.trim().toLowerCase(),
           name: name.trim(),
-          role: role
+          role: role,
+          phone: phone
         });
 
         setEmail('');
         setPassword('');
         setName('');
         setRole('admin');
+        setPhone('');
       }
     } catch (err) {
       console.error(err);
@@ -100,6 +105,7 @@ export default function Users() {
     setPassword(''); // Hasła nie da się podejrzeć
     setName(u.name || '');
     setRole(u.role || 'admin');
+    setPhone(u.phone || '');
     setEditingId(u.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -142,6 +148,25 @@ export default function Users() {
               required
             />
           </div>
+          <div className="flex-1 w-full">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Numer telefonu</label>
+            <input 
+              type="text" 
+              value={phone} 
+              onChange={e => {
+                let val = e.target.value.replace(/[^\d]/g, '');
+                if (val.length > 3) val = val.slice(0,3) + ' ' + val.slice(3);
+                if (val.length > 7) val = val.slice(0,7) + ' ' + val.slice(7);
+                if (val.length > 11) val = val.slice(0, 11);
+                setPhone(val);
+              }}
+              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="xxx xxx xxx"
+              pattern="\d{3} \d{3} \d{3}"
+              title="Format: xxx xxx xxx"
+              required
+            />
+          </div>
           {!editingId && (
             <div className="flex-1 w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">Hasło (min. 6 znaków)</label>
@@ -177,7 +202,8 @@ export default function Users() {
                   setEmail('');
                   setPassword('');
                   setName('');
-                  setRole('admin');
+        setRole('admin');
+        setPhone('');
                 }}
                 className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded transition-colors"
               >
@@ -205,6 +231,7 @@ export default function Users() {
                 <th className="px-6 py-4">Imię i Nazwisko</th>
                 <th className="px-6 py-4">E-mail (Login)</th>
                 <th className="px-6 py-4">Hasło</th>
+                <th className="px-6 py-4">Telefon</th>
                 <th className="px-6 py-4">Rola</th>
                 <th className="px-6 py-4 text-right">Akcje</th>
               </tr>
@@ -221,6 +248,7 @@ export default function Users() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-bold text-gray-800">{u.name}</td>
                     <td className="px-6 py-4 text-gray-600">{u.email}</td>
+                    <td className="px-6 py-4 text-gray-600">{u.phone || "-"}</td>
                     <td className="px-6 py-4 text-green-600 font-bold text-sm">
                       <i className="ph ph-shield-check mr-1"></i>
                       Zaszyfrowane
