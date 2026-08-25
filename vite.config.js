@@ -4,6 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/Serwis-CRIST/',
+  build: {
+    outDir: 'docs'
+  },
   plugins: [
     react(),
     VitePWA({
