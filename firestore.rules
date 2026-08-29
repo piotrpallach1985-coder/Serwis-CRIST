@@ -1,28 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Funkcja pomocnicza: czy użytkownik jest zalogowany (Manager)
+
+    // --- FUNKCJE POMOCNICZE ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Awarie (tickets)
-    // - Czytanie: każdy (żeby Operator widział formularz/maszyny) - opcjonalne, ale dla uproszczenia
-    // - Tworzenie: każdy (Operator zgłasza awarię bez logowania)
-    // - Edycja/Usuwanie: tylko zalogowany manager
-    match /tickets/{ticketId} {
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+
+    // 1. ZGŁASZAJĄCY (Pracownicy)
+    match /reporters/{document=**} {
       allow read: if true;
-      allow create: if true; 
+      allow create: if isSignedIn() || (
+        request.resource.data.name is string 
+        && request.resource.data.name.size() >= 3 
+        && request.resource.data.name.size() <= 80
+      );
       allow update, delete: if isSignedIn();
     }
 
-    // Maszyny, Rejony, Tematy, Zgłaszający, Podwykonawcy (dane publiczne dla operatora)
+    // 2. MASZYNY
     match /machines/{document=**} {
       allow read: if true;
-      allow create: if true; // Zezwala operatorom zgłaszającym awarię na utworzenie "Innej" maszyny
+      
+      // Zalogowany tworzy dowolnie, niezalogowany operator podlega restrykcjom:
+      allow create: if isSignedIn() || (
+        request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\).*')
+        && (!('xPercent' in request.resource.data) || request.resource.data.xPercent == null)
+        && (!('yPercent' in request.resource.data) || request.resource.data.yPercent == null)
+      );
+                    
       allow update, delete: if isSignedIn();
     }
+
+    // 3. ZGŁOSZENIA AWARII (Tickets) - ZERO WYCIEKU
+    match /tickets/{ticketId} {
+      // Tylko zalogowany personel widzi historię awarii
+      allow read: if isSignedIn();   
+      // Niezalogowany może TYLKO wrzucić zgłoszenie (jak do skrzynki)
+      allow create: if true;          
+      // Zezwól na dopisanie zdjęć przez system offline sync (OfflineSyncManager), blokując modyfikację innych pól
+      allow update: if isSignedIn() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos']);
+      allow delete: if isSignedIn();
+    }
+
+    // 4. SŁOWNIKI PUBLICZNE (Odczyt dla formularza, edycja dla zalogowanych)
     match /regions/{document=**} {
       allow read: if true;
       allow write: if isSignedIn();
@@ -31,31 +63,35 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn();
     }
-    match /reporters/{document=**} {
-      allow read: if true;
-      allow write: if true; // Zgłaszający mogą się dopisywać z formularza bez logowania!
-    }
     match /services/{document=**} {
       allow read: if true;
       allow write: if isSignedIn();
     }
 
-    // Pozostałe (Użytkownicy, Role, Ustawienia, KPI) - restrykcyjne
-    match /users/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /roles/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /settings/{document=**} {
-      allow read, write: if isSignedIn();
-    }
-    match /planned_services/{document=**} {
-      allow read, write: if isSignedIn();
-    }
+    // 5. POWIADOMIENIA (Operator wysyła, zalogowany zarządza)
     match /notifications/{document=**} {
       allow read: if isSignedIn();
-      allow write: if true; // Operator (niezalogowany) musi móc wysłać powiadomienie
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    // 6. MODUŁY KRYTYCZNE / ADMIN (Tylko rola 'admin' może modyfikować)
+    match /users/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /roles/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /settings/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 7. ZADANIA I SERWISY PLANOWANE (Zalogowany personel)
+    match /planned_services/{document=**} {
+      allow read, write: if isSignedIn();
     }
     match /action_items/{document=**} {
       allow read, write: if isSignedIn();
