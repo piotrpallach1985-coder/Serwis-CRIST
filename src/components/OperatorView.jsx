@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { signInAnonymously } from 'firebase/auth';
 import jsQR from 'jsqr';
 import { Html5Qrcode } from 'html5-qrcode';
 import OperatorForm from './OperatorForm';
@@ -27,7 +28,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleStepChange = (newStep) => {
@@ -61,10 +62,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
     let unsubscribeRegions = () => {};
     try {
       unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
-        const machinesData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
         setMachines(machinesData);
 
         if (initialMachineId && step === 'scan') {
@@ -81,22 +79,19 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
             }
           }
         }
-      }, (error) => {
-        console.error("Błąd nasłuchu maszyn:", error);
-        setErrorMsg("Błąd połączenia z bazą maszyn: " + error.message);
-      });
+      }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
 
       unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
-        setTopicsList(querySnapshot.docs.map(d => d.data().text));
-      });
+        setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
+      }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
 
       unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
-        setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+        setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+      }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
 
       unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
-        setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+        setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+      }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
     } catch (error) {
       console.error("Błąd inicjalizacji:", error);
       setErrorMsg("Krytyczny błąd: " + error.message);
@@ -300,62 +295,49 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
             ) : (
               <div className="space-y-4">
                 <button
-                  onClick={startLiveScanner}
-                  className="w-full max-w-md mx-auto p-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-md transition-all flex flex-col items-center justify-center gap-2"
-                >
-                  <i className="ph ph-qr-code text-4xl"></i>
-                  <span>Skanuj kod QR aparatem (Na żywo)</span>
-                  <span className="text-xs text-blue-200 font-normal">Włącz widok z kamery bezpośrednio w aplikacji</span>
-                </button>
-
-                <div className="text-xs text-gray-400 font-bold uppercase tracking-wider my-2">- LUB WGRAJ ZDJĘCIE -</div>
-
-                <label className="flex items-center justify-center gap-2 w-full max-w-md mx-auto p-3 bg-gray-50 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors text-sm font-semibold text-gray-700">
-                  <i className="ph ph-image text-xl text-blue-600"></i>
-                  <span>Wybierz plik ze zdjęciem kodu QR</span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleFileScan}
-                    className="hidden"
-                  />
-                </label>
+                    onClick={startLiveScanner}
+                    className="w-full max-w-md mx-auto py-5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 relative overflow-hidden group"
+                  >
+                    <div className="relative w-20 h-20 flex items-center justify-center rounded-xl overflow-hidden">
+                      <i className="ph ph-qr-code text-[80px] text-white/90"></i>
+                      <div className="absolute left-0 w-full h-1 bg-red-500 opacity-90 shadow-[0_0_12px_4px_rgba(239,68,68,0.9)] animate-scan z-10"></div>
+                    </div>
+                    <span className="text-2xl tracking-wide">Skanuj kod QR</span>
+                  </button>
               </div>
             )}
             
             <div className="mt-8 border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-medium text-gray-700 mb-3">Lub wybierz maszynę ręcznie</h3>
-              <select 
-                className="w-full max-w-md mx-auto block p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none bg-white text-left"
+              <h3 className="text-lg font-medium text-gray-700 mb-3">Lub wpisz nazwę i wybierz z listy</h3>
+              <input 
+                type="text"
+                list="machine-datalist"
+                placeholder="Zacznij wpisywać nazwę maszyny..."
+                className="w-full max-w-md mx-auto block p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white text-left mb-4 shadow-sm"
                 onChange={(e) => {
                   const val = e.target.value;
-                  
-                  if (val === 'manual') {
-                    setSelectedMachine({ id: 'manual', name: '' });
+                  const m = machines.find(machine => `${machine.name} ${machine.bay ? `(${machine.bay})` : ''}` === val);
+                  if (m) {
+                    setSelectedMachine(m);
                     handleStepChange('form');
-                  } else if (val !== '') {
-                    const m = machines.find(machine => machine.id === val);
-                    if (m) {
-                      setSelectedMachine(m);
-                      handleStepChange('form');
-                    }
                   }
                 }}
-                value=""
-              >
-                <option value="" disabled>Wybierz z listy...</option>
+              />
+              <datalist id="machine-datalist">
                 {machines.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} {m.bay ? `(${m.bay})` : ''}
-                  </option>
+                  <option key={m.id} value={`${m.name} ${m.bay ? `(${m.bay})` : ''}`} />
                 ))}
-                <option value="manual" className="font-bold text-blue-900">
-                  + Inna maszyna (wpisz ręcznie)...
-                </option>
-              </select>
-              <p className="text-sm text-gray-400 mt-2">
-                Użyj tej opcji, jeśli kod QR jest zniszczony lub nieczytelny.
-              </p>
+              </datalist>
+              
+              <button 
+                onClick={() => {
+                  setSelectedMachine({ id: 'manual', name: '' });
+                  handleStepChange('form');
+                }}
+                className="w-full max-w-md mx-auto p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-400 transition-colors"
+              >
+                + Brak na liście? Dodaj maszynę ręcznie
+              </button>
             </div>
           </div>
         )}
@@ -400,6 +382,15 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
               className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-gray-900/20 active:scale-95"
             >
               Zgłoś kolejną awarię
+            </button>
+            <button 
+              onClick={() => {
+                window.history.pushState({ module: '' }, '', window.location.pathname);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }} 
+              className="w-full sm:w-auto mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-red-600/20 active:scale-95"
+            >
+              Powrót
             </button>
           </div>
         )}

@@ -45,7 +45,7 @@ export default function ActionItems({ machines, user }) {
   useEffect(() => {
     const q = query(collection(db, 'action_items'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
     }, (err) => {
       alert('Błąd ładowania Tematów do Realizacji: ' + err.message);
       console.error(err);
@@ -89,6 +89,10 @@ export default function ActionItems({ machines, user }) {
     
     // Sort logic (optional, already sorted by createdAt desc by default, but we can keep it as is or sort by dueDate)
     return filtered.sort((a,b) => {
+       const isAClosed = a.status === 'completed';
+       const isBClosed = b.status === 'completed';
+       if (isAClosed && !isBClosed) return 1;
+       if (!isAClosed && isBClosed) return -1;
        const dA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
        const dB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
        return dA - dB;
@@ -116,23 +120,23 @@ export default function ActionItems({ machines, user }) {
     <div className="space-y-6 flex flex-col animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200 shrink-0">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-slate-800 flex items-center gap-1.5">
             <i className="ph ph-clipboard-text text-2xl text-blue-600"></i>
             Tematy do Realizacji
           </h2>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-[10px] md:text-xs mt-1 leading-tight">
             Akcje i problemy zgłoszone podczas serwisów planowanych
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
           <button 
             onClick={handleExportExcel}
-            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-green-200 transition-colors"
+            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-green-200 transition-colors"
           >
             <i className="ph ph-file-xls text-lg"></i>
             Eksportuj (.xlsx)
           </button>
-          <div className="flex bg-slate-100 rounded-lg p-1">
+          <div className="flex bg-slate-100 rounded-lg p-1 overflow-x-auto max-w-full hide-scrollbar">
           <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Wszystkie</button>
           <button onClick={() => setFilterStatus('pending')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'pending' ? 'bg-amber-500 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Oczekujące</button>
           <button onClick={() => setFilterStatus('completed')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'completed' ? 'bg-green-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Zrealizowane</button>
@@ -159,7 +163,57 @@ export default function ActionItems({ machines, user }) {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          
+  <div className="lg:hidden flex flex-col gap-1.5 p-2">
+    {filteredItems.length === 0 ? (
+      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak tematów do realizacji.</div>
+    ) : (
+      filteredItems.map(item => {
+        const dueDate = item.dueDate ? (typeof item.dueDate.toDate === 'function' ? item.dueDate.toDate() : new Date(item.dueDate)) : null;
+        const createdDate = item.createdAt ? (typeof item.createdAt.toDate === 'function' ? item.createdAt.toDate() : new Date(item.createdAt)) : null;
+        const isCompleted = item.status === 'completed';
+        const machineName = item.machineName || getMachineName(item.machineId);
+
+        return (
+          <div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col relative ${isCompleted ? 'border-green-500 border-l-4' : 'border-blue-500 border-l-4'}`}>
+            {isCompleted && (
+              <div className="absolute top-0 right-0 bg-green-500 text-white px-2.5 py-1 rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm">
+                Zrealizowane
+              </div>
+            )}
+            {!isCompleted && (
+              <div className="absolute top-0 right-0 bg-blue-500 text-white px-2.5 py-1 rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm">
+                Oczekujące
+              </div>
+            )}
+            
+            <div className="pt-2">
+              <h4 className="font-bold text-[#002b5e] text-lg leading-tight mb-1">{machineName || 'Brak maszyny'}</h4>
+              <p className="text-sm font-semibold text-slate-700 mb-2">{item.problem || 'Brak opisu'}</p>
+              
+              <div className="text-xs text-slate-500 space-y-1">
+                <div className="flex items-center gap-1"><i className="ph ph-calendar-blank"></i> Zgłoszono: {createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</div>
+                <div className="flex items-center gap-1"><i className="ph ph-warning-circle"></i> Wymagany termin: {dueDate ? dueDate.toLocaleDateString('pl-PL') : '-'}</div>
+                <div className="flex items-center gap-1"><i className="ph ph-user"></i> Zgłosił: {item.createdBy || '-'}</div>
+              </div>
+            </div>
+            
+            <div className="mt-2 flex justify-end">
+              {item.status !== 'completed' && (
+                  <button 
+                    onClick={() => handleComplete(item.id)} 
+                    className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 font-bold py-1.5 px-4 rounded-lg text-xs transition-colors shadow-sm inline-flex items-center gap-1"
+                  >
+                    <i className="ph ph-check-circle text-base"></i> Wykonano
+                  </button>
+                )}
+            </div>
+          </div>
+        );
+      })
+    )}
+  </div>
+  <table className="hidden lg:table w-full text-sm text-left">
             <thead className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-100">
               <tr>
                 <th className="px-6 py-4">Data Zgłoszenia</th>
@@ -216,14 +270,8 @@ export default function ActionItems({ machines, user }) {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {item.status !== 'completed' && (
-                        <button 
-                          onClick={() => handleComplete(item.id)}
-                          className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-bold transition-colors"
-                        >
-                          Zakończ
-                        </button>
-                      )}
+                          {item.status !== 'completed' && (<button onClick={() => handleComplete(item.id)} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-bold transition-colors">Wykonano</button>)}
+                          
                     </td>
                   </tr>
                 ))

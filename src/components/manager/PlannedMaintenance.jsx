@@ -19,11 +19,12 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         'ID Serwisu': s.id,
         'Nazwa Serwisu': s.name || '-',
         'Maszyna': s.machineName || getMachine(s.machineId)?.name || '-',
-        'Priorytet': s.priority === 'high' ? 'Wysoki (Krytyczny)' : 'Normalny',
+        'Priorytet': s.priority === 'Krytyczny' ? 'Krytyczny' : 'Standard',
         'Typ Wyzwalacza': s.triggerType === 'hours' ? 'RBG' : (s.triggerType === 'calendar' ? 'Kalendarz' : 'Mieszany'),
         'Data Wykonania/Oczekiwana': targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
         'Cel RBG': s.targetWorkHours || '-',
-        'Status': s.status === 'completed' ? 'Zakończony' : (s.status === 'in_progress' ? 'W trakcie' : 'Oczekujący')
+        'Status': s.status === 'completed' ? 'Zakończony' : (s.status === 'in_progress' ? 'W trakcie' : 'Oczekujący'),
+        'Historia': (s.history || []).map(h => `[${new Date(h.date).toLocaleDateString()}] ${h.user}: ${h.action}`).join(' | ')
       };
     });
     exportToExcel(dataToExport, isArchive ? 'Archiwum_Serwisow' : 'Planowane_Serwisy');
@@ -88,7 +89,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   useEffect(() => {
     const q = query(collection(db, 'planned_services'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
     });
     return () => unsub();
   }, []);
@@ -354,6 +355,28 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     }
   };
 
+  
+  const handleAddNote = async (srv) => {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    try {
+      const historyEntry = {
+        date: new Date().toISOString(),
+        user: user?.name || 'System',
+        action: 'Dodano notatkę',
+        note: newNote.trim()
+      };
+      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
+      await updatePlannedService(srv.id, { history: newHistory });
+      setNewNote('');
+    } catch (err) {
+      console.error(err);
+      alert('Błąd dodawania notatki');
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
   const handleSetInProgress = async (srv) => {
     if (confirm('Czy na pewno chcesz oznaczyć ten serwis jako "W trakcie"?')) {
       const historyEntry = {
@@ -484,31 +507,31 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex gap-4 mb-4 flex-wrap">
+        <div className="flex gap-2 sm:gap-4 flex-wrap p-2 sm:p-4 bg-white/95 backdrop-blur border-b sm:border border-gray-200  shadow-sm sm:rounded-xl mb-4">
           <button 
             onClick={() => setSelectedServiceId(null)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all w-fit"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all w-fit"
           >
             <i className="ph ph-arrow-left text-lg"></i>
             Wróć do listy serwisów
           </button>
           <button 
             onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all w-fit"
+            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-sm transition-all w-fit"
           >
             <i className="ph ph-file-pdf text-xl text-red-600"></i>
             Karta Serwisu PDF
           </button>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* LEWA KOLUMNA (Karta Serwisu) */}
           <div className="w-full lg:w-2/3 space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-6 sm:p-8">
-                <div className="flex justify-between items-start mb-6">
+              <div className="p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4 sm:mb-6">
                   <div>
-                    <h2 className="text-2xl font-black text-slate-800">{srv.name}</h2>
+                    <h2 className="text-base sm:text-2xl font-black text-slate-800">{srv.name}</h2>
                     <div className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider flex items-center gap-2">
                       <i className="ph ph-engine text-lg text-slate-400"></i>
                       {machine?.name || 'Nieznana maszyna'} ({getMachineRegionName(machine?.regionId)})
@@ -615,8 +638,8 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
             </div>
           </div>
 
-          {/* PRAWA KOLUMNA (Historia Zdarzeń) */} \n<div className="w-full lg:w-1/3">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          {/* PRAWA KOLUMNA (Historia Zdarzeń) */} <div className="w-full lg:w-1/3">
+<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
               <h4 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2">
                 <i className="ph ph-clock-counter-clockwise text-lg"></i> HISTORIA ZDARZEŃ</h4>
               
@@ -823,11 +846,11 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200 shrink-0">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-slate-800 flex items-center gap-2">
             <i className={`ph ${isArchive ? 'ph-archive text-slate-600' : 'ph-calendar-check text-blue-600'} text-2xl`}></i>
             {isArchive ? 'Archiwum Serwisów' : 'Serwis Planowany'}
           </h2>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-[10px] md:text-xs mt-1 leading-tight">
             {isArchive ? 'Historia zakończonych prac prewencyjnych' : 'Konserwacja prewencyjna, harmonogramy i liczniki roboczogodzin'}
           </p>
         </div>

@@ -34,8 +34,8 @@ export default function PlannedMaintenanceList({
                   {columns.rbg && <th className="px-6 py-4">Termin (RBG)</th>}
                   {columns.priority && <th className="px-6 py-4">Priorytet</th>}
                   {columns.status && <th className="px-6 py-4">Status</th>}
-                  {columns.actions && <th className="px-6 py-4 text-right">Szczegóły</th>}
-                </tr>
+                  {columns.actions && <th className="px-6 py-4 w-12 text-center">Akcje</th>}
+</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredServices.length === 0 ? (
@@ -46,6 +46,19 @@ export default function PlannedMaintenanceList({
                   const machine = getMachine(srv.machineId);
                   const isCompleted = srv.status === 'completed';
                   const rowColor = getStatusColor(srv, machine);
+  const isOverdue = (() => {
+    if (srv.status === 'completed') return false;
+    if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
+      const parsedDate = safeParseDate(srv.nextDate);
+      if (parsedDate && parsedDate < new Date()) return true;
+    }
+    if ((srv.triggerType === 'hours' || srv.triggerType === 'mixed') && srv.targetWorkHours) {
+      if ((machine?.currentWorkHours || 0) >= srv.targetWorkHours) return true;
+    }
+    return false;
+  })();
+  const isCritical = srv.priority === 'Krytyczny';
+  const showRedCritical = isCritical && isOverdue;
 
                   return (
                     <tr key={srv.id} className={`hover:bg-slate-50 transition-colors group ${isCompleted ? 'opacity-70' : ''}`}>
@@ -86,7 +99,7 @@ export default function PlannedMaintenanceList({
                       )}
                       {columns.priority && (
                         <td className="px-6 py-4">
-                          {srv.priority === 'Krytyczny' ? <span className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border border-red-100 flex inline-flex items-center gap-1 w-max"><i className="ph ph-warning"></i> KRYTYCZNE</span> : <span className="text-slate-400 text-xs font-bold uppercase">Standard</span>}
+                          {isCritical ? <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border flex inline-flex items-center gap-1 w-max ${showRedCritical ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><i className="ph ph-warning"></i> KRYTYCZNE</span> : <span className="text-slate-400 text-xs font-bold uppercase">Standard</span>}
                         </td>
                       )}
                       {columns.status && (
@@ -97,14 +110,13 @@ export default function PlannedMaintenanceList({
                         </td>
                       )}
                       {columns.actions && (
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-2 group-hover:border-blue-300 group-hover:text-blue-600">
-                            Szczegóły
-                            <i className="ph ph-caret-right"></i>
-                          </button>
-                        </td>
-                      )}
-                    </tr>
+                          <td className="px-6 py-4">
+                            <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-bold py-2 px-3 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-1 group-hover:border-blue-300 group-hover:text-blue-600">
+                              <i className="ph ph-caret-right"></i> Szczegóły
+                            </button>
+                          </td>
+                        )}
+</tr>
                   );
                 })}
               </tbody>
@@ -120,48 +132,66 @@ export default function PlannedMaintenanceList({
               const isCompleted = srv.status === 'completed';
               const rowColor = getStatusColor(srv, machine);
 
-              return (
-                <div key={srv.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col relative">
-                  <div className="flex justify-between items-start mb-3">
+              const isOverdue = (() => {
+                      if (srv.status === 'completed') return false;
+                      if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
+                        const parsedDate = safeParseDate(srv.nextDate);
+      if (parsedDate && parsedDate < new Date()) return true;
+                      }
+                      if ((srv.triggerType === 'hours' || srv.triggerType === 'mixed') && srv.targetWorkHours) {
+                        if ((machine?.currentWorkHours || 0) >= srv.targetWorkHours) return true;
+                      }
+                      return false;
+                    })();
+                    const isCritical = srv.priority === 'Krytyczny';
+                    const showRedCritical = isCritical && isOverdue;
+return (
+<div key={srv.id} onClick={() => setSelectedServiceId(srv.id)} className={`cursor-pointer bg-white p-4 pt-6 rounded-xl shadow-sm border flex flex-col relative hover:bg-slate-50 transition-colors ${showRedCritical ? 'border-red-500 border-l-4' : 'border-slate-200'}`}>
+{isCritical && (
+<div className={`absolute top-0 right-0 text-white px-2.5 py-1 ${showRedCritical ? "bg-red-500" : "bg-gray-400"} rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm`}>
+Krytyczne
+</div>
+)}
+                  <div className="flex justify-between items-start mb-1">
                     <div className="pr-20">
                       <h4 className="font-bold text-slate-800 text-[15px]">{srv.name}</h4>
                       <div className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{getMachineRegionName(machine?.regionId)}</div>
                     </div>
-                    <span className={`absolute top-4 right-4 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider ${rowColor}`}>
-                      {isCompleted ? 'Zakończone' : srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
-                    </span>
+                    
                   </div>
                   
-                  <div className="text-sm text-slate-600 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <div className="font-bold text-slate-700 mb-1 flex items-center gap-2">
+                  <div className="text-sm text-slate-600 mb-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div className="font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                       <i className="ph ph-engine text-slate-400 text-base"></i>
                       {machine?.name || 'Nieznana maszyna'}
                     </div>
-                    {srv.priority === 'Krytyczny' && (
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-black text-red-600 uppercase tracking-wider bg-red-50 w-max px-2 py-1 rounded border border-red-100"><i className="ph ph-warning"></i> KRYTYCZNY</div>
-                    )}
+                    
                   </div>
                   
-                  <div className="flex justify-between items-end pt-3 border-t border-slate-100">
-                    <div className="flex flex-col gap-1">
-                      {(srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                          <i className="ph ph-calendar-blank text-slate-400"></i>
-                          {srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString() : '-'}
-                        </span>
-                      )}
-                      {(srv.triggerType === 'hours' || srv.triggerType === 'mixed') && (
-                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                          <i className="ph ph-hourglass text-slate-400"></i>
-                          Cel: {srv.targetWorkHours} <span className="text-slate-400 font-normal">({machine?.currentWorkHours || 0})</span>
-                        </span>
+                  <div className="flex justify-between items-end pt-2 border-t border-slate-100 cursor-pointer" onClick={() => setSelectedServiceId(srv.id)}>
+                      <div className="flex flex-col gap-1">
+                        {(srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                            {srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString('pl-PL') : '-'}
+                          </span>
+                        )}
+                        {(srv.triggerType === 'hours' || srv.triggerType === 'mixed') && (
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                            {srv.targetWorkHours} RBG <span className="opacity-50">({machine?.currentWorkHours || 0})</span>
+                          </span>
+                        )}
+                      </div>
+                      
+                      {isCompleted ? (
+                        <div className="border border-green-500 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm bg-green-50">
+                          Zakończone
+                        </div>
+                      ) : (
+                        <div className={`border px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${srv.status === 'in_progress' ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-slate-300 text-slate-600 bg-slate-50'}`}>
+                          {srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
+                        </div>
                       )}
                     </div>
-                    <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-2 group-hover:border-blue-300 group-hover:text-blue-600">
-                      Szczegóły
-                      <i className="ph ph-caret-right"></i>
-                    </button>
-                  </div>
                 </div>
               );
             })}

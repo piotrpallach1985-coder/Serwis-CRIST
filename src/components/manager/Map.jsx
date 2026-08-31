@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { doc, updateDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
+import { safeParseDate } from '../../utils/dateHelpers';
 
 export default function ShipyardMap({ tickets = [], plannedServices = [], modeType = 'tickets', machines = [], regions = [], user, plannedWarningDays = 30, onNavigateToTickets }) {
   const [mode, setMode] = useState('view'); // 'view' or 'edit'
@@ -13,6 +14,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
     defaultPan: { x: 0, y: 0 }
   });
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [currentSubmapId, setCurrentSubmapId] = useState(null);
   const [uploadingMap, setUploadingMap] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -99,12 +101,45 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
   
   // States for Edit Mode
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [imageProgress, setImageProgress] = useState(0);
+  const imgRef = useRef(null);
+
+  const currentMapUrl = currentSubmapId ? (regions.find(r => r.id === currentSubmapId)?.mapImageUrl || mapConfig.url) : mapConfig.url;
+
+  useEffect(() => {
+    setIsImageLoading(true);
+    setImageProgress(0);
+
+    const safetyTimeout = setTimeout(() => {
+      setIsImageLoading(false);
+      setImageProgress(100);
+    }, 4000); // 4 seconds max loading screen
+
+    // If image is already loaded from cache before effect runs
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+      clearTimeout(safetyTimeout);
+      setIsImageLoading(false);
+      setImageProgress(100);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setImageProgress(p => {
+        if (p >= 90) return 90;
+          const next = p + Math.floor(Math.random() * 15) + 5;
+          return next > 90 ? 90 : next;
+      });
+    }, 200);
+    return () => { clearInterval(interval); clearTimeout(safetyTimeout); };
+  }, [currentMapUrl]);
   const [tempPos, setTempPos] = useState(null);
   const [editingType, setEditingType] = useState('region'); // 'region' or 'machine'
   const [editingId, setEditingId] = useState('');
   
   // Drag & Drop
-  const [draggingPin, setDraggingPin] = useState(null); // { id, type, xPercent, yPercent }
+  const [draggingPin, setDraggingPin] = useState(null);
+const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, type, xPercent, yPercent }
   
   // Zoom & Pan
   const [zoomScale, setZoomScale] = useState(1);
@@ -116,7 +151,26 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
   const pointerDownPosRef = useRef(null);
   
   const mapContainerRef = useRef(null);
-  const imgRef = useRef(null);
+  const mapContentRef = useRef(null);
+
+  useEffect(() => {
+    const el = mapContentRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      e.preventDefault(); // Teraz to zadziała poprawnie i zablokuje przewijanie strony
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      setZoomScale(s => Math.min(Math.max(1, parseFloat((s + delta).toFixed(2))), 5));
+    };
+
+    // Rejestrujemy zdarzenie z wymuszeniem 'passive: false'
+    el.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
 
   // Exact bounds of the visual image inside object-fit: contain
   const [imgBounds, setImgBounds] = useState({ width: 0, height: 0 });
@@ -150,142 +204,178 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
   const hideTimeoutRef = useRef(null);
 
   // Zoptymalizowane obliczanie statusu pinezek
-  const pinData = useMemo(() => {
+    const pinData = useMemo(() => {
     const pins = [];
     const now = new Date();
-    
-    // First, find all machines that have pins
-    const pinnedMachineIds = new Set(
-      machines.filter(m => m.xPercent != null && m.yPercent != null).map(m => m.id)
-    );
-    
-    // Process Regions
-    regions.forEach(region => {
-      if (region.xPercent == null || region.yPercent == null) return;
-      
-      let status = 'ok';
-      let count = 0;
 
-      if (modeType === 'tickets') {
-        const activeTickets = tickets.filter(t => 
-          t.regionId === region.id && 
-          t.status !== 5 && 
-          !pinnedMachineIds.has(t.machineId)
-        );
-        if (activeTickets.length > 0) {
-          status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
-        }
-        count = activeTickets.length;
-      } else if (modeType === 'planned_maintenance') {
-        // Find machines in this region that are NOT pinned individually
-        const regionMachineIds = machines.filter(m => m.regionId === region.id && !pinnedMachineIds.has(m.id)).map(m => m.id);
-        const activePlans = plannedServices.filter(p => regionMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
+    if (currentSubmapId === null) {
+      // MAIN MAP
+      // Process Regions
+      regions.forEach(region => {
+        if (region.xPercent == null || region.yPercent == null) return;
         
-        activePlans.forEach(p => {
-          let isOverdue = false;
-          let isWarning = false;
-          if (p.nextDate) {
-            const nextDate = p.nextDate.toDate ? p.nextDate.toDate() : new Date(p.nextDate);
-            if (nextDate < now) {
-              isOverdue = true;
-            } else {
-              const diffTime = Math.abs(nextDate - now);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-              if (diffDays <= plannedWarningDays) isWarning = true;
-            }
+        let status = 'ok';
+        let count = 0;
+        let machineCount = 0;
+
+        const regionMachineIds = machines.filter(m => m.regionId === region.id).map(m => m.id);
+          const submapMachineIds = machines.filter(m => {
+            if (m.regionId !== region.id) return false;
+            const isPinnedOnMain = m.pinnedOnMap === 'main' || (!m.pinnedOnMap && (!region || !region.mapImageUrl));
+            return !isPinnedOnMain; 
+          }).map(m => m.id);
+          machineCount = regionMachineIds.length;
+
+          if (modeType === 'tickets') {
+            const activeTickets = tickets.filter(t => submapMachineIds.includes(t.machineId) && t.status !== 5 && t.status !== '5');
+          if (activeTickets.length > 0) {
+            status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
           }
-          if (p.targetWorkHours) {
-            const m = machines.find(mac => mac.id === p.machineId);
-            if (m) {
-              if (m.currentWorkHours >= p.targetWorkHours) isOverdue = true;
-              else if (p.hoursInterval) {
-                // Warning if we are within roughly the equivalent of warning days in hours (naive approach: 24h a day)
-                // Let's assume standard use, maybe 10 rbg per day. So 30 days is 300 rbg. 
-                // Or simpler: if (target - current) < (hoursInterval * (plannedWarningDays/365)) - not very reliable.
-                // Let's just say warning if < 10% of interval left or < 100 rbg? 
-                // Actually, the user's request: "zielony - brak planowanych serwisów w najbliższych 30 dniach, zółty - serwis planowany w najbliższych 30 dniach" 
-                // Mostly calendar logic. For RBG, let's say 24rbg/day * plannedWarningDays as a rough threshold.
-                const rbgThreshold = plannedWarningDays * 8; // Assuming 8h shift/day
-                if ((p.targetWorkHours - m.currentWorkHours) <= rbgThreshold) isWarning = true;
+          count = activeTickets.length;
+        } else if (modeType === 'planned_maintenance') {
+          const activePlans = plannedServices.filter(p => submapMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
+          
+          activePlans.forEach(p => {
+            let isOverdue = false;
+            let isWarning = false;
+            if (p.nextDate) {
+              const nextDate = safeParseDate(p.nextDate);
+              if (nextDate < now) isOverdue = true;
+              else {
+                const diffDays = Math.ceil(Math.abs(nextDate - now) / (1000 * 60 * 60 * 24)); 
+                if (diffDays <= plannedWarningDays) isWarning = true;
               }
             }
-          }
-          if (p.status === 'in_progress') status = 'in_progress';
+            if (p.targetWorkHours) {
+              const m = machines.find(mac => mac.id === p.machineId);
+              if (m) {
+                if (m.currentWorkHours >= p.targetWorkHours) isOverdue = true;
+                else if (p.hoursInterval && (p.targetWorkHours - m.currentWorkHours) <= plannedWarningDays * 8) isWarning = true;
+              }
+            }
+            if (p.status === 'in_progress') status = 'in_progress';
             else if (isOverdue && status !== 'in_progress') status = 'critical';
             else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
-        });
-        count = activePlans.length;
-      }
-      
-      pins.push({
-        id: region.id,
-        type: 'region',
-        name: region.name,
-        xPercent: region.xPercent,
-        yPercent: region.yPercent,
-        status,
-        itemCount: count,
-        machineCount: machines.filter(m => m.regionId === region.id).length
-      });
-    });
-
-    // Process Machines
-    machines.forEach(machine => {
-      if (machine.xPercent == null || machine.yPercent == null) return;
-      
-      let status = 'ok';
-      let count = 0;
-
-      if (modeType === 'tickets') {
-        const activeTickets = tickets.filter(t => t.machineId === machine.id && t.status !== 5);
-        if (activeTickets.length > 0) {
-          status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+          });
+          count = activePlans.length;
         }
-        count = activeTickets.length;
-      } else if (modeType === 'planned_maintenance') {
-        const activePlans = plannedServices.filter(p => p.machineId === machine.id && (p.status === 'pending' || p.status === 'in_progress'));
-        activePlans.forEach(p => {
-          let isOverdue = false;
-          let isWarning = false;
-          if (p.nextDate) {
-            const nextDate = p.nextDate.toDate ? p.nextDate.toDate() : new Date(p.nextDate);
-            if (nextDate < now) {
-              isOverdue = true;
-            } else {
-              const diffTime = Math.abs(nextDate - now);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-              if (diffDays <= plannedWarningDays) isWarning = true;
-            }
+
+        pins.push({
+          id: region.id,
+          type: 'region',
+          name: region.name,
+          xPercent: region.xPercent,
+          yPercent: region.yPercent,
+          status,
+          itemCount: count,
+          machineCount,
+          hasSubmap: !!region.mapImageUrl
+        });
+      });
+
+      // Process Machines
+      machines.forEach(machine => {
+        if (machine.xPercent == null || machine.yPercent == null) return;
+        const region = regions.find(r => r.id === machine.regionId);
+        
+        const isPinnedOnMain = machine.pinnedOnMap === 'main' || (!machine.pinnedOnMap && (!region || !region.mapImageUrl));
+        if (!isPinnedOnMain) return;
+        
+        let status = 'ok';
+        let count = 0;
+
+        if (modeType === 'tickets') {
+          const activeTickets = tickets.filter(t => t.machineId === machine.id && t.status !== 5 && t.status !== '5');
+          if (activeTickets.length > 0) {
+            status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
           }
-          if (p.targetWorkHours) {
-            if (machine.currentWorkHours >= p.targetWorkHours) {
-              isOverdue = true;
-            } else if (p.hoursInterval) {
-              const rbgThreshold = plannedWarningDays * 8;
-              if ((p.targetWorkHours - machine.currentWorkHours) <= rbgThreshold) isWarning = true;
+          count = activeTickets.length;
+        } else if (modeType === 'planned_maintenance') {
+          const activePlans = plannedServices.filter(p => p.machineId === machine.id && (p.status === 'pending' || p.status === 'in_progress'));
+          activePlans.forEach(p => {
+            let isOverdue = false;
+            let isWarning = false;
+            if (p.nextDate) {
+              const nextDate = safeParseDate(p.nextDate);
+              if (nextDate < now) isOverdue = true;
+              else {
+                const diffDays = Math.ceil(Math.abs(nextDate - now) / (1000 * 60 * 60 * 24)); 
+                if (diffDays <= plannedWarningDays) isWarning = true;
+              }
             }
-          }
-          if (p.status === 'in_progress') status = 'in_progress';
+            if (p.targetWorkHours) {
+              if (machine.currentWorkHours >= p.targetWorkHours) isOverdue = true;
+              else if (p.hoursInterval && (p.targetWorkHours - machine.currentWorkHours) <= plannedWarningDays * 8) isWarning = true;
+            }
+            if (p.status === 'in_progress') status = 'in_progress';
             else if (isOverdue && status !== 'in_progress') status = 'critical';
             else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
+          });
+          count = activePlans.length;
+        }
+
+        pins.push({
+          id: machine.id,
+          type: 'machine',
+          name: machine.name,
+          xPercent: machine.xPercent,
+          yPercent: machine.yPercent,
+          status,
+          itemCount: count
         });
-        count = activePlans.length;
-      }
-      
-      pins.push({
-        id: machine.id,
-        type: 'machine',
-        name: machine.name,
-        xPercent: machine.xPercent,
-        yPercent: machine.yPercent,
-        status,
-        itemCount: count,
-        machineCount: 1
       });
-    });
+    } else {
+      // SUBMAP (Show only machines belonging to currentSubmapId)
+      machines.forEach(machine => {
+        if (machine.regionId !== currentSubmapId || machine.xPercent == null || machine.yPercent == null) return;
+        
+        let status = 'ok';
+        let count = 0;
+
+        if (modeType === 'tickets') {
+          const activeTickets = tickets.filter(t => t.machineId === machine.id && t.status !== 5 && t.status !== '5');
+          if (activeTickets.length > 0) {
+            status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+          }
+          count = activeTickets.length;
+        } else if (modeType === 'planned_maintenance') {
+          const activePlans = plannedServices.filter(p => p.machineId === machine.id && (p.status === 'pending' || p.status === 'in_progress'));
+          activePlans.forEach(p => {
+            let isOverdue = false;
+            let isWarning = false;
+            if (p.nextDate) {
+              const nextDate = safeParseDate(p.nextDate);
+              if (nextDate < now) isOverdue = true;
+              else {
+                const diffDays = Math.ceil(Math.abs(nextDate - now) / (1000 * 60 * 60 * 24)); 
+                if (diffDays <= plannedWarningDays) isWarning = true;
+              }
+            }
+            if (p.targetWorkHours) {
+              if (machine.currentWorkHours >= p.targetWorkHours) isOverdue = true;
+              else if (p.hoursInterval && (p.targetWorkHours - machine.currentWorkHours) <= plannedWarningDays * 8) isWarning = true;
+            }
+            if (p.status === 'in_progress') status = 'in_progress';
+            else if (isOverdue && status !== 'in_progress') status = 'critical';
+            else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
+          });
+          count = activePlans.length;
+        }
+
+        pins.push({
+          id: machine.id,
+          type: 'machine',
+          name: machine.name,
+          xPercent: machine.xPercent,
+          yPercent: machine.yPercent,
+          status,
+          itemCount: count
+        });
+      });
+    }
 
     return pins;
-  }, [tickets, plannedServices, modeType, machines, regions, plannedWarningDays]);
+  }, [tickets, plannedServices, modeType, machines, regions, plannedWarningDays, currentSubmapId]);
 
   // Apply drag preview
   const displayPins = useMemo(() => {
@@ -375,7 +465,11 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
     
     try {
       const collectionName = type === 'region' ? 'regions' : 'machines';
-      await updateDoc(doc(db, collectionName, id), { xPercent, yPercent });
+        const updateData = { xPercent, yPercent };
+        if (type === 'machine') {
+           updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
+        }
+        await updateDoc(doc(db, collectionName, id), updateData);
     } catch (error) {
       console.error("Błąd zapisywania przemieszczonej pinezki:", error);
     }
@@ -405,8 +499,9 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
     const yPercent = (y / rect.height) * 100;
 
     setTempPos({ xPercent, yPercent });
-    setEditingId('');
-    setIsModalOpen(true);
+      setEditingId('');
+      if (currentSubmapId !== null) setEditingType('machine');
+      setIsModalOpen(true);
   };
 
   const handleSavePin = async (e) => {
@@ -415,10 +510,11 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
 
     try {
       const collectionName = editingType === 'region' ? 'regions' : 'machines';
-      await updateDoc(doc(db, collectionName, editingId), {
-        xPercent: tempPos.xPercent,
-        yPercent: tempPos.yPercent
-      });
+      const updateData = { xPercent: tempPos.xPercent, yPercent: tempPos.yPercent };
+      if (editingType === 'machine') {
+         updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
+      }
+      await updateDoc(doc(db, collectionName, editingId), updateData);
       setIsModalOpen(false);
       setTempPos(null);
     } catch (error) {
@@ -441,14 +537,16 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
     }
   };
 
-  const getUnpinnedItems = () => {
+      const getUnpinnedItems = () => {
     if (editingType === 'region') {
       return regions.filter(r => r.xPercent == null || r.yPercent == null);
     } else {
+      if (currentSubmapId !== null) {
+        return machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
+      }
       return machines.filter(m => m.xPercent == null || m.yPercent == null);
     }
   };
-
   const [tooltipPos, setTooltipPos] = useState({ isNearTop: false, isNearLeft: false, isNearRight: false });
 
   const handleMouseEnter = (pinId, e) => {
@@ -495,12 +593,8 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
         }}
       >
         <div 
-          className="relative w-full h-full flex items-center justify-center p-2 overflow-hidden touch-none"
-          onWheel={(e) => {
-            e.preventDefault();
-            const delta = e.deltaY < 0 ? 0.15 : -0.15;
-            setZoomScale(s => Math.min(Math.max(1, parseFloat((s + delta).toFixed(2))), 5));
-          }}
+            ref={mapContentRef}
+            className="relative w-full h-full flex items-center justify-center p-2 overflow-hidden touch-none"
           onTouchStart={(e) => {
             if (e.touches.length >= 2) {
               setIsPanningMap(false); // Blokujemy panoramowanie gdy uzytkownik zaczyna robic pinch to zoom
@@ -525,25 +619,51 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
           }}
           onTouchEnd={() => { touchDistRef.current = null; }}
         >
-          {/* Transform Wrapper dla Zoom i Pan */}
+          
+            {/* Transform Wrapper dla Zoom i Pan */}
           <div 
-            className="relative w-full h-full flex items-center justify-center transition-transform duration-100 ease-out origin-center"
-            style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})` }}
+            className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center"
+            style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 0 }}
           >
             {/* Obraz tła dopasowany do okna (contain) */}
             <img 
-              ref={imgRef}
-              src={mapConfig.url} 
-              alt="Mapa Stoczni" 
-              className={`w-full h-full object-contain transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'} cursor-${mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
-              onClick={handleMapClick} // Zostawiamy jako fallback dla desktopu
-              draggable="false"
-              onLoad={(e) => setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight })}
-              onError={(e) => {
-                e.target.onerror = null; 
-                e.target.src = 'https://placehold.co/1600x900/1e293b/94a3b8?text=BRAK+MAPY.%5CnWgraj+nowa+mape+w+trybie+Edycji.';
-              }}
-            />
+                ref={imgRef}
+                src={currentMapUrl || 'https://placehold.co/1600x900/1e293b/94a3b8?text=BRAK+MAPY.%5CnWgraj+nowa+mape+w+trybie+Edycji.'} 
+                alt="Mapa Stoczni" 
+                className={`w-full h-full object-contain transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'} cursor-${mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
+                onClick={handleMapClick}
+                draggable="false"
+                onLoad={(e) => {
+                  setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight });
+                  setImageProgress(100);
+                  setTimeout(() => setIsImageLoading(false), 200);
+                }}
+                onError={(e) => {
+                  e.target.onerror = null; 
+                  e.target.src = 'https://placehold.co/1600x900/1e293b/94a3b8?text=BRAK+MAPY.%5CnWgraj+nowa+mape+w+trybie+Edycji.';
+                  setImageProgress(100);
+                  setIsImageLoading(false);
+                }}
+              />
+          </div>
+
+          {isImageLoading && (
+              <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
+                <i className="ph ph-spinner-gap animate-spin text-5xl mb-4 text-blue-500"></i>
+                <h3 className="text-base md:text-xl font-bold mb-2">Ładowanie mapy...</h3>
+                <div className="w-64 h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${imageProgress}%` }}></div>
+                </div>
+                <p className="mt-2 text-[10px] md:text-sm text-slate-400 font-mono">{imageProgress}%</p>
+</div>
+)}
+
+            
+            {/* Z-INDEX LAYER FOR PINS - Rendered above tools */}
+          <div 
+            className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center pointer-events-none"
+            style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 100 }}
+          >
 
             {/* Wrapper na pinezki - ma dokładny rozmiar widzialnego obrazka! */}
             {imgBounds.width > 0 && (
@@ -555,7 +675,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                 {/* Nakładka instruktażowa w trybie edycji */}
                 {mode === 'edit' && !draggingPin && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none flex items-center justify-center z-10">
-                    <div className="bg-amber-500/90 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse text-sm whitespace-nowrap">
+                    <div className="bg-amber-500/90 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse text-[10px] md:text-sm whitespace-nowrap">
                       Kliknij aby przypiąć, lub chwyć pinezkę aby przesunąć
                     </div>
                   </div>
@@ -638,72 +758,88 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                         <div className="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-75 pointer-events-none scale-[2.5]"></div>
                       )}
                       
-                      {/* Zwykła, mała kropka */}
-                      <div className={`
-                        relative w-3 h-3 sm:w-4 sm:h-4 rounded-full flex items-center justify-center
-                        border-2 border-white shadow-lg transition-all duration-300
-                        ${bgColor} ring-4 ${ringColor}
-                        ${isHovered || isDraggingThis ? 'scale-150' : 'scale-100'}
-                      `}></div>
+                      
+                        {/* Zwykła kropka lub kwadrat dla rejonu z podmapą */}
+                        <div className={`
+                          relative ${pin.type === 'region' && pin.hasSubmap ? 'w-4 h-4 sm:w-5 sm:h-5 rounded-md' : 'w-3 h-3 sm:w-4 sm:h-4 rounded-full'} flex items-center justify-center
+                          border-2 border-white shadow-lg transition-all duration-300
+                          ${bgColor} ring-4 ${ringColor}
+                          ${isHovered || isDraggingThis ? 'scale-150' : 'scale-100'}
+                        `}></div>
                       
                       {/* Usuwanie w trybie edycji */}
                       {mode === 'edit' && !isDraggingThis && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeletePin(pin.id, pin.type); }}
-                          className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:bg-red-700 hover:scale-110 z-30 pointer-events-auto"
-                          title="Usuń z mapy"
-                        >
-                          <i className="ph ph-x text-xs font-bold"></i>
-                        </button>
-                      )}
+                                                  <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeletePin(pin.id, pin.type); }}
+                            className="absolute -top-3 -right-3 sm:-top-4 sm:-right-4 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:bg-red-700 hover:scale-110 z-30 pointer-events-auto"
+                            title="Usuń z mapy"
+                          >
+                            <i className="ph ph-x text-[9px] md:text-xs font-bold"></i>
+                          </button>
+                        )}
+  
+                        {/* Tooltip w trybie View */}
+                        {isHovered && mode === 'view' && (
+                          <div 
+                            className={`absolute ${tooltipPosClass} w-44 md:w-56 bg-slate-900/95 backdrop-blur-md text-white p-2 md:p-4 rounded-xl shadow-2xl border border-slate-700 pointer-events-auto z-50 animate-fade-in`}
+                            onMouseEnter={() => handleMouseEnter(pin.id)} // Podtrzymanie
+                            onMouseLeave={handleMouseLeave}
+                          >
+                            <div className="font-black text-[10px] md:text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">
+                              <i className={`ph ${pin.type === 'machine' ? 'ph-engine' : 'ph-map-pin'} text-slate-400`}></i>
+                              {pin.name}
+                            </div>
+                            
+                            <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
+                              <div className="flex justify-between items-center text-[9px] md:text-xs">
+                                <span className="text-slate-400">Stan:</span>
+                                {pin.status === 'critical' ? (
+                                  <span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>
+                                ) : pin.status === 'in_progress' ? (
+                                    <span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>
+                                  ) : pin.status === 'warning' ? (
+                                  <span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>
+                                ) : (
+                                  <span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>
+                                )}
+                              </div>
+                              {pin.type === 'region' && (
+                                <div className="flex justify-between items-center text-[9px] md:text-xs">
+                                  <span className="text-slate-400">Maszyny w rejonie:</span>
+                                  <span className="font-bold">{pin.machineCount}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between items-center text-[9px] md:text-xs">
+                                <span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span>
+                                <span className="font-bold">{pin.itemCount}</span>
+                              </div>
+                            </div>
 
-                      {/* Tooltip w trybie View */}
-                      {isHovered && mode === 'view' && (
-                        <div 
-                          className={`absolute ${tooltipPosClass} w-56 bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-xl shadow-2xl border border-slate-700 pointer-events-auto z-50 animate-fade-in`}
-                          onMouseEnter={() => handleMouseEnter(pin.id)} // Podtrzymanie
-                          onMouseLeave={handleMouseLeave}
-                        >
-                          <div className="font-black text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">
-                            <i className={`ph ${pin.type === 'machine' ? 'ph-engine' : 'ph-map-pin'} text-slate-400`}></i>
-                            {pin.name}
-                          </div>
-                          
-                          <div className="mt-3 space-y-2 mb-4">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-400">Stan:</span>
-                              {pin.status === 'critical' ? (
-                                <span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>
-                              ) : pin.status === 'in_progress' ? (
-                                  <span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>
-                                ) : pin.status === 'warning' ? (
-                                <span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>
-                              ) : (
-                                <span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>
+                                                        <div className="flex flex-col gap-2 w-full">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if(isFullscreen) document.exitFullscreen?.();
+                                  onNavigateToTickets(pin.name);
+                                }}
+                                className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}
+                              >
+                                {modeType === 'planned_maintenance' ? 'Przejdź do serwisów' : 'Przejdź do awarii'} <i className="ph ph-arrow-right"></i>
+                              </button>
+
+                              {pin.type === 'region' && pin.hasSubmap && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCurrentSubmapId(pin.id);
+                                    setHoveredPin(null);
+                                  }}
+                                  className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2"
+                                >
+                                  Wejdź do podmapy <i className="ph ph-arrow-right"></i>
+                                </button>
                               )}
                             </div>
-                            {pin.type === 'region' && (
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400">Maszyny w rejonie:</span>
-                                <span className="font-bold">{pin.machineCount}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span>
-                              <span className="font-bold">{pin.itemCount}</span>
-                            </div>
-                          </div>
-                          
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if(isFullscreen) document.exitFullscreen?.();
-                              onNavigateToTickets(pin.name);
-                            }}
-                            className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-2`}
-                          >
-                            {modeType === 'planned_maintenance' ? 'Przejdź do serwisów' : 'Przejdź do awarii'} <i className="ph ph-arrow-right"></i>
-                          </button>
 
                           {/* Trójkącik tooltipa */}
                           <div className={`absolute ${arrowClass} border-[6px] border-transparent pointer-events-none`}></div>
@@ -717,77 +853,72 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
           </div>
 
           
-          {/* Ustawienia Mapy (Wgrywanie tła i widok domyślny) */}
-          {mode === 'edit' && (
-            <div className="absolute top-14 sm:top-16 left-4 z-30 bg-white p-4 rounded-xl shadow-xl w-64 sm:w-72 border border-amber-200 animate-fade-in">
-              <h3 className="font-bold text-slate-800 text-sm mb-3 border-b pb-2 flex items-center gap-2">
-                <i className="ph ph-image text-amber-500"></i> Ustawienia Tła i Widoku
-              </h3>
-              
-              <div className="mb-4">
-                <label className="block text-xs font-bold text-slate-500 mb-1">1. Wgraj nową mapę (plik)</label>
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleMapFileChange}
-                    disabled={uploadingMap}
-                    className="absolute inset-0 w-full h-full z-50 opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  
-                  <div 
-                    className={"w-full border-2 border-dashed rounded-lg p-3 text-center transition-colors " + (mapDragActive ? 'border-amber-500 bg-amber-50' : (uploadingMap ? 'bg-slate-50 border-slate-300' : 'bg-slate-50 border-blue-300 hover:bg-blue-50'))}
-                    onDragEnter={handleMapDragEnter}
-                    onDragLeave={handleMapDragLeave}
-                    onDragOver={handleMapDragOver}
-                    onDrop={handleMapDrop}
-                  >
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleMapFileChange}
-                      disabled={uploadingMap}
-                      className="absolute inset-0 z-50 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                    {uploadingMap ? (
-                      <span className="text-sm font-bold text-blue-600 flex items-center justify-center gap-2">
-                        <i className="ph ph-spinner animate-spin"></i> {Math.round(uploadProgress)}%
-                      </span>
-                    ) : (
-                      <span className={"text-xs font-bold " + (mapDragActive ? 'text-amber-600' : 'text-blue-600')}>
-                        {mapDragActive ? 'Upuść tutaj!' : 'Kliknij lub upuść plik tu'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">2. Zapisz kadr startowy</label>
-                <p className="text-[10px] text-slate-400 mb-2 leading-tight">Ustaw mapę (przybliż/przesuń) do optymalnego widoku startowego i zapisz.</p>
-                <button 
-                  onClick={saveDefaultView}
-                  className="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                >
-                  <i className="ph ph-floppy-disk"></i> Ustaw jako domyślny kadr
-                </button>
+          {/* Ustawienia Mapy (Wgrywanie t'a i widok domyslny) */}
+  {mode === 'edit' && currentSubmapId === null && (
+    <div className="absolute top-14 sm:top-16 left-4 z-30 bg-white p-3 md:p-4 rounded-xl shadow-xl w-48 sm:w-72 border border-amber-200 animate-fade-in transition-all">
+      {isSettingsMinimized ? (
+        <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(false); }} className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2">
+          <i className="ph ph-image text-amber-500"></i> Opcje Mapy
+        </button>
+      ) : (
+        <>
+          <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(true); }} className="absolute top-2 right-2 text-slate-400 p-1"><i className="ph ph-minus"></i></button>
+          <h3 className="font-bold text-slate-800 text-[10px] md:text-sm mb-3 border-b pb-2 flex items-center gap-2">
+            <i className="ph ph-image text-amber-500"></i> Ustawienia
+          </h3>
+          <div className="mb-4">
+            <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">1. Wgraj nowa mape</label>
+            <div className="relative">
+              <input type="file" accept="image/*" onChange={handleMapFileChange} disabled={uploadingMap} className="absolute inset-0 w-full h-full z-50 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+              <div className={"w-full border-2 border-dashed rounded-lg p-3 text-center transition-colors " + (mapDragActive ? 'border-amber-500 bg-amber-50' : (uploadingMap ? 'bg-slate-50 border-slate-300' : 'bg-slate-50 border-blue-300 hover:bg-blue-50'))} onDragEnter={handleMapDragEnter} onDragLeave={handleMapDragLeave} onDragOver={handleMapDragOver} onDrop={handleMapDrop}>
+                {uploadingMap ? (
+                  <>
+                    <i className="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-600">Przetwarzanie...</p>
+                  </>
+                ) : (
+                  <>
+                    <i className="ph ph-upload-simple text-2xl text-blue-400 mb-2"></i>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-600">Kliknij lub upusc plik</p>
+                  </>
+                )}
               </div>
             </div>
-          )}
+          </div>
+          
+          <div className="mb-2">
+            <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">3. Ustaw domyslny widok</label>
+            <button onClick={saveDefaultView} className="w-full bg-slate-800 hover:bg-slate-900 text-white text-[9px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+              <i className="ph ph-floppy-disk"></i> Ustaw jako domyslny kadr
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )}
 
           {/* Przyciski Narzędzi i Widoku (umieszczone na mapie, napis usunięty) */}
-          <div className="absolute top-4 left-4 z-30 flex flex-wrap gap-2">
+          <div className="absolute top-4 left-4 z-[60] flex flex-wrap gap-2 pointer-events-auto">
+              {currentSubmapId && (
+                <button 
+                  onClick={() => setCurrentSubmapId(null)}
+                  className="px-3 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md border border-indigo-500 flex items-center gap-2 transition-transform hover:scale-105 pointer-events-auto"
+                >
+                  <i className="ph ph-arrow-left text-base sm:text-lg"></i>
+                  <span className="hidden sm:inline">Powrót do Mapy Głównej</span>
+                </button>
+              )}
             { (user?.role === 'admin' || user?.permissions?.includes('edit_map')) && (
               <>
                 <button 
                   onClick={() => setMode('view')} 
-                  className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}
+                  className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs sm:text-[10px] md:text-sm flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}
                 >
                   <i className="ph ph-eye text-base sm:text-lg"></i> <span className="hidden sm:inline">Podgląd</span>
                 </button>
                 <button 
                   onClick={() => setMode('edit')} 
-                  className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}
+                  className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs sm:text-[10px] md:text-sm flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}
                 >
                   <i className="ph ph-pencil-simple text-base sm:text-lg"></i> <span className="hidden sm:inline">Edycja</span>
                 </button>
@@ -795,18 +926,117 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
             )}
             <button 
               onClick={toggleFullscreen} 
-              className="px-3 py-1.5 sm:py-2 rounded-lg font-bold text-xs sm:text-sm bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white flex items-center gap-2 shadow-md"
+              className="px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs sm:text-[10px] md:text-sm bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white flex items-center gap-2 shadow-md"
             >
               <i className={`ph ${isFullscreen ? 'ph-corners-in' : 'ph-corners-out'} text-base sm:text-lg`}></i> 
               <span className="hidden sm:inline">{isFullscreen ? 'Zamknij' : 'Pełny ekran'}</span>
             </button>
           </div>
 
+          
+          {/* Statystyki na mapie */}
+          {/* Statystyki na mapie */}
+            {mode === 'view' && modeType === 'tickets' && (
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-40 bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[220px] scale-[0.5] lg:scale-100 origin-top-right">
+                  <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
+                    {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Awarii'}
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Wszystkie maszyny</span>
+                    <span className="font-bold text-lg">{currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId).length : machines.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-amber-500/80">Brak lokalizacji (nieprzypięte)</span>
+                    <span className="font-bold text-lg text-amber-500/80">
+                      {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Zgłoszone awarie</span>
+                    <span className="font-bold text-lg text-amber-400">{
+                      currentSubmapId 
+                      ? tickets.filter(t => t.regionId === currentSubmapId && t.status !== 5 && t.status !== '5').length 
+                      : tickets.filter(t => t.status !== 5 && t.status !== '5').length
+                    }</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Krytyczne</span>
+                    <span className="font-bold text-lg text-rose-500">{
+                      currentSubmapId
+                      ? tickets.filter(t => t.regionId === currentSubmapId && t.isCritical && t.status !== 5 && t.status !== '5').length
+                      : tickets.filter(t => t.isCritical && t.status !== 5 && t.status !== '5').length
+                    }</span>
+                  </div>
+                </div>
+              )}
+
+            {mode === 'view' && modeType === 'planned_maintenance' && (
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-40 bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[240px] scale-[0.5] lg:scale-100 origin-top-right">
+                  <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
+                    {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Serwisów'}
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Wszystkie maszyny</span>
+                    <span className="font-bold text-lg">{currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId).length : machines.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-amber-500/80">Brak lokalizacji (nieprzypięte)</span>
+                    <span className="font-bold text-lg text-amber-500/80">
+                      {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Planowane (30 dni)</span>
+                    <span className="font-bold text-lg text-amber-400">{
+                      (() => {
+                        const now = new Date();
+                        return plannedServices.filter(srv => {
+                          if (srv.status === 'completed' || srv.status === 'in_progress') return false;
+                          const machine = machines.find(m => m.id === srv.machineId);
+                          if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false;
+                          let isOverdue = false;
+                          let isWarning = false;
+                          if (srv.nextDate) {
+                            const nDate = safeParseDate(srv.nextDate);
+                            if (nDate < now) isOverdue = true;
+                            else {
+                              const diffDays = Math.ceil(Math.abs(nDate - now) / (1000 * 60 * 60 * 24));
+                              if (diffDays <= 30) isWarning = true;
+                            }
+                          }
+                          if (srv.targetWorkHours && machine) {
+                            if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
+                            else if (srv.hoursInterval && (srv.targetWorkHours - machine.currentWorkHours) <= 30 * 8) isWarning = true;
+                          }
+                          return !isOverdue && isWarning;
+                        }).length;
+                      })()
+                    }</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] md:text-sm font-medium text-slate-300">Przekroczone / Pilne</span>
+                    <span className="font-bold text-lg text-rose-500">{
+                      (() => {
+                        const now = new Date();
+                        return plannedServices.filter(srv => {
+                          if (srv.status === 'completed' || srv.status === 'in_progress') return false;
+                          const machine = machines.find(m => m.id === srv.machineId);
+                          if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false;
+                          if (srv.nextDate && safeParseDate(srv.nextDate) < now) return true;
+                          if (srv.targetWorkHours && machine && machine.currentWorkHours >= srv.targetWorkHours) return true;
+                          return false;
+                        }).length;
+                      })()
+                    }</span>
+                  </div>
+                </div>
+              )}
+
           {/* Przyciski Sterowania Zoomem */}
-          <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl">
+          <div className="absolute bottom-[90px] lg:bottom-4 right-4 z-30 flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl">
             <button 
               onClick={() => setZoomScale(s => Math.min(parseFloat((s + 0.25).toFixed(2)), 4))} 
-              className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-xl shadow-sm transition-colors"
+              className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors"
               title="Powiększ (+)"
             >
               +
@@ -820,7 +1050,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
             </button>
             <button 
               onClick={() => setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 1))} 
-              className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-xl shadow-sm transition-colors"
+              className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors"
               title="Pomniejsz (-)"
             >
               -
@@ -837,11 +1067,11 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
             <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <i className="ph ph-push-pin text-blue-600 text-xl"></i> 
+                <i className="ph ph-push-pin text-blue-600 text-base md:text-xl"></i> 
                 Przypnij Obiekt
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
-                <i className="ph ph-x text-xl"></i>
+                <i className="ph ph-x text-base md:text-xl"></i>
               </button>
             </div>
             
@@ -849,23 +1079,25 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
               
               <div className="flex bg-gray-100 p-1 rounded-lg">
                 <button
-                  type="button"
-                  onClick={() => { setEditingType('region'); setEditingId(''); }}
-                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${editingType === 'region' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    type="button"
+                    disabled={currentSubmapId !== null}
+                    onClick={() => { setEditingType('region'); setEditingId(''); }}
+                    style={{ opacity: currentSubmapId !== null ? 0.3 : 1 }}
+                  className={`flex-1 py-2 text-[10px] md:text-sm font-bold rounded-md transition-all ${editingType === 'region' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Rejon / Hala
                 </button>
                 <button
                   type="button"
                   onClick={() => { setEditingType('machine'); setEditingId(''); }}
-                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${editingType === 'machine' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex-1 py-2 text-[10px] md:text-sm font-bold rounded-md transition-all ${editingType === 'machine' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Konkretna Maszyna
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Wybierz element z bazy</label>
+                <label className="block text-[9px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Wybierz element z bazy</label>
                 <select 
                   value={editingId} 
                   onChange={e => setEditingId(e.target.value)}
@@ -877,13 +1109,18 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
                     <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
                 </select>
-                {getUnpinnedItems().length === 0 && (
-                  <p className="text-[10px] text-amber-600 mt-2"><i className="ph ph-warning-circle"></i> Brak obiektów bez przypiętej lokalizacji. Usuń najpierw jakąś pinezkę z mapy.</p>
-                )}
+                                                    {getUnpinnedItems().length === 0 && (
+                    <p className="text-[11px] text-amber-600 mt-2 font-semibold">
+                      <i className="ph ph-check-circle mr-1"></i> 
+                      {currentSubmapId !== null 
+                        ? "Wszystkie przypisane maszyny są już na mapie! Możesz je złapać i swobodnie przesuwać." 
+                        : "Brak obiektów do przypięcia. Wszystkie znajdują się już na mapie (możesz je przesuwać)."}
+                    </p>
+                  )}
               </div>
 
               <div className="pt-2">
-                <button type="submit" disabled={!editingId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg shadow-sm transition-colors text-sm">
+                <button type="submit" disabled={!editingId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg shadow-sm transition-colors text-[10px] md:text-sm">
                   Zapisz pinezkę na mapie
                 </button>
               </div>

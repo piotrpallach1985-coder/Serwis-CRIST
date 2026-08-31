@@ -15,6 +15,7 @@ import Regions from './manager/Regions';
 import Roles from './manager/Roles';
 import Users from './manager/Users';
 import Settings from './manager/Settings';
+import Reports from './manager/Reports';
 import Services from './manager/Services';
 import Topics from './manager/Topics';
 import Reporters from './manager/Reporters';
@@ -24,13 +25,13 @@ import ActionItems from './manager/ActionItems';
 export default function ManagerView({ user, onLogout, onSwitchView }) {
   const [currentModule, setCurrentModule] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('module') || 'tickets';
+    return params.get('module') || 'home';
   });
 
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    const m = params.get('module') || 'tickets';
-    return params.get('tab') || (m === 'planned_maintenance' ? 'dashboard_planned' : (m === 'master_data' ? 'machines' : 'dashboard_tickets'));
+    const m = params.get('module') || 'home';
+    return params.get('tab') || (m === 'home' ? 'home' : (m === 'planned_maintenance' ? 'dashboard_planned' : (m === 'master_data' ? 'machines' : 'dashboard_tickets')));
   });
 
   const [globalTicketId, setGlobalTicketId] = useState(null);
@@ -39,19 +40,22 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
   // Obsługa przycisku "Wstecz" przeglądarki (Popstate)
   useEffect(() => {
     window.history.replaceState({ tab: activeTab, module: currentModule }, '', `?module=${currentModule}&tab=${activeTab}`);
+    
     const handlePopState = (e) => {
-      if (e.state) {
-        if (e.state.module) setCurrentModule(e.state.module);
-        if (e.state.tab) setActiveTab(e.state.tab);
-      }
+      const params = new URLSearchParams(window.location.search);
+      const mod = params.get('module');
+      const t = params.get('tab');
+      if (mod) setCurrentModule(mod);
+      if (t) setActiveTab(t);
     };
+
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    window.history.replaceState({ tab: tabId, module: currentModule }, '', `?module=${currentModule}&tab=${tabId}`);
+    window.history.pushState({ tab: tabId, module: currentModule }, '', `?module=${currentModule}&tab=${tabId}`);
   };
 
   // Stany na dane z chmury
@@ -59,6 +63,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
   const [machines, setMachines] = useState([]);
   const [services, setServices] = useState([]);
   const [plannedServices, setPlannedServices] = useState([]);
+  const [actionItems, setActionItems] = useState([]);
 
   const [branding, setBranding] = useState({
     companyName: 'CRIST S.A.',
@@ -79,7 +84,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
 
   const [roles, setRoles] = useState([]);
   const [regions, setRegions] = useState([]);
-  const [archiveDelayDays, setArchiveDelayDays] = useState(14);
+  
   const [allowTicketDeletion, setAllowTicketDeletion] = useState(false);
   const [plannedWarningDays, setPlannedWarningDays] = useState(30);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -98,21 +103,21 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
 
   // Pobieranie danych z Firebase (Real-time)
   useEffect(() => {
-    const qTickets = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+    const qTickets = query(collection(db, 'tickets'), where('status', 'in', [1,2,3,4]));
     const unsubTickets = onSnapshot(qTickets, (snapshot) => {
-      setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted).sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubMachines = onSnapshot(collection(db, 'machines'), (snapshot) => {
-      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubServices = onSnapshot(collection(db, 'services'), (snapshot) => {
-      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubPlanned = onSnapshot(collection(db, 'planned_services'), (snapshot) => {
-      setPlannedServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setPlannedServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     // Nasłuchiwanie powiadomień dla użytkownika
@@ -131,6 +136,10 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
           notifs.push({ id: docSnap.id, ...data });
         }
       });
+
+    const unsubActionItems = onSnapshot(collection(db, 'action_items'), (snapshot) => {
+      setActionItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted));
+    });
       
       notifs.sort((a, b) => {
         const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : Date.now();
@@ -159,19 +168,17 @@ setNotifications(notifs);
     });
 
     const unsubRoles = onSnapshot(collection(db, 'roles'), (snapshot) => {
-      setRoles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setRoles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubRegions = onSnapshot(collection(db, 'regions'), (snapshot) => {
-      setRegions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setRegions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.archiveDelayDays !== undefined) {
-          setArchiveDelayDays(data.archiveDelayDays);
-        }
+        
         if (data.allowTicketDeletion !== undefined) {
           setAllowTicketDeletion(data.allowTicketDeletion);
         }
@@ -237,8 +244,8 @@ setNotifications(notifs);
   const relevantNotifications = [];
 
   // Dynamiczne powiadomienia z nowo dodanych awarii (status 1)
-  if (currentModule === 'tickets' || currentModule === 'master_data') {
-    tickets.filter(t => t.status === 1 || t.status === '1').forEach(t => {
+  if (currentModule === 'tickets') {
+    tickets.filter(t => t.status !== 5 && t.status !== '5').forEach(t => {
       relevantNotifications.push({
         id: 'dyn_ticket_' + t.id,
         title: t.isCritical ? "KRYTYCZNA AWARIA!" : "Nowe zgłoszenie awarii",
@@ -252,8 +259,8 @@ setNotifications(notifs);
     });
   }
 
-  // Dynamiczne powiadomienia z przekroczonych serwisów planowanych
-  if (currentModule === 'planned_maintenance' || currentModule === 'master_data') {
+  // Indywidualne powiadomienia dla przedawnionych serwisow
+  if (currentModule === 'planned_maintenance') {
     const now = new Date();
     plannedServices.forEach(srv => {
       if (srv.status === 'completed' || srv.status === 'in_progress') return;
@@ -283,8 +290,30 @@ setNotifications(notifs);
         });
       }
     });
+
+    // Zbiorcze powiadomienie dla tematow do realizacji
+    let openActionItems = 0;
+    actionItems.forEach(item => {
+      if (item.status !== 'completed') {
+        openActionItems++;
+      }
+    });
+
+    if (openActionItems > 0) {
+      relevantNotifications.push({
+        id: 'dyn_action_grouped',
+        title: "TEMATY DO REALIZACJI",
+        message: 'Liczba tematow do realizacji: ' + openActionItems,
+        isCritical: true,
+        read: false,
+        linkTo: 'action_items',
+        createdAt: { toDate: () => new Date() },
+        isDynamic: true
+      });
+    }
   }
 
+  
   // Oryginalne powiadomienia (np. inne systemowe)
   notifications.forEach(n => {
     if (n.ticketId) return; // Mamy dynamiczne
@@ -327,13 +356,13 @@ setNotifications(notifs);
     if (user.role === 'admin') {
       workItems.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
       workItems.push({ id: 'roles', label: 'Role i Uprawnienia', icon: 'ph-shield-check' });
-      workItems.push({ id: 'settings', label: 'Ustawienia', icon: 'ph-gear' });
+      workItems.push({ id: 'reports', label: 'Raportowanie & Ustawienia', icon: 'ph-chart-bar' });
+      workItems.push({ id: 'settings', label: 'Administrator Programu', icon: 'ph-gear' });
     }
   }
 
   const dataItems = [];
 
-  // Filtrowanie zakładek na podstawie roli
   let visibleWorkItems = workItems;
   let visibleDataItems = dataItems;
 
@@ -365,7 +394,7 @@ setNotifications(notifs);
       {/* Menu Boczne */}
       <aside 
         className={`${isSidebarOpen ? 'w-72' : 'w-0 -translate-x-full'} 
-        md:translate-x-0 md:static fixed inset-y-0 left-0 z-50 bg-[#111827] text-gray-300 transition-all duration-300 ease-in-out flex flex-col no-print overflow-hidden border-r border-gray-800 shadow-xl`}
+        lg:translate-x-0 lg:static fixed inset-y-0 left-0 z-[9999] bg-[#111827] text-gray-300 transition-all duration-300 ease-in-out flex flex-col no-print overflow-hidden border-r border-gray-800 shadow-xl`}
       >
         <div className="p-6 bg-[#0f172a] min-w-[288px] border-b border-gray-800">
 
@@ -442,7 +471,7 @@ setNotifications(notifs);
           )}
         </nav>
 
-        <div className="p-6 bg-[#0f172a] min-w-[288px] border-t border-gray-800 space-y-2">
+        <div className="p-6 pb-12 bg-[#0f172a] min-w-[288px] border-t border-gray-800 space-y-2">
           <button 
             onClick={() => {
               // Wróć do portalu
@@ -461,25 +490,32 @@ setNotifications(notifs);
 
       {/* Główna zawartość */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between no-print shadow-sm">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-gray-100 rounded text-gray-600 transition-colors"
-            >
-              <i className="ph ph-list text-2xl"></i>
-            </button>
-            <h2 className="text-xl font-semibold text-gray-800 hidden sm:block">
+        <header className="bg-[#002b5e] lg:bg-white text-white lg:text-gray-800 p-4 flex justify-between items-center sticky top-0 z-[1000] lg:border-b lg:border-gray-200 lg:shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 lg:bg-blue-100 lg:text-blue-700 text-white rounded-full flex items-center justify-center font-bold shrink-0">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <span className="text-lg font-bold lg:hidden">{user?.name || 'Portal'}</span>
+            <span className="hidden lg:block font-semibold text-xl">
               {workItems.find(m => m.id === activeTab)?.label || dataItems.find(m => m.id === activeTab)?.label}
-            </h2>
+            </span>
           </div>
 
-          {/* DZWONECZEK POWIADOMIEŃ */}
+          <div className="flex gap-4 text-2xl items-center">
+            {/* Przycisk menu dla desktopu */}
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="hidden lg:block p-2 hover:bg-gray-100 rounded text-gray-600 transition-colors"
+            >
+              <i className="ph ph-list"></i>
+            </button>
+
+            {/* DZWONECZEK POWIADOMIEŃ */}
           {currentModule !== 'master_data' && (
             <div className="relative">
               <button 
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+                className="relative p-2 text-white lg:text-gray-600 hover:bg-white/10 lg:hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
               >
                 <i className="ph ph-bell text-2xl"></i>
                 {unreadCount > 0 && (
@@ -506,15 +542,22 @@ setNotifications(notifs);
                           onClick={() => {
                             markAsRead(n.id);
                             if (n.ticketId) {
-                              setGlobalTicketId(n.ticketId);
-                              setIsNotificationsOpen(false);
-                              window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
-                              window.dispatchEvent(new PopStateEvent('popstate'));
-                            } else if (n.linkTo === 'planned_maintenance') {
-                              setIsNotificationsOpen(false);
-                              window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
-                              window.dispatchEvent(new PopStateEvent('popstate'));
-                            }
+                                setGlobalTicketId(n.ticketId);
+                                setIsNotificationsOpen(false);
+                                setCurrentModule('tickets');
+                                setActiveTab('tickets');
+                                window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
+                              } else if (n.linkTo === 'planned_maintenance') {
+                                setIsNotificationsOpen(false);
+                                setCurrentModule('planned_maintenance');
+                                setActiveTab('planned_maintenance');
+                                window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
+                              } else if (n.linkTo === 'action_items') {
+                                  setIsNotificationsOpen(false);
+                                  setCurrentModule('planned_maintenance');
+                                  setActiveTab('action_items');
+                                  window.history.pushState({ module: 'planned_maintenance', tab: 'action_items' }, '', '?module=planned_maintenance&tab=action_items');
+                                }
                           }}
                           className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
                         >
@@ -538,9 +581,9 @@ setNotifications(notifs);
               )}
             </div>
           )}
-        </header>
+        </div></header>
 
-        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-gray-50">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-24 lg:pb-6">
           {activeTab === 'dashboard_tickets' && (
             <MapComponent 
               tickets={tickets} 
@@ -570,24 +613,8 @@ setNotifications(notifs);
             />
           )}
           {activeTab === 'home' && <HomeDashboard setActiveTab={setActiveTab} setCurrentModule={setCurrentModule} user={user} />}
-          {activeTab === 'tickets' && <Tickets machines={machines} initialSearchQuery={globalSearchQuery} tickets={tickets.filter(t => {
-            if (t.isManuallyArchived) return false; // Ukryj w bieżących jeśli zarchiwizowano ręcznie
-            if (t.status !== 5) return true;
-            if (!t.closedAt) return true; // Jeśli brak daty zamknięcia, pokaż w bieżących
-            
-            const closedDate = safeParseDate(t.closedAt) || new Date(0);
-            const daysDiff = (new Date() - closedDate) / (1000 * 60 * 60 * 24);
-            return daysDiff < archiveDelayDays;
-          })} user={user} services={services} allowTicketDeletion={allowTicketDeletion} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
-          {activeTab === 'archive' && <Tickets tickets={tickets.filter(t => {
-            if (t.isManuallyArchived) return true; // Pokaż w archiwum jeśli zarchiwizowano ręcznie przez admina
-            if (t.status !== 5) return false;
-            if (!t.closedAt) return false;
-            
-            const closedDate = safeParseDate(t.closedAt) || new Date(0);
-            const daysDiff = (new Date() - closedDate) / (1000 * 60 * 60 * 24);
-            return daysDiff >= archiveDelayDays;
-          })} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
+          {activeTab === 'tickets' && <Tickets machines={machines} initialSearchQuery={globalSearchQuery} tickets={tickets} user={user} services={services} allowTicketDeletion={allowTicketDeletion} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
+          {activeTab === 'archive' && <Tickets tickets={[]} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
           {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
           {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
           {activeTab === 'action_items' && <ActionItems machines={machines} user={user} />}
@@ -602,14 +629,44 @@ setNotifications(notifs);
           {activeTab === 'users' && <Users />}
           {activeTab === 'roles' && <Roles />}
           {activeTab === 'settings' && <Settings />}
+            {activeTab === 'reports' && <Reports tickets={tickets} plannedServices={plannedServices} machines={machines} />}
         </div>
       </main>
 
-      {isSidebarOpen && (
+            {isSidebarOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/50 z-[9998]"
           onClick={() => setIsSidebarOpen(false)}
         ></div>
+      )}
+
+      {/* BOTTOM NAVIGATION FOR MOBILE (PZU STYLE) */}
+      {currentModule !== 'home' && (
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[68px] z-[9997] shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] pb-1">
+        
+        {/* Renderuj pierwsze 4 zakładki dynamicznie dla danego modułu */}
+        {[...workItems, ...dataItems].slice(0, 4).map((item, index) => {
+          const isActive = activeTab === item.id;
+          return (
+            <button 
+              key={item.id}
+              onClick={() => { handleTabChange(item.id); }}
+              className={`flex flex-col items-center justify-center w-16 h-full transition-colors ${isActive ? 'text-[#002b5e]' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <i className={`ph ${isActive ? 'ph-fill ' : ''}${item.icon} text-2xl mb-0.5`}></i>
+              <span className="text-[10px] font-bold text-center leading-tight line-clamp-1">{item.label}</span>
+            </button>
+          );
+        })}
+
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="flex flex-col items-center justify-center w-16 h-full transition-colors text-gray-400 hover:text-gray-600"
+        >
+          <i className="ph ph-dots-three-circle text-2xl mb-0.5"></i>
+          <span className="text-[10px] font-bold">Więcej</span>
+        </button>
+      </nav>
       )}
     </div>
   );

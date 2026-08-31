@@ -1,8 +1,44 @@
-import { useState, useMemo } from 'react';
-import KPIReportPanel from './reports/KPIReportPanel';
+import { useState, useMemo, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
+
 
 export default function KPIDashboard({ tickets, machines, plannedServices = [] }) {
-  const [period, setPeriod] = useState('all');
+  const [period, setPeriod] = useState('7');
+
+  const [historicalTickets, setHistoricalTickets] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        
+        const q = query(
+          collection(db, 'tickets'),
+          where('closedAt', '>=', ninetyDaysAgo)
+        );
+        const snap = await getDocs(q);
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && x.status === 5);
+        setHistoricalTickets(docs);
+      } catch (err) {
+        console.error("Błąd pobierania historii KPI:", err);
+      }
+      setLoadingHistory(false);
+    };
+    fetchHistory();
+  }, []);
+
+  const allTicketsForKPI = useMemo(() => {
+    // Combine active tickets (passed via props) with historical closed tickets
+    const activeMap = new Map(tickets.map(t => [t.id, t]));
+    historicalTickets.forEach(t => {
+      if (!activeMap.has(t.id)) activeMap.set(t.id, t);
+    });
+    return Array.from(activeMap.values());
+  }, [tickets, historicalTickets]);
+
 
   const safeParseDate = (dateVal) => {
     if (!dateVal) return null;
@@ -13,7 +49,7 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
   };
 
   const filteredTickets = useMemo(() => {
-    return tickets.filter(t => {
+    return allTicketsForKPI.filter(t => {
       if (period === 'all') return true;
       const createdAt = safeParseDate(t.createdAt);
       if (!createdAt) return false;
@@ -34,7 +70,7 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
       
       return true;
     });
-  }, [tickets, period]);
+  }, [allTicketsForKPI, period]);
 
   // 1. Podstawowe statystyki
   const totalTickets = filteredTickets.length;
@@ -72,7 +108,7 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       
-      <KPIReportPanel tickets={tickets} plannedServices={plannedServices} machines={machines} />
+      
       {/* Pasek filtrów */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap gap-4 justify-between items-center">
         <div className="font-bold text-gray-700 flex items-center gap-2">
@@ -93,46 +129,70 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-6">
         
-        {/* Kafel MTTR */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-3xl">
-            <i className="ph ph-timer"></i>
+        {/* Kafel: Wszystkie Zgłoszenia */}
+        <div className="bg-white p-2 lg:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-1 lg:gap-4 text-center lg:text-left">
+          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-lg lg:text-3xl shrink-0">
+            <i className="ph ph-files"></i>
           </div>
           <div>
-            <div className="text-2xl font-bold text-gray-800">
-              {avgHours}g {avgMins}m
-            </div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Średni czas naprawy (MTTR)</div>
-          </div>
-        </div>
-
-        {/* Kafel skuteczności zamknięć */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-3xl">
-            <i className="ph ph-chart-pie-slice"></i>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-gray-800">
-              {totalTickets > 0 ? Math.round((closedTickets.length / totalTickets) * 100) : 0}%
-            </div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Wskaźnik zamknięć zgłoszeń</div>
+            <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{totalTickets}</div>
+            <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">Ilość zgłoszeń</div>
           </div>
         </div>
 
         {/* Kafel zgłoszeń krytycznych */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center text-3xl">
+        <div className="bg-white p-2 lg:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-1 lg:gap-4 text-center lg:text-left">
+          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center text-lg lg:text-3xl shrink-0">
             <i className="ph ph-warning-octagon"></i>
           </div>
           <div>
-            <div className="text-3xl font-bold text-gray-800">{criticalTickets.length}</div>
-            <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Awarii krytycznych (wybrany okres)</div>
+            <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{criticalTickets.length}</div>
+            <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">Awarii krytycznych</div>
+          </div>
+        </div>
+
+        {/* Kafel: Zgłoszenia zamknięte */}
+        <div className="bg-white p-2 lg:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-1 lg:gap-4 text-center lg:text-left">
+          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-lg lg:text-3xl shrink-0">
+            <i className="ph ph-check-circle"></i>
+          </div>
+          <div>
+            <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{closedTickets.length}</div>
+            <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">Zgłoszeń zamkniętych</div>
+          </div>
+        </div>
+
+        {/* Kafel MTTR */}
+        <div className="bg-white p-2 lg:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-1 lg:gap-4 text-center lg:text-left">
+          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-lg lg:text-3xl shrink-0">
+            <i className="ph ph-timer"></i>
+          </div>
+          <div>
+            <div className="text-base lg:text-2xl font-bold text-gray-800 leading-tight">
+              {avgHours}g {avgMins}m
+            </div>
+            <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">Średni czas (MTTR)</div>
+          </div>
+        </div>
+
+        {/* Kafel skuteczności zamknięć */}
+        <div className="bg-white p-2 lg:p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-start gap-1 lg:gap-4 text-center lg:text-left">
+          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-lg lg:text-3xl shrink-0">
+            <i className="ph ph-chart-pie-slice"></i>
+          </div>
+          <div>
+            <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">
+              {totalTickets > 0 ? Math.round((closedTickets.length / totalTickets) * 100) : 0}%
+            </div>
+            <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">Wskaźnik zamknięć</div>
           </div>
         </div>
 
       </div>
+
 
       {/* Tabela awaryjności maszyn */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
