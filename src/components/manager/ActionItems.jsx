@@ -199,14 +199,16 @@ export default function ActionItems({ machines, user }) {
             </div>
             
             <div className="mt-2 flex justify-end">
-              {item.status !== 'completed' && (
-                  <button 
-                    onClick={() => handleComplete(item.id)} 
-                    className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 font-bold py-1.5 px-4 rounded-lg text-xs transition-colors shadow-sm inline-flex items-center gap-1"
-                  >
-                    <i className="ph ph-check-circle text-base"></i> Wykonano
-                  </button>
-                )}
+              {item.status !== 'completed' ? (
+                    <button 
+                      onClick={() => handleComplete(item.id)} 
+                      className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 font-bold py-1.5 px-4 rounded-lg text-xs transition-colors shadow-sm inline-flex items-center gap-1"
+                    >
+                      <i className="ph ph-check-circle text-base"></i> Potwierdź wykonanie
+                    </button>
+                  ) : (
+                    <span className="text-green-600 font-bold text-xs flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100"><i className="ph ph-check"></i> Wykonano</span>
+                  )}
             </div>
           </div>
         );
@@ -270,7 +272,7 @@ export default function ActionItems({ machines, user }) {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                          {item.status !== 'completed' && (<button onClick={() => handleComplete(item.id)} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-bold transition-colors">Wykonano</button>)}
+                          {item.status !== 'completed' ? (<button onClick={() => handleComplete(item.id)} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-bold transition-colors shadow-sm">Potwierdź wykonanie</button>) : (<span className="text-green-600 font-bold text-xs"><i className="ph ph-check"></i> Wykonano</span>)}
                           
                     </td>
                   </tr>

@@ -758,19 +758,19 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
 
         
         {/* Sekcja: Spostrzeżenia i Uwagi na przyszłość */}
-        <div className="mt-8 bg-amber-50 p-6 rounded-xl border border-amber-200">
-          <h3 className="text-lg font-bold text-amber-900 flex items-center gap-2 mb-4">
+        <div className="mt-4 bg-amber-50 p-3 rounded-xl border border-amber-200">
+          <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2 mb-2">
             <i className="ph ph-lightbulb text-xl text-amber-600"></i>
             Spostrzeżenia i uwagi na przyszłość
           </h3>
           
-          <div className="space-y-4 mb-6">
+          <div className="space-y-2 mb-3">
             {(!srv.futureNotes || srv.futureNotes.length === 0) ? (
               <p className="text-sm text-amber-700 italic">Brak zapisanych uwag.</p>
             ) : (
               srv.futureNotes.map((note, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-lg shadow-sm border border-amber-100 flex flex-col">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
+                <div key={idx} className="bg-white p-2.5 rounded-lg shadow-sm border border-amber-100 flex flex-col">
+                  <p className="text-xs text-gray-800 whitespace-pre-wrap">{note.text}</p>
                   <div className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex justify-between items-center">
                     <span>Dodał: {note.author}</span>
                     <span>{new Date(note.createdAt).toLocaleString()}</span>
@@ -783,10 +783,10 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
           {!isCompleted && (
           <div className="flex flex-col gap-2">
             <textarea 
-              value={newFutureNote} 
-              onChange={e => setNewFutureNote(e.target.value)} 
-              className="w-full p-3 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm resize-y" 
-              rows="3" 
+                value={newFutureNote} 
+                onChange={e => setNewFutureNote(e.target.value)} 
+                className="w-full p-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-xs resize-y" 
+                rows="2" 
               placeholder="Wpisz nowe spostrzeżenia lub uwagi..." 
             />
             <div className="flex justify-end">

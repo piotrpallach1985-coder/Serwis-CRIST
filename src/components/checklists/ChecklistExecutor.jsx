@@ -1,7 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { storage } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { compressImage } from '../../utils/imageCompressor';
 
-export default function ChecklistExecutor({ steps, onComplete, initialResponses = {} }) {
-  const [responses, setResponses] = useState(initialResponses);
+export default function ChecklistExecutor({ steps, onComplete, initialResponses = {}, storageKey = null }) {
+  const [responses, setResponses] = useState(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem('checklist_progress_' + storageKey);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return initialResponses;
+  });
+
+  useEffect(() => {
+    if (storageKey) {
+      localStorage.setItem('checklist_progress_' + storageKey, JSON.stringify(responses));
+    }
+  }, [responses, storageKey]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
 
@@ -85,9 +103,9 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
           return (
             <div 
               key={step.id} 
-              className={`p-5 rounded-2xl border-2 transition-colors \${isMissing ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}
+              className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-colors ${lockedSteps[step.id] ? 'border-gray-300 bg-gray-100 opacity-75' : (isMissing ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50')}`}
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-start">
                   <h4 className="font-bold text-gray-800 text-lg flex items-start gap-2">
                     <span className="bg-white text-gray-600 rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0 border border-gray-200 shadow-sm">
@@ -104,8 +122,8 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
 
                 <div className="mt-2">
                   {step.type === 'CHECKBOX' && (
-                    <label className="flex items-center gap-4 cursor-pointer p-2 bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
-                      <div className="relative flex items-center justify-center w-12 h-12 rounded-full border-2 border-gray-300 bg-white">
+                    <label className="flex items-center gap-3 cursor-pointer p-2 bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
+                      <div className="relative flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-300 bg-white">
                         <input 
                           type="checkbox"
                           className="opacity-0 absolute w-full h-full cursor-pointer"
@@ -131,10 +149,10 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
                   )}
 
                   {step.type === 'PHOTO' && (
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                       {val ? (
                         <div className="relative">
-                          <img src={val} alt="Załącznik" className="w-full h-48 object-cover rounded-xl border-2 border-gray-200" />
+                          <img src={val} alt="Załącznik" className="w-full h-24 sm:h-32 sm:h-48 object-cover rounded-xl border-2 border-gray-200" />
                           <button 
                             onClick={() => updateResponse(step.id, null)}
                             className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg"
@@ -143,7 +161,7 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
                           </button>
                         </div>
                       ) : (
-                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 bg-white rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
+                        <label className="flex flex-col items-center justify-center w-full h-24 sm:h-32 border-2 border-dashed border-gray-300 bg-white rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
                           {uploadingPhotoId === step.id ? (
                             <div className="flex flex-col items-center gap-2 text-blue-600">
                               <i className="ph ph-spinner-gap animate-spin text-3xl"></i>
@@ -165,7 +183,25 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
                       )}
                     </div>
                   )}
+                
+                <div className="mt-4 flex justify-end">
+                  {!lockedSteps[step.id] ? (
+                    <button
+                      onClick={() => setLockedSteps(prev => ({...prev, [step.id]: true}))}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg font-bold text-sm hover:bg-green-600 transition-colors shadow-sm"
+                    >
+                      Wykonana
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setLockedSteps(prev => ({...prev, [step.id]: false}))}
+                      className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg font-bold text-sm hover:bg-gray-300 transition-colors shadow-sm"
+                    >
+                      Edytuj
+                    </button>
+                  )}
                 </div>
+</div>
               </div>
             </div>
           );
@@ -175,7 +211,7 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
       <button
         onClick={handleSubmit}
         disabled={!isFormValid() || isSubmitting}
-        className="w-full bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 text-white font-bold text-lg py-5 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3"
+        className="w-full bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 text-white font-bold text-lg py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3"
       >
         {isSubmitting ? (
           <>
