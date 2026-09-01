@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import jsQR from 'jsqr';
@@ -17,7 +17,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
   }); // 'scan', 'form', 'success'
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null); // Do debuggowania na telefonie
 
   // Obsługa przycisku Wstecz (Popstate)
   useEffect(() => {
@@ -28,17 +28,15 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [step]);
+return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleStepChange = (newStep) => {
     setStep(newStep);
     window.history.pushState({ step: newStep }, '', `?module=operator&step=${newStep}`);
   };
-  
   const [isLiveScanning, setIsLiveScanning] = useState(false);
   const html5QrcodeRef = useRef(null);
-  const machinesRef = useRef([]);
 
   // Status sieci
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -54,72 +52,72 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
     };
   }, []);
 
-  // Pobieranie maszyn i tematów (Zabezpieczone przed "Wyścigiem" autoryzacji)
+  // Formularz
+
+  // Pobieranie maszyn i tematów
   useEffect(() => {
     let unsubscribeMachines = () => {};
     let unsubscribeTopics = () => {};
     let unsubscribeReporters = () => {};
     let unsubscribeRegions = () => {};
+    let authUnsub = () => {};
 
-    // Czekamy, aż Firebase potwierdzi przypisanie tokenu
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // Mamy token (Manager lub Anonim). Bezpiecznie pobieramy dane z Firestore.
-        try {
-          unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
-            const machinesData = querySnapshot.docs.map(document => ({ id: document.id, ...document.data() })).filter(m => !m.isDeleted);
-            setMachines(machinesData);
-
-            if (initialMachineId && step === 'scan') {
-              const targetMachine = machinesData.find(m => m.id === initialMachineId);
-              if (targetMachine) {
-                setSelectedMachine(targetMachine);
-                handleStepChange('form');
-              } else {
-                const docRef = doc(db, "machines", initialMachineId);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                  setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
-                  handleStepChange('form');
-                }
-              }
-            }
-          }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
-
-          unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
-            setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
-          }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
-
-          unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
-            setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
-          }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
-
-          unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
-            setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
-          }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
-
-        } catch (error) {
-          console.error("Błąd inicjalizacji bazy:", error);
-          setErrorMsg("Krytyczny błąd bazy: " + error.message);
-        }
-      } else {
-        // Brak tokenu. Logujemy anonima w tle.
-        signInAnonymously(auth).catch(err => {
-          console.error("Błąd autoryzacji:", err);
-          setErrorMsg("Błąd połączenia z serwerem autoryzacji: " + err.message);
-        });
+    try {
+      if (!auth.currentUser) {
+        signInAnonymously(auth).catch((error) => console.error("Anonymous login error:", error));
       }
-    });
 
+      authUnsub = onAuthStateChanged(auth, (authUser) => {
+        if (authUser) {
+          // Firebase Auth confirms we have a token, safe to attach listeners
+
+      unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
+        const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
+        setMachines(machinesData);
+
+        if (initialMachineId && step === 'scan') {
+          const targetMachine = machinesData.find(m => m.id === initialMachineId);
+          if (targetMachine) {
+            setSelectedMachine(targetMachine);
+            handleStepChange('form');
+          } else {
+            const docRef = doc(db, "machines", initialMachineId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
+              handleStepChange('form');
+            }
+          }
+        }
+      }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
+
+      unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
+        setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
+      }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
+
+      unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
+        setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+      }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
+
+      unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
+        setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+      }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
+              }
+        });
+      } catch (error) {
+      console.error("Błąd inicjalizacji:", error);
+      setErrorMsg("Krytyczny błąd: " + error.message);
+    }
     return () => {
-      unsubscribeAuth();
       unsubscribeMachines();
       unsubscribeTopics();
       unsubscribeReporters();
       unsubscribeRegions();
+        if (authUnsub) authUnsub();
     };
   }, [initialMachineId]);
 
+  const machinesRef = useRef([]);
   useEffect(() => {
     machinesRef.current = machines;
   }, [machines]);
@@ -184,9 +182,73 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
       }
     };
   }, []);
+  const handleFileScan = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        // Skalowanie obrazu
+        let w = img.width;
+        let h = img.height;
+        if (w > 1200 || h > 1200) {
+          const ratio = Math.min(1200 / w, 1200 / h);
+          w = w * ratio;
+          h = h * ratio;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        context.drawImage(img, 0, 0, w, h);
+        
+        const imageData = context.getImageData(0, 0, w, h);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "attemptBoth",
+        });
+
+        if (code) {
+          let machineId = code.data;
+          if (code.data.includes('?machine=')) {
+            const urlParams = new URLSearchParams(code.data.split('?')[1]);
+            machineId = urlParams.get('machine');
+          }
+          const currentMachines = machinesRef.current;
+          const foundMachine = currentMachines.find(m => m.id === machineId);
+          if (foundMachine) {
+            setSelectedMachine(foundMachine);
+            handleStepChange('form');
+          } else {
+            alert('Nie znaleziono maszyny o tym kodzie w bazie.');
+            handleStepChange('scan');
+          }
+        } else {
+          setErrorMsg('Nie wykryto kodu QR na zdjęciu. Spróbuj jeszcze raz (zrób wyraźne zdjęcie).');
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+
+  const resetFlow = () => {
+    
+    
+    
+    setSelectedMachine(null);
+    setErrorMsg(null);
+    if (initialMachineId) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    handleStepChange('scan');
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col relative">
+
 
       <header className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-md">
         <div>
@@ -215,6 +277,7 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
 
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full mt-4">
         
+        {/* Kontener na błędy (Logowanie błędów na ekranie) */}
         {errorMsg && (
           <div className="mb-4 bg-red-100 border-l-4 border-red-600 text-red-900 p-4 rounded shadow-sm">
             <h3 className="font-bold text-sm">Log błędu systemu:</h3>
@@ -313,7 +376,6 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
             stopLiveScanner={stopLiveScanner}
           />
         )}
-        
         {step === 'success' && (
           <div className="bg-white p-8 sm:p-12 rounded-3xl shadow-xl flex flex-col items-center justify-center text-center animate-fade-in border border-emerald-100 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>

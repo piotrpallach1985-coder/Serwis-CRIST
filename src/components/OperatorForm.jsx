@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import React, { useState } from 'react';
+import { collection, doc, setDoc, serverTimestamp, getDoc, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
+import { savePhotoToIndexedDB } from '../utils/offlineStorage';
 import { db, storage } from '../firebase';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function OperatorForm({
   selectedMachine,
@@ -15,28 +16,38 @@ export default function OperatorForm({
   reportersList,
   stopLiveScanner
 }) {
-  const [topicMode, setTopicMode] = useState('select'); 
+  const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
+  const [reporterDeviceId] = useState(() => {
+    let id = localStorage.getItem('device_id_token');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 8).toUpperCase();
+      localStorage.setItem('device_id_token', id);
+    }
+    return id;
+  });
   const [isCritical, setIsCritical] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [photos, setPhotos] = useState([]);
+  const [pendingPhotos, setPendingPhotos] = useState([]);
   const [uploadProgress, setUploadProgress] = useState('');
 
-  // 1. ZALOGOWANIE W TLE PRZY OTWARCIU FORMULARZA (Odblokowuje wgrywanie zdjęć)
-  useEffect(() => {
-    const auth = getAuth();
-    if (!auth.currentUser) {
-      signInAnonymously(auth).catch(err => console.error("Błąd logowania w tle:", err));
-    }
-  }, []);
+  
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; 
+    if (loading) return;
     
     if (selectedMachine.id === 'manual' && (!selectedMachine.name || !selectedMachine.name.trim())) {
       return alert('Podaj nazwę maszyny!');
@@ -44,42 +55,111 @@ export default function OperatorForm({
     if (!topic || !description || !reporterName.trim() || !reporterPhone.trim()) {
       return alert('Wypełnij wszystkie wymagane pola (Imię, Telefon, Temat, Opis)!');
     }
-
     const cleanedPhone = reporterPhone.replace(/\D/g, '');
     if (cleanedPhone.length !== 9) {
       return alert('Numer telefonu musi składać się z dokładnie 9 cyfr.');
     }
-
+    
     if (!isOnline) {
       alert('Jesteś offline. Zgłoszenie zostanie zapisane lokalnie i wysłane automatycznie po odzyskaniu połączenia z siecią.');
     }
 
+    // 1. Zabezpieczenie przed duplikowaniem (2 godziny)
+    if (selectedMachine.id !== 'manual') {
+      try {
+        const q = query(collection(db, 'tickets'), where('machineId', '==', selectedMachine.id));
+        const snap = await getDocs(q);
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        let foundDuplicate = null;
+        snap.forEach(doc => {
+          const t = doc.data();
+          const d = new Date(t.createdAt);
+          const st = Number(t.status);
+          if (d > twoHoursAgo && st !== 5) foundDuplicate = d;
+        });
+        
+        if (foundDuplicate) {
+          const proceed = window.confirm(`UWAGA: Awaria dla tej maszyny została już zgłoszona dzisiaj o godzinie ${foundDuplicate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.\n\nCzy na pewno chcesz wysłać KOLEJNE zgłoszenie dla tego samego urządzenia?`);
+          if (!proceed) return;
+        }
+      } catch (err) {
+        console.error('Błąd weryfikacji duplikatów:', err);
+      }
+    }
+
     setLoading(true);
     setErrorMsg(null);
+
+    // 2. Dodawanie Zgłaszającego do bazy
+    const reporterNameTrimmed = reporterName.trim();
+    if (reporterNameTrimmed) {
+      try {
+        const repQ = query(collection(db, 'reporters'), where('name', '==', reporterNameTrimmed));
+        const repSnap = await getDocs(repQ);
+        if (repSnap.empty) {
+          await addDoc(collection(db, 'reporters'), {
+            name: reporterNameTrimmed + " (DO WERYFIKACJI)",
+            phone: reporterPhone.trim(),
+            createdAt: new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.error("Błąd zapisywania zgłaszającego:", e);
+      }
+    }
+
     try {
       let finalMachineId = selectedMachine.id;
-      let finalMachineName = selectedMachine.name;
       
-      // 2. BLOKADA ANTY-SPAMOWA DLA NOWYCH MASZYN
-      if (finalMachineId === 'manual') {
-        const newMachineRef = doc(collection(db, 'machines'));
-        finalMachineName = `${selectedMachine.name} (DO WERYFIKACJI)`;
-        
-        await setDoc(newMachineRef, {
-          name: finalMachineName,
-          bay: '',
-          createdAt: new Date().toISOString()
-        });
-        finalMachineId = newMachineRef.id;
+      
+        if (finalMachineId === 'manual') {
+          // Użytkownik dodał "Inną" maszynę
+          // Zgodnie z prośbą, dodajemy ją do bazy, by w przyszłości mogła zostać edytowana przez admina.
+          const newMachineRef = await addDoc(collection(db, 'machines'), {
+            name: selectedMachine.name + ' (DO WERYFIKACJI)',
+            regionId: selectedMachine.regionId || '',
+            bay: selectedMachine.bay || '',
+            currentWorkHours: 0,
+            status: 'active',
+            isDeleted: false,
+            createdAt: new Date().toISOString(),
+            createdBy: reporterName.trim() || 'Operator',
+            description: 'Maszyna dodana z poziomu zgłoszenia awarii. Wymaga uzupełnienia danych i wygenerowania QR.'
+          });
+          finalMachineId = newMachineRef.id;
+        }
+
+
+      
+      const ticketRef = doc(collection(db, 'tickets'));
+      const regionObj = regions.find(r => r.id === selectedMachine.regionId);
+      let uploadedUrls = [];
+      let saveToOfflineQueue = false;
+
+      // 3. Wgrywamy zdjęcia NAJPIERW (jeśli online)
+      if (pendingPhotos.length > 0) {
+        if (navigator.onLine) {
+          try {
+            for (const p of pendingPhotos) {
+              const fileName = Date.now() + '_' + p.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+              const fileRef = ref(storage, `tickets/${ticketRef.id}/${fileName}`);
+              await uploadString(fileRef, p.base64, 'data_url');
+              const url = await getDownloadURL(fileRef);
+              uploadedUrls.push(url);
+            }
+          } catch (uploadErr) {
+            console.error("Błąd wgrywania zdjęć online, przechodzę w tryb offline:", uploadErr);
+            saveToOfflineQueue = true;
+          }
+        } else {
+          saveToOfflineQueue = true;
+        }
       }
 
-      const ticketRef = doc(collection(db, 'tickets'));
-      let photoUrls = photos; 
-      const regionObj = regions.find(r => r.id === selectedMachine.regionId);
-      
-      await setDoc(ticketRef, {
+      // 4. Tworzymy zgłoszenie ATOMOWO (z linkami do zdjęć od razu)
+      const ticketPayload = {
         machineId: finalMachineId,
-        machineName: finalMachineName, // Używa bezpiecznej nazwy
+        machineName: selectedMachine.name,
         bay: selectedMachine.bay || '',
         regionId: selectedMachine.regionId || '',
         regionName: regionObj ? regionObj.name : '',
@@ -88,21 +168,34 @@ export default function OperatorForm({
         isCritical,
         reportedBy: reporterName.trim(),
         reporterPhone: reporterPhone.trim(),
+        reporterDevice: navigator.userAgent,
+        reporterDeviceId: reporterDeviceId,
         status: 1,
         createdAt: new Date().toISOString(),
-        photos: photoUrls,
+        photos: uploadedUrls, // Gotowe linki, zero potrzeby updateDoc dla niezalogowanych (w trybie online)
         updates: [{
           timestamp: new Date().toISOString(),
           status: 1,
           comment: 'Zgłoszenie awarii w systemie.',
           author: reporterName.trim()
         }]
-      });
+      };
 
+      await setDoc(ticketRef, ticketPayload);
+
+      // 5. Tryb offline dla zdjęć (jeśli nie udało się wgrać online)
+      if (saveToOfflineQueue && pendingPhotos.length > 0) {
+        for (const p of pendingPhotos) {
+          await savePhotoToIndexedDB(ticketRef.id, p.base64, p.name);
+        }
+      }
+
+
+      // Zapis powiadomienia w tle
       const newNotifRef = doc(collection(db, "notifications"));
       setDoc(newNotifRef, {
         title: isCritical ? "KRYTYCZNA AWARIA!" : "Nowe zgłoszenie awarii",
-        message: `Maszyna: ${finalMachineName} - ${topic}`,
+        message: `Maszyna: ${selectedMachine.name} - ${topic}`,
         isCritical: isCritical,
         read: false,
         ticketId: ticketRef.id,
@@ -110,6 +203,8 @@ export default function OperatorForm({
       }).catch(err => console.error("Błąd powiadomienia w tle:", err));
       
       setTopicMode('select');
+      
+      // Zapisujemy w tle, jeśli offline Firebase zadba o to
       handleStepChange('success');
     } catch (error) {
       console.error("Szczegóły błędu Firebase:", error);
@@ -120,20 +215,38 @@ export default function OperatorForm({
   };
 
   return (
+    <div className="flex flex-col gap-4">
+      {errorMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl shadow-sm text-sm font-bold flex items-center gap-3">
+          <i className="ph ph-warning-circle text-2xl"></i>
+          {errorMsg}
+        </div>
+      )}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            {/* Karta szczegółów wybranej maszyny */}
             <div className="bg-blue-50/70 p-5 border-b border-blue-100">
-              <div className="flex justify-between items-start">
-                <div className="flex-1 mr-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="flex-1 w-full sm:mr-4">
                   <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded">Zgłoszenie dla maszyny</span>
                   {selectedMachine.id === 'manual' ? (
-                    <input 
-                      type="text" 
-                      value={selectedMachine.name} 
-                      onChange={(e) => setSelectedMachine({...selectedMachine, name: e.target.value})} 
-                      className="w-full mt-2 p-2 border border-blue-300 rounded font-bold text-lg focus:outline-none focus:border-blue-900 bg-white" 
-                      placeholder="Wpisz nazwę maszyny..." 
-                      autoFocus
-                    />
+                    <div className="mt-2 flex flex-col gap-2">
+                      <input 
+                        type="text" 
+                        value={selectedMachine.name || ''} 
+                        onChange={(e) => setSelectedMachine({...selectedMachine, name: e.target.value})} 
+                        className="w-full p-2 border border-blue-300 rounded font-bold text-lg focus:outline-none focus:border-blue-900 bg-white" 
+                        placeholder="Wpisz nazwę maszyny..." 
+                        autoFocus
+                      />
+                      <select
+                        value={selectedMachine.regionId || ''}
+                        onChange={(e) => setSelectedMachine({...selectedMachine, regionId: e.target.value})}
+                        className="w-full p-2 border border-blue-300 rounded font-medium text-sm text-slate-700 focus:outline-none focus:border-blue-900 bg-white"
+                      >
+                        <option value="" disabled>-- Wybierz rejon (opcjonalnie) --</option>
+                        {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
                   ) : (
                     <div className="font-black text-xl text-slate-800 break-words mt-1">{selectedMachine.name}</div>
                   )}
@@ -145,7 +258,7 @@ export default function OperatorForm({
                       setSelectedMachine(null);
                       handleStepChange('scan');
                     }} 
-                    className="mb-6 flex items-center gap-2 text-gray-500 hover:text-gray-800 font-bold text-sm bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors"
+                    className="mb-6 flex items-center gap-2 text-white hover:text-white font-bold text-sm bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
                   >
                     <i className="ph ph-arrow-left text-lg"></i> Cofnij i skanuj ponownie
                   </button>
@@ -260,7 +373,8 @@ export default function OperatorForm({
                     required
                   >
                     <option value="" disabled>Wybierz z podpowiedzi...</option>
-                    <option value="manual" className="font-bold text-blue-900">+ Wpisz własny temat...</option>
+                    
+                      <option value="manual" className="font-bold text-blue-900">+ Wpisz własny temat...</option>
                     {topicsList.map((t, i) => <option key={i} value={t}>{t}</option>)}
                   </select>
                 ) : (
@@ -296,6 +410,7 @@ export default function OperatorForm({
                 <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} className="w-5 h-5 text-red-600 rounded focus:ring-red-600" />
                 <span className="text-red-900 font-medium">Maszyna jest całkowicie unieruchomiona (Krytyczne)</span>
               </label>
+              {/* Zdjęcia */}
               <div className="bg-white p-4 rounded border border-gray-200">
                 <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                   <i className="ph ph-camera text-blue-900 text-lg"></i>
@@ -313,27 +428,28 @@ export default function OperatorForm({
                         accept="image/*"
                         className="hidden"
                         onChange={async (e) => {
-                          const files = Array.from(e.target.files);
-                          if (!files.length) return;
-                          setUploadProgress('Wgrywanie zdjęć...');
-                          setLoading(true);
-                          let newUrls = [];
-                          try {
-                            for (let i = 0; i < files.length; i++) {
-                              const file = files[i];
-                              const fileName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                              const fileRef = ref(storage, `tickets/operator_temp/${fileName}`);
-                              await uploadBytes(fileRef, file);
-                              const url = await getDownloadURL(fileRef);
-                              newUrls.push(url);
+                          
+                            const files = Array.from(e.target.files);
+                            if (!files.length) return;
+                            setUploadProgress('Przetwarzanie zdjęć...');
+                            setLoading(true);
+                            try {
+                              let newPhotos = [];
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files[i];
+                                const compressedFile = await compressImage(file, 2);
+                                const base64 = await fileToBase64(compressedFile);
+                                const preview = URL.createObjectURL(compressedFile);
+                                newPhotos.push({ file: compressedFile, base64, preview, name: compressedFile.name });
+                              }
+                              setPendingPhotos(prev => [...prev, ...newPhotos]);
+                            } catch (err) {
+                              console.error(err);
+                              alert("Błąd przetwarzania: " + err.message);
                             }
-                            setPhotos(prev => [...prev, ...newUrls]);
-                          } catch (err) {
-                            console.error(err);
-                            alert("Błąd wgrywania: " + err.message);
-                          }
-                          setUploadProgress('');
-                          setLoading(false);
+                            setUploadProgress('');
+                            setLoading(false);
+
                         }}
                       />
                     </label>
@@ -346,36 +462,37 @@ export default function OperatorForm({
                         capture="environment"
                         className="hidden"
                         onChange={async (e) => {
-                          const files = Array.from(e.target.files);
-                          if (!files.length) return;
-                          setUploadProgress('Wgrywanie zdjęć...');
-                          setLoading(true);
-                          let newUrls = [];
-                          try {
-                            for (let i = 0; i < files.length; i++) {
-                              const file = files[i];
-                              const fileName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                              const fileRef = ref(storage, `tickets/operator_temp/${fileName}`);
-                              await uploadBytes(fileRef, file);
-                              const url = await getDownloadURL(fileRef);
-                              newUrls.push(url);
+                          
+                            const files = Array.from(e.target.files);
+                            if (!files.length) return;
+                            setUploadProgress('Przetwarzanie zdjęć...');
+                            setLoading(true);
+                            try {
+                              let newPhotos = [];
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files[i];
+                                const compressedFile = await compressImage(file, 2);
+                                const base64 = await fileToBase64(compressedFile);
+                                const preview = URL.createObjectURL(compressedFile);
+                                newPhotos.push({ file: compressedFile, base64, preview, name: compressedFile.name });
+                              }
+                              setPendingPhotos(prev => [...prev, ...newPhotos]);
+                            } catch (err) {
+                              console.error(err);
+                              alert("Błąd przetwarzania: " + err.message);
                             }
-                            setPhotos(prev => [...prev, ...newUrls]);
-                          } catch (err) {
-                            console.error(err);
-                            alert("Błąd wgrywania: " + err.message);
-                          }
-                          setUploadProgress('');
-                          setLoading(false);
+                            setUploadProgress('');
+                            setLoading(false);
+
                         }}
                       />
                     </label>
                   </div>
-                  {photos.length > 0 && (
+                  {pendingPhotos.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto py-2">
-                      {photos.map((url, i) => (
+                      {pendingPhotos.map((p, i) => (
                         <div key={i} className="relative w-20 h-20 shrink-0 border border-gray-300 rounded overflow-hidden">
-                          <img src={url} alt="preview" className="object-cover w-full h-full" />
+                          <img src={p.preview} alt="preview" className="object-cover w-full h-full" />
                         </div>
                       ))}
                     </div>
@@ -385,7 +502,7 @@ export default function OperatorForm({
 
               <button 
                 type="submit" 
-                disabled={loading || !isOnline} 
+                disabled={loading} 
                 className={`w-full font-bold py-4 rounded text-lg transition-colors flex items-center justify-center gap-2 ${
                   loading ? 'bg-blue-400 text-white cursor-not-allowed' : 
                   !isOnline ? 'bg-orange-500 hover:bg-orange-600 text-white' : 
@@ -402,5 +519,6 @@ export default function OperatorForm({
               </button>
             </form>
           </div>
+    </div>
   );
 }
