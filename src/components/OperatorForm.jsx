@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { collection, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../firebase';
 
 export default function OperatorForm({
@@ -14,7 +15,7 @@ export default function OperatorForm({
   reportersList,
   stopLiveScanner
 }) {
-  const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
+  const [topicMode, setTopicMode] = useState('select'); 
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [reporterName, setReporterName] = useState('');
@@ -25,9 +26,17 @@ export default function OperatorForm({
   const [photos, setPhotos] = useState([]);
   const [uploadProgress, setUploadProgress] = useState('');
 
+  // 1. ZALOGOWANIE W TLE PRZY OTWARCIU FORMULARZA (Odblokowuje wgrywanie zdjęć)
+  useEffect(() => {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch(err => console.error("Błąd logowania w tle:", err));
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // Zapobieganie dublowaniu
+    if (loading) return; 
     
     if (selectedMachine.id === 'manual' && (!selectedMachine.name || !selectedMachine.name.trim())) {
       return alert('Podaj nazwę maszyny!');
@@ -49,11 +58,15 @@ export default function OperatorForm({
     setErrorMsg(null);
     try {
       let finalMachineId = selectedMachine.id;
+      let finalMachineName = selectedMachine.name;
       
+      // 2. BLOKADA ANTY-SPAMOWA DLA NOWYCH MASZYN
       if (finalMachineId === 'manual') {
         const newMachineRef = doc(collection(db, 'machines'));
+        finalMachineName = `${selectedMachine.name} (DO WERYFIKACJI)`;
+        
         await setDoc(newMachineRef, {
-          name: selectedMachine.name,
+          name: finalMachineName,
           bay: '',
           createdAt: new Date().toISOString()
         });
@@ -61,14 +74,12 @@ export default function OperatorForm({
       }
 
       const ticketRef = doc(collection(db, 'tickets'));
-      
-      let photoUrls = photos; // już wgrane adresy URL
-      
+      let photoUrls = photos; 
       const regionObj = regions.find(r => r.id === selectedMachine.regionId);
       
       await setDoc(ticketRef, {
         machineId: finalMachineId,
-        machineName: selectedMachine.name,
+        machineName: finalMachineName, // Używa bezpiecznej nazwy
         bay: selectedMachine.bay || '',
         regionId: selectedMachine.regionId || '',
         regionName: regionObj ? regionObj.name : '',
@@ -88,11 +99,10 @@ export default function OperatorForm({
         }]
       });
 
-      // Zapis powiadomienia w tle
       const newNotifRef = doc(collection(db, "notifications"));
       setDoc(newNotifRef, {
         title: isCritical ? "KRYTYCZNA AWARIA!" : "Nowe zgłoszenie awarii",
-        message: `Maszyna: ${selectedMachine.name} - ${topic}`,
+        message: `Maszyna: ${finalMachineName} - ${topic}`,
         isCritical: isCritical,
         read: false,
         ticketId: ticketRef.id,
@@ -100,8 +110,6 @@ export default function OperatorForm({
       }).catch(err => console.error("Błąd powiadomienia w tle:", err));
       
       setTopicMode('select');
-      
-      // Zapisujemy w tle, jeśli offline Firebase zadba o to
       handleStepChange('success');
     } catch (error) {
       console.error("Szczegóły błędu Firebase:", error);
@@ -113,7 +121,6 @@ export default function OperatorForm({
 
   return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Karta szczegółów wybranej maszyny */}
             <div className="bg-blue-50/70 p-5 border-b border-blue-100">
               <div className="flex justify-between items-start">
                 <div className="flex-1 mr-4">
@@ -289,7 +296,6 @@ export default function OperatorForm({
                 <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} className="w-5 h-5 text-red-600 rounded focus:ring-red-600" />
                 <span className="text-red-900 font-medium">Maszyna jest całkowicie unieruchomiona (Krytyczne)</span>
               </label>
-              {/* Zdjęcia */}
               <div className="bg-white p-4 rounded border border-gray-200">
                 <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                   <i className="ph ph-camera text-blue-900 text-lg"></i>
