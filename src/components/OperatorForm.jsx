@@ -258,7 +258,7 @@ export default function OperatorForm({
                       setSelectedMachine(null);
                       handleStepChange('scan');
                     }} 
-                    className="mb-6 flex items-center gap-2 text-white hover:text-white font-bold text-sm bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
+                    className="mb-6 flex items-center gap-2 text-white hover:text-white font-bold text-sm bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
                   >
                     <i className="ph ph-arrow-left text-lg"></i> Cofnij i skanuj ponownie
                   </button>

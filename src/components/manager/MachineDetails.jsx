@@ -1,9 +1,10 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { safeParseDate } from '../../utils/dateHelpers';
+import MachineDTR from './MachineDTR';
 
 
-export default function MachineDetails({ machine, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete }) {
+export default function MachineDetails({ machine, user, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete }) {
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';
   const baseUrl = window.location.origin + window.location.pathname;
   const qrValue = `${baseUrl}?machine=${machine.id}`;
@@ -14,10 +15,10 @@ export default function MachineDetails({ machine, history, loading, onBack, onPr
         <div className="flex items-center gap-4">
           <button 
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
-            title="Wróć do listy maszyn"
+            className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm"
+            title="Powrót"
           >
-            <i className="ph ph-arrow-left text-xl"></i>
+            <i className="ph ph-arrow-left text-lg"></i> Powrót
           </button>
           <h2 className="text-sm md:text-xl font-bold text-gray-800">Szczegóły Maszyny</h2>
         </div>
@@ -99,6 +100,8 @@ export default function MachineDetails({ machine, history, loading, onBack, onPr
               )}
             </div>
           </div>
+
+        <MachineDTR machine={machine} canManage={user?.role === 'admin' || (user?.permissions || []).includes('manage_dtr')} />
 
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center gap-3">

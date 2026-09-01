@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, query, getDocs, limit, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { generateAuditorReport } from '../utils/reports/auditorExport';
 import { db, auth } from '../firebase';
 
 export default function Login({ onLogin, currentUser }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
   const [errorMsg, setErrorMsg] = useState('');
   
   // Status połączenia z bazą
@@ -19,6 +21,16 @@ export default function Login({ onLogin, currentUser }) {
     companyLogoUrl: '',
     appLogoUrl: ''
   });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'general'), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false });
+      }
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "branding"), (docSnap) => {
@@ -131,13 +143,27 @@ export default function Login({ onLogin, currentUser }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center p-4 pt-24 sm:pt-4 text-[#111827] relative">
+    <div className="min-h-[100svh] bg-[#f8f9fa] flex flex-col items-center justify-center p-2 pt-16 sm:p-4 sm:pt-4 text-[#111827] relative">
       
       
       {/* Logo Aplikacji (Lewy Górny Róg) */}
-      {branding.appLogoUrl && (
+      {currentUser && currentUser.role !== 'operator' && (
+        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-2 rounded-xl shadow-sm border border-gray-100">
+          <div className="font-bold text-gray-800 text-xs sm:text-sm">
+            <span className="hidden sm:inline">Zalogowano jako: </span><span className="text-blue-600">{currentUser.name}</span>
+          </div>
+          <button 
+            onClick={() => { import("firebase/auth").then(({ signOut }) => signOut(auth)); onLogin(null); }} 
+            className="text-red-500 hover:bg-red-50 p-1 sm:px-3 sm:py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 text-xs sm:text-sm"
+          >
+            <i className="ph ph-sign-out"></i> <span className="hidden sm:inline">Wyloguj</span>
+          </button>
+        </div>
+      )}
+
+        {branding.appLogoUrl && (
         <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-50">
-          <img src={branding.appLogoUrl} alt="App Logo" className="h-12 sm:h-16 md:h-24 lg:h-28 object-contain drop-shadow-sm rounded-xl overflow-hidden" />
+          <img src={branding.appLogoUrl} alt="App Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-sm rounded-xl overflow-hidden" />
         </div>
       )}
 
@@ -145,79 +171,71 @@ export default function Login({ onLogin, currentUser }) {
 
       
       {/* Logo / Header */}
-      <div className="text-center mb-12 animate-fade-in mt-6">
+      <div className="text-center mb-6 animate-fade-in mt-2">
         <div className="flex justify-center mb-4 min-h-[64px] items-center">
           {branding.companyLogoUrl ? (
-            <img src={branding.companyLogoUrl} alt="Company Logo" className="max-h-24 max-w-xs object-contain rounded-2xl overflow-hidden" />
+            <img src={branding.companyLogoUrl} alt="Company Logo" className="max-h-16 max-w-[200px] object-contain rounded-2xl overflow-hidden" />
           ) : (
             <i className="ph ph-buildings text-5xl text-[#111827]"></i>
           )}
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">{branding.companyName}</h1>
+        <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-1 md:mb-2">{branding.companyName}</h1>
         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{branding.systemSubtitle}</p>
       </div>
 
       {/* Grid kafelków */}
       {!currentUser ? (
-        <div className="w-full max-w-4xl animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="w-full max-w-4xl animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-8">
           <div 
             onClick={handleOperatorBypass}
-            className="cursor-pointer bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
+            className="cursor-pointer bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
           >
-            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-yellow-50 text-yellow-500 animate-pulse">
-              <i className="ph-fill ph-warning text-5xl"></i>
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-4 bg-yellow-50 text-yellow-500 animate-pulse">
+              <i className="ph-fill ph-warning text-2xl md:text-3xl"></i>
             </div>
-            <h2 className="text-2xl font-bold mb-3 text-gray-800">Zgłoszenie Awarii</h2>
-            <p className="text-gray-500 text-base mb-6">Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.</p>
-            <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+            <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">Zgłoszenie Awarii</h2>
+            <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.</p>
+            <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
               Zgłoś awarię <i className="ph ph-arrow-right font-bold"></i>
             </button>
           </div>
 
           <div 
             onClick={() => setLoginModalTarget('login_only')}
-            className="cursor-pointer bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
+            className="cursor-pointer bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-center transition-transform hover:-translate-y-2 hover:shadow-xl"
           >
-            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-blue-50 text-blue-600">
-              <i className="ph-fill ph-gear text-5xl animate-[spin_4s_linear_infinite]"></i>
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-4 bg-blue-50 text-blue-600">
+              <i className="ph-fill ph-gear text-2xl md:text-3xl animate-[spin_4s_linear_infinite]"></i>
             </div>
-            <h2 className="text-2xl font-bold mb-3 text-gray-800">Utrzymanie Ruchu</h2>
-            <p className="text-gray-500 text-base mb-6">Dostęp dla autoryzowanych pracowników działu Utrzymania Ruchu.</p>
-            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+            <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">Utrzymanie Ruchu</h2>
+            <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">Dostęp dla autoryzowanych pracowników działu Utrzymania Ruchu.</p>
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
               Zaloguj się <i className="ph ph-lock-key font-bold"></i>
             </button>
           </div>
         </div>
       ) : (
         <div className="w-full max-w-5xl animate-fade-in">
-          <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <div className="font-bold text-gray-800">
-              Zalogowano jako: <span className="text-blue-600">{currentUser.name}</span>
-            </div>
-            <button 
-              onClick={() => { import("firebase/auth").then(({ signOut }) => signOut(auth)); onLogin(null); }} 
-              className="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
-            >
-              <i className="ph ph-sign-out"></i> Wyloguj
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
             {tiles.filter(t => {
               // usunięte: pozwalamy wejść do modułu, uprawnienia są weryfikowane przez ManagerView
-              if (t.id === 'operator') return false; // Ukryte w widoku zalogowanym
+              if (t.id === 'operator') return false;
+              if (t.id === 'tickets' && !modSettings.enableTickets) return false;
+              if (t.id === 'planned_maintenance' && !modSettings.enablePlanned) return false; // Ukryte w widoku zalogowanym
               return true;
             }).map(tile => (
-              <div key={tile.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-between transition-transform hover:-translate-y-1 hover:shadow-md">
+              <div key={tile.id} onClick={tile.action} className="cursor-pointer bg-white p-3 md:p-6 rounded-xl md:rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-between transition-transform hover:-translate-y-1 hover:shadow-md">
                 <div className="w-full flex flex-col items-center">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${tile.iconBg}`}>
-                    <i className={`ph ${tile.icon} text-4xl`}></i>
+                  <div className={`w-10 h-10 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-2 md:mb-4 ${tile.iconBg}`}>
+                    <i className={`ph ${tile.icon} text-2xl md:text-4xl`}></i>
                   </div>
-                  <h2 className="text-xl font-bold mb-2 text-gray-800">{tile.title}</h2>
-                  <p className="text-gray-500 text-sm mb-6 line-clamp-3">{tile.desc}</p>
+                  <h2 className="text-sm md:text-xl font-bold mb-1 md:mb-2 text-gray-800 leading-tight">{tile.title}</h2>
+                  <p className="text-gray-500 text-[10px] md:text-sm mb-2 md:mb-6 line-clamp-3 md:line-clamp-3 leading-tight">{tile.desc}</p>
                 </div>
                 <button
                   onClick={tile.action}
-                  className={`w-full ${tile.color} text-white font-bold text-sm py-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2`}
+                  className={`w-full ${tile.color} text-white font-bold text-sm py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2`}
                 >
                   Wejdź
                   <i className="ph ph-arrow-right font-bold"></i>
@@ -227,6 +245,10 @@ export default function Login({ onLogin, currentUser }) {
           </div>
         </div>
       )}
+
+      
+          
+
 
       {/* Modal logowania */}
       {loginModalTarget && (
@@ -273,7 +295,7 @@ export default function Login({ onLogin, currentUser }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#111827] hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors mt-4 shadow-md flex items-center justify-center gap-2"
+                className="w-full bg-[#111827] hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-2 md:py-3 rounded-xl transition-colors mt-4 shadow-md flex items-center justify-center gap-2"
               >
                 {loading ? 'Logowanie...' : 'Zaloguj się i przejdź'}
               </button>

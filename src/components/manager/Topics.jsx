@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function Topics() {
@@ -7,10 +7,11 @@ export default function Topics() {
   const [newTopic, setNewTopic] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'topics'), (snapshot) => {
-      setTopics(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTopics(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
     return () => unsubscribe();
   }, []);
@@ -33,6 +34,7 @@ export default function Topics() {
       }
       setNewTopic('');
       setEditingId(null);
+        setIsFormOpen(false);
     } catch (error) {
       console.error('Błąd dodawania tematu:', error);
       alert('Nie udało się dodać tematu.');
@@ -43,13 +45,14 @@ export default function Topics() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten temat z listy podpowiedzi?')) {
-      await deleteDoc(doc(db, 'topics', id));
+      await updateDoc(doc(db, 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
     }
   };
 
   const handleEdit = (t) => {
     setNewTopic(t.text);
     setEditingId(t.id);
+    setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -71,12 +74,30 @@ export default function Topics() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <i className="ph ph-plus-circle text-blue-600"></i>
-          {editingId ? 'Edytuj temat podpowiedzi' : 'Dodaj nowy temat do podpowiedzi'}
-        </h2>
-        <form onSubmit={handleAddTopic} className="flex flex-col sm:flex-row gap-4 items-end">
+      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Tematy Zgłoszeń (Podpowiedzi)</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj szybkimi tematami awarii dla zgłaszających</p>
+        </div>
+        <button onClick={() => { setEditingId(null); setNewTopic(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
+          <i className="ph ph-plus text-lg"></i> Dodaj Temat
+        </button>
+      </div>
+
+      {isFormOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 overflow-y-auto" onClick={(e) => { if(e.target === e.currentTarget) setIsFormOpen(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-fade-in flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
+              <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
+                <i className="ph ph-chat-text text-blue-600"></i>
+                {editingId ? 'Edytuj temat podpowiedzi' : 'Dodaj nowy temat do podpowiedzi'}
+              </h2>
+              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
+                <i className="ph ph-x text-2xl"></i>
+              </button>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleAddTopic} className="flex flex-col gap-4">
           <div className="flex-1 w-full">
             <label className="block text-sm font-medium text-gray-700 mb-1">Treść zgłoszenia (Temat)</label>
             <input 
@@ -87,22 +108,23 @@ export default function Topics() {
               placeholder="np. Przepalona żarówka"
             />
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            {editingId && (
-              <button 
-                type="button" 
-                onClick={() => { setEditingId(null); setNewTopic(''); }}
-                className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded transition-colors"
-              >
-                Anuluj
-              </button>
-            )}
-            <button disabled={loading} className="w-full sm:w-auto bg-[#111827] hover:bg-gray-800 text-white font-bold py-3 px-6 rounded transition-colors disabled:opacity-50">
-              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz' : 'Dodaj temat')}
-            </button>
+          <div className="flex justify-end gap-3 pt-4 mt-2 border-t border-gray-100">
+                  <button 
+                    type="button" 
+                    onClick={() => { setIsFormOpen(false); setEditingId(null); setNewTopic(''); }}
+                    className="px-6 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                  <button disabled={loading} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">
+                    {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz' : 'Dodaj temat')}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
@@ -113,28 +135,21 @@ export default function Topics() {
             </button>
           )}
         </div>
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-gray-100 p-2 md:p-0 flex flex-col gap-2 md:block">
           {topics.length === 0 ? (
             <li className="p-8 text-center text-gray-500">Brak zapisanych tematów. Wgraj domyślne lub dodaj własny.</li>
           ) : (
             topics.map(t => (
-              <li key={t.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+              <li key={t.id} className="p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 hover:bg-gray-50 border border-gray-200 md:border-0 rounded-xl md:rounded-none bg-white">
                 <span className="font-medium text-gray-800">{t.text}</span>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => handleEdit(t)}
-                    className="text-blue-500 hover:bg-blue-50 px-3 py-1.5 rounded transition-colors font-medium text-sm"
-                  >
-                    Edytuj
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(t.id)}
-                    className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
-                    title="Usuń"
-                  >
-                    <i className="ph ph-trash text-lg"></i>
-                  </button>
-                </div>
+                <div className="flex justify-end gap-1.5 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-2 md:pt-0 w-full md:w-auto">
+                    <button onClick={() => handleEdit(t)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
+                      <i className="ph ph-pencil-simple"></i> Edytuj
+                    </button>
+                    <button onClick={() => handleDelete(t.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
+                      <i className="ph ph-trash"></i> Usuń
+                    </button>
+                  </div>
               </li>
             ))
           )}

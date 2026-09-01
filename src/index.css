@@ -20,3 +20,60 @@
     display: none !important;
   }
 }
+@keyframes scan {
+  0%, 100% { top: 0%; }
+  50% { top: 100%; }
+}
+.animate-scan { animation: scan 2s linear infinite; }
+
+\n
+/* MOBILE CARDS FOR TABLES */
+@media (max-width: 1024px) {
+  .mobile-cards table, .mobile-cards thead, .mobile-cards tbody, .mobile-cards th, .mobile-cards td, .mobile-cards tr { 
+    display: block; 
+  }
+  .mobile-cards thead tr { 
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+  .mobile-cards tr { 
+    border: 1px solid #e2e8f0; 
+    border-radius: 0.75rem; 
+    margin-bottom: 1rem; 
+    background: white; 
+    padding: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  }
+  .mobile-cards td { 
+    border: none;
+    position: relative;
+    padding: 0.5rem 0.5rem 0.5rem 45% !important;
+    text-align: right !important;
+    min-height: 2.5rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .mobile-cards td:last-child {
+    border-bottom: 0;
+    justify-content: center;
+    padding-left: 0.5rem !important;
+  }
+  .mobile-cards td:before { 
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    transform: translateY(-50%);
+    width: 40%; 
+    padding-right: 10px; 
+    white-space: nowrap;
+    text-align: left;
+    font-weight: 700;
+    color: #64748b;
+    font-size: 10px;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+}

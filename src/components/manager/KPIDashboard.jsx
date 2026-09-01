@@ -12,13 +12,7 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        
-        const q = query(
-          collection(db, 'tickets'),
-          where('closedAt', '>=', ninetyDaysAgo)
-        );
+        const q = query(collection(db, 'tickets'));
         const snap = await getDocs(q);
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && x.status === 5);
         setHistoricalTickets(docs);

@@ -4,6 +4,9 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/
 import { db, storage } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 
+// Globalny cache dla obrazów mapy (działa do wylogowania/odświeżenia)
+const mapImageCache = {};
+
 export default function ShipyardMap({ tickets = [], plannedServices = [], modeType = 'tickets', machines = [], regions = [], user, plannedWarningDays = 30, onNavigateToTickets }) {
   const [mode, setMode] = useState('view'); // 'view' or 'edit'
   const [hoveredPin, setHoveredPin] = useState(null);
@@ -14,6 +17,8 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
     defaultPan: { x: 0, y: 0 }
   });
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [cachedMainMap, setCachedMainMap] = useState('');
+  const [cachedSubmaps, setCachedSubmaps] = useState({});
   const [currentSubmapId, setCurrentSubmapId] = useState(null);
   const [uploadingMap, setUploadingMap] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -108,12 +113,21 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
   const currentMapUrl = currentSubmapId ? (regions.find(r => r.id === currentSubmapId)?.mapImageUrl || mapConfig.url) : mapConfig.url;
 
   useEffect(() => {
+    if (!currentMapUrl) return;
+    
+    if (mapImageCache[currentMapUrl]) {
+      setIsImageLoading(false);
+      setImageProgress(100);
+      return;
+    }
+
     setIsImageLoading(true);
     setImageProgress(0);
 
     const safetyTimeout = setTimeout(() => {
       setIsImageLoading(false);
       setImageProgress(100);
+      mapImageCache[currentMapUrl] = true;
     }, 4000); // 4 seconds max loading screen
 
     // If image is already loaded from cache before effect runs
@@ -121,6 +135,7 @@ export default function ShipyardMap({ tickets = [], plannedServices = [], modeTy
       clearTimeout(safetyTimeout);
       setIsImageLoading(false);
       setImageProgress(100);
+      mapImageCache[currentMapUrl] = true;
       return;
     }
 
@@ -374,7 +389,9 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
       });
     }
 
-    return pins;
+    
+return pins;
+
   }, [tickets, plannedServices, modeType, machines, regions, plannedWarningDays, currentSubmapId]);
 
   // Apply drag preview
@@ -566,14 +583,144 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
     }
   };
 
+  
+  const unpinnedData = useMemo(() => {
+    let status = 'ok';
+    let unpinnedCount = 0;
+    let unpinnedMachineCount = 0;
+    let unpinnedMachineIds = [];
+    const now = new Date();
+
+    if (currentSubmapId === null) {
+      unpinnedMachineIds = machines.filter(m => m.xPercent == null || m.yPercent == null).map(m => m.id);
+    } else {
+      unpinnedMachineIds = machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null)).map(m => m.id);
+    }
+    unpinnedMachineCount = unpinnedMachineIds.length;
+
+    if (unpinnedMachineIds.length > 0) {
+      if (modeType === 'tickets') {
+        const activeTickets = tickets.filter(t => unpinnedMachineIds.includes(t.machineId) && t.status !== 5 && t.status !== '5');
+        if (activeTickets.length > 0) {
+          status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+        }
+        unpinnedCount = activeTickets.length;
+      } else if (modeType === 'planned_maintenance') {
+        const activePlans = plannedServices.filter(p => unpinnedMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
+        activePlans.forEach(p => {
+          let isOverdue = false;
+          let isWarning = false;
+          if (p.nextDate) {
+            const nextDate = safeParseDate(p.nextDate);
+            if (nextDate < now) isOverdue = true;
+            else {
+              const diffDays = Math.ceil(Math.abs(nextDate - now) / (1000 * 60 * 60 * 24)); 
+              if (diffDays <= plannedWarningDays) isWarning = true;
+            }
+          }
+          if (p.targetWorkHours) {
+            const m = machines.find(mac => mac.id === p.machineId);
+            if (m) {
+              if (m.currentWorkHours >= p.targetWorkHours) isOverdue = true;
+              else if (p.hoursInterval && (p.targetWorkHours - m.currentWorkHours) <= plannedWarningDays * 8) isWarning = true;
+            }
+          }
+          if (p.status === 'in_progress') status = 'in_progress';
+          else if (isOverdue && status !== 'in_progress') status = 'critical';
+          else if (status !== 'critical' && status !== 'in_progress' && isWarning) status = 'warning';
+        });
+        unpinnedCount = activePlans.length;
+      }
+    }
+    return { status, unpinnedCount, unpinnedMachineCount };
+  }, [tickets, plannedServices, modeType, machines, currentSubmapId, plannedWarningDays]);
+
+  const getUnpinnedColor = () => {
+    if (unpinnedData.status === 'critical') return 'text-red-500';
+    if (unpinnedData.status === 'in_progress') return 'text-blue-500';
+    if (unpinnedData.status === 'warning') return 'text-amber-500';
+    return 'text-emerald-500';
+  };
+  
+  const getUnpinnedBgColor = () => {
+    if (unpinnedData.status === 'critical') return 'text-red-500/80';
+    if (unpinnedData.status === 'in_progress') return 'text-blue-500/80';
+    if (unpinnedData.status === 'warning') return 'text-amber-500/80';
+    return 'text-emerald-500/80';
+  };
+
+  const getUnpinnedPulse = () => {
+    return unpinnedData.status === 'critical' || unpinnedData.status === 'in_progress' ? 'animate-pulse' : '';
+  };
+
   const handleMouseLeave = () => {
     hideTimeoutRef.current = setTimeout(() => {
       setHoveredPin(null);
     }, 300); // 300ms delay to allow moving to tooltip
   };
 
+  
+  const renderUnpinnedTooltip = () => {
+    if (hoveredPin !== 'unpinned_items') return null;
+
+    return (
+      <div 
+        className="absolute right-[110%] top-0 w-44 md:w-56 bg-slate-900/95 backdrop-blur-md text-white p-2 md:p-4 rounded-xl shadow-2xl border border-slate-700 pointer-events-auto z-[60] animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-black text-[10px] md:text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">
+          <i className="ph ph-push-pin text-slate-400"></i>
+          Bez lokalizacji / Inne
+        </div>
+        
+        <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
+          <div className="flex justify-between items-center text-[9px] md:text-xs">
+            <span className="text-slate-400">Stan:</span>
+            {unpinnedData.status === 'critical' ? (
+              <span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>
+            ) : unpinnedData.status === 'in_progress' ? (
+                <span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>
+              ) : unpinnedData.status === 'warning' ? (
+              <span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>
+            ) : (
+              <span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>
+            )}
+          </div>
+          <div className="flex justify-between items-center text-[9px] md:text-xs">
+            <span className="text-slate-400">Maszyny w rejonie:</span>
+            <span className="font-bold">{unpinnedData.unpinnedMachineCount}</span>
+          </div>
+          <div className="flex justify-between items-center text-[9px] md:text-xs">
+            <span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span>
+            <span className="font-bold">{unpinnedData.unpinnedCount}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if(isFullscreen) document.exitFullscreen?.();
+              setHoveredPin(null);
+              // "Bez lokalizacji" nie zadziała w globalnej szukarce jeśli go szukamy po stringu 'Bez lokalizacji / Inne'. 
+              // Ponieważ na razie mapowanie nie wspiera szukania unpinned_items, kliknięcie po prostu zamyka tooltip (lub można przeładować na inną logikę). 
+              // User poprosił tylko o "chmurkę". Dodamy jednak nawigację po nazwie rejonu "-" lub czymkolwiek, co wyczyści filtr by móc je znaleźć, 
+              // albo po prostu wołamy to samo co dla zwykłej pineski.
+              onNavigateToTickets && onNavigateToTickets('Bez lokalizacji / Inne');
+            }}
+            className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}
+          >
+            {modeType === 'planned_maintenance' ? 'Przejdź do serwisów' : 'Przejdź do awarii'} <i className="ph ph-arrow-right"></i>
+          </button>
+        </div>
+        {/* Trójkącik tooltipa w prawo */}
+        <div className="absolute top-1/2 -translate-y-1/2 -right-3 border-[6px] border-transparent border-l-slate-900/95 pointer-events-none"></div>
+      </div>
+    );
+  };
+
   return (
-    <div className={`flex flex-col animate-fade-in relative ${isFullscreen ? 'h-screen w-screen bg-slate-900 p-2 sm:p-4' : 'h-full space-y-2'}`} ref={isFullscreen ? null : mapContainerRef}>
+      <div className={`flex flex-col animate-fade-in relative ${isFullscreen ? 'h-screen w-screen bg-slate-900 p-2 sm:p-4' : 'h-full space-y-2'}`} ref={isFullscreen ? null : mapContainerRef}>
       
 
       {/* Kontener Mapy */}
@@ -634,6 +781,7 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
                 onClick={handleMapClick}
                 draggable="false"
                 onLoad={(e) => {
+                  if (currentMapUrl) mapImageCache[currentMapUrl] = true;
                   setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight });
                   setImageProgress(100);
                   setTimeout(() => setIsImageLoading(false), 200);
@@ -647,7 +795,7 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
               />
           </div>
 
-          {isImageLoading && (
+          {(isImageLoading && !mapImageCache[currentMapUrl]) && (
               <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
                 <i className="ph ph-spinner-gap animate-spin text-5xl mb-4 text-blue-500"></i>
                 <h3 className="text-base md:text-xl font-bold mb-2">Ładowanie mapy...</h3>
@@ -937,7 +1085,7 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
           {/* Statystyki na mapie */}
           {/* Statystyki na mapie */}
             {mode === 'view' && modeType === 'tickets' && (
-                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-40 bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[220px] scale-[0.5] lg:scale-100 origin-top-right">
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[220px] scale-[0.5] lg:scale-100 origin-top-right">
                   <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
                     {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Awarii'}
                   </div>
@@ -945,12 +1093,18 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
                     <span className="text-[10px] md:text-sm font-medium text-slate-300">Wszystkie maszyny</span>
                     <span className="font-bold text-lg">{currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId).length : machines.length}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[10px] md:text-sm font-medium text-amber-500/80">Brak lokalizacji (nieprzypięte)</span>
-                    <span className="font-bold text-lg text-amber-500/80">
-                      {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
-                    </span>
-                  </div>
+                  <div 
+                      className="flex items-center justify-between gap-4 relative pointer-events-auto cursor-pointer group rounded p-1 -mx-1 hover:bg-slate-800/50 transition-colors"
+                      onMouseEnter={(e) => handleMouseEnter('unpinned_items', e)}
+                      onMouseLeave={handleMouseLeave}
+                      onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
+                    >
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Brak lokalizacji (nieprzypięte)</span>
+                      <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
+                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                      </span>
+                      {renderUnpinnedTooltip()}
+                    </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-[10px] md:text-sm font-medium text-slate-300">Zgłoszone awarie</span>
                     <span className="font-bold text-lg text-amber-400">{
@@ -971,7 +1125,7 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
               )}
 
             {mode === 'view' && modeType === 'planned_maintenance' && (
-                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-40 bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[240px] scale-[0.5] lg:scale-100 origin-top-right">
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[240px] scale-[0.5] lg:scale-100 origin-top-right">
                   <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
                     {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Serwisów'}
                   </div>
@@ -979,12 +1133,18 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
                     <span className="text-[10px] md:text-sm font-medium text-slate-300">Wszystkie maszyny</span>
                     <span className="font-bold text-lg">{currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId).length : machines.length}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[10px] md:text-sm font-medium text-amber-500/80">Brak lokalizacji (nieprzypięte)</span>
-                    <span className="font-bold text-lg text-amber-500/80">
-                      {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
-                    </span>
-                  </div>
+                  <div 
+                      className="flex items-center justify-between gap-4 relative pointer-events-auto cursor-pointer group rounded p-1 -mx-1 hover:bg-slate-800/50 transition-colors"
+                      onMouseEnter={(e) => handleMouseEnter('unpinned_items', e)}
+                      onMouseLeave={handleMouseLeave}
+                      onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
+                    >
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Brak lokalizacji (nieprzypięte)</span>
+                      <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
+                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                      </span>
+                      {renderUnpinnedTooltip()}
+                    </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-[10px] md:text-sm font-medium text-slate-300">Planowane (30 dni)</span>
                     <span className="font-bold text-lg text-amber-400">{

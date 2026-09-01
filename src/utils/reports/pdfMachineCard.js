@@ -80,7 +80,7 @@ export const generateMachineHistoryPDF = async (machine, tickets, plannedService
         n(t.reportedBy || '-'),
         n(problemDesc),
         n(t.status === 5 ? 'Zamkniete' : 'Otwarte'),
-        n(t.completedBy || '-')
+        n(t.completedBy || (t.history?.length ? t.history[t.history.length - 1].user : '-'))
       ];
     });
 
@@ -135,7 +135,7 @@ export const generateMachineHistoryPDF = async (machine, tickets, plannedService
       doc.text(n('Brak zaplanowanych lub zrealizowanych serwisow dla tej maszyny.'), 14, currentY);
     }
 
-    doc.save(n(`Karta_Maszyny_${machine.qrCode || 'Nieznana'}_${new Date().toISOString().split('T')[0]}.pdf`));
+    doc.save(n(`Karta_Maszyny_${(machine.name || machine.qrCode || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`));
   } catch (error) {
     console.error('Błąd generowania PDF:', error);
     alert('Wystąpił błąd podczas generowania dokumentu.');

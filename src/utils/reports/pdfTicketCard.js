@@ -92,7 +92,7 @@ export const generateTicketPDF = async (ticket) => {
         [n('Data Zgloszenia:'), safeParseDate(ticket.createdAt)?.toLocaleString('pl-PL') || '-'],
         [n('Priorytet:'), n(ticket.isCritical ? 'Krytyczny (Wysoki)' : 'Standardowy')],
         [n('Data Zamkniecia:'), ticket.closedAt ? safeParseDate(ticket.closedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Wykonawca (Zamykajacy):'), n(ticket.completedBy || '-')],
+        [n('Wykonawca (Zamykajacy):'), n(ticket.completedBy || ticket.assignedTo || '-')],
       ],
       theme: 'grid',
       headStyles: { fillColor: [60, 100, 180] },

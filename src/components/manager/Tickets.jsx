@@ -1,6 +1,6 @@
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion, collection, query, where, orderBy, limit, getDocs, startAfter } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
@@ -16,17 +16,71 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         'ID Zgłoszenia': t.id,
         'Data Zgłoszenia': openD ? openD.toLocaleString('pl-PL') : '-',
         'Data Zamknięcia': closeD ? closeD.toLocaleString('pl-PL') : '-',
-        'Maszyna': t.machineName || (machines && machines.find(m => m.id === t.machineId)?.name) || '-',
+        'Maszyna': (machines && machines.find(m => m.id === t.machineId)?.name) || ((t.machineName || '-') + ' (maszyna usunięta)'),
         'Temat Zgłoszenia': t.topic || '-',
         'Opis Problemu': t.description || '-',
         'Zgłaszający': t.reportedBy || '-',
-        'Status': (t.status === 1 ? 'Otwarte' : t.status === 2 ? 'W trakcie' : t.status === 3 ? 'Części' : t.status === 4 ? 'Zewnętrzny' : t.status === 5 ? 'Zakończone' : 'Nieznany')
+        'Status': (t.status === 1 ? 'Otwarte' : t.status === 2 ? 'Weryfikacja' : t.status === 3 ? 'Oczekujące' : t.status === 4 ? 'W trakcie' : t.status === 5 ? 'Zakończone' : 'Nieznany')
       };
     });
     exportToExcel(dataToExport, isArchive ? 'Archiwum_Awarii' : 'Zgloszenia_Awarii');
   };
 
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
+
+  const [internalArchive, setInternalArchive] = useState([]);
+  const [lastArchiveDoc, setLastArchiveDoc] = useState(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [hasMoreArchive, setHasMoreArchive] = useState(true);
+
+  useEffect(() => {
+    if (isArchive) {
+      fetchArchive(false);
+    }
+  }, [isArchive]);
+
+  const fetchArchive = async (loadMore = false) => {
+    if (loadingArchive || (!hasMoreArchive && loadMore)) return;
+    setLoadingArchive(true);
+    try {
+      let q = query(
+        collection(db, 'tickets'),
+        where('status', '==', 5),
+        orderBy('closedAt', 'desc'),
+        limit(50)
+      );
+      if (loadMore && lastArchiveDoc) {
+        q = query(
+          collection(db, 'tickets'),
+          where('status', '==', 5),
+          orderBy('closedAt', 'desc'),
+          startAfter(lastArchiveDoc),
+          limit(50)
+        );
+      }
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs;
+      const newTickets = docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted);
+      
+      if (loadMore) {
+        setInternalArchive(prev => {
+          const combined = [...prev, ...newTickets];
+          return Array.from(new Map(combined.map(item => [item.id, item])).values());
+        });
+      } else {
+        setInternalArchive(newTickets);
+      }
+      
+      setLastArchiveDoc(docs[docs.length - 1] || null);
+      setHasMoreArchive(docs.length === 50);
+    } catch (err) {
+      console.error("Błąd pobierania archiwum:", err);
+    }
+    setLoadingArchive(false);
+  };
+
+  const activeTicketsArray = isArchive ? internalArchive : tickets;
+
   const [comment, setComment] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,7 +145,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         closeConfirmModal();
         setLoading(true);
         try {
-          await deleteDoc(doc(db, 'tickets', ticketId));
+          await updateDoc(doc(db, 'tickets', ticketId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
           setSelectedTicketId(null);
           showToast('Zgłoszenie zostało trwale usunięte.');
         } catch (err) {
@@ -113,9 +167,18 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         closeConfirmModal();
         setLoading(true);
         try {
+          const currentData = activeTicketsArray.find(t => t.id === ticketId);
           await updateDoc(doc(db, 'tickets', ticketId), {
-            isManuallyArchived: true,
-            closedAt: new Date().toISOString()
+            isManuallyArchived: true, status: 5,
+            closedAt: currentData?.closedAt || new Date().toISOString(),
+            completedBy: currentData?.completedBy || user.name,
+            history: arrayUnion({
+              date: new Date().toISOString(),
+              user: user.name,
+              action: "Przeniesiono do Archiwum",
+              note: "Zamknięto i przeniesiono ręcznie",
+              photos: []
+            })
           });
           setSelectedTicketId(null);
           showToast('Zgłoszenie pomyślnie zarchiwizowane.');
@@ -147,8 +210,8 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     1: { label: 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200' },
     'new': { label: 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200' },
     2: { label: 'Weryfikacja UT', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-    3: { label: 'Wybór wykonawcy', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    4: { label: 'W realizacji', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+    3: { label: 'Oczek. na naprawę', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    4: { label: 'Naprawa w trakcie', color: 'bg-blue-100 text-blue-800 border-blue-200' },
     5: { label: 'Zakończone', color: 'bg-green-100 text-green-800 border-green-200' }
   };
 
@@ -177,7 +240,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     const ticketRef = doc(db, 'tickets', ticketId);
 
     try {
-      const currentData = tickets.find(t => t.id === ticketId);
+      const currentData = activeTicketsArray.find(t => t.id === ticketId);
       if (!currentData) {
         throw new Error("Zgłoszenie nie istnieje w aktualnym widoku!");
       }
@@ -206,6 +269,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         updateData.status = newStatus;
         if (newStatus === 5) {
           updateData.closedAt = serverTimestamp();
+          updateData.completedBy = user.name;
         } else if (newStatus !== 5 && isArchive) {
           updateData.closedAt = null;
         }
@@ -236,13 +300,14 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     }
   };
 
-  const currentTicket = selectedTicketId ? (tickets.find(t => t.id === selectedTicketId) || (isArchive ? tickets.find(t => t.id === selectedTicketId) : null)) : null;
+  const currentTicket = selectedTicketId ? activeTicketsArray.find(t => t.id === selectedTicketId) : null;
 
   // Pełny widok szczegółów zgłoszenia
 
   if (selectedTicketId && currentTicket) {
     return (
       <TicketDetails
+        machines={machines}
         currentTicket={currentTicket}
         setSelectedTicketId={setSelectedTicketId}
         user={user}
@@ -269,7 +334,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   }
 
   // Sortowanie i filtrowanie
-  const sortedTickets = [...tickets].sort((a, b) => {
+  const sortedTickets = [...activeTicketsArray].sort((a, b) => {
     const isAClosed = a.status === 5;
     const isBClosed = b.status === 5;
     if (isAClosed && !isBClosed) return 1;
@@ -281,13 +346,22 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   });
 
   const filteredTickets = sortedTickets.filter(t => {
-    const searchStr = filterMachine.toLowerCase();
-    const matchMachine = (t.machineName?.toLowerCase() || '').includes(searchStr) || 
-                         (t.department?.toLowerCase() || '').includes(searchStr) ||
-                         (t.regionName?.toLowerCase() || '').includes(searchStr);
-    const matchStatus = filterStatus ? String(t.status) === filterStatus : true;
-    return matchMachine && matchStatus;
-  });
+      const searchStr = filterMachine.toLowerCase();
+      let matchMachine = false;
+      
+      if (searchStr === 'bez lokalizacji' || searchStr === 'bez lokalizacji / inne') {
+        const m = machines?.find(mac => mac.id === t.machineId);
+        matchMachine = m && (m.xPercent == null || m.yPercent == null);
+      } else {
+        matchMachine = (t.machineName?.toLowerCase() || '').includes(searchStr) || 
+                       (t.department?.toLowerCase() || '').includes(searchStr) ||
+                       (t.reportedBy?.toLowerCase() || '').includes(searchStr) ||
+                       (t.regionName?.toLowerCase() || '').includes(searchStr);
+      }
+      
+      const matchStatus = filterStatus ? String(t.status) === filterStatus : true;
+      return matchMachine && matchStatus;
+    });
 
   // Obliczenia statystyk dla Dashboardu
   const activeTickets = tickets.filter(t => t.status !== 5);
@@ -305,8 +379,8 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
       
       {/* Statystyki Dashboard (tylko w widoku głównym) */}
       {!isArchive && (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 mb-6">
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+        <div className="hidden lg:grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-6 mb-6">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
             <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
               <i className="ph ph-warning-circle"></i>
             </div>
@@ -316,7 +390,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
             </div>
           </div>
           
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
             <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
               <i className="ph ph-siren"></i>
             </div>
@@ -326,7 +400,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
             </div>
           </div>
 
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
             <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
               <i className="ph ph-check-circle"></i>
             </div>
@@ -336,7 +410,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
             </div>
           </div>
 
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
             <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
               <i className="ph ph-engine"></i>
             </div>
@@ -349,7 +423,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
       )}
 
       {/* Pasek filtrów i opcji */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4 items-center justify-between">
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto flex-1">
           <div className="relative flex-1 max-w-md">
             <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -382,7 +456,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
               setFilterStatus('');
             }}
             disabled={!filterMachine && !filterStatus}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm rounded-lg border border-red-200 transition-colors whitespace-nowrap"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm rounded-lg border border-red-200 transition-colors whitespace-nowrap"
             title="Wyczyść wszystkie filtry wyszukiwania"
           >
             <i className="ph ph-funnel-x text-lg"></i>
@@ -393,16 +467,16 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <button 
             onClick={handleExportExcel}
-            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-green-200 transition-colors"
+            className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-green-200 transition-colors"
           >
             <i className="ph ph-file-xls text-lg"></i>
             Eksportuj (.xlsx)
           </button>
           {/* Przycisk Dostosuj Kolumny */}
-          <div className="relative">
+          <div className="relative hidden md:block">
             <button 
               onClick={() => setShowColumnPicker(!showColumnPicker)}
-              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-2 border border-gray-300 transition-colors"
+              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-gray-300 transition-colors"
             >
               <i className="ph ph-[#111827] ph-columns text-base"></i>
               Dostosuj kolumny
@@ -410,46 +484,46 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
 
             {showColumnPicker && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 z-50 animate-fade-in">
-                <div className="font-bold text-xs text-gray-400 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100 flex justify-between items-center">
+                <div className="font-bold text-xs text-gray-400 uppercase tracking-wider mb-1 pb-2 border-b border-gray-100 flex justify-between items-center">
                   <span>Widoczne Kolumny</span>
                   <button onClick={() => setShowColumnPicker(false)} className="text-gray-400 hover:text-gray-600">
                     <i className="ph ph-x text-sm"></i>
                   </button>
                 </div>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.date} onChange={() => toggleColumn('date')} className="rounded text-blue-600" />
                     Data zgłoszenia
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.region} onChange={() => toggleColumn('region')} className="rounded text-blue-600" />
                     Miejsce (Rejon)
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.machine} onChange={() => toggleColumn('machine')} className="rounded text-blue-600" />
                     Maszyna
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.bay} onChange={() => toggleColumn('bay')} className="rounded text-blue-600" />
                     Przelot / Inf. dodatkowa
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.topic} onChange={() => toggleColumn('topic')} className="rounded text-blue-600" />
                     Temat zgłoszenia
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.reporter} onChange={() => toggleColumn('reporter')} className="rounded text-blue-600" />
                     Zgłaszający (Kto zgłosił)
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.status} onChange={() => toggleColumn('status')} className="rounded text-blue-600" />
                     Status
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.service} onChange={() => toggleColumn('service')} className="rounded text-blue-600" />
                     Przypisany Serwis
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleCols.duration} onChange={() => toggleColumn('duration')} className="rounded text-blue-600" />
                     Czas trwania
                   </label>
@@ -465,12 +539,74 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
       </div>
 
       {/* Tabela zgłoszeń */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      
+      {/* Karty dla wersji mobilnej (PZU style) */}
+      <div className="lg:hidden flex flex-col gap-4">
+        {filteredTickets.length === 0 ? (
+          <div className="p-6 text-center text-gray-500 bg-white rounded-xl border border-gray-200">
+            Brak zgłoszeń.
+          </div>
+        ) : (
+          filteredTickets.map(ticket => {
+            const dateObj = safeParseDate(ticket.createdAt);
+            const dateStr = dateObj ? dateObj.toLocaleDateString('pl-PL') : '-';
+            const timeStr = dateObj ? dateObj.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '-';
+            let statusColor = 'text-gray-600 border-gray-300';
+            if (ticket.status === 1) statusColor = 'text-red-600 border-red-300 bg-red-50'; // Nowe
+            if (ticket.status === 2 || ticket.status === 3) statusColor = 'text-blue-600 border-blue-300 bg-blue-50'; // W trakcie
+            if (ticket.status === 4 || ticket.status === 5) statusColor = 'text-green-600 border-green-400 bg-green-50'; // Zrobione
+
+            const statusLabel = STATUSES[ticket.status]?.label || 'STATUS';
+            
+            return (
+              <div 
+                key={ticket.id} 
+                onClick={() => { setSelectedTicketId(ticket.id); setSelectedService(ticket.assignedTo || ''); setEtr(ticket.etr || ''); }}
+                className={`bg-white rounded-xl border-l-4 shadow-sm p-4 cursor-pointer relative transition-all active:scale-[0.98] ${ticket.isCritical ? 'border-red-500' : 'border-blue-500'} border-t border-r border-b border-gray-200`}
+              >
+                {ticket.isCritical && (
+                  <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg rounded-tr-xl">
+                    KRYTYCZNE
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-start mb-1 pr-6">
+                  <h3 className="font-bold text-[#003366] text-base leading-tight">
+                    {ticket.machineName || 'Nieznana Maszyna'}{!machines?.some(m => m.id === ticket.machineId) && <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}
+                  </h3>
+                  <i className="ph ph-caret-right text-gray-400 absolute right-4 top-1/2 -translate-y-1/2"></i>
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-1">
+                  Rejon: <span className="font-medium text-gray-800">{ticket.regionName || '-'}</span>
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-1 line-clamp-1">
+                  Temat: {ticket.topic}
+                </div>
+                
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                  <div className="text-xs text-gray-500 flex flex-col">
+                    <span>{dateStr}</span>
+                    <span className="font-medium">{timeStr}</span>
+                  </div>
+                  
+                  <div className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase border tracking-wider ${statusColor}`}>
+                    {statusLabel}
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-bold text-gray-500">
-              <tr>
-                {visibleCols.date && <th className="px-6 py-4">Data zgłoszenia</th>}
+<tr>
+{visibleCols.date && <th className="px-6 py-4">Data zgłoszenia</th>}
                 {visibleCols.region && <th className="px-6 py-4">Miejsce (Rejon)</th>}
                 {visibleCols.machine && <th className="px-6 py-4">Maszyna</th>}
                 {visibleCols.bay && <th className="px-6 py-4">Przelot/Inf.</th>}
@@ -479,8 +615,8 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                 {visibleCols.status && <th className="px-6 py-4">Status</th>}
                 {visibleCols.service && <th className="px-6 py-4">Przypisany Serwis</th>}
                 {visibleCols.duration && <th className="px-6 py-4">Czas trwania</th>}
-                <th className="px-6 py-4 text-right">Szczegóły</th>
-              </tr>
+                <th className="px-6 py-4 w-12 text-center">Akcje</th>
+                </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTickets.length === 0 ? (
@@ -492,7 +628,8 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
               ) : (
                 filteredTickets.map(ticket => (
                   <tr key={ticket.id} className="hover:bg-blue-50/30 transition-colors group">
-                    {visibleCols.date && (
+
+                      {visibleCols.date && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-gray-800">
                           {safeParseDate(ticket.createdAt)?.toLocaleDateString('pl-PL') || '-'}
@@ -511,7 +648,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
 
                     {visibleCols.machine && (
                       <td className="px-6 py-4 font-bold text-[#111827]">
-                        {ticket.machineName}
+                        {ticket.machineName}{!machines?.some(m => m.id === ticket.machineId) && <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}
                       </td>
                     )}
 
@@ -561,21 +698,31 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
                       </td>
                     )}
 
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => { setSelectedTicketId(ticket.id); setSelectedService(ticket.assignedTo || ''); setEtr(ticket.etr || ''); }}
-                        className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-2 group-hover:border-blue-300 group-hover:text-blue-600"
-                      >
-                        Szczegóły
-                        <i className="ph ph-caret-right"></i>
-                      </button>
-                    </td>
-                  </tr>
+                    <td className="px-6 py-4">
+                        <button 
+                          onClick={() => { setSelectedTicketId(ticket.id); setSelectedService(ticket.assignedTo || ''); setEtr(ticket.etr || ''); }}
+                          className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-bold py-2 px-3 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-1 group-hover:border-blue-300 group-hover:text-blue-600"
+                        >
+                          <i className="ph ph-caret-right"></i> Szczegóły
+                        </button>
+                      </td>
+</tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        {isArchive && hasMoreArchive && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-center">
+            <button
+              onClick={() => fetchArchive(true)}
+              disabled={loadingArchive}
+              className="px-6 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded transition-colors disabled:opacity-50"
+            >
+              {loadingArchive ? 'Ładowanie...' : 'Załaduj więcej'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

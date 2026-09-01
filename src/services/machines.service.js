@@ -36,5 +36,5 @@ export const updateMachine = async (machineId, machineData) => {
 };
 
 export const deleteMachine = async (machineId) => {
-  return await deleteDoc(doc(db, 'machines', machineId));
+  return await updateDoc(doc(db, 'machines', machineId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
 };

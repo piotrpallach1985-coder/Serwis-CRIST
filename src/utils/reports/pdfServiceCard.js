@@ -184,7 +184,7 @@ export const generateServicePDF = async (service, machine) => {
       }
     }
 
-    doc.save(n(`Serwis_${service.name?.replace(/\s+/g, '_') || 'Karta'}_${new Date().toISOString().split('T')[0]}.pdf`));
+    doc.save(n(`Serwis_${(service.machineName || '').replace(/\s+/g, '_')}_${(service.name || '').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`));
   } catch (error) {
     console.error('Błąd generowania PDF serwisu:', error);
     alert('Wystąpił błąd podczas generowania dokumentu.');

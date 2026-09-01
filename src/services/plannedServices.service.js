@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, query, where, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, query, where, arrayUnion, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { createNotification } from './notifications.service';
 
@@ -16,11 +16,13 @@ export const updatePlannedService = async (serviceId, data) => {
 };
 
 export const deletePlannedService = async (serviceId) => {
-  return await deleteDoc(doc(db, 'planned_services', serviceId));
+  return await updateDoc(doc(db, 'planned_services', serviceId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
 };
 
-export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null) => {
+export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null, actionItemData = null) => {
+  const batch = writeBatch(db);
   const serviceRef = doc(db, 'planned_services', serviceId);
+  
   const payload = {
     status: 'completed',
     completedAt: serverTimestamp(),
@@ -32,12 +34,30 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
     delete payload.completionDetails.historyEntry;
   }
   
-  await updateDoc(serviceRef, payload);
+  batch.update(serviceRef, payload);
 
-  // Jeśli zdefiniowano interwał odnowienia, generujemy nowy plan serwisowy w oparciu o poprzedni
+  // Generujemy nowy plan serwisowy
   if (nextPlanData) {
-    await addPlannedService(nextPlanData);
+    const nextDataObj = {
+      ...nextPlanData,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    };
+    const nextDateRaw = nextDataObj.nextDate;
+    if (nextDateRaw && typeof nextDateRaw.toISOString === 'function') {
+      nextDataObj.nextDate = nextDateRaw.toISOString();
+    }
+    const newServiceRef = doc(collection(db, 'planned_services'));
+    batch.set(newServiceRef, nextDataObj);
   }
+
+  // Generujemy action item (tematy do realizacji)
+  if (actionItemData) {
+    const newActionItemRef = doc(collection(db, 'action_items'));
+    batch.set(newActionItemRef, actionItemData);
+  }
+
+  await batch.commit();
 };
 
 /**

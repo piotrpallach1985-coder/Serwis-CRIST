@@ -96,15 +96,48 @@ export const generateKPIReportPDF = async (tickets, plannedServices, machines, d
     // --- WIZUALIZACJA NA PDF ---
     let currentY = 50;
     
-    // Tabela Głównych KPI
+        const openTicketsCount = tickets.filter(t => t.status !== 5).length;
+    const reportedTicketsCount = tickets.length;
+    const allPlannedCount = plannedServices.length;
+
+    const now = new Date();
+    const overdueServicesCount = plannedServices.filter(srv => {
+        if (srv.status === 'completed' || srv.status === 'in_progress') return false;
+        let isOverdue = false;
+        const machine = machines.find(m => m.id === srv.machineId);
+        if (srv.nextDate) {
+          const nDate = safeParseDate(srv.nextDate);
+          if (nDate && nDate < now) isOverdue = true;
+        }
+        if (srv.targetWorkHours && machine) {
+          if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
+        }
+        return isOverdue;
+    }).length;
+
+    const formatMTTR = (totalMs, count) => {
+      if (count === 0) return '0 h 0 min';
+      const avgMs = totalMs / count;
+      const hours = Math.floor(avgMs / (1000 * 60 * 60));
+      const mins = Math.round((avgMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours} h ${mins} min`;
+    };
+
+    const mttrString = formatMTTR(totalRepairTimeMs, repairCount);
+
+    // Tabela G'ƈwnych KPI
     autoTable(doc, {
       startY: currentY,
       head: [[n('Wskaznik (KPI)'), n('Wynik'), n('Opis Wskaznika')]],
       body: [
-        [n('MTTR (Sredni Czas Naprawy)'), `${mttrHours} h`, n('Sredni czas od zgloszenia do usuniecia awarii')],
-        [n('Stosunek Pracy (Prewencja / Reakcja)'), `${preventivePercent}% / ${reactivePercent}%`, n('Ilosc serwisow planowanych vs napraw awaryjnych')],
-        [n('Laczna liczba wykonanych serwisow'), `${completedServices.length}`, n('Zrealizowane prace z kalendarza/RBG')],
-        [n('Laczna liczba naprawionych awarii'), `${repairCount}`, n('Zakonczone zgloszenia awaryjne w systemie')]
+        [n('MTTR (Sredni Czas Naprawy)'), mttrString, n('Sredni czas od zgloszenia do usuniecia awarii')],
+        [n('Liczba zgloszonych awarii'), `${reportedTicketsCount}`, n('Wszystkie awarie w wybranym okresie')],
+        [n('Liczba otwartych zgloszen'), `${openTicketsCount}`, n('Awarie obecnie oczekujace/w trakcie')],
+        [n('Liczba wykonanych napraw'), `${repairCount}`, n('Awarie zakonczone w wybranym okresie')],
+        [n('Liczba planowanych serwisow'), `${allPlannedCount}`, n('Wszystkie serwisy wpisane do planu')],
+        [n('Liczba wykonanych serwisow'), `${completedServices.length}`, n('Zrealizowane prace z kalendarza/RBG')],
+        [n('Liczba zaleglych serwisow'), `${overdueServicesCount}`, n('Przekroczony czas lub RBG')],
+        [n('Stosunek Pracy (Prewencja / Reakcja)'), `${preventivePercent}% / ${reactivePercent}%`, n('Serwisy zaplanowane vs naprawy awaryjne')]
       ],
       styles: { fontSize: 10, cellPadding: 4 },
       headStyles: { fillColor: [40, 80, 140] },

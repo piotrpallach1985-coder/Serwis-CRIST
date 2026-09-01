@@ -61,6 +61,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
   // Stany na dane z chmury
   const [tickets, setTickets] = useState([]);
   const [machines, setMachines] = useState([]);
+  const [reporters, setReporters] = useState([]);
   const [services, setServices] = useState([]);
   const [plannedServices, setPlannedServices] = useState([]);
   const [actionItems, setActionItems] = useState([]);
@@ -109,7 +110,11 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
     });
 
     const unsubMachines = onSnapshot(collection(db, 'machines'), (snapshot) => {
-      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted)); //(doc => ({ id: doc.id, ...doc.data() })));
+      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted));
+    });
+
+    const unsubReporters = onSnapshot(collection(db, 'reporters'), (snapshot) => {
+      setReporters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(x => !x.isDeleted));
     });
 
     const unsubServices = onSnapshot(collection(db, 'services'), (snapshot) => {
@@ -191,6 +196,7 @@ setNotifications(notifs);
     return () => {
       unsubTickets();
       unsubMachines();
+      unsubReporters();
       unsubServices();
       unsubPlanned();
       unsubNotifications();
@@ -328,7 +334,35 @@ setNotifications(notifs);
     return (timeB || 0) - (timeA || 0);
   });
 
-  const unreadCount = relevantNotifications.filter(n => !n.read).length;
+  
+    // Powiadomienia w Administracji o wpisach do weryfikacji
+    if (user?.role === 'admin' && currentModule === 'master_data') {
+      machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
+        relevantNotifications.push({
+          id: 'dyn_verif_machine_' + m.id,
+          title: "MASZYNA DO WERYFIKACJI",
+          message: 'Nowa maszyna wymaga weryfikacji: ' + m.name,
+          isCritical: true,
+          read: false,
+          isDynamic: true,
+          linkTo: 'machines'
+        });
+      });
+      reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).forEach(r => {
+        relevantNotifications.push({
+          id: 'dyn_verif_reporter_' + r.id,
+          title: "ZGŁASZAJĄCY DO WERYFIKACJI",
+          message: 'Nowy pracownik wymaga weryfikacji: ' + r.name,
+          isCritical: false,
+          read: false,
+          isDynamic: true,
+          linkTo: 'reporters'
+        });
+      });
+    }
+
+    const unreadCount = relevantNotifications.filter(n => !n.read).length;
+
 
   let workItems = [];
   if (currentModule === 'tickets') {
@@ -348,14 +382,14 @@ setNotifications(notifs);
   } else if (currentModule === 'master_data') {
     workItems = [
       { id: 'machines', label: 'Baza Maszyn', icon: 'ph-engine' },
-      { id: 'regions', label: 'Rejony na stoczni', icon: 'ph-map-pin' },
+      { id: 'regions', label: 'Rejony na zakładzie', icon: 'ph-map-pin' },
       { id: 'services', label: 'Podwykonawcy / Serwis', icon: 'ph-wrench' },
       { id: 'topics', label: 'Tematy Zgłoszeń', icon: 'ph-text-aa' },
       { id: 'reporters', label: 'Zgłaszający', icon: 'ph-user-list' }
     ];
     if (user.role === 'admin') {
-      workItems.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
       workItems.push({ id: 'roles', label: 'Role i Uprawnienia', icon: 'ph-shield-check' });
+        workItems.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
       workItems.push({ id: 'reports', label: 'Raportowanie & Ustawienia', icon: 'ph-chart-bar' });
       workItems.push({ id: 'settings', label: 'Administrator Programu', icon: 'ph-gear' });
     }
@@ -511,8 +545,7 @@ setNotifications(notifs);
             </button>
 
             {/* DZWONECZEK POWIADOMIEŃ */}
-          {currentModule !== 'master_data' && (
-            <div className="relative">
+          <div className="relative">
               <button 
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className="relative p-2 text-white lg:text-gray-600 hover:bg-white/10 lg:hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
@@ -527,61 +560,70 @@ setNotifications(notifs);
 
               {/* Rozwijane okno powiadomień */}
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-                  <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
-                    <span className="font-bold text-sm">Powiadomienia systemowe</span>
-                    <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                    {relevantNotifications.length === 0 ? (
-                      <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
-                    ) : (
-                      relevantNotifications.map(n => (
-                        <div 
-                          key={n.id} 
-                          onClick={() => {
-                            markAsRead(n.id);
-                            if (n.ticketId) {
-                                setGlobalTicketId(n.ticketId);
-                                setIsNotificationsOpen(false);
-                                setCurrentModule('tickets');
-                                setActiveTab('tickets');
-                                window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
-                              } else if (n.linkTo === 'planned_maintenance') {
-                                setIsNotificationsOpen(false);
-                                setCurrentModule('planned_maintenance');
-                                setActiveTab('planned_maintenance');
-                                window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
-                              } else if (n.linkTo === 'action_items') {
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                    <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
+                      <span className="font-bold text-sm">Powiadomienia systemowe</span>
+                      <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                      {relevantNotifications.length === 0 ? (
+                        <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
+                      ) : (
+                        relevantNotifications.map(n => (
+                          <div 
+                            key={n.id} 
+                            onClick={() => {
+                              markAsRead(n.id);
+                              if (n.ticketId) {
+                                  setGlobalTicketId(n.ticketId);
+                                  setIsNotificationsOpen(false);
+                                  setCurrentModule('tickets');
+                                  setActiveTab('tickets');
+                                  window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
+                                } else if (n.linkTo === 'planned_maintenance') {
                                   setIsNotificationsOpen(false);
                                   setCurrentModule('planned_maintenance');
-                                  setActiveTab('action_items');
-                                  window.history.pushState({ module: 'planned_maintenance', tab: 'action_items' }, '', '?module=planned_maintenance&tab=action_items');
-                                }
-                          }}
-                          className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.isCritical ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                            <i className={`ph ${n.isCritical ? 'ph-siren' : 'ph-info'} text-lg`}></i>
-                          </div>
-                          <div className="flex-1 text-xs">
-                            <div className="font-bold text-gray-800 mb-0.5">{n.title}</div>
-                            <div className="text-gray-600 leading-relaxed">{n.message}</div>
-                            <div className="text-[10px] text-gray-400 mt-1">
-                              {safeParseDate(n.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || 'Przed chwilą'}
+                                  setActiveTab('planned_maintenance');
+                                  window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
+                                } else if (n.linkTo === 'action_items') {
+                                    setIsNotificationsOpen(false);
+                                    setCurrentModule('planned_maintenance');
+                                    setActiveTab('action_items');
+                                    window.history.pushState({ module: 'planned_maintenance', tab: 'action_items' }, '', '?module=planned_maintenance&tab=action_items');
+                                    } else if (n.linkTo === 'machines') {
+                                    setIsNotificationsOpen(false);
+                                    setCurrentModule('master_data');
+                                    setActiveTab('machines');
+                                    window.history.pushState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines');
+                                  } else if (n.linkTo === 'reporters') {
+                                    setIsNotificationsOpen(false);
+                                    setCurrentModule('master_data');
+                                    setActiveTab('reporters');
+                                    window.history.pushState({ module: 'master_data', tab: 'reporters' }, '', '?module=master_data&tab=reporters');
+                                  }
+                              }}
+                            className={`p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.isCritical ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                              <i className={`ph ${n.isCritical ? 'ph-siren' : 'ph-info'} text-lg`}></i>
                             </div>
+                            <div className="flex-1 text-xs">
+                              <div className="font-bold text-gray-800 mb-0.5">{n.title}</div>
+                              <div className="text-gray-600 leading-relaxed">{n.message}</div>
+                              <div className="text-[10px] text-gray-400 mt-1">
+                                {safeParseDate(n.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || 'Przed chwilą'}
+                              </div>
+                            </div>
+                            {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
                           </div>
-                          {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
-                  
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          )}
-        </div></header>
+          </header>
 
         <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-24 lg:pb-6">
           {activeTab === 'dashboard_tickets' && (
@@ -614,14 +656,14 @@ setNotifications(notifs);
           )}
           {activeTab === 'home' && <HomeDashboard setActiveTab={setActiveTab} setCurrentModule={setCurrentModule} user={user} />}
           {activeTab === 'tickets' && <Tickets machines={machines} initialSearchQuery={globalSearchQuery} tickets={tickets} user={user} services={services} allowTicketDeletion={allowTicketDeletion} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
-          {activeTab === 'archive' && <Tickets tickets={[]} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
+          {activeTab === 'archive' && <Tickets machines={machines} tickets={[]} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
           {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
           {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
           {activeTab === 'action_items' && <ActionItems machines={machines} user={user} />}
           {activeTab === 'kpi' && <KPIDashboard tickets={tickets} machines={machines} plannedServices={plannedServices} />}
 
           {/* Master Data */}
-          {activeTab === 'machines' && <Machines tickets={tickets} plannedServices={plannedServices} />}
+          {activeTab === 'machines' && <Machines tickets={tickets} plannedServices={plannedServices} user={user} />}
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services services={services} />}
           {activeTab === 'topics' && <Topics />}

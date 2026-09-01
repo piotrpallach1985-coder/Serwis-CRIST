@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Login from './components/Login';
 import OperatorView from './components/OperatorView';
 import ManagerView from './components/ManagerView';
+import OfflineSyncManager from './components/OfflineSyncManager';
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -67,20 +68,26 @@ export default function App() {
 
   if (currentView === 'operator') {
     return (
-      <OperatorView 
-        user={user} 
-        onLogout={() => handleSetUser(null)} 
-        initialMachineId={urlMachineId}
-        onSwitchView={user.role === 'admin' ? () => setAdminView('manager') : null}
-      />
+      <>
+        <OfflineSyncManager />
+        <OperatorView 
+          user={user} 
+          onLogout={() => handleSetUser(null)} 
+          initialMachineId={urlMachineId}
+          onSwitchView={user.role === 'admin' ? () => setAdminView('manager') : null}
+        />
+      </>
     );
   }
 
   return (
-    <ManagerView 
-      user={user} 
-      onLogout={() => handleSetUser(null)} 
-      onSwitchView={user.role === 'admin' ? () => setAdminView('operator') : null}
-    />
+    <>
+      <OfflineSyncManager />
+      <ManagerView 
+        user={user} 
+        onLogout={() => handleSetUser(null)} 
+        onSwitchView={user.role === 'admin' ? () => setAdminView('operator') : null}
+      />
+    </>
   );
 }

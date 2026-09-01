@@ -6,6 +6,7 @@ import { db } from '../../firebase';
 import { addPlannedService, updatePlannedService, deletePlannedService, markServiceCompleted } from '../../services/plannedServices.service';
 import { updateMachineWorkHours } from '../../services/machines.service';
 import { safeParseDate } from '../../utils/dateHelpers';
+import MachineDTR from './MachineDTR';
 import PlannedMaintenanceList from './PlannedMaintenanceList';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 import ChecklistExecutor from '../checklists/ChecklistExecutor';
@@ -18,7 +19,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
       return {
         'ID Serwisu': s.id,
         'Nazwa Serwisu': s.name || '-',
-        'Maszyna': s.machineName || getMachine(s.machineId)?.name || '-',
+        'Maszyna': getMachine(s.machineId)?.name || ((s.machineName || '-') + ' (maszyna usunięta)'),
         'Priorytet': s.priority === 'Krytyczny' ? 'Krytyczny' : 'Standard',
         'Typ Wyzwalacza': s.triggerType === 'hours' ? 'RBG' : (s.triggerType === 'calendar' ? 'Kalendarz' : 'Mieszany'),
         'Data Wykonania/Oczekiwana': targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
@@ -513,8 +514,14 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all w-fit"
           >
             <i className="ph ph-arrow-left text-lg"></i>
-            Wróć do listy serwisów
+            Wróc do listy serwisów
           </button>
+          
+          {srv.machineId && (
+            <button onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-sm transition-all w-fit">
+              <i className="ph ph-file-pdf text-xl text-red-600"></i> Karta PDF
+            </button>
+          )}
           <button 
             onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))}
             className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-sm transition-all w-fit"
@@ -534,7 +541,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <h2 className="text-base sm:text-2xl font-black text-slate-800">{srv.name}</h2>
                     <div className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider flex items-center gap-2">
                       <i className="ph ph-engine text-lg text-slate-400"></i>
-                      {machine?.name || 'Nieznana maszyna'} ({getMachineRegionName(machine?.regionId)})
+                      {machine?.name || ((srv.machineName || 'Nieznana maszyna'))} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>} ({getMachineRegionName(machine?.regionId)})
                     </div>
                   </div>
                   <div>

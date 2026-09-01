@@ -7,6 +7,8 @@ export default function Settings() {
   const [archiveDelayDays, setArchiveDelayDays] = useState(14);
   const [allowTicketDeletion, setAllowTicketDeletion] = useState(false);
   const [plannedWarningDays, setPlannedWarningDays] = useState(30);
+  const [enableTickets, setEnableTickets] = useState(true);
+  const [enablePlanned, setEnablePlanned] = useState(true);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   // Branding states
@@ -144,6 +146,8 @@ export default function Settings() {
         if (data.allowTicketDeletion !== undefined) {
           setAllowTicketDeletion(data.allowTicketDeletion);
         }
+        if (data.enableTickets !== undefined) setEnableTickets(data.enableTickets);
+        if (data.enablePlanned !== undefined) setEnablePlanned(data.enablePlanned);
         if (data.plannedWarningDays !== undefined) {
           setPlannedWarningDays(data.plannedWarningDays);
         }
@@ -159,8 +163,9 @@ export default function Settings() {
     try {
       await setDoc(doc(db, "settings", "general"), {
         archiveDelayDays: parseInt(archiveDelayDays, 10),
-        allowTicketDeletion: allowTicketDeletion,
-        plannedWarningDays: parseInt(plannedWarningDays, 10)
+        allowTicketDeletion: false,
+        enableTickets: enableTickets,
+        enablePlanned: enablePlanned
       }, { merge: true });
       // Zapis nazwy firmy i podtytułu
       await setDoc(doc(db, "settings", "branding"), {
@@ -193,64 +198,41 @@ export default function Settings() {
           </div>
         )}
 
-        <form onSubmit={handleSave} className="max-w-xl space-y-6">
+        <form onSubmit={handleSave} className="max-w-7xl w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+
+          
+
+
+
+
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-5">
-            <h3 className="font-bold text-blue-900 mb-2">Automatyczna Archiwizacja</h3>
+            <h3 className="font-bold text-blue-900 mb-2">Aktywne Moduły Firmy</h3>
             <p className="text-sm text-blue-800 mb-4">
-              Zgłoszenia ze statusem &quot;Zakończono&quot; będą wyświetlane w Rejestrze Awarii przez określoną liczbę dni. 
-              Po tym czasie znikną z głównej tabeli i będą dostępne tylko w Archiwum Zgłoszeń.
+              Wybierz, które moduły są włączone dla tej instalacji (firmy). Odznaczenie modułu ukryje go na ekranie głównym i zablokuje możliwość nadawania do niego uprawnień innym pracownikom.
             </p>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">
-                Czas do archiwizacji (w dniach)
+            
+            <div className="flex flex-col gap-4">
+              <label className="flex items-center gap-3 cursor-pointer p-4 border border-blue-200 bg-white rounded-xl hover:bg-gray-50 transition-colors">
+                <input type="checkbox" checked={enableTickets} onChange={e => setEnableTickets(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
+                <div>
+                  <span className="block font-bold text-gray-800">Moduł Zgłoszeń i Awarii (Awarie UR)</span>
+                  <span className="text-sm text-gray-500">Zarządzanie biletami, skanowanie kodów awarii, MTTR.</span>
+                </div>
               </label>
-              <input
-                type="number"
-                min="0"
-                value={archiveDelayDays}
-                onChange={(e) => setArchiveDelayDays(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                required
-              />
+              <label className="flex items-center gap-3 cursor-pointer p-4 border border-blue-200 bg-white rounded-xl hover:bg-gray-50 transition-colors">
+                <input type="checkbox" checked={enablePlanned} onChange={e => setEnablePlanned(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
+                <div>
+                  <span className="block font-bold text-gray-800">Moduł Serwisów Planowanych (Serwis UR)</span>
+                  <span className="text-sm text-gray-500">Przeglądy okresowe, harmonogramy z cyklami zliczania RBG i Dni.</span>
+                </div>
+              </label>
             </div>
           </div>
 
-          <div className="bg-red-50 border border-red-100 rounded-lg p-5">
-            <h3 className="font-bold text-red-900 mb-2">Czyszczenie Wpisów i Uprawnienia</h3>
-            <p className="text-sm text-red-800 mb-4">
-              Włączenie tej opcji pozwala osobom posiadającym rolę **Administratora** na trwałe usuwanie wybranych wpisów z Rejestru Awarii oraz Archiwum.
-            </p>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input 
-                type="checkbox"
-                checked={allowTicketDeletion}
-                onChange={(e) => setAllowTicketDeletion(e.target.checked)}
-                className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
-              />
-              <span className="font-bold text-gray-800 text-sm">Zezwalaj Administratorowi na usuwanie zgłoszeń (Czyszczenie bazy)</span>
-            </label>
-          </div>
 
-          <div className="bg-amber-50 border border-amber-100 rounded-lg p-5">
-            <h3 className="font-bold text-amber-900 mb-2">Ostrzeżenia Serwisu Planowanego</h3>
-            <p className="text-sm text-amber-800 mb-4">
-              Pinezki na mapie będą podświetlone na żółto, gdy zbliża się termin przeglądu.
-            </p>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">
-                Ostrzegaj na ile dni przed terminem:
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={plannedWarningDays}
-                onChange={(e) => setPlannedWarningDays(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none"
-                required
-              />
-            </div>
           </div>
-
 
         {/* Sekcja Branding */}
         <div className="mt-8 border-t border-gray-200 pt-8 mb-6">

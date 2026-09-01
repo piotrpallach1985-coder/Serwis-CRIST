@@ -65,6 +65,13 @@ export default function Reporters() {
     setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const sortedReporters = [...reporters].sort((a, b) => {
+    const aVerify = (a.name || '').includes('(DO WERYFIKACJI)');
+    const bVerify = (b.name || '').includes('(DO WERYFIKACJI)');
+    if (aVerify && !bVerify) return -1;
+    if (!aVerify && bVerify) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   return (
     <div className="space-y-6">
@@ -170,10 +177,10 @@ export default function Reporters() {
         <div className="overflow-x-auto">
           
 <div className="lg:hidden flex flex-col gap-1.5 p-2">
-  {reporters.length === 0 ? (
+  {sortedReporters.length === 0 ? (
     <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak danych.</div>
   ) : (
-    reporters.map(item => {
+    sortedReporters.map(item => {
     const isVerifying = (item.name || '').includes('(DO WERYFIKACJI)');
     return (
     <div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col relative ${isVerifying ? 'border-orange-500 border-l-4 bg-orange-50/50' : 'border-slate-200 border-l-4 border-l-[#002b5e]'}`}>
@@ -206,12 +213,12 @@ export default function Reporters() {
               </tr>
             </thead>
             <tbody>
-              {reporters.length === 0 ? (
+              {sortedReporters.length === 0 ? (
                 <tr>
                   <td colSpan="3" className="p-6 text-center text-gray-500">Brak pracowników w bazie.</td>
                 </tr>
               ) : (
-                reporters.map(r => (
+                sortedReporters.map(r => (
     <tr key={r.id} className={"border-b border-gray-100 transition-colors " + ((r.name || '').includes('(DO WERYFIKACJI)') ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-blue-50')}>
                     <td className="p-4 font-semibold text-gray-800 text-base">{r.name}</td>
                     <td className="p-4 text-gray-700">{r.position || '-'}</td>
