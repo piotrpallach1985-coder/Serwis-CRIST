@@ -28,8 +28,8 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
       }
     };
     window.addEventListener('popstate', handlePopState);
-return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [step]);
 
   const handleStepChange = (newStep) => {
     setStep(newStep);
@@ -54,48 +54,61 @@ return () => window.removeEventListener('popstate', handlePopState);
 
   // Formularz
 
-  // Pobieranie maszyn i tematów
+  // Pobieranie maszyn i tematów - Z ZALOGOWANIEM W TLE NA POCZĄTKU
   useEffect(() => {
     let unsubscribeMachines = () => {};
     let unsubscribeTopics = () => {};
     let unsubscribeReporters = () => {};
     let unsubscribeRegions = () => {};
-    try {
-      unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
-        const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
-        setMachines(machinesData);
 
-        if (initialMachineId && step === 'scan') {
-          const targetMachine = machinesData.find(m => m.id === initialMachineId);
-          if (targetMachine) {
-            setSelectedMachine(targetMachine);
-            handleStepChange('form');
-          } else {
-            const docRef = doc(db, "machines", initialMachineId);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
+    const initializeData = async () => {
+      try {
+        // 1. ZALOGOWANIE W TLE ZANIM POBIERZEMY DANE
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+
+        // 2. PODPIĘCIE NASŁUCHIWACZY DOPIERO PO ZALOGOWANIU
+        unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
+          const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
+          setMachines(machinesData);
+
+          if (initialMachineId && step === 'scan') {
+            const targetMachine = machinesData.find(m => m.id === initialMachineId);
+            if (targetMachine) {
+              setSelectedMachine(targetMachine);
               handleStepChange('form');
+            } else {
+              const docRef = doc(db, "machines", initialMachineId);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
+                handleStepChange('form');
+              }
             }
           }
-        }
-      }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
+        }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
 
-      unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
-        setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
-      }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
+        unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
+          setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
+        }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
 
-      unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
-        setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
-      }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
+        unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
+          setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+        }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
 
-      unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
-        setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
-      }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
-    } catch (error) {
-      console.error("Błąd inicjalizacji:", error);
-      setErrorMsg("Krytyczny błąd: " + error.message);
-    }
+        unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
+          setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
+        }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
+
+      } catch (error) {
+        console.error("Błąd inicjalizacji:", error);
+        setErrorMsg("Krytyczny błąd podczas logowania: " + error.message);
+      }
+    };
+
+    initializeData();
+
     return () => {
       unsubscribeMachines();
       unsubscribeTopics();
@@ -222,9 +235,6 @@ return () => window.removeEventListener('popstate', handlePopState);
 
 
   const resetFlow = () => {
-    
-    
-    
     setSelectedMachine(null);
     setErrorMsg(null);
     if (initialMachineId) {
