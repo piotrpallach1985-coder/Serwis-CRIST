@@ -398,8 +398,7 @@ return () => window.removeEventListener('popstate', handlePopState);
             </button>
             <button 
               onClick={() => {
-                window.history.pushState({ module: '' }, '', window.location.pathname);
-                window.dispatchEvent(new PopStateEvent('popstate'));
+                window.location.href = window.location.pathname;
               }} 
               className="w-full sm:w-auto mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-red-600/20 active:scale-95"
             >

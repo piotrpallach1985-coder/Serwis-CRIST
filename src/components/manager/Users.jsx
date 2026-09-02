@@ -20,7 +20,6 @@ export default function Users() {
   const [usersList, setUsersList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('admin');
   const [phone, setPhone] = useState('');
@@ -44,8 +43,6 @@ export default function Users() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!email.trim() || !name.trim()) return alert('Podaj e-mail i imię z nazwiskiem');
-    if (!editingId && !password.trim()) return alert('Podaj hasło dla nowego użytkownika');
-    
     setLoading(true);
     try {
       if (editingId) {
@@ -59,13 +56,13 @@ export default function Users() {
         setEditingId(null);
         setIsFormOpen(false);
         setEmail('');
-        setPassword('');
+        
         setName('');
         setRole('admin');
         setPhone('');
       } else {
         // Tworzenie NOWEGO konta w bezpiecznym module Authentication
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), password.trim());
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), Math.random().toString(36).slice(-10) + "Aa1!");
         const newUid = userCredential.user.uid;
 
         // Zapisanie roli i nazwy do bazy danych (BEZ HASŁA!)
@@ -77,7 +74,7 @@ export default function Users() {
         });
 
         setEmail('');
-        setPassword('');
+        
         setName('');
         setRole('admin');
         setPhone('');
@@ -85,10 +82,7 @@ export default function Users() {
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        alert('Ten e-mail jest już zarejestrowany w systemie.');
-      } else if (err.code === 'auth/weak-password') {
-        alert('Hasło jest za słabe. Musi mieć co najmniej 6 znaków.');
-      } else {
+        alert('Ten e-mail jest już zarejestrowany w systemie.'); } else {
         alert('Nie udało się zapisać użytkownika: ' + err.message);
       }
     } finally {
@@ -104,7 +98,7 @@ export default function Users() {
 
   const handleEdit = (u) => {
     setEmail(u.email);
-    setPassword(''); // Hasła nie da się podejrzeć
+     // Hasła nie da się podejrzeć
     setName(u.name || '');
     setRole(u.role || 'admin');
     setPhone(u.phone || '');
@@ -120,7 +114,7 @@ export default function Users() {
           <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Użytkownicy (Konta dostępowe)</h2>
           <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj autoryzowanymi użytkownikami systemu (logowanie, aplikacja)</p>
         </div>
-        <button onClick={() => { setEditingId(null); setEmail(''); setPassword(''); setName(''); setRole('admin'); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
+        <button onClick={() => { setEditingId(null); setEmail('');  setName(''); setRole('admin'); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
           <i className="ph ph-plus text-lg"></i> Dodaj Użytkownika
         </button>
       </div>
@@ -188,19 +182,7 @@ export default function Users() {
               required
             />
           </div>
-          {!editingId && (
-            <div className="flex-1 w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hasło (min. 6 znaków)</label>
-              <input 
-                type="text" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="np. trudnehaslo123"
-                required={!editingId}
-              />
-            </div>
-          )}
+          
           <div className="flex-1 w-full">
             <label className="block text-sm font-medium text-gray-700 mb-1">Uprawnienia</label>
             <select
@@ -222,7 +204,7 @@ export default function Users() {
                       setIsFormOpen(false);
                       setEditingId(null);
                       setEmail('');
-                      setPassword('');
+                      
                       setName('');
                       setRole('admin');
                       setPhone('');
@@ -283,7 +265,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-4">Imię i Nazwisko</th>
                 <th className="px-6 py-4">E-mail (Login)</th>
-                <th className="px-6 py-4">Hasło</th>
+                
                 <th className="px-6 py-4">Telefon</th>
                 <th className="px-6 py-4">Rola</th>
                 <th className="px-6 py-4 text-right">Akcje</th>
@@ -301,10 +283,7 @@ export default function Users() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-bold text-gray-800">{u.name}</td>
                     <td className="px-6 py-4 text-gray-600">{u.email}</td>
-                    <td className="px-6 py-4 text-green-600 font-bold text-sm">
-                        <i className="ph ph-shield-check mr-1"></i>
-                        Zaszyfrowane
-                      </td>
+                    
                       <td className="px-6 py-4 text-gray-600">{u.phone || "-"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${

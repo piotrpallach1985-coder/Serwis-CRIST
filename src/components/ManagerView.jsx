@@ -509,8 +509,7 @@ setNotifications(notifs);
           <button 
             onClick={() => {
               // Wróć do portalu
-              window.history.pushState({ module: '' }, '', window.location.pathname);
-              window.dispatchEvent(new PopStateEvent('popstate'));
+              window.location.href = window.location.pathname;
             }}
             className="w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-bold px-4 py-3 rounded-lg transition-colors shadow-sm mb-2"
           >

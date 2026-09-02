@@ -113,7 +113,7 @@ export default function Regions() {
       <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
         <div>
           <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejony (Miejsca)</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj rejonami stoczni używanymi w systemie.</p>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj rejonami zakladu używanymi w systemie.</p>
         </div>
         <button onClick={() => { setEditingId(null); setName(''); setDescription(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
           <i className="ph ph-plus text-lg"></i> Dodaj Rejon

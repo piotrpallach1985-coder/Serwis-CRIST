@@ -670,7 +670,7 @@ return pins;
       >
         <div className="font-black text-[10px] md:text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">
           <i className="ph ph-push-pin text-slate-400"></i>
-          Bez lokalizacji / Inne
+          Nieprzypięte
         </div>
         
         <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
@@ -702,11 +702,11 @@ return pins;
               e.stopPropagation();
               if(isFullscreen) document.exitFullscreen?.();
               setHoveredPin(null);
-              // "Bez lokalizacji" nie zadziała w globalnej szukarce jeśli go szukamy po stringu 'Bez lokalizacji / Inne'. 
+              // "Bez lokalizacji" nie zadziała w globalnej szukarce jeśli go szukamy po stringu 'Nieprzypięte'. 
               // Ponieważ na razie mapowanie nie wspiera szukania unpinned_items, kliknięcie po prostu zamyka tooltip (lub można przeładować na inną logikę). 
               // User poprosił tylko o "chmurkę". Dodamy jednak nawigację po nazwie rejonu "-" lub czymkolwiek, co wyczyści filtr by móc je znaleźć, 
               // albo po prostu wołamy to samo co dla zwykłej pineski.
-              onNavigateToTickets && onNavigateToTickets('Bez lokalizacji / Inne');
+              onNavigateToTickets && onNavigateToTickets('Nieprzypięte');
             }}
             className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}
           >
@@ -1085,7 +1085,7 @@ return pins;
           {/* Statystyki na mapie */}
           {/* Statystyki na mapie */}
             {mode === 'view' && modeType === 'tickets' && (
-                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[220px] scale-[0.5] lg:scale-100 origin-top-right">
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[220px] scale-[0.65] lg:scale-100 origin-top-right">
                   <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
                     {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Awarii'}
                   </div>
@@ -1099,7 +1099,7 @@ return pins;
                       onMouseLeave={handleMouseLeave}
                       onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
                     >
-                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Brak lokalizacji (nieprzypięte)</span>
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Nieprzypięte</span>
                       <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
                         {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
                       </span>
@@ -1125,7 +1125,7 @@ return pins;
               )}
 
             {mode === 'view' && modeType === 'planned_maintenance' && (
-                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[240px] scale-[0.5] lg:scale-100 origin-top-right">
+                <div className="absolute top-4 right-2 lg:top-4 lg:right-4 z-[110] bg-slate-900/90 backdrop-blur-md p-2 lg:px-5 lg:py-4 rounded-lg lg:rounded-xl border border-slate-700 shadow-xl text-white pointer-events-none flex flex-col gap-1 lg:gap-3 min-w-[140px] lg:min-w-[240px] scale-[0.65] lg:scale-100 origin-top-right">
                   <div className="text-[9px] md:text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 border-b border-slate-700 pb-2">
                     {currentSubmapId ? 'Statystyki Rejonu' : 'Statystyki Serwisów'}
                   </div>
@@ -1139,7 +1139,7 @@ return pins;
                       onMouseLeave={handleMouseLeave}
                       onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
                     >
-                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Brak lokalizacji (nieprzypięte)</span>
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Nieprzypięte</span>
                       <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
                         {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
                       </span>

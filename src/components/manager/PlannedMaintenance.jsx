@@ -517,11 +517,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
             Wróc do listy serwisów
           </button>
           
-          {srv.machineId && (
-            <button onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-sm transition-all w-fit">
-              <i className="ph ph-file-pdf text-xl text-red-600"></i> Karta PDF
-            </button>
-          )}
+          
           <button 
             onClick={() => import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, machine))}
             className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-sm transition-all w-fit"
@@ -541,7 +537,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <h2 className="text-base sm:text-2xl font-black text-slate-800">{srv.name}</h2>
                     <div className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider flex items-center gap-2">
                       <i className="ph ph-engine text-lg text-slate-400"></i>
-                      {machine?.name || ((srv.machineName || 'Nieznana maszyna'))} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>} ({getMachineRegionName(machine?.regionId)})
+                      {machine?.name || <>{srv.machineName || 'Nieznana maszyna'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>} ({getMachineRegionName(machine?.regionId)})
                     </div>
                   </div>
                   <div>

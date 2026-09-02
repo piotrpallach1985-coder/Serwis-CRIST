@@ -69,7 +69,7 @@ export default function PlannedMaintenanceList({
                         </td>
                       )}
                       {columns.machine && (
-                        <td className="px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || ((srv.machineName || 'Nieznana'))} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}</td>
+                        <td className="px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || <>{srv.machineName || 'Nieznana'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>}</td>
                       )}
                       {columns.region && (
                         <td className="px-6 py-4 font-bold text-slate-600 text-sm">{getMachineRegionName(machine?.regionId)}</td>
@@ -163,7 +163,7 @@ Krytyczne
                   <div className="text-sm text-slate-600 mb-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <div className="font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                       <i className="ph ph-engine text-slate-400 text-base"></i>
-                      {machine?.name || ((srv.machineName || 'Nieznana maszyna'))} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}
+                      {machine?.name || <>{srv.machineName || 'Nieznana maszyna'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>}
                     </div>
                     
                   </div>

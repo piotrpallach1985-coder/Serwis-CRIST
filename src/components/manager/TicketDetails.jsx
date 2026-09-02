@@ -140,10 +140,7 @@ export default function TicketDetails({
                   <div className="bg-[#f8f9fa] border border-gray-200 rounded-lg p-4 text-[#4b5563] text-sm leading-relaxed whitespace-pre-wrap">
                     {currentTicket.description}
                   </div>
-                  
-                  {machine && <MachineDTR machine={machine} canManage={user?.role === 'admin' || (user?.permissions || []).includes('manage_dtr')} />}
-
-                    {currentTicket.photos && currentTicket.photos.length > 0 && (
+{currentTicket.photos && currentTicket.photos.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Załączone zdjęcia</h4>
                       <div className="flex flex-wrap gap-2">
