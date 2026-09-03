@@ -11,8 +11,9 @@ import PlannedMaintenanceList from './PlannedMaintenanceList';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 import ChecklistExecutor from '../checklists/ChecklistExecutor';
 
-export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false, allowTicketDeletion = false, canEditPlanned = true, canDeletePlanned = true }) {
+export default function PlannedMaintenance({ machines, regions = [], user, plannedWarningDays = 30, isArchive = false, allowTicketDeletion = false, canEditPlanned = true, canDeletePlanned = true, initialServiceId, onClearServiceId }) {
   const [services, setServices] = useState([]);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
   const handleExportExcel = () => {
     const dataToExport = filteredServices.map(s => {
       const targetDate = safeParseDate(s.nextDate);
@@ -31,7 +32,33 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     exportToExcel(dataToExport, isArchive ? 'Archiwum_Serwisow' : 'Planowane_Serwisy');
   };
 
-  const [selectedServiceId, setSelectedServiceId] = useState(null);
+  const [selectedServiceId, setSelectedServiceId] = useState(initialServiceId || null);
+  
+
+  // Złap cofanie (Back button) i zamknij widok szczegółów zamiast wychodzić z modułu
+  useEffect(() => {
+    if (selectedServiceId) {
+      window.history.pushState({ internalDetails: true }, '');
+    }
+  }, [selectedServiceId]);
+
+  useEffect(() => {
+    const handlePopStateForDetails = (e) => {
+      if (selectedServiceId) {
+        setSelectedServiceId(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopStateForDetails);
+    return () => window.removeEventListener('popstate', handlePopStateForDetails);
+  }, [selectedServiceId]);
+
+  useEffect(() => {
+    if (initialServiceId) {
+      setSelectedServiceId(initialServiceId);
+      if (onClearServiceId) onClearServiceId();
+    }
+  }, [initialServiceId, onClearServiceId]);
+  const [showDTRModal, setShowDTRModal] = useState(false);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   
   // Modals
@@ -91,6 +118,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     const q = query(collection(db, 'planned_services'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
+      setServicesLoaded(true);
     });
     return () => unsub();
   }, []);
@@ -538,6 +566,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
                     <div className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider flex items-center gap-2">
                       <i className="ph ph-engine text-lg text-slate-400"></i>
                       {machine?.name || <>{srv.machineName || 'Nieznana maszyna'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>} ({getMachineRegionName(machine?.regionId)})
+    
                     </div>
                   </div>
                   <div>
@@ -820,6 +849,10 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
         machines={machines} handleSaveService={handleSaveService}
       />
 
+        <div className="mt-8">
+          <MachineDTR machine={machines.find(m => m.id === srv?.machineId)} canManage={user?.role === 'manager' || user?.role === 'admin'} />
+        </div>
+        
       {/* Lightbox for details view */}
       {lightboxImg && (
         <div 

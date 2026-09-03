@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
+import { getMessaging } from "firebase/messaging";
 import { 
   initializeFirestore, 
   persistentLocalCache, 
@@ -28,3 +29,5 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
+
+export const messaging = getMessaging(app);

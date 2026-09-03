@@ -1,6 +1,6 @@
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion, collection, query, where, orderBy, limit, getDocs, startAfter } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, arrayUnion, collection, query, where, orderBy, limit, getDocs, startAfter } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
@@ -192,6 +192,24 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   };
 
   // Nasłuchiwanie na zmiany globalnego filtru z mapy
+
+  // Złap cofanie (Back button) i zamknij widok szczegółów zamiast wychodzić z modułu
+  useEffect(() => {
+    if (selectedTicketId) {
+      window.history.pushState({ internalDetails: true }, '');
+    }
+  }, [selectedTicketId]);
+
+  useEffect(() => {
+    const handlePopStateForDetails = (e) => {
+      if (selectedTicketId) {
+        setSelectedTicketId(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopStateForDetails);
+    return () => window.removeEventListener('popstate', handlePopStateForDetails);
+  }, [selectedTicketId]);
+
   useEffect(() => {
     if (initialSearchQuery !== undefined) {
       setFilterMachine(initialSearchQuery);
@@ -300,11 +318,42 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
     }
   };
 
-  const currentTicket = selectedTicketId ? activeTicketsArray.find(t => t.id === selectedTicketId) : null;
+  const [fetchedMissingTicket, setFetchedMissingTicket] = useState(null);
+  
+  useEffect(() => {
+    if (selectedTicketId) {
+      const found = activeTicketsArray.find(t => t.id === selectedTicketId);
+      if (!found) {
+        // Fetch it specifically if it's missing (e.g. older than 50 limit in archive)
+        getDoc(doc(db, 'tickets', selectedTicketId)).then(snap => {
+            if (snap.exists()) {
+              setFetchedMissingTicket({ id: snap.id, ...snap.data() });
+            }
+          });
+      } else {
+        setFetchedMissingTicket(null);
+      }
+    } else {
+      setFetchedMissingTicket(null);
+    }
+  }, [selectedTicketId, activeTicketsArray]);
+
+  const currentTicket = selectedTicketId ? (activeTicketsArray.find(t => t.id === selectedTicketId) || fetchedMissingTicket) : null;
 
   // Pełny widok szczegółów zgłoszenia
 
+
+  if (selectedTicketId && !currentTicket) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
+        <span className="ml-3 text-gray-500 font-medium">Wczytywanie zgłoszenia...</span>
+      </div>
+    );
+  }
+
   if (selectedTicketId && currentTicket) {
+
     return (
       <TicketDetails
         machines={machines}

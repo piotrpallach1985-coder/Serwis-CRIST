@@ -28,6 +28,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
     return params.get('module') || 'home';
   });
 
+  const [pushStatus, setPushStatus] = useState(Notification.permission);
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get('module') || 'home';
@@ -35,6 +36,7 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
   });
 
   const [globalTicketId, setGlobalTicketId] = useState(null);
+  const [globalServiceId, setGlobalServiceId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
 
   // Obsługa przycisku "Wstecz" przeglądarki (Popstate)
@@ -580,12 +582,12 @@ setNotifications(notifs);
                                   setGlobalTicketId(n.ticketId);
                                   setIsNotificationsOpen(false);
                                   setCurrentModule('tickets');
-                                  setActiveTab('tickets');
+                                  setActiveTab(isArchived ? 'archive' : 'tickets');
                                   window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
                                 } else if (n.linkTo === 'planned_maintenance') {
                                   setIsNotificationsOpen(false);
                                   setCurrentModule('planned_maintenance');
-                                  setActiveTab('planned_maintenance');
+                                  setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
                                   window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
                                 } else if (n.linkTo === 'action_items') {
                                     setIsNotificationsOpen(false);
@@ -638,7 +640,7 @@ setNotifications(notifs);
               user={user} 
               onNavigateToTickets={(query) => {
                 setGlobalSearchQuery(query);
-                setActiveTab('tickets');
+                setActiveTab(isArchived ? 'archive' : 'tickets');
               }}
             />
           )}
@@ -652,20 +654,36 @@ setNotifications(notifs);
               user={user} 
               plannedWarningDays={plannedWarningDays}
               onNavigateToTickets={() => {
-                setActiveTab('planned_maintenance');
+                setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
               }}
             />
           )}
           {activeTab === 'home' && <HomeDashboard setActiveTab={setActiveTab} setCurrentModule={setCurrentModule} user={user} />}
           {activeTab === 'tickets' && <Tickets machines={machines} initialSearchQuery={globalSearchQuery} tickets={tickets} user={user} services={services} allowTicketDeletion={allowTicketDeletion} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
-          {activeTab === 'archive' && <Tickets machines={machines} tickets={[]} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} />}
-          {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
-          {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} />}
+          {activeTab === 'archive' && <Tickets machines={machines} tickets={[]} user={user} services={services} allowTicketDeletion={allowTicketDeletion} isArchive={true} initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)} />}
+          {activeTab === 'planned_maintenance' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={false} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)} />}
+          {activeTab === 'archive_planned' && <PlannedMaintenance machines={machines} regions={regions} user={user} plannedWarningDays={plannedWarningDays} isArchive={true} allowTicketDeletion={allowTicketDeletion} canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned} initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)} />}
           {activeTab === 'action_items' && <ActionItems machines={machines} user={user} />}
           {activeTab === 'kpi' && <KPIDashboard tickets={tickets} machines={machines} plannedServices={plannedServices} />}
 
           {/* Master Data */}
-          {activeTab === 'machines' && <Machines tickets={tickets} plannedServices={plannedServices} user={user} />}
+          {activeTab === 'machines' && <Machines 
+              tickets={tickets} 
+              plannedServices={plannedServices} 
+              user={user} 
+              onOpenTicket={(id, isArchived) => {
+                setGlobalTicketId(id);
+                setCurrentModule('home');
+                setActiveTab(isArchived ? 'archive' : 'tickets');
+                window.history.pushState({ module: 'home', tab: isArchived ? 'archive' : 'tickets', openTicket: id }, '', '?module=home&tab=' + (isArchived ? 'archive' : 'tickets') + '&openTicket=' + id);
+              }}
+              onOpenService={(id, isArchived) => {
+                setGlobalServiceId(id);
+                setCurrentModule('planned_maintenance');
+                setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
+                window.history.pushState({ module: 'planned_maintenance', tab: isArchived ? 'archive_planned' : 'planned_maintenance', openService: id }, '', '?module=planned_maintenance&tab=' + (isArchived ? 'archive_planned' : 'planned_maintenance') + '&openService=' + id);
+              }}
+            />}
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services services={services} />}
           {activeTab === 'topics' && <Topics />}

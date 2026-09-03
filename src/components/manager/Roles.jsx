@@ -41,8 +41,20 @@ export default function Roles() {
         { id: 'reports', label: 'Raportowanie' },
         { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' }
       ]
-    }
-  ];
+    },
+      {
+        module: 'Powiadomienia Push',
+        permissions: [
+          { id: 'push_new_critical', label: 'Nowe Awarie Krytyczne' },
+          { id: 'push_new_all', label: 'Wszystkie Nowe Awarie' },
+          { id: 'push_status_updates', label: 'Zmiany statusów powiązanych zgłoszeń' },
+          { id: 'push_new_comments', label: 'Nowe komentarze w powiązanych zgłoszeniach' },
+          { id: 'push_planned_services', label: 'Powiadomienia o zbliżających się serwisach' }
+        ]
+      }
+    ];
+
+  
 
   // Helper do płaskiej listy
   const allPermissionsFlat = availablePermissionsGrouped.flatMap(g => g.permissions);
@@ -106,7 +118,7 @@ export default function Roles() {
 
   const handleDelete = async (id) => {
     if (confirm("Czy na pewno chcesz usunąć tę rolę? UWAGA: Użytkownicy z tą rolą stracą wszystkie dostępy!")) {
-      await updateDoc(doc(db, "roles", id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+      await updateDoc(doc(db, "roles", id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
     }
   };
 

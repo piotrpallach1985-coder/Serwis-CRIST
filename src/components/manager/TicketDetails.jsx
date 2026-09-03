@@ -104,7 +104,10 @@ export default function TicketDetails({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8 border-t border-gray-100 pt-8">
                     <div>
                       <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">DANE OBIEKTU</h3>
-                      <div className="font-bold text-[#111827] text-lg mb-1">{currentTicket.machineName}{!machines?.some(m => m.id === currentTicket.machineId) && <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}</div>
+                      <div className="font-bold text-[#111827] text-lg mb-1 flex items-center gap-2">
+    {currentTicket.machineName}{!machines?.some(m => m.id === currentTicket.machineId) && <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span>}
+    
+  </div>
                       <div className="text-gray-500 text-sm flex items-center gap-1 mb-1">
                         <i className="ph ph-map-pin"></i> {currentTicket.regionName || 'Brak Rejonu'} {currentTicket.bay ? ` / ${currentTicket.bay}` : ''}
                       </div>
@@ -497,6 +500,10 @@ export default function TicketDetails({
 
           </div>
         </div>
+
+      <div className="mt-8">
+        <MachineDTR machine={machines?.find(m => m.id === currentTicket.machineId)} canManage={user?.role === 'manager' || user?.role === 'admin'} />
+      </div>
 
       {/* Lightbox */}
       {lightboxImg && (
