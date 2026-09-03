@@ -122,66 +122,52 @@ return () => window.removeEventListener('popstate', handlePopState);
     machinesRef.current = machines;
   }, [machines]);
 
-  const startLiveScanner = async () => {
+    const startLiveScanner = () => {
     setIsLiveScanning(true);
     setErrorMsg(null);
-    setTimeout(async () => {
-      try {
-        if (html5QrcodeRef.current) {
-          try { await html5QrcodeRef.current.stop(); } catch(e) { /* ignore */ }
-        }
-        const html5QrCode = new Html5Qrcode("qr-reader");
-        html5QrcodeRef.current = html5QrCode;
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            stopLiveScanner();
-            let machineId = decodedText;
-            if (decodedText.includes('?machine=')) {
-              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-              machineId = urlParams.get('machine');
-            }
-            const currentMachines = machinesRef.current;
-            const foundMachine = currentMachines.find(m => m.id === machineId);
-            if (foundMachine) {
-              setSelectedMachine(foundMachine);
-              handleStepChange('form');
-            } else {
-              alert('Nie znaleziono maszyny o kodzie: ' + machineId);
-              handleStepChange('scan');
-            }
-          },
-          () => {} // Ignoruj powtarzalne ramki bez QR
-        );
-      } catch (err) {
-        console.error("Błąd uruchamiania kamery:", err);
-        setErrorMsg("Błąd kamery: " + (err.message || err) + ". Zezwól na dostęp do aparatu w przeglądarce.");
-        setIsLiveScanning(false);
-      }
-    }, 150);
   };
 
-  const stopLiveScanner = async () => {
-    if (html5QrcodeRef.current) {
-      try {
-        await html5QrcodeRef.current.stop();
-        html5QrcodeRef.current.clear();
-      } catch (e) {
-        console.error("Stop scanner err:", e);
-      }
-      html5QrcodeRef.current = null;
-    }
+  const stopLiveScanner = () => {
     setIsLiveScanning(false);
   };
 
-  useEffect(() => {
-    return () => {
-      if (html5QrcodeRef.current) {
-        try { html5QrcodeRef.current.stop(); } catch(e) { /* ignore */ }
-      }
-    };
-  }, []);
+    useEffect(() => {
+    if (isLiveScanning) {
+      const html5QrCode = new Html5Qrcode('qr-reader');
+      html5QrcodeRef.current = html5QrCode;
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          stopLiveScanner();
+          let machineId = decodedText;
+          if (decodedText.includes('?machine=')) {
+            const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+            machineId = urlParams.get('machine');
+          }
+          if (machineId) {
+            if (machineId === initialMachineId) {
+              const targetMachine = machinesRef.current.find(m => m.id === machineId);
+              if (targetMachine) { setSelectedMachine(targetMachine); handleStepChange('form'); }
+            } else {
+              const foundMachine = machinesRef.current.find(m => m.id === machineId);
+              if (foundMachine) { setSelectedMachine(foundMachine); handleStepChange('form'); }
+              else { alert('Nie znaleziono maszyny: ' + machineId); handleStepChange('scan'); }
+            }
+          } else { alert('Nieprawidlowy QR'); }
+        },
+        () => {}
+      ).catch(err => {
+        console.error('Scanner error:', err);
+        setErrorMsg(err.message || 'Blad uruchamiania kamery.');
+      });
+      return () => {
+        if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
+        const container = document.getElementById('qr-reader');
+        if (container) container.innerHTML = '';
+      };
+    }
+  }, [isLiveScanning, initialMachineId]);
   const handleFileScan = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -400,10 +386,9 @@ return () => window.removeEventListener('popstate', handlePopState);
               onClick={() => {
                 window.location.href = window.location.pathname;
               }} 
-              className="w-full sm:w-auto mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-red-600/20 active:scale-95"
-            >
-              Powrót
-            </button>
+              className="w-full sm:w-auto mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-red-600/20 active:scale-95">
+                {'Powr\u00F3t'}
+              </button>
           </div>
         )}
       </main>

@@ -175,7 +175,7 @@ const [isSettingsMinimized, setIsSettingsMinimized] = useState(true); // { id, t
     const handleWheel = (e) => {
       e.preventDefault(); // Teraz to zadziała poprawnie i zablokuje przewijanie strony
       const delta = e.deltaY < 0 ? 0.15 : -0.15;
-      setZoomScale(s => Math.min(Math.max(1, parseFloat((s + delta).toFixed(2))), 5));
+      setZoomScale(s => Math.min(Math.max(0.5, parseFloat((s + delta).toFixed(2))), 5));
     };
 
     // Rejestrujemy zdarzenie z wymuszeniem 'passive: false'
@@ -561,7 +561,7 @@ return pins;
       if (currentSubmapId !== null) {
         return machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
       }
-      return machines.filter(m => m.xPercent == null || m.yPercent == null);
+      return machines.filter(m => !m.regionId && (m.xPercent == null || m.yPercent == null));
     }
   };
   const [tooltipPos, setTooltipPos] = useState({ isNearTop: false, isNearLeft: false, isNearRight: false });
@@ -670,7 +670,7 @@ return pins;
       >
         <div className="font-black text-[10px] md:text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">
           <i className="ph ph-push-pin text-slate-400"></i>
-          Nieprzypięte
+            {currentSubmapId ? 'Bez pineski' : 'Bez rejonu'}
         </div>
         
         <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
@@ -702,11 +702,11 @@ return pins;
               e.stopPropagation();
               if(isFullscreen) document.exitFullscreen?.();
               setHoveredPin(null);
-              // "Bez lokalizacji" nie zadziała w globalnej szukarce jeśli go szukamy po stringu 'Nieprzypięte'. 
+              // "Bez lokalizacji" nie zadziała w globalnej szukarce jeśli go szukamy po stringu 'Bez rejonu'. 
               // Ponieważ na razie mapowanie nie wspiera szukania unpinned_items, kliknięcie po prostu zamyka tooltip (lub można przeładować na inną logikę). 
               // User poprosił tylko o "chmurkę". Dodamy jednak nawigację po nazwie rejonu "-" lub czymkolwiek, co wyczyści filtr by móc je znaleźć, 
               // albo po prostu wołamy to samo co dla zwykłej pineski.
-              onNavigateToTickets && onNavigateToTickets('Nieprzypięte');
+              onNavigateToTickets && onNavigateToTickets(currentSubmapId ? 'Bez pineski' : 'Bez rejonu');
             }}
             className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}
           >
@@ -760,7 +760,7 @@ return pins;
                 e.touches[0].clientY - e.touches[1].clientY
               );
               const factor = dist / touchDistRef.current;
-              setZoomScale(s => Math.min(Math.max(1, s * factor), 5));
+              setZoomScale(s => Math.min(Math.max(0.5, s * factor), 5));
               touchDistRef.current = dist;
             }
           }}
@@ -1099,9 +1099,9 @@ return pins;
                       onMouseLeave={handleMouseLeave}
                       onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
                     >
-                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Nieprzypięte</span>
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> {currentSubmapId ? 'Bez pineski' : 'Bez rejonu'}</span>
                       <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
-                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null && !m.regionId).length}
                       </span>
                       {renderUnpinnedTooltip()}
                     </div>
@@ -1139,9 +1139,9 @@ return pins;
                       onMouseLeave={handleMouseLeave}
                       onClick={() => setHoveredPin(hoveredPin === 'unpinned_items' ? null : 'unpinned_items')}
                     >
-                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> Nieprzypięte</span>
+                      <span className={`text-[10px] md:text-sm font-medium flex items-center gap-1.5 ${getUnpinnedBgColor()}`}><i className={`ph ph-push-pin text-base ${getUnpinnedColor()} ${getUnpinnedPulse()}`}></i> {currentSubmapId ? 'Bez pineski' : 'Bez rejonu'}</span>
                       <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>
-                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null).length}
+                        {currentSubmapId ? machines.filter(m => m.regionId === currentSubmapId && m.xPercent == null).length : machines.filter(m => m.xPercent == null && !m.regionId).length}
                       </span>
                       {renderUnpinnedTooltip()}
                     </div>
@@ -1209,7 +1209,7 @@ return pins;
               {Math.round(zoomScale * 100)}%
             </button>
             <button 
-              onClick={() => setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 1))} 
+              onClick={() => setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 0.5))} 
               className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors"
               title="Pomniejsz (-)"
             >

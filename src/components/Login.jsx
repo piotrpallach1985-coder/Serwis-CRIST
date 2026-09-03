@@ -9,56 +9,42 @@ export default function Login({ onLogin, currentUser }) {
   const [isScanning, setIsScanning] = useState(false);
   const html5QrcodeRef = useRef(null);
   
-  const startScanner = () => {
+    const startScanner = () => {
     setIsScanning(true);
-    setTimeout(async () => {
-      try {
-        if (html5QrcodeRef.current) {
-          try { await html5QrcodeRef.current.stop(); } catch(e) {}
-        }
-        const html5QrCode = new Html5Qrcode('portal-qr-reader');
-        html5QrcodeRef.current = html5QrCode;
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            stopScanner();
-            let machineId = decodedText;
-            if (decodedText.includes('?machine=')) {
-              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-              machineId = urlParams.get('machine');
-            }
-            window.history.replaceState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines&openMachine=' + machineId);
-            onLogin(currentUser); // Trigger reload with new module
-          },
-          () => {} // Ignore errors
-        );
-      } catch (err) {
-        console.error('Scanner init error:', err);
-        alert('Blad dostepu do kamery: ' + err.message);
-        setIsScanning(false);
-      }
-    }, 100);
   };
 
-  const stopScanner = async () => {
-    if (html5QrcodeRef.current) {
-      try {
-        await html5QrcodeRef.current.stop();
-        html5QrcodeRef.current.clear();
-      } catch (e) {}
-      html5QrcodeRef.current = null;
-    }
+  const stopScanner = () => {
     setIsScanning(false);
   };
 
-  useEffect(() => {
-    return () => {
-      if (html5QrcodeRef.current) {
-        try { html5QrcodeRef.current.stop(); } catch(e) {}
-      }
-    };
-  }, []);
+    useEffect(() => {
+    if (isScanning) {
+      const html5QrCode = new Html5Qrcode('portal-qr-reader');
+      html5QrcodeRef.current = html5QrCode;
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          stopScanner();
+          let machineId = decodedText;
+          if (decodedText.includes('?machine=')) {
+            const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+            machineId = urlParams.get('machine');
+          }
+          window.history.replaceState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines&openMachine=' + machineId);
+          onLogin(currentUser);
+        },
+        () => {} // Ignore errors
+      ).catch(err => {
+        console.error('Camera start error', err);
+      });
+      return () => {
+        if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
+        const container = document.getElementById('portal-qr-reader');
+        if (container) container.innerHTML = '';
+      };
+    }
+  }, [isScanning, currentUser, onLogin]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -319,9 +305,7 @@ export default function Login({ onLogin, currentUser }) {
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 relative flex flex-col gap-4">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-bold text-lg text-slate-800">Skanuj kod QR maszyny</h3>
-              <button onClick={stopScanner} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
-                <i className="ph ph-x"></i>
-              </button>
+              <button onClick={stopScanner} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg transition-colors text-sm shadow-md"><i className="ph ph-arrow-left"></i> {'Powr\u00F3t'}</button>
             </div>
             <div id="portal-qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
             <p className="text-xs text-center text-slate-500">
@@ -385,4 +369,4 @@ export default function Login({ onLogin, currentUser }) {
       )}
     </div>
   );
-}
+}

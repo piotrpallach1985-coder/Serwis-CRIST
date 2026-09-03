@@ -165,7 +165,7 @@ export default function Machines({ tickets = [], plannedServices = [], user }) {
       setAdditionalDescription('');
       setEditingId(null);
         setIsFormOpen(false);
-      if (selectedMachine && selectedMachine.id === id) { setSelectedMachine(null); }
+      if (selectedMachine && selectedMachine.id === editingId) { setSelectedMachine(null); }
     } catch (error) {
       console.error('Błąd dodawania maszyny:', error);
       showToast('Nie udało się dodać maszyny.', 'error');
@@ -331,7 +331,13 @@ setIsFormOpen(true);
                   <textarea value={additionalDescription} onChange={(e) => setAdditionalDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none resize-y min-h-[80px]" placeholder="Opis pomocniczy widoczny dla pracowników..."></textarea>
                   <p className="text-xs text-gray-400 mt-1">Ten opis będzie widoczny pod nazwą maszyny, może pomóc w dokładniejszej identyfikacji.</p>
                 </div>
-                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+                                  {editingId && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mt-4 text-yellow-800 text-sm">
+                      <p className="font-bold"><i className="ph ph-warning-circle mr-1"></i> Uwaga dotycząca kodów QR</p>
+                        <p>Jeśli zmieniasz nazwę maszyny, stary, wydrukowany kod QR (naklejka) będzie miał nieaktualny napis. Pamiętaj, aby po zapisaniu zmian wygenerować i wydrukować <strong>nowy kod QR</strong>!</p>
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
                   <button 
                     type="button" 
                     onClick={() => {
@@ -431,7 +437,13 @@ setIsFormOpen(true);
             <input type="text" value={additionalDescription} onChange={(e) => setAdditionalDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="Opcjonalnie..." />
           </div>
           </div>
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 mt-4">
+                            {editingId && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mt-4 text-yellow-800 text-sm">
+                      <p className="font-bold"><i className="ph ph-warning-circle mr-1"></i> Uwaga dotycząca kodów QR</p>
+                        <p>Jeśli zmieniasz nazwę maszyny, stary, wydrukowany kod QR (naklejka) będzie miał nieaktualny napis. Pamiętaj, aby po zapisaniu zmian wygenerować i wydrukować <strong>nowy kod QR</strong>!</p>
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 mt-4">
             <button 
               type="button" 
               onClick={() => {

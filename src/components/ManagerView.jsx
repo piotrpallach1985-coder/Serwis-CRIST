@@ -39,7 +39,10 @@ export default function ManagerView({ user, onLogout, onSwitchView }) {
 
   // Obsługa przycisku "Wstecz" przeglądarki (Popstate)
   useEffect(() => {
-    window.history.replaceState({ tab: activeTab, module: currentModule }, '', `?module=${currentModule}&tab=${activeTab}`);
+    const urlParams = new URLSearchParams(window.location.search);
+      urlParams.set('module', currentModule);
+      urlParams.set('tab', activeTab);
+      window.history.replaceState({ tab: activeTab, module: currentModule }, '', '?' + urlParams.toString());
     
     const handlePopState = (e) => {
       const params = new URLSearchParams(window.location.search);
