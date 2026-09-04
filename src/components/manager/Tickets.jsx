@@ -196,7 +196,7 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
   // Złap cofanie (Back button) i zamknij widok szczegółów zamiast wychodzić z modułu
   useEffect(() => {
     if (selectedTicketId) {
-      window.history.pushState({ internalDetails: true }, '');
+      window.history.pushState({ ...window.history.state, internalDetails: true }, '');
     }
   }, [selectedTicketId]);
 
@@ -398,10 +398,14 @@ export default function Tickets({ tickets, machines = [], user, services, isArch
       const searchStr = filterMachine.toLowerCase();
       let matchMachine = false;
       
-      if (searchStr === 'bez lokalizacji' || searchStr === 'bez lokalizacji / inne') {
-        const m = machines?.find(mac => mac.id === t.machineId);
-        matchMachine = m && (m.xPercent == null || m.yPercent == null);
-      } else {
+      if (searchStr === 'bez lokalizacji' || searchStr === 'bez lokalizacji / inne' || searchStr === 'bez pineski' || searchStr === 'bez rejonu') {
+          const m = machines?.find(mac => mac.id === t.machineId);
+          if (searchStr === 'bez rejonu') {
+             matchMachine = m && !m.regionId && (m.xPercent == null || m.yPercent == null);
+          } else {
+             matchMachine = m && (m.xPercent == null || m.yPercent == null);
+          }
+        } else {
         matchMachine = (t.machineName?.toLowerCase() || '').includes(searchStr) || 
                        (t.department?.toLowerCase() || '').includes(searchStr) ||
                        (t.reportedBy?.toLowerCase() || '').includes(searchStr) ||

@@ -3,10 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/Serwis-CRIST/',
-  build: {
-    outDir: 'docs'
-  },
+  base: './',
   plugins: [
     react(),
     VitePWA({

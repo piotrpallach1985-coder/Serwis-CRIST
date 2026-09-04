@@ -38,7 +38,7 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   // Złap cofanie (Back button) i zamknij widok szczegółów zamiast wychodzić z modułu
   useEffect(() => {
     if (selectedServiceId) {
-      window.history.pushState({ internalDetails: true }, '');
+      window.history.pushState({ ...window.history.state, internalDetails: true }, '');
     }
   }, [selectedServiceId]);
 
@@ -53,11 +53,11 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
   }, [selectedServiceId]);
 
   useEffect(() => {
-    if (initialServiceId) {
+    if (initialServiceId && servicesLoaded && !selectedServiceId) {
       setSelectedServiceId(initialServiceId);
       if (onClearServiceId) onClearServiceId();
     }
-  }, [initialServiceId, onClearServiceId]);
+  }, [initialServiceId, onClearServiceId, servicesLoaded, selectedServiceId]);
   const [showDTRModal, setShowDTRModal] = useState(false);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   
@@ -537,9 +537,15 @@ export default function PlannedMaintenance({ machines, regions = [], user, plann
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex gap-2 sm:gap-4 flex-wrap p-2 sm:p-4 bg-white/95 backdrop-blur border-b sm:border border-gray-200  shadow-sm sm:rounded-xl mb-4">
-          <button 
-            onClick={() => setSelectedServiceId(null)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all w-fit"
+          {window.history.state?.backToMachineId && (
+              <button onClick={() => { const returnId = window.history.state?.backToMachineId; if (returnId) { window.history.pushState({ module: 'master_data', tab: 'machines', openMachine: returnId }, '', '?module=master_data&tab=machines&openMachine=' + returnId); window.dispatchEvent(new PopStateEvent('popstate')); } }} className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all w-fit">
+                <i className="ph ph-arrow-u-up-left text-lg"></i>
+                Wróć do Urządzenia
+              </button>
+            )}
+            <button 
+              onClick={() => setSelectedServiceId(null)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all w-fit"
           >
             <i className="ph ph-arrow-left text-lg"></i>
             Wróc do listy serwisów

@@ -41,7 +41,7 @@ export default function PlannedMaintenanceFormModal({
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Kategoria / Priorytet</label>
             <select value={priority} onChange={e => setPriority(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
-              <option value="NieKrytyczny">NieKrytyczny (w tle)</option>
+              <option value="NieKrytyczny">Standardowy (bez zatrzymania maszyny)</option>
               <option value="Krytyczny">Krytyczny (zatrzymuje linię)</option>
             </select>
           </div>

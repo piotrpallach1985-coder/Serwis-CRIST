@@ -4,7 +4,7 @@ import { safeParseDate } from '../../utils/dateHelpers';
 import MachineDTR from './MachineDTR';
 
 
-export default function MachineDetails({ machine, user, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
+export default function MachineDetails({ isFromQR, onScanNext, machine, user, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';
   const baseUrl = window.location.origin + window.location.pathname;
   const qrValue = `${baseUrl}?machine=${machine.id}`;
@@ -13,9 +13,16 @@ export default function MachineDetails({ machine, user, history, loading, onBack
     <div className="bg-[#f8f9fa] w-full flex flex-col h-full animate-fade-in relative text-[#111827]">
       <div className="bg-white border-b border-gray-200 p-2 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={onBack}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm"
+          {isFromQR && <button
+              onClick={onScanNext}
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors text-sm mr-2"
+            >
+              <i className="ph ph-qr-code text-lg"></i>
+              Skanuj kolejny kod
+            </button>}
+            <button 
+              onClick={onBack}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm"
             title="Powrót"
           >
             <i className="ph ph-arrow-left text-lg"></i> Powrót
@@ -125,7 +132,7 @@ export default function MachineDetails({ machine, user, history, loading, onBack
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.tickets.map(t => (
-                      <div key={t.id} onClick={() => onOpenTicket && onOpenTicket(t.id, t.status === 5)} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
+                      <div key={t.id} onClick={() => onOpenTicket && onOpenTicket(t.id, t.status === 5, machine.id)} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
                         <div className="flex justify-between items-start mb-2">
                           <div className="font-bold text-gray-800">{t.topic || 'Inne'}</div>
                           <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${t.status === 5 ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-600'}`}>
@@ -159,7 +166,7 @@ export default function MachineDetails({ machine, user, history, loading, onBack
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.services.map(s => (
-                      <div key={s.id} onClick={() => onOpenService && onOpenService(s.id, s.status === 'completed')} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
+                      <div key={s.id} onClick={() => onOpenService && onOpenService(s.id, s.status === 'completed', machine.id)} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
                         <div className="flex justify-between items-start mb-2">
                           <div className="font-bold text-gray-800">{s.name}</div>
                           <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${s.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>

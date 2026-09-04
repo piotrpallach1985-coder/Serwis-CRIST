@@ -592,7 +592,7 @@ return pins;
     const now = new Date();
 
     if (currentSubmapId === null) {
-      unpinnedMachineIds = machines.filter(m => m.xPercent == null || m.yPercent == null).map(m => m.id);
+      unpinnedMachineIds = machines.filter(m => !m.regionId && (m.xPercent == null || m.yPercent == null)).map(m => m.id);
     } else {
       unpinnedMachineIds = machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null)).map(m => m.id);
     }

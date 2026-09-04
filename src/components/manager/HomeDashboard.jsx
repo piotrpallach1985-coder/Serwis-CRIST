@@ -7,6 +7,17 @@ import { Html5Qrcode } from 'html5-qrcode';
 export default function HomeDashboard({ setActiveTab, setCurrentModule, user }) {
   const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
   const [isScanning, setIsScanning] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('scanner') === 'true') {
+      startScanner();
+      // Remove it from URL so it doesn't trigger again on reload
+      const newUrl = window.location.pathname + '?module=home&tab=home';
+      window.history.replaceState({ module: 'home', tab: 'home' }, '', newUrl);
+    }
+  }, []);
+
   const html5QrcodeRef = useRef(null);
   const machinesRef = useRef([]);
 
@@ -163,7 +174,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user }) 
             <i className="ph ph-gear"></i>
           </div>
           <h3 className="text-lg font-bold text-slate-800 mb-1 text-center leading-tight">Administracja</h3>
-          <p className="text-xs text-slate-500 text-center">Baza maszyn, ustawienia, pracownicy i system.</p>
+          <p className="text-xs text-slate-500 text-center">Baza urządzeń, ustawienia, pracownicy i system.</p>
         </button>
         
       </div>

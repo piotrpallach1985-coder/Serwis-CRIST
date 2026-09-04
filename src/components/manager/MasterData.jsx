@@ -12,7 +12,7 @@ export default function MasterData({ user, machines, regions, services, roles })
   const [activeSubTab, setActiveSubTab] = useState('machines');
 
   const tabs = [
-    { id: 'machines', label: 'Baza Maszyn', icon: 'ph-engine' },
+    { id: 'machines', label: 'Baza Urz\u0105dze\u0144', icon: 'ph-engine' },
     { id: 'regions', label: 'Rejony na stoczni', icon: 'ph-map-pin' },
     { id: 'services', label: 'Podwykonawcy / Serwis', icon: 'ph-wrench' },
     { id: 'topics', label: 'Tematy Zgłoszeń', icon: 'ph-text-aa' },

@@ -47,11 +47,20 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const machineParam = params.get('machine');
     if (machineParam) {
-      setUrlMachineId(machineParam);
-      // Jeśli wejście z kodu QR, ustaw moduł i zaloguj automatycznie
-      window.history.replaceState({ module: 'operator' }, '', `?module=operator&machine=${machineParam}`);
-      setCurrentModule('operator');
-      handleSetUser({ name: 'Pracownik (QR)', role: 'operator' });
+      if (user && user.role !== 'operator') {
+        const params = new URLSearchParams(window.location.search);
+        params.set('module', 'master_data');
+        params.set('tab', 'machines');
+        params.set('openMachine', machineParam);
+        params.delete('machine');
+        window.history.replaceState({ module: 'master_data', tab: 'machines', openMachine: machineParam }, '', '?' + params.toString());
+        setCurrentModule('master_data');
+      } else {
+        setUrlMachineId(machineParam);
+        window.history.replaceState({ module: 'operator' }, '', '?module=operator&machine=' + machineParam);
+        setCurrentModule('operator');
+        handleSetUser({ name: 'Pracownik (QR)', role: 'operator' });
+      }
     }
   }, []);
 

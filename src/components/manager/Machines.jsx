@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -9,9 +9,10 @@ import { safeParseDate } from '../../utils/dateHelpers';
 import MachineDetails from './MachineDetails';
 
 import ConfirmModal from './ConfirmModal';
+import { Html5Qrcode } from 'html5-qrcode';
 import Toast from './Toast';
 
-export default function Machines({ tickets = [], plannedServices = [], user }) {
+export default function Machines({ tickets = [], plannedServices = [], user, onOpenTicket, onOpenService }) {
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
   const [name, setName] = useState('');
@@ -29,6 +30,9 @@ export default function Machines({ tickets = [], plannedServices = [], user }) {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [machineHistory, setMachineHistory] = useState({ tickets: [], services: [] });
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isFromQR, setIsFromQR] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const html5QrcodeRef = useRef(null);
 
 
   const [toastConfig, setToastConfig] = useState({ message: '', type: 'success' });
@@ -41,7 +45,7 @@ export default function Machines({ tickets = [], plannedServices = [], user }) {
       if (openMachineId) {
         const targetMachine = machines.find(m => m.id === openMachineId);
         if (targetMachine) {
-          handleViewMachine(targetMachine);
+          handleViewMachine(targetMachine, true);
         }
       }
       setInitialOpenProcessed(true);
@@ -97,25 +101,80 @@ export default function Machines({ tickets = [], plannedServices = [], user }) {
   };
 
   
-  const handleViewMachine = async (m) => {
+  
+  const startScanner = () => {
+    setIsScanning(true);
+    setTimeout(async () => {
+      try {
+        if (html5QrcodeRef.current) {
+          try { await html5QrcodeRef.current.stop(); } catch(e) {}
+        }
+        html5QrcodeRef.current = new Html5Qrcode("machines-qr-reader");
+        await html5QrcodeRef.current.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            stopScanner();
+            let machineId = decodedText;
+            if (decodedText.includes('?machine=')) {
+              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+              machineId = urlParams.get('machine');
+            }
+            const targetMachine = machines.find(m => m.id === machineId);
+            if (targetMachine) {
+              handleViewMachine(targetMachine, true);
+            } else {
+              setToastConfig({ message: 'Nie znaleziono maszyny', type: 'error' });
+            }
+          },
+          () => {} // Ignore errors
+        );
+      } catch (err) {
+        console.error("Scanner init error:", err);
+        alert("B\u0142\u0105d dost\u0119pu do kamery: " + err.message);
+        setIsScanning(false);
+      }
+    }, 100);
+  };
+
+  const stopScanner = async () => {
+    if (html5QrcodeRef.current) {
+      try {
+        await html5QrcodeRef.current.stop();
+        html5QrcodeRef.current.clear();
+      } catch (e) {
+        console.error("Stop scanner err:", e);
+      }
+      html5QrcodeRef.current = null;
+    }
+    setIsScanning(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (html5QrcodeRef.current) {
+        try { html5QrcodeRef.current.stop(); } catch(e) {}
+      }
+    };
+  }, []);
+
+
+  const handleViewMachine = async (m, fromQR = false) => {
+    setIsFromQR(fromQR);
     setSelectedMachine(m);
     setLoadingHistory(true);
     try {
       // Tickets
-      const activeTickets = tickets.filter(t => t.machineId === m.id);
-      const qArchived = query(collection(db, 'tickets'), where('machineId', '==', m.id), where('status', '==', 5));
-      const snapArchived = await getDocs(qArchived);
-      const archivedTickets = snapArchived.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const allT = [...activeTickets, ...archivedTickets].filter((v,i,a) => a.findIndex(t=>t.id === v.id) === i);
-      allT.sort((a,b) => (safeParseDate(b.createdAt) || 0) - (safeParseDate(a.createdAt) || 0));
+      const qAllT = query(collection(db, 'tickets'), where('machineId', '==', m.id));
+        const snapAllT = await getDocs(qAllT);
+        const allT = snapAllT.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allT.sort((a,b) => (safeParseDate(b.createdAt) || 0) - (safeParseDate(a.createdAt) || 0));
 
       // Services
-      const activeServices = plannedServices.filter(s => s.machineId === m.id);
-      const qArchivedS = query(collection(db, 'planned_services'), where('machineId', '==', m.id), where('status', '==', 'completed'));
-      const snapArchivedS = await getDocs(qArchivedS);
-      const archivedS = snapArchivedS.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const allS = [...activeServices, ...archivedS].filter((v,i,a) => a.findIndex(s=>s.id === v.id) === i);
-      allS.sort((a,b) => (safeParseDate(b.completedAt || b.createdAt) || 0) - (safeParseDate(a.completedAt || a.createdAt) || 0));
+      const qAllS = query(collection(db, 'planned_services'), where('machineId', '==', m.id));
+        const snapAllS = await getDocs(qAllS);
+        const allS = snapAllS.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allS.sort((a,b) => (safeParseDate(b.completedAt || b.createdAt) || 0) - (safeParseDate(a.completedAt || a.createdAt) || 0));
       
       setMachineHistory({ tickets: allT, services: allS });
     } catch(err) {
@@ -280,7 +339,12 @@ setIsFormOpen(true);
     return (
       <>
         <MachineDetails 
-            machine={selectedMachine} 
+              isFromQR={isFromQR}
+              onScanNext={() => {
+                setSelectedMachine(null);
+                startScanner();
+              }}
+              machine={selectedMachine} 
             user={user} 
         onEdit={() => handleEdit(selectedMachine)}
         onDelete={() => handleDelete(selectedMachine.id, selectedMachine.name)} 
@@ -289,7 +353,9 @@ setIsFormOpen(true);
         regions={regions}
         onBack={() => setSelectedMachine(null)} 
         onPrint={handlePrint} 
-        onGeneratePDF={() => handleDownloadPDF(selectedMachine, machineHistory)} 
+        onGeneratePDF={() => handleDownloadPDF(selectedMachine, machineHistory)}
+          onOpenTicket={onOpenTicket}
+          onOpenService={onOpenService} 
       />
         
       {isFormOpen && (
@@ -385,9 +451,25 @@ setIsFormOpen(true);
 
   return (
     <div className="space-y-6">
+      
+  {isScanning && (
+    <div className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white p-4 rounded-xl shadow-2xl border border-slate-200 flex flex-col gap-4">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-bold text-lg text-slate-800">Skanuj kod QR maszyny</h3>
+          <button onClick={stopScanner} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+            <i className="ph ph-x"></i>
+          </button>
+        </div>
+        <div id="machines-qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
+        <p className="text-xs text-center text-slate-500">Skieruj aparat na kod QR znajduj\u0105cy si\u0119 na maszynie, aby otworzy\u0107 jej szczeg\u0142y.</p>
+      </div>
+    </div>
+  )}
+
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejestr Maszyn</h2>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejestr Urządzeń</h2>
           <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj maszynami i generuj kody QR</p>
         </div>
         <button onClick={() => { 
@@ -472,7 +554,7 @@ setIsFormOpen(true);
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden m-6 mt-0">
         <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">Rejestr Maszyn</h2>
+          <h2 className="text-lg font-bold text-gray-800">Rejestr Urządzeń</h2>
           <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold">Łącznie: {machines.length}</span>
         </div>
         <div className="p-4 bg-white border-b border-gray-100 flex flex-col sm:flex-row gap-4">
@@ -545,10 +627,7 @@ setIsFormOpen(true);
               </div>
             </div>
             
-            <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
-                <button onClick={(e) => { e.stopPropagation(); handleEdit(m); }} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs"><i className="ph ph-pencil-simple text-sm"></i> Edytuj</button>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(m.id, m.name); }} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs"><i className="ph ph-trash text-sm"></i> Usuń</button>
-              </div>
+            
           </div>
         );
       })

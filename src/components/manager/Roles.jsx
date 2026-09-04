@@ -31,7 +31,7 @@ export default function Roles() {
     {
       module: 'Administracja',
       permissions: [
-        { id: 'machines', label: 'Rejestr Maszyn' },
+        { id: 'machines', label: 'Rejestr Urządzeń' },
         { id: 'regions', label: 'Rejony' },
         { id: 'services', label: 'Podwykonawcy / Serwis' },
         { id: 'topics', label: 'Tematy Zgłoszeń' },

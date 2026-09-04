@@ -65,6 +65,13 @@ export default function TicketDetails({
         {/* Górny pasek nawigacyjny z przyciskiem powrotu */}
         <div className="p-2 md:p-4 border-b border-gray-200 bg-white sticky top-0 z-20 flex justify-between items-center shadow-sm">
           <div className="flex gap-2 md:gap-4">
+            
+            {window.history.state?.backToMachineId && (
+              <button onClick={() => { const returnId = window.history.state?.backToMachineId; if (returnId) { window.history.pushState({ module: 'master_data', tab: 'machines', openMachine: returnId }, '', '?module=master_data&tab=machines&openMachine=' + returnId); window.dispatchEvent(new PopStateEvent('popstate')); } }} className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all">
+                <i className="ph ph-arrow-u-up-left text-lg"></i>
+                Wróć do Urządzenia
+              </button>
+            )}
             <button onClick={() => setSelectedTicketId(null)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all">
               <i className="ph ph-arrow-left text-lg"></i> Powrót do rejestru
             </button>
@@ -501,9 +508,11 @@ export default function TicketDetails({
           </div>
         </div>
 
-      <div className="mt-8">
-        <MachineDTR machine={machines?.find(m => m.id === currentTicket.machineId)} canManage={user?.role === 'manager' || user?.role === 'admin'} />
-      </div>
+      {machines?.some(m => m.id === currentTicket.machineId) && (
+        <div className="mt-8">
+          <MachineDTR machine={machines?.find(m => m.id === currentTicket.machineId)} canManage={user?.role === 'manager' || user?.role === 'admin'} />
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxImg && (

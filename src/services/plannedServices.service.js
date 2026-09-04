@@ -16,7 +16,7 @@ export const updatePlannedService = async (serviceId, data) => {
 };
 
 export const deletePlannedService = async (serviceId) => {
-  return await updateDoc(doc(db, 'planned_services', serviceId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+  return await updateDoc(doc(db, 'planned_services', serviceId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
 };
 
 export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null, actionItemData = null) => {

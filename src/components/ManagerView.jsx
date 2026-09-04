@@ -386,7 +386,7 @@ setNotifications(notifs);
     ];
   } else if (currentModule === 'master_data') {
     workItems = [
-      { id: 'machines', label: 'Baza Maszyn', icon: 'ph-engine' },
+      { id: 'machines', label: 'Baza Urz\u0105dze\u0144', icon: 'ph-engine' },
       { id: 'regions', label: 'Rejony na zakładzie', icon: 'ph-map-pin' },
       { id: 'services', label: 'Podwykonawcy / Serwis', icon: 'ph-wrench' },
       { id: 'topics', label: 'Tematy Zgłoszeń', icon: 'ph-text-aa' },
@@ -582,12 +582,12 @@ setNotifications(notifs);
                                   setGlobalTicketId(n.ticketId);
                                   setIsNotificationsOpen(false);
                                   setCurrentModule('tickets');
-                                  setActiveTab(isArchived ? 'archive' : 'tickets');
+                                  setActiveTab('tickets');
                                   window.history.pushState({ module: 'tickets', tab: 'tickets' }, '', '?module=tickets&tab=tickets');
                                 } else if (n.linkTo === 'planned_maintenance') {
                                   setIsNotificationsOpen(false);
                                   setCurrentModule('planned_maintenance');
-                                  setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
+                                  setActiveTab('planned_maintenance');
                                   window.history.pushState({ module: 'planned_maintenance', tab: 'planned_maintenance' }, '', '?module=planned_maintenance&tab=planned_maintenance');
                                 } else if (n.linkTo === 'action_items') {
                                     setIsNotificationsOpen(false);
@@ -640,7 +640,7 @@ setNotifications(notifs);
               user={user} 
               onNavigateToTickets={(query) => {
                 setGlobalSearchQuery(query);
-                setActiveTab(isArchived ? 'archive' : 'tickets');
+                setActiveTab('tickets');
               }}
             />
           )}
@@ -654,7 +654,7 @@ setNotifications(notifs);
               user={user} 
               plannedWarningDays={plannedWarningDays}
               onNavigateToTickets={() => {
-                setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
+                setActiveTab('planned_maintenance');
               }}
             />
           )}
@@ -671,18 +671,18 @@ setNotifications(notifs);
               tickets={tickets} 
               plannedServices={plannedServices} 
               user={user} 
-              onOpenTicket={(id, isArchived) => {
-                setGlobalTicketId(id);
-                setCurrentModule('home');
-                setActiveTab(isArchived ? 'archive' : 'tickets');
-                window.history.pushState({ module: 'home', tab: isArchived ? 'archive' : 'tickets', openTicket: id }, '', '?module=home&tab=' + (isArchived ? 'archive' : 'tickets') + '&openTicket=' + id);
-              }}
-              onOpenService={(id, isArchived) => {
-                setGlobalServiceId(id);
-                setCurrentModule('planned_maintenance');
-                setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
-                window.history.pushState({ module: 'planned_maintenance', tab: isArchived ? 'archive_planned' : 'planned_maintenance', openService: id }, '', '?module=planned_maintenance&tab=' + (isArchived ? 'archive_planned' : 'planned_maintenance') + '&openService=' + id);
-              }}
+              onOpenTicket={(id, isArchived, machineId) => {
+                  setGlobalTicketId(id);
+                  setCurrentModule('tickets');
+                  setActiveTab(isArchived ? 'archive' : 'tickets');
+                  window.history.pushState({ module: 'tickets', tab: isArchived ? 'archive' : 'tickets', openTicket: id, backToMachineId: machineId || window.history.state?.openMachine }, '', '?module=tickets&tab=' + (isArchived ? 'archive' : 'tickets') + '&openTicket=' + id);
+                }}
+              onOpenService={(id, isArchived, machineId) => {
+                  setGlobalServiceId(id);
+                  setCurrentModule('planned_maintenance');
+                  setActiveTab(isArchived ? 'archive_planned' : 'planned_maintenance');
+                  window.history.pushState({ module: 'planned_maintenance', tab: isArchived ? 'archive_planned' : 'planned_maintenance', openService: id, backToMachineId: machineId || window.history.state?.openMachine }, '', '?module=planned_maintenance&tab=' + (isArchived ? 'archive_planned' : 'planned_maintenance') + '&openService=' + id);
+                }}
             />}
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services services={services} />}

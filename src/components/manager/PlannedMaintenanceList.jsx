@@ -58,7 +58,7 @@ export default function PlannedMaintenanceList({
     return false;
   })();
   const isCritical = srv.priority === 'Krytyczny';
-  const showRedCritical = isCritical && isOverdue;
+  const showRedCritical = false;
 
                   return (
                     <tr key={srv.id} className={`hover:bg-slate-50 transition-colors group ${isCompleted ? 'opacity-70' : ''}`}>
@@ -105,7 +105,7 @@ export default function PlannedMaintenanceList({
                       {columns.status && (
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${rowColor}`}>
-                            {isCompleted ? 'Zakończone' : srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
+                            {isCompleted ? 'Zako\u0144czone' : srv.status === 'in_progress' ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
                           </span>
                         </td>
                       )}
@@ -144,12 +144,12 @@ export default function PlannedMaintenanceList({
                       return false;
                     })();
                     const isCritical = srv.priority === 'Krytyczny';
-                    const showRedCritical = isCritical && isOverdue;
+                    const showRedCritical = false;
 return (
 <div key={srv.id} onClick={() => setSelectedServiceId(srv.id)} className={`cursor-pointer bg-white p-4 pt-6 rounded-xl shadow-sm border flex flex-col relative hover:bg-slate-50 transition-colors ${showRedCritical ? 'border-red-500 border-l-4' : 'border-slate-200'}`}>
 {isCritical && (
 <div className={`absolute top-0 right-0 text-white px-2.5 py-1 ${showRedCritical ? "bg-red-500" : "bg-gray-400"} rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm`}>
-Krytyczne
+Wysoki
 </div>
 )}
                   <div className="flex justify-between items-start mb-1">
@@ -187,8 +187,8 @@ Krytyczne
                           Zakończone
                         </div>
                       ) : (
-                        <div className={`border px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${srv.status === 'in_progress' ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-slate-300 text-slate-600 bg-slate-50'}`}>
-                          {srv.status === 'in_progress' ? 'W trakcie' : 'Oczekuje'}
+                        <div className={`border px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${rowColor}`}>
+                          {srv.status === 'in_progress' ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
                         </div>
                       )}
                     </div>
