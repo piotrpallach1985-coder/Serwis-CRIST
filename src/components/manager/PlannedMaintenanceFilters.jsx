@@ -5,6 +5,7 @@ export default function PlannedMaintenanceFilters({
   filterTime, setFilterTime,
   filterRegion, setFilterRegion,
   filterMachine, setFilterMachine,
+  searchQuery = '', setSearchQuery,
   clearFilters,
   showColumnMenu, setShowColumnMenu,
   columns, toggleColumn,
@@ -14,8 +15,17 @@ export default function PlannedMaintenanceFilters({
   return (
     <>
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center shrink-0">
-        <span className="text-sm font-bold text-slate-700 mr-2"><i className="ph ph-funnel"></i> Filtruj:</span>
-        
+        <div className="relative w-full sm:w-64">
+          <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+          <input
+            type="text"
+            placeholder="Szukaj (maszyna, serwis)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 transition-all shadow-sm"
+          />
+        </div>
+
         {!isArchive && (
           <div className="flex bg-slate-100 rounded-lg p-1">
             <button onClick={() => setFilterTime('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterTime === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Wszystkie</button>
@@ -34,8 +44,8 @@ export default function PlannedMaintenanceFilters({
           {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
 
-        {(filterTime !== 'all' || filterRegion || filterMachine) && (
-          <button onClick={clearFilters} className="text-sm text-red-600 font-bold px-3 py-2 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1">
+        {(filterTime !== 'all' || filterRegion || filterMachine || searchQuery) && (
+          <button onClick={clearFilters} className="text-sm text-red-600 font-bold px-3 py-2 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
             <i className="ph ph-x"></i> Wyczyść filtry
           </button>
         )}

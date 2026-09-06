@@ -1,59 +1,31 @@
-import { Html5Qrcode } from 'html5-qrcode';
+import QRScannerModal from './shared/QRScannerModal';
 import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, collection, query, getDocs, limit, onSnapshot } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 import { generateAuditorReport } from '../utils/reports/auditorExport';
 import { db, auth } from '../firebase';
 
 export default function Login({ onLogin, currentUser }) {
   const [isScanning, setIsScanning] = useState(false);
-  const html5QrcodeRef = useRef(null);
-  
-    const startScanner = () => {
-    setIsScanning(true);
-  };
-
-  const stopScanner = () => {
+  const handleScanSuccess = async (machineId) => {
     setIsScanning(false);
-  };
-
-    useEffect(() => {
-    if (isScanning) {
-      const html5QrCode = new Html5Qrcode('portal-qr-reader');
-      html5QrcodeRef.current = html5QrCode;
-      html5QrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          stopScanner();
-          let machineId = decodedText;
-          if (decodedText.includes('?machine=')) {
-            const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-            machineId = urlParams.get('machine');
-          }
-          window.history.replaceState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines&openMachine=' + machineId);
-          onLogin(currentUser);
-        },
-        () => {} // Ignore errors
-      ).catch(err => {
-        console.error('Camera start error', err);
-      });
-      return () => {
-        if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
-        const container = document.getElementById('portal-qr-reader');
-        if (container) container.innerHTML = '';
-      };
+    try {
+      if (!auth.currentUser) await signInAnonymously(auth);
+    } catch (e) {
+      console.warn('Anonymous sign-in failed', e);
     }
-  }, [isScanning, currentUser, onLogin]);
+    window.history.replaceState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines&openMachine=' + machineId);
+    onLogin(currentUser);
+  };
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
   const [errorMsg, setErrorMsg] = useState('');
   
-  // Status połączenia z bazą
-  const [dbStatus, setDbStatus] = useState('checking'); // 'checking', 'connected', 'error'
-  const [loginModalTarget, setLoginModalTarget] = useState(null); // null = modal zamknięty, otherwise tab id string
+  const [dbStatus, setDbStatus] = useState('checking'); 
+  const [loginModalTarget, setLoginModalTarget] = useState(null); 
 
   const [branding, setBranding] = useState({
     companyName: 'CRIST S.A.',
@@ -82,9 +54,6 @@ export default function Login({ onLogin, currentUser }) {
     return () => unsub();
   }, []);
 
-
-  
-
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
@@ -92,11 +61,9 @@ export default function Login({ onLogin, currentUser }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      // 1. Zaloguj przez Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
       
-      // 2. Pobierz rolę z kolekcji users (ID dokumentu to UID z Auth)
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
@@ -104,10 +71,8 @@ export default function Login({ onLogin, currentUser }) {
         setErrorMsg('Zalogowano, ale brak przypisanej roli w bazie danych.');
       } else {
         const userData = userDoc.data();
-        if (loginModalTarget && loginModalTarget !== 'login_only') {
-          window.history.replaceState({ module: loginModalTarget }, '', `?module=${loginModalTarget}`);
-        }
-        window.history.replaceState({}, '', window.location.pathname);
+        const targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
+        window.history.replaceState({ module: targetModule, tab: targetModule === 'home' ? 'home' : undefined }, '', `?module=${targetModule}${targetModule === 'home' ? '&tab=home' : ''}`);
         onLogin({ 
           uid: user.uid,
           name: userData.name || user.email, 
@@ -128,14 +93,18 @@ export default function Login({ onLogin, currentUser }) {
     }
   };
 
-  const handleOperatorBypass = () => {
+  const handleOperatorBypass = async () => {
+    try {
+      if (!auth.currentUser) await signInAnonymously(auth);
+    } catch (e) {
+      console.warn('Anonymous sign-in failed', e);
+    }
     window.history.replaceState({ module: 'operator' }, '', `?module=operator`);
-    onLogin({ name: 'Nieznany Zgłaszający', role: 'operator' });
+    onLogin({ name: 'Nieznany Zgłaszający', role: 'operator', uid: auth.currentUser?.uid || 'anon' });
   };
 
   const handleTileClick = (target) => {
     if (currentUser) {
-      // Omijamy logowanie, jeśli użytkownik jest już zalogowany (np. kliknął Wróć do portalu)
       window.history.replaceState({ module: target }, '', `?module=${target}`);
       onLogin(currentUser);
     } else {
@@ -144,8 +113,7 @@ export default function Login({ onLogin, currentUser }) {
   };
 
   const tiles = [
-        
-{
+    {
       id: 'operator',
       title: 'Zgłoszenie Awarii',
       desc: 'Dla pracowników hali. Brak konieczności zakładania konta. Zgłoszenia bezpośrednio ze stanowiska.',
@@ -181,48 +149,33 @@ export default function Login({ onLogin, currentUser }) {
       iconBg: 'bg-gray-100 text-[#111827]',
       action: () => handleTileClick('master_data')
     },
-{
+    {
       id: 'dtr_scanner',
       title: 'Maszyny / DTR',
-      desc: 'Skanuj kod QR na hali, aby odczytac dokumenty DTR.',
+      desc: 'Skanuj kod QR na hali, aby odczytać dokumenty DTR.',
       icon: 'ph-qr-code',
       color: 'bg-blue-600 hover:bg-blue-700',
       iconBg: 'bg-blue-50 text-blue-600',
-      action: () => startScanner()
+      action: () => setIsScanning(true)
     },
   ];
 
   return (
     <div className="min-h-[100svh] bg-[#f8f9fa] flex flex-col items-center justify-center p-2 pt-16 sm:p-4 sm:pt-4 text-[#111827] relative">
       
-      
-      {/* Logo Aplikacji (Lewy Górny Róg) */}
       {currentUser && currentUser.role !== 'operator' && (
         <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-2 rounded-xl shadow-sm border border-gray-100">
           <div className="font-bold text-gray-800 text-xs sm:text-sm">
             <span className="hidden sm:inline">Zalogowano jako: </span><span className="text-blue-600">{currentUser.name}</span>
           </div>
-          <button 
-            onClick={() => { import("firebase/auth").then(({ signOut }) => signOut(auth)); onLogin(null); }} 
-            className="text-red-500 hover:bg-red-50 p-1 sm:px-3 sm:py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 text-xs sm:text-sm"
-          >
-            <i className="ph ph-sign-out"></i> <span className="hidden sm:inline">Wyloguj</span>
+          <button onClick={() => onLogin(null)} className="ml-2 text-gray-400 hover:text-gray-600 transition-colors">
+            <i className="ph ph-sign-out text-lg sm:text-xl"></i>
           </button>
         </div>
       )}
 
-        {branding.appLogoUrl && (
-        <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-50">
-          <img src={branding.appLogoUrl} alt="App Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-sm rounded-xl overflow-hidden" />
-        </div>
-      )}
-
-      
-
-      
-      {/* Logo / Header */}
-      <div className="text-center mb-6 animate-fade-in mt-2">
-        <div className="flex justify-center mb-4 min-h-[64px] items-center">
+      <div className="mb-6 md:mb-12 text-center animate-fade-in-up mt-8 sm:mt-0">
+        <div className="flex justify-center mb-4 md:mb-6">
           {branding.companyLogoUrl ? (
             <img src={branding.companyLogoUrl} alt="Company Logo" className="max-h-16 max-w-[200px] object-contain rounded-2xl overflow-hidden" />
           ) : (
@@ -233,7 +186,6 @@ export default function Login({ onLogin, currentUser }) {
         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{branding.systemSubtitle}</p>
       </div>
 
-      {/* Grid kafelków */}
       {!currentUser ? (
         <div className="w-full max-w-4xl animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-8">
           <div 
@@ -266,13 +218,11 @@ export default function Login({ onLogin, currentUser }) {
         </div>
       ) : (
         <div className="w-full max-w-5xl animate-fade-in">
-          
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
             {tiles.filter(t => {
-              // usunięte: pozwalamy wejść do modułu, uprawnienia są weryfikowane przez ManagerView
               if (t.id === 'operator') return false;
               if (t.id === 'tickets' && !modSettings.enableTickets) return false;
-              if (t.id === 'planned_maintenance' && !modSettings.enablePlanned) return false; // Ukryte w widoku zalogowanym
+              if (t.id === 'planned_maintenance' && !modSettings.enablePlanned) return false;
               return true;
             }).map(tile => (
               <div key={tile.id} onClick={tile.action} className="cursor-pointer bg-white p-2 md:p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center justify-between transition-transform hover:-translate-y-1 hover:shadow-md">
@@ -296,25 +246,14 @@ export default function Login({ onLogin, currentUser }) {
         </div>
       )}
 
-      
-          
+      <QRScannerModal 
+        isOpen={isScanning} 
+        onClose={() => setIsScanning(false)} 
+        onScanSuccess={handleScanSuccess} 
+        title="Skanuj kod QR maszyny"
+        subtitle="Skieruj aparat na kod QR, aby odczytać dokumenty DTR."
+      />
 
-
-            {isScanning && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 relative flex flex-col gap-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-lg text-slate-800">Skanuj kod QR maszyny</h3>
-              <button onClick={stopScanner} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg transition-colors text-sm shadow-md"><i className="ph ph-arrow-left"></i> {'Powr\u00F3t'}</button>
-            </div>
-            <div id="portal-qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
-            <p className="text-xs text-center text-slate-500">
-              Skieruj aparat na kod QR, aby otworzyc dokumenty DTR.
-            </p>
-          </div>
-        </div>
-      )}
-      {/* Modal logowania */}
       {loginModalTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">

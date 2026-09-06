@@ -43,6 +43,8 @@ export default function TicketDetails({
 
   // Czas pracy
   const machine = machines?.find(m => m.id === currentTicket.machineId);
+  const machineName = machine?.name || currentTicket.machineName || 'Maszyna usunięta';
+  const machineRegion = machine ? machine.regionId : null;
 
   const duration = currentTicket.closedAt && currentTicket.startedAt ? 
     ((new Date(currentTicket.closedAt) - new Date(currentTicket.startedAt))/1000/3600).toFixed(1) : 
@@ -355,9 +357,6 @@ export default function TicketDetails({
                                                 setUploadError(null);
                                                 let newUrls = [];
                                                 try {
-                                                  const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-                                                  const { storage } = await import('../../firebase');
-                                                  const { compressImage } = await import('../../utils/imageCompressor');
                                                   for (let i = 0; i < files.length; i++) {
                                                     const file = files[i];
                                                     const compressedFile = await compressImage(file, 2);
@@ -395,9 +394,6 @@ export default function TicketDetails({
                                                 setUploadError(null);
                                                 let newUrls = [];
                                                 try {
-                                                  const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-                                                  const { storage } = await import('../../firebase');
-                                                  const { compressImage } = await import('../../utils/imageCompressor');
                                                   for (let i = 0; i < files.length; i++) {
                                                     const file = files[i];
                                                     const compressedFile = await compressImage(file, 2);

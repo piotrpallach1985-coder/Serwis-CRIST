@@ -1,3 +1,4 @@
+import { useManagerContext } from '../../context/ManagerDataContext';
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -5,7 +6,9 @@ import { safeParseDate } from '../../utils/dateHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 
-export default function ActionItems({ machines, user }) {
+export default function ActionItems({ user }) {
+  const { machines } = useManagerContext();
+
   const [items, setItems] = useState([]);
   const handleExportExcel = () => {
     const dataToExport = filteredItems.map(item => {
@@ -15,7 +18,7 @@ export default function ActionItems({ machines, user }) {
       return {
         'ID': item.id,
         'Data Zgłoszenia': createdDate ? createdDate.toLocaleDateString('pl-PL') : '-',
-        'Maszyna': item.machineName || getMachineName(item.machineId) || '-',
+        'Maszynę': item.machineName || getMachineName(item.machineId) || '-',
         'Problem / Zadanie': item.problem || '-',
         'Wymagany Termin': dueDate ? dueDate.toLocaleDateString('pl-PL') : '-',
         'Zgłaszający': item.createdBy || '-',
@@ -219,7 +222,7 @@ export default function ActionItems({ machines, user }) {
             <thead className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-100">
               <tr>
                 <th className="px-6 py-4">Data Zgłoszenia</th>
-                <th className="px-6 py-4">Maszyna</th>
+                <th className="px-6 py-4">Maszynę</th>
                 <th className="px-6 py-4">Problem / Zadanie</th>
                 <th className="px-6 py-4">Wymagany Termin</th>
                 <th className="px-6 py-4">Zgłaszający</th>
@@ -285,3 +288,4 @@ export default function ActionItems({ machines, user }) {
     </div>
   );
 }
+

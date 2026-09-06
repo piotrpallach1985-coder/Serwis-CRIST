@@ -23,9 +23,7 @@ export default function Topics() {
     setLoading(true);
     try {
       if (editingId) {
-        import('firebase/firestore').then(({ updateDoc }) => {
-          updateDoc(doc(db, 'topics', editingId), { text: newTopic.trim() });
-        });
+        updateDoc(doc(db, 'topics', editingId), { text: newTopic.trim() });
       } else {
         const newTopicRef = doc(collection(db, 'topics'));
         setDoc(newTopicRef, {

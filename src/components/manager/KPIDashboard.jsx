@@ -1,9 +1,12 @@
+import { useManagerContext } from '../../context/ManagerDataContext';
 import { useState, useMemo, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 
-export default function KPIDashboard({ tickets, machines, plannedServices = [] }) {
+export default function KPIDashboard() {
+  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
+
   const [period, setPeriod] = useState('7');
 
   const [historicalTickets, setHistoricalTickets] = useState([]);
@@ -88,7 +91,7 @@ export default function KPIDashboard({ tickets, machines, plannedServices = [] }
   const avgHours = Math.floor(avgRepairMinutes / 60);
   const avgMins = avgRepairMinutes % 60;
 
-  // 3. Maszyny z największą liczbą awarii
+  // 3. Maszynę z największą liczbą awarii
   const machineFaultCounts = {};
   filteredTickets.forEach(t => {
     const mName = t.machineName || 'Nieznana maszyna';

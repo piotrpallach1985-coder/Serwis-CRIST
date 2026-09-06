@@ -73,8 +73,7 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
     const now = new Date();
     
     // Używamy dynamicznego importu lub zaimportowanego writeBatch, doc
-    const { writeBatch, doc, collection: firestoreCollection } = await import('firebase/firestore');
-    const batch = writeBatch(db);
+        const batch = writeBatch(db);
     let hasWrites = false;
     
     for (const docSnap of snapshot.docs) {
@@ -112,7 +111,7 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
 
         if (shouldAlert) {
           // Wysyłamy powiadomienie do batcha
-          const newNotifRef = doc(firestoreCollection(db, 'notifications'));
+          const newNotifRef = doc(collection(db, 'notifications'));
           batch.set(newNotifRef, {
             title: `Planowany Serwis: ${machine.name}`,
             message: alertMessage,

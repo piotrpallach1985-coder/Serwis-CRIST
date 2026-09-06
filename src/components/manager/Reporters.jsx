@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useState } from 'react';
+import { addDoc, doc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useManagerContext } from '../../context/ManagerDataContext';
 
 export default function Reporters() {
-  const [reporters, setReporters] = useState([]);
+  const { reporters = [] } = useManagerContext();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [position, setPosition] = useState('');
@@ -11,13 +12,6 @@ export default function Reporters() {
   const [editingId, setEditingId] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'reporters'), (snapshot) => {
-      setReporters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
-    });
-    return () => unsubscribe();
-  }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();

@@ -1,183 +1,265 @@
-import { generateAuditorReport } from '../../utils/reports/auditorExport';
-import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { Html5Qrcode } from 'html5-qrcode';
+import React, { useState, useEffect } from 'react';
+import { useManagerContext } from '../../context/ManagerDataContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import QRScannerModal from '../shared/QRScannerModal';
+import { safeParseDate } from '../../utils/dateHelpers';
 
-export default function HomeDashboard({ setActiveTab, setCurrentModule, user }) {
-  const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
+export default function HomeDashboard({ setActiveTab, setCurrentModule, user, onLogout }) {
+  const {
+    tickets = [],
+    plannedServices = [],
+    roles = [],
+    branding = {},
+  } = useManagerContext();
+
+  const { isAdmin, canManageUsers, canManageRoles, canViewReports } = usePermissions(user, roles);
+
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('scanner') === 'true') {
-      startScanner();
-      // Remove it from URL so it doesn't trigger again on reload
+      setIsScanning(true);
       const newUrl = window.location.pathname + '?module=home&tab=home';
       window.history.replaceState({ module: 'home', tab: 'home' }, '', newUrl);
     }
   }, []);
 
-  const html5QrcodeRef = useRef(null);
-  const machinesRef = useRef([]);
-
-  // Fetch machines for validation
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'general'), (snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false });
-      }
-    });
-    
-    // We also need machines list for validation. We can get it from 'machines' collection.
-    // Instead of doing onSnapshot here just for machines, we can just rely on the openMachine parameter handled in ManagerView/Machines,
-    // which will validate if it exists anyway!
-    return () => unsub();
-  }, []);
-
-  const startScanner = () => {
-    setIsScanning(true);
-    setTimeout(async () => {
-      try {
-        if (html5QrcodeRef.current) {
-          try { await html5QrcodeRef.current.stop(); } catch(e) {}
-        }
-        const html5QrCode = new Html5Qrcode("dashboard-qr-reader");
-        html5QrcodeRef.current = html5QrCode;
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            stopScanner();
-            let machineId = decodedText;
-            if (decodedText.includes('?machine=')) {
-              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-              machineId = urlParams.get('machine');
-            }
-            // Switch to MasterData -> Machines with openMachine
-            setCurrentModule('master_data');
-            setActiveTab('machines');
-            window.history.pushState({ module: 'master_data', tab: 'machines' }, '', `?module=master_data&tab=machines&openMachine=${machineId}`);
-          },
-          () => {} // Ignore errors
-        );
-      } catch (err) {
-        console.error("Scanner init error:", err);
-        alert("Błąd dostępu do kamery: " + err.message);
-        setIsScanning(false);
-      }
-    }, 100);
-  };
-
-  const stopScanner = async () => {
-    if (html5QrcodeRef.current) {
-      try {
-        await html5QrcodeRef.current.stop();
-        html5QrcodeRef.current.clear();
-      } catch (e) {
-        console.error("Stop scanner err:", e);
-      }
-      html5QrcodeRef.current = null;
-    }
+  const handleScanSuccess = (machineId) => {
     setIsScanning(false);
+    setCurrentModule('ur');
+    setActiveTab('machines');
+    const newUrl = `?module=ur&tab=machines&openMachine=${machineId}`;
+    window.history.pushState(
+      { module: 'ur', tab: 'machines', openMachine: machineId },
+      '',
+      newUrl
+    );
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { module: 'ur', tab: 'machines', openMachine: machineId }
+    }));
   };
 
-  useEffect(() => {
-    return () => {
-      if (html5QrcodeRef.current) {
-        try { html5QrcodeRef.current.stop(); } catch(e) {}
-      }
-    };
-  }, []);
+  const navigateToModule = (moduleName, defaultTab) => {
+    setCurrentModule(moduleName);
+    setActiveTab(defaultTab);
+    const newUrl = `?module=${moduleName}&tab=${defaultTab}`;
+    window.history.pushState({ module: moduleName, tab: defaultTab }, '', newUrl);
+    window.dispatchEvent(new PopStateEvent('popstate', {
+      state: { module: moduleName, tab: defaultTab }
+    }));
+  };
+
+  // Statystyki operacyjne dla kafelka UR
+  const activeTicketsCount = tickets.filter(t => t.status !== 5 && t.status !== '5').length;
+  const criticalTicketsCount = tickets.filter(t => t.isCritical && t.status !== 5 && t.status !== '5').length;
+  const overdueServicesCount = plannedServices.filter(s => {
+    if (s.status === 'completed' || s.status === 'in_progress') return false;
+    if (!s.nextDate) return false;
+    const nDate = safeParseDate(s.nextDate);
+    return nDate && nDate < new Date();
+  }).length;
+
+  const canAccessCompanyAdmin = isAdmin || canManageUsers || canManageRoles || canViewReports;
+  const canAccessProgramAdmin = isAdmin;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center h-full min-h-[600px] p-6 animate-fade-in bg-slate-50 relative">
-      <h2 className="text-3xl font-black text-slate-800 mb-2 tracking-tight text-center">Witaj w systemie zarządzania</h2>
-      <p className="text-slate-500 mb-12 text-center max-w-lg">
-        Wybierz moduł, do którego chcesz przejść, aby rozpocząć pracę.
-      </p>
-
-      {isScanning && (
-        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white p-4 rounded-xl shadow-2xl border border-slate-200 flex flex-col gap-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-lg text-slate-800">Skanuj kod QR maszyny</h3>
-              <button onClick={stopScanner} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
-                <i className="ph ph-x"></i>
-              </button>
-            </div>
-            <div id="dashboard-qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
-            <p className="text-xs text-center text-slate-500">
-              Skieruj aparat na kod QR znajdujący się na maszynie, aby otworzyć jej dokumentację DTR oraz szczegóły.
+    <div className="min-h-screen flex flex-col bg-slate-100 text-slate-800">
+      {/* GÓRNY PASEK PULPITU GŁÓWNEGO */}
+      <header className="bg-[#1B253B] text-white shadow-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-inner flex-shrink-0">
+            {branding?.companyLogoUrl ? (
+              <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+            ) : (
+              <span className="text-xl">{branding?.companyName?.charAt(0) || 'C'}</span>
+            )}
+          </div>
+          <div>
+            <h1 className="font-extrabold text-base sm:text-lg leading-tight tracking-wide">
+              {branding?.companyName || 'CRIST S.A.'}
+            </h1>
+            <p className="text-[10px] sm:text-xs text-blue-300 uppercase tracking-widest font-semibold">
+              {branding?.systemSubtitle || 'MAINTENANCE SYSTEM'}
             </p>
           </div>
         </div>
-      )}
 
-      {/* Zmieniono grid na 4 kolumny i pomniejszono kafelki (p-6, w-16 h-16, text-3xl) zgodnie z życzeniem */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-5xl">
-        
-        {/* SKANER MASZYN / DTR (Nowa Kafelka) */}
-        <button 
-          onClick={startScanner}
-          className="group flex flex-col items-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-500 transition-all cursor-pointer transform hover:-translate-y-1"
-        >
-          <div className="relative w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all overflow-hidden">
-            <i className="ph ph-qr-code z-10"></i>
-            <div className="absolute inset-0 border-[3px] border-transparent group-hover:border-blue-400 opacity-50 rounded-full z-0"></div>
+        {/* Profil i wylogowanie */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="hidden sm:flex flex-col text-right">
+            <span className="text-xs font-bold text-white">{user?.name || 'Użytkownik'}</span>
+            <span className="text-[10px] text-blue-300 capitalize">{user?.role || 'Operator'}</span>
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1 text-center leading-tight">Maszyny / DTR</h3>
-          <p className="text-xs text-slate-500 text-center">Skanuj QR na hali aby otworzyć Dokumentację Techniczno-Ruchową.</p>
-        </button>
-
-        {modSettings.enableTickets && (
-          <button 
-            onClick={() => {
-              setCurrentModule('tickets'); setActiveTab('dashboard_tickets'); window.history.pushState({ module: 'tickets', tab: 'dashboard_tickets' }, '', '?module=tickets&tab=dashboard_tickets');
-            }}
-            className="group flex flex-col items-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-red-400 transition-all cursor-pointer transform hover:-translate-y-1"
-          >
-            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:bg-red-600 group-hover:text-white transition-all">
-              <i className="ph ph-warning-circle"></i>
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1 text-center leading-tight">Awarie UR</h3>
-            <p className="text-xs text-slate-500 text-center">Zarządzanie awariami zgłaszanymi z produkcji.</p>
-          </button>
-        )}
-
-        {modSettings.enablePlanned && (
-          <button 
-            onClick={() => {
-              setCurrentModule('planned_maintenance'); setActiveTab('dashboard_planned'); window.history.pushState({ module: 'planned_maintenance', tab: 'dashboard_planned' }, '', '?module=planned_maintenance&tab=dashboard_planned');
-            }}
-            className="group flex flex-col items-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-400 transition-all cursor-pointer transform hover:-translate-y-1"
-          >
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-              <i className="ph ph-calendar-check"></i>
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1 text-center leading-tight">Serwis UR</h3>
-            <p className="text-xs text-slate-500 text-center">Harmonogramy przeglądów, prewencja i zaplanowane prace.</p>
-          </button>
-        )}
-
-        <button 
-          onClick={() => {
-            setCurrentModule('master_data');
-            const t = user?.role === 'admin' ? 'settings' : 'machines';
-            setActiveTab(t);
-            window.history.pushState({ module: 'master_data', tab: t }, '', '?module=master_data&tab='+t);
-          }}
-          className="group flex flex-col items-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all cursor-pointer transform hover:-translate-y-1"
-        >
-          <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all">
-            <i className="ph ph-gear"></i>
+          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shadow-inner">
+            {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1 text-center leading-tight">Administracja</h3>
-          <p className="text-xs text-slate-500 text-center">Baza urządzeń, ustawienia, pracownicy i system.</p>
-        </button>
-        
-      </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white text-xs font-medium transition-colors border border-red-500/30 cursor-pointer"
+              title="Wyloguj się"
+            >
+              <i className="ph ph-sign-out text-base"></i>
+              <span className="hidden sm:inline">Wyloguj</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* MODAL SKANERA QR */}
+      <QRScannerModal
+        isOpen={isScanning}
+        onClose={() => setIsScanning(false)}
+        onScanSuccess={handleScanSuccess}
+        title="Skaner Kodów QR Maszyny"
+        subtitle="Skieruj aparat na tabliczkę QR urządzenia, aby przejść do karty technicznej."
+      />
+
+      {/* GŁÓWNA ZAWARTOŚĆ — 4 KAFELKI */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 max-w-7xl mx-auto w-full animate-fade-in">
+        <div className="text-center mb-8 sm:mb-12">
+          <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wider mb-3">
+            Pulpit Główny
+          </span>
+          <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+            Wybierz moduł do pracy
+          </h2>
+          <p className="text-sm sm:text-base text-slate-500 mt-2 max-w-xl mx-auto">
+            Wybierz obszar, którym chcesz zarządzać lub użyj skanera na hali produkcyjnej.
+          </p>
+        </div>
+
+        {/* SIATKA 4 KAFELKÓW (1 kolumna mobile, 2 tablet, 4 desktop) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
+          
+          {/* SKANER QR DLA MASZYN / DTR */}
+          <button
+            type="button"
+            onClick={() => setIsScanning(true)}
+            className="group relative flex flex-col items-center justify-between p-6 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[250px] transform hover:-translate-y-1"
+          >
+            <div className="my-auto py-2">
+              <div className="w-20 h-20 mx-auto bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                <i className="ph ph-qr-code"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-1">
+                Skaner QR Maszyn
+              </h3>
+              <p className="text-xs text-slate-500 line-clamp-2 px-2">
+                Zeskanuj kod z tabliczki znamionowej na hali, aby od razu otworzyć kartę maszyny i dokumenty DTR.
+              </p>
+            </div>
+
+            <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 group-hover:text-blue-700">
+              <span>Uruchom aparat</span>
+              <i className="ph ph-camera text-sm"></i>
+            </div>
+          </button>
+
+          {/* PANEL AWARII / SERWISÓW UR */}
+          <button
+            type="button"
+            onClick={() => navigateToModule('ur', 'dashboard_tickets')}
+            className="group relative flex flex-col items-center justify-between p-6 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-red-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[250px] transform hover:-translate-y-1"
+          >
+            <div className="my-auto py-2">
+              <div className="w-20 h-20 mx-auto bg-red-50 text-red-600 rounded-2xl flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-red-600 group-hover:text-white transition-all shadow-sm">
+                <i className="ph ph-wrench"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-1">
+                Panel Awarii i Serwisów
+              </h3>
+              <p className="text-xs text-slate-500 line-clamp-2 px-2">
+                Awarie bieżące, prewencja, harmonogramy przeglądów oraz baza techniczna zakładu.
+              </p>
+            </div>
+
+            <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs font-bold text-red-600 group-hover:text-red-700">
+              <span>Otwórz Panel UR</span>
+              <i className="ph ph-arrow-right text-sm"></i>
+            </div>
+          </button>
+
+          {/* PANEL ADMINISTRATORA FIRMY */}
+          {canAccessCompanyAdmin ? (
+            <button
+              type="button"
+              onClick={() => navigateToModule('company_admin', 'users')}
+              className="group relative flex flex-col items-center justify-between p-6 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[250px] transform hover:-translate-y-1"
+            >
+              <div className="my-auto py-2">
+                <div className="w-20 h-20 mx-auto bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
+                  <i className="ph ph-users-three"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">
+                  Administrator Firmy
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-2 px-2">
+                  Użytkownicy, przypisywanie ról, uprawnienia i raporty audytowe dla dyrekcji.
+                </p>
+              </div>
+
+              <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs font-bold text-purple-600 group-hover:text-purple-700">
+                <span>Zarządzaj firmą</span>
+                <i className="ph ph-arrow-right text-sm"></i>
+              </div>
+            </button>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[250px]">
+              <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-2xl flex items-center justify-center text-3xl mb-3">
+                <i className="ph ph-lock"></i>
+              </div>
+              <h3 className="text-base font-bold text-slate-500 mb-1">
+                Administrator Firmy
+              </h3>
+              <p className="text-xs text-slate-400">Brak uprawnień do tego modułu.</p>
+            </div>
+          )}
+
+          {/* PANEL ADMINISTRATORA PROGRAMU */}
+          {canAccessProgramAdmin ? (
+            <button
+              type="button"
+              onClick={() => navigateToModule('system_admin', 'settings')}
+              className="group relative flex flex-col items-center justify-between p-6 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[250px] transform hover:-translate-y-1"
+            >
+              <div className="my-auto py-2">
+                <div className="w-20 h-20 mx-auto bg-slate-100 text-slate-700 rounded-2xl flex items-center justify-center text-4xl mb-4 group-hover:scale-110 group-hover:bg-slate-800 group-hover:text-white transition-all shadow-sm">
+                  <i className="ph ph-gear-six"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-1">
+                  Administrator Programu
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-2 px-2">
+                  Ustawienia globalne aplikacji, branding, logo, przełączniki modułów i integracje.
+                </p>
+              </div>
+
+              <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-slate-900">
+                <span>Ustawienia systemu</span>
+                <i className="ph ph-arrow-right text-sm"></i>
+              </div>
+            </button>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[250px]">
+              <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-2xl flex items-center justify-center text-3xl mb-3">
+                <i className="ph ph-lock"></i>
+              </div>
+              <h3 className="text-base font-bold text-slate-500 mb-1">
+                Administrator Programu
+              </h3>
+              <p className="text-xs text-slate-400">Dostępny tylko dla Administratora Technicznego.</p>
+            </div>
+          )}
+
+        </div>
+      </main>
+
+      {/* STOPKA PULPITU */}
+      <footer className="py-4 text-center text-xs text-slate-400 border-t border-slate-200">
+        System Obsługi Serwisu & Awarie UR • CRIST S.A.
+      </footer>
     </div>
   );
 }

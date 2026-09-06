@@ -1,19 +1,22 @@
+﻿import { useManagerContext } from '../../context/ManagerDataContext';
 import React, { useState, useEffect } from 'react';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
-export default function Reports({ tickets, plannedServices, machines }) {
+export default function Reports() {
+  const { tickets, machines, plannedServices } = useManagerContext();
+
   const [loading, setLoading] = useState(false);
-  const [plannedWarningDays, setPlannedWarningDays] = useState(30);
+  const [localWarningDays, setLocalWarningDays] = useState(30);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "general"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.plannedWarningDays !== undefined) {
-          setPlannedWarningDays(data.plannedWarningDays);
+        if (data.localWarningDays !== undefined) {
+          setlocalWarningDays(data.localWarningDays);
         }
       }
     });
@@ -34,7 +37,7 @@ export default function Reports({ tickets, plannedServices, machines }) {
   const saveWarningDays = async (val) => {
     try {
       await setDoc(doc(db, "settings", "general"), {
-        plannedWarningDays: parseInt(val, 10)
+        localWarningDays: parseInt(val, 10)
       }, { merge: true });
     } catch (e) {
       console.error(e);
@@ -100,9 +103,9 @@ export default function Reports({ tickets, plannedServices, machines }) {
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-amber-200 shadow-sm">
             <input 
               type="number" 
-              value={plannedWarningDays}
+              value={localWarningDays}
               onChange={(e) => {
-                setPlannedWarningDays(e.target.value);
+                setlocalWarningDays(e.target.value);
                 saveWarningDays(e.target.value);
               }}
               min="1"
@@ -117,3 +120,4 @@ export default function Reports({ tickets, plannedServices, machines }) {
     </div>
   );
 }
+
