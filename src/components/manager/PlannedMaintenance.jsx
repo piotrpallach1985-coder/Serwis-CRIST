@@ -22,6 +22,7 @@ export default function PlannedMaintenance({
   initialServiceId,
   onClearServiceId,
   initialSearchQuery = '',
+  onClearSearchQuery,
 }) {
   const { plannedServices, machines, regions, plannedWarningDays, allowTicketDeletion } = useManagerContext();
 
@@ -94,7 +95,13 @@ export default function PlannedMaintenance({
     return found ? found.name : regionId;
   };
 
-  const clearFilters = () => { setFilterTime('all'); setFilterRegion(''); setFilterMachine(''); setSearchQuery(''); };
+  const clearFilters = () => { 
+    setFilterTime('all'); 
+    setFilterRegion(''); 
+    setFilterMachine(''); 
+    setSearchQuery(''); 
+    if (onClearSearchQuery) onClearSearchQuery();
+  };
   const toggleColumn = (key) => setColumns(prev => ({ ...prev, [key]: !prev[key] }));
 
   const filteredServices = useMemo(() => {
@@ -113,10 +120,16 @@ export default function PlannedMaintenance({
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesName = srv.name && srv.name.toLowerCase().includes(q);
-        const matchesMach = machName && (machName.toLowerCase().includes(q) || q.includes(machName.toLowerCase()));
-        const matchesReg = regName && (regName.toLowerCase().includes(q) || q.includes(regName.toLowerCase()));
-        if (!matchesName && !matchesMach && !matchesReg) return false;
+        if (q === 'bez rejonu') {
+          if (machine?.regionId || (regName && regName !== '-' && regName !== 'Bez rejonu')) return false;
+        } else if (q === 'bez pineski') {
+          if (machine && machine.xPercent != null && machine.yPercent != null) return false;
+        } else {
+          const matchesName = srv.name && srv.name.toLowerCase().includes(q);
+          const matchesMach = machName && (machName.toLowerCase().includes(q) || q.includes(machName.toLowerCase()));
+          const matchesReg = regName && (regName.toLowerCase().includes(q) || q.includes(regName.toLowerCase()));
+          if (!matchesName && !matchesMach && !matchesReg) return false;
+        }
       }
 
       if (filterTime !== 'all' && !isArchive) {

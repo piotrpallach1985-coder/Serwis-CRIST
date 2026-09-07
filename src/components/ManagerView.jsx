@@ -92,6 +92,7 @@ function ManagerViewInner({ user, onLogout }) {
   // --- Tab change z URL sync ---
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    setGlobalSearchQuery('');
     window.history.pushState({ tab: tabId, module: currentModule }, '', `?module=${currentModule}&tab=${tabId}`);
   };
 
@@ -225,6 +226,7 @@ function ManagerViewInner({ user, onLogout }) {
             <Tickets
               user={user}
               initialSearchQuery={globalSearchQuery}
+              onClearSearchQuery={() => setGlobalSearchQuery('')}
               initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)}
             />
           )}
@@ -233,6 +235,7 @@ function ManagerViewInner({ user, onLogout }) {
               user={user}
               isArchive={true}
               initialSearchQuery={globalSearchQuery}
+              onClearSearchQuery={() => setGlobalSearchQuery('')}
               initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)}
             />
           )}
@@ -243,6 +246,7 @@ function ManagerViewInner({ user, onLogout }) {
               user={user}
               isArchive={false}
               initialSearchQuery={globalSearchQuery}
+              onClearSearchQuery={() => setGlobalSearchQuery('')}
               canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
               initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)}
             />
@@ -252,6 +256,7 @@ function ManagerViewInner({ user, onLogout }) {
               user={user}
               isArchive={true}
               initialSearchQuery={globalSearchQuery}
+              onClearSearchQuery={() => setGlobalSearchQuery('')}
               canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
               initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)}
             />

@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64 } from './pdfHelpers';
+import { TICKET_STATUS, SERVICE_STATUS } from '../constants';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -56,8 +57,8 @@ export const generateKPIReportPDF = async (tickets, plannedServices, machines, d
     doc.text(n(`Wygenerowano: ${new Date().toLocaleDateString('pl-PL')}`), 14, 36);
 
     // --- OBLICZENIA ---
-    const closedTickets = tickets.filter(t => t.status === 5);
-    const completedServices = plannedServices.filter(s => s.status === 'completed');
+    const closedTickets = tickets.filter(t => t.status === TICKET_STATUS.CLOSED);
+    const completedServices = plannedServices.filter(s => s.status === SERVICE_STATUS.COMPLETED);
 
     // 1. MTTR
     let totalRepairTimeMs = 0;
@@ -96,13 +97,13 @@ export const generateKPIReportPDF = async (tickets, plannedServices, machines, d
     // --- WIZUALIZACJA NA PDF ---
     let currentY = 50;
     
-        const openTicketsCount = tickets.filter(t => t.status !== 5).length;
+        const openTicketsCount = tickets.filter(t => t.status !== TICKET_STATUS.CLOSED).length;
     const reportedTicketsCount = tickets.length;
     const allPlannedCount = plannedServices.length;
 
     const now = new Date();
     const overdueServicesCount = plannedServices.filter(srv => {
-        if (srv.status === 'completed' || srv.status === 'in_progress') return false;
+        if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === SERVICE_STATUS.IN_PROGRESS) return false;
         let isOverdue = false;
         const machine = machines.find(m => m.id === srv.machineId);
         if (srv.nextDate) {

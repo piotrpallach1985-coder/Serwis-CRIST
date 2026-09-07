@@ -1,8 +1,9 @@
-﻿import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerContext } from '../../context/ManagerDataContext';
 import { useState, useEffect } from 'react';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
-import { deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { safeParseDate } from '../../utils/dateHelpers';
 import { QRCodeSVG } from 'qrcode.react';
 
 import MachineDetails from './MachineDetails';
@@ -22,6 +23,7 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [qrModalMachine, setQrModalMachine] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [isFromQRScan, setIsFromQRScan] = useState(false);
   const [machineHistory, setMachineHistory] = useState({ tickets: [], services: [] });
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -108,40 +110,117 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
 
   const handleViewMachine = async (m, fromQR = false) => {
     setSelectedMachine(m);
+    setIsFromQRScan(fromQR);
     setLoadingHistory(true);
-    const relatedTickets = tickets.filter(t => t.machineId === m.id);
-    setMachineHistory({ tickets: relatedTickets, services: plannedServices.filter(s => s.machineId === m.id) });
-    setLoadingHistory(false);
+    try {
+      // 1. Pobierz wszystkie zgłoszenia powiązane z tą maszyną (włącznie ze statusem 5 / archiwalnymi)
+      const qTicketsById = query(collection(db, 'tickets'), where('machineId', '==', m.id));
+      const snapTickets = await getDocs(qTicketsById);
+      let machineTickets = snapTickets.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
+
+      // Sprawdź powiązania po nazwie maszyny (obsługa wariantów z dopiskiem i bez dopisku np. "(DO WERYFIKACJI)")
+      const cleanName = m.name ? m.name.replace(/\s*\(DO WERYFIKACJI\)/gi, '').trim() : '';
+      if (cleanName) {
+        const qTicketsByName = query(collection(db, 'tickets'), where('machineName', '==', m.name));
+        const snapByName = await getDocs(qTicketsByName);
+        const byNameDocs = snapByName.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
+
+        let byCleanDocs = [];
+        if (cleanName !== m.name) {
+          const qTicketsByClean = query(collection(db, 'tickets'), where('machineName', '==', cleanName));
+          const snapByClean = await getDocs(qTicketsByClean);
+          byCleanDocs = snapByClean.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
+        }
+
+        const ticketMap = new Map();
+        machineTickets.forEach(t => ticketMap.set(t.id, t));
+        byNameDocs.forEach(t => ticketMap.set(t.id, t));
+        byCleanDocs.forEach(t => ticketMap.set(t.id, t));
+        machineTickets = Array.from(ticketMap.values());
+      }
+
+      // Sortuj zgłoszenia od najnowszych
+      machineTickets.sort((a, b) => {
+        const dA = safeParseDate(a.createdAt)?.getTime() || 0;
+        const dB = safeParseDate(b.createdAt)?.getTime() || 0;
+        return dB - dA;
+      });
+
+      // 2. Pobierz wszystkie serwisy powiązane z tą maszyną (włącznie ze statusem 'completed')
+      const qServices = query(collection(db, 'planned_services'), where('machineId', '==', m.id));
+      const snapServices = await getDocs(qServices);
+      let machineServices = snapServices.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
+
+      // Sortuj serwisy od najnowszych
+      machineServices.sort((a, b) => {
+        const dA = safeParseDate(a.completedAt || a.nextDate || a.createdAt)?.getTime() || 0;
+        const dB = safeParseDate(b.completedAt || b.nextDate || b.createdAt)?.getTime() || 0;
+        return dB - dA;
+      });
+
+      setMachineHistory({ tickets: machineTickets, services: machineServices });
+    } catch (err) {
+      console.error("Błąd pobierania historii maszyny z Firestore:", err);
+      // Fallback do danych lokalnych z kontekstu
+      const relatedTickets = tickets.filter(t => t.machineId === m.id || (t.machineName && m.name && t.machineName.toLowerCase().includes(m.name.toLowerCase())));
+      setMachineHistory({ tickets: relatedTickets, services: plannedServices.filter(s => s.machineId === m.id) });
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
-  const handleScanSuccess = (decodedText) => {
-    try {
-      const url = new URL(decodedText);
-      const machineId = url.searchParams.get('machine');
-      if (machineId) {
-        const found = machines.find(m => m.id === machineId);
-        if (found) {
-          handleViewMachine(found, true);
-        } else {
-          showToast('Nie znaleziono maszyny z tego kodu QR.', 'error');
-        }
-      } else {
-        showToast('Nieprawidłowy kod QR aplikacji.', 'error');
-      }
-    } catch {
-      showToast('Błąd odczytu QR.', 'error');
+  const handleScanSuccess = (decoded) => {
+    setIsScanning(false);
+    if (!decoded) {
+      showToast('Błąd odczytu QR: brak danych.', 'error');
+      return;
+    }
+
+    let machineId = typeof decoded === 'string' ? decoded.trim() : String(decoded);
+    if (machineId.includes('?machine=')) {
+      try {
+        const queryPart = machineId.split('?')[1];
+        const urlParams = new URLSearchParams(queryPart);
+        machineId = urlParams.get('machine') || machineId;
+      } catch (e) {}
+    } else if (machineId.startsWith('http://') || machineId.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(machineId);
+        machineId = parsedUrl.searchParams.get('machine') || machineId;
+      } catch (e) {}
+    }
+
+    const found = machines.find(m =>
+      m.id === machineId ||
+      (m.qrCode && m.qrCode === machineId) ||
+      (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+    );
+
+    if (found) {
+      handleViewMachine(found, true);
+      showToast(`Wczytano maszynę: ${found.name}`, 'success');
+    } else {
+      showToast('Nie znaleziono maszyny z tego kodu QR.', 'error');
     }
   };
 
   return (
     <div className="space-y-6">
+      <QRScannerModal
+        isOpen={isScanning}
+        onClose={() => setIsScanning(false)}
+        onScanSuccess={handleScanSuccess}
+        title="Skanuj kod QR (Baza Urządzeń)"
+        subtitle="Skieruj aparat na kod QR maszyny, aby otworzyć jej detale."
+      />
       {selectedMachine ? (
         <MachineDetails
           machine={selectedMachine}
           history={machineHistory}
           loading={loadingHistory}
-          isFromQR={false}
-          onBack={() => setSelectedMachine(null)}
+          isFromQR={isFromQRScan}
+          onScanNext={() => setIsScanning(true)}
+          onBack={() => { setSelectedMachine(null); setIsFromQRScan(false); }}
           onPrint={handlePrint}
           onGeneratePDF={generateMachineHistoryPDF}
           regions={regions}
@@ -153,13 +232,7 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
         />
       ) : (
         <>
-          <QRScannerModal
-            isOpen={isScanning}
-            onClose={() => setIsScanning(false)}
-            onScanSuccess={handleScanSuccess}
-            title="Skanuj kod QR (Baza Urządzeń)"
-            subtitle="Skieruj aparat na kod QR maszyny, aby otworzyć jej detale."
-          />
+
 
           <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
             <div>
@@ -191,6 +264,7 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
                   <i className="ph ph-funnel absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
                   <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 appearance-none shadow-sm cursor-pointer">
                     <option value="">Wszystkie Rejony</option>
+                    <option value="bez_rejonu">Bez rejonu</option>
                     {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>

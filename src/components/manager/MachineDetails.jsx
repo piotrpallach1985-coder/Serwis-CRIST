@@ -13,13 +13,16 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
     <div className="bg-[#f8f9fa] w-full flex flex-col h-full animate-fade-in relative text-[#111827]">
       <div className="bg-white border-b border-gray-200 p-2 md:px-6 md:py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-4">
-          {isFromQR && <button
+          {onScanNext && (
+            <button
               onClick={onScanNext}
-              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors text-sm mr-2"
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors text-sm"
+              title="Skanuj kod QR maszyny"
             >
               <i className="ph ph-qr-code text-lg"></i>
-              Skanuj kolejny kod
-            </button>}
+              <span className="hidden sm:inline">Skanuj QR</span>
+            </button>
+          )}
             <button 
               onClick={onBack}
               className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm"

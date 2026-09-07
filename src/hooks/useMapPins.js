@@ -31,6 +31,13 @@ function applyServiceStatus(currentStatus, serviceState, serviceOriginalStatus) 
   return currentStatus;
 }
 
+function matchesMachineName(ticketMachName, machineName) {
+  if (!ticketMachName || !machineName) return false;
+  const tClean = ticketMachName.toLowerCase().replace(/\s*\(do weryfikacji\)/gi, '').trim();
+  const mClean = machineName.toLowerCase().replace(/\s*\(do weryfikacji\)/gi, '').trim();
+  return tClean === mClean || (tClean && (mClean.includes(tClean) || tClean.includes(mClean)));
+}
+
 /**
  * useMapPins — Hook obliczający listę pinezek do wyświetlenia na mapie.
  * Wyciągnięty z Map.jsx (linie 222–405).
@@ -52,25 +59,59 @@ export function useMapPins({
     const now = new Date();
 
     if (currentSubmapId === null) {
+      // Zidentyfikuj maszyny, które mają własną, samodzielną pinezkę na mapie głównej
+      const pinnedMainMachineIds = new Set(
+        machines
+          .filter(m => {
+            if (m.xPercent == null || m.yPercent == null) return false;
+            const reg = regions.find(r => r.id === m.regionId);
+            return m.pinnedOnMap === 'main' || (!m.pinnedOnMap && (!reg || !reg.mapImageUrl));
+          })
+          .map(m => m.id)
+      );
+
       // MAPA GŁÓWNA — Rejony
       regions.forEach(region => {
         if (region.xPercent == null || region.yPercent == null) return;
 
         let status = 'ok';
         let count = 0;
-        const regionMachineIds = machines.filter(m => m.regionId === region.id).map(m => m.id);
-        const submapMachineIds = machines.filter(m => {
-          if (m.regionId !== region.id) return false;
-          const isPinnedOnMain = m.pinnedOnMap === 'main' || (!m.pinnedOnMap && (!region || !region.mapImageUrl));
-          return !isPinnedOnMain;
-        }).map(m => m.id);
+        const regionMachines = machines.filter(m => m.regionId === region.id);
+        const regionMachineIds = regionMachines.map(m => m.id);
 
         if (modeType === 'tickets') {
-          const activeTickets = tickets.filter(t => submapMachineIds.includes(t.machineId) && t.status !== 5 && t.status !== '5');
-          if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+          // Zgłoszenia przypisane do rejonu lub do maszyn w tym rejonie, które NIE mają własnej pinezki na mapie głównej
+          const activeTickets = tickets.filter(t => {
+            if (t.status === 5 || t.status === '5') return false;
+
+            // Jeśli maszyna ma już własną pinezkę bezpośrednio na mapie głównej, nie dublujemy w rejonie
+            if (pinnedMainMachineIds.has(t.machineId)) return false;
+
+            // Sprawdzamy powiązanie z rejonem: po ID, po nazwie, po maszynie
+            if (t.regionId === region.id) return true;
+            if (t.regionName && region.name && t.regionName.trim().toLowerCase() === region.name.trim().toLowerCase()) return true;
+            if (regionMachineIds.includes(t.machineId)) return true;
+            if (regionMachines.some(m => matchesMachineName(t.machineName, m.name))) return true;
+
+            return false;
+          });
+
+          if (activeTickets.length > 0) {
+            status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+          }
           count = activeTickets.length;
         } else if (modeType === 'planned_maintenance') {
-          const activePlans = plannedServices.filter(p => submapMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
+          const activePlans = plannedServices.filter(p => {
+            if (p.status !== 'pending' && p.status !== 'in_progress') return false;
+            if (pinnedMainMachineIds.has(p.machineId)) return false;
+
+            if (p.regionId === region.id) return true;
+            if (regionMachineIds.includes(p.machineId)) return true;
+            if (regionMachines.some(m => matchesMachineName(p.machineName, m.name))) return true;
+
+            return false;
+          });
+
           activePlans.forEach(p => {
             const machine = machines.find(m => m.id === p.machineId);
             const svcState = getServiceStatus(p, machine, plannedWarningDays, now);
@@ -79,21 +120,31 @@ export function useMapPins({
           count = activePlans.length;
         }
 
-        pins.push({ id: region.id, type: 'region', name: region.name, xPercent: region.xPercent, yPercent: region.yPercent, status, itemCount: count, machineCount: regionMachineIds.length, hasSubmap: !!region.mapImageUrl });
+        pins.push({
+          id: region.id,
+          type: 'region',
+          name: region.name,
+          xPercent: region.xPercent,
+          yPercent: region.yPercent,
+          status,
+          itemCount: count,
+          machineCount: regionMachineIds.length,
+          hasSubmap: !!region.mapImageUrl
+        });
       });
 
-      // MAPA GŁÓWNA — Maszyny bez submapy
+      // MAPA GŁÓWNA — Maszyny mające pinezkę na mapie głównej
       machines.forEach(machine => {
-        if (machine.xPercent == null || machine.yPercent == null) return;
-        const region = regions.find(r => r.id === machine.regionId);
-        const isPinnedOnMain = machine.pinnedOnMap === 'main' || (!machine.pinnedOnMap && (!region || !region.mapImageUrl));
-        if (!isPinnedOnMain) return;
+        if (!pinnedMainMachineIds.has(machine.id)) return;
 
         let status = 'ok';
         let count = 0;
 
         if (modeType === 'tickets') {
-          const activeTickets = tickets.filter(t => t.machineId === machine.id && t.status !== 5 && t.status !== '5');
+          const activeTickets = tickets.filter(t =>
+            (t.machineId === machine.id || matchesMachineName(t.machineName, machine.name)) &&
+            t.status !== 5 && t.status !== '5'
+          );
           if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
           count = activeTickets.length;
         } else if (modeType === 'planned_maintenance') {
@@ -116,7 +167,10 @@ export function useMapPins({
         let count = 0;
 
         if (modeType === 'tickets') {
-          const activeTickets = tickets.filter(t => t.machineId === machine.id && t.status !== 5 && t.status !== '5');
+          const activeTickets = tickets.filter(t =>
+            (t.machineId === machine.id || matchesMachineName(t.machineName, machine.name)) &&
+            t.status !== 5 && t.status !== '5'
+          );
           if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
           count = activeTickets.length;
         } else if (modeType === 'planned_maintenance') {
@@ -151,20 +205,31 @@ export function useMapPins({
     let unpinnedCount = 0;
     const now = new Date();
 
-    let unpinnedMachineIds;
     if (currentSubmapId === null) {
-      unpinnedMachineIds = machines.filter(m => !m.regionId && (m.xPercent == null || m.yPercent == null)).map(m => m.id);
-    } else {
-      unpinnedMachineIds = machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null)).map(m => m.id);
-    }
+      // MAPA GŁÓWNA: "Bez rejonu"
+      const unpinnedMachines = machines.filter(m => !m.regionId);
+      const unpinnedMachineIds = new Set(unpinnedMachines.map(m => m.id));
 
-    if (unpinnedMachineIds.length > 0) {
       if (modeType === 'tickets') {
-        const activeTickets = tickets.filter(t => unpinnedMachineIds.includes(t.machineId) && t.status !== 5 && t.status !== '5');
+        const activeTickets = tickets.filter(t => {
+          if (t.status === 5 || t.status === '5') return false;
+          if (t.regionId) return false;
+          const reg = (t.regionName || '').toLowerCase().trim();
+          if (reg && reg !== 'bez rejonu' && reg !== '-') return false;
+          const machObj = machines.find(m => m.id === t.machineId || matchesMachineName(t.machineName, m.name));
+          if (machObj && machObj.regionId) return false;
+          return true;
+        });
         if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
         unpinnedCount = activeTickets.length;
       } else if (modeType === 'planned_maintenance') {
-        const activePlans = plannedServices.filter(p => unpinnedMachineIds.includes(p.machineId) && (p.status === 'pending' || p.status === 'in_progress'));
+        const activePlans = plannedServices.filter(p => {
+          if (p.status !== 'pending' && p.status !== 'in_progress') return false;
+          if (p.regionId) return false;
+          const machObj = machines.find(m => m.id === p.machineId);
+          if (machObj && machObj.regionId) return false;
+          return true;
+        });
         activePlans.forEach(p => {
           const machine = machines.find(m => m.id === p.machineId);
           const svcState = getServiceStatus(p, machine, plannedWarningDays, now);
@@ -172,9 +237,41 @@ export function useMapPins({
         });
         unpinnedCount = activePlans.length;
       }
-    }
 
-    return { status, unpinnedCount, unpinnedMachineCount: unpinnedMachineIds.length };
+      return { status, unpinnedCount, unpinnedMachineCount: unpinnedMachines.length };
+    } else {
+      // PODMAPA: "Bez pineski" w bieżącym rejonie
+      const unpinnedMachines = machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
+      const unpinnedMachineIds = new Set(unpinnedMachines.map(m => m.id));
+
+      if (modeType === 'tickets') {
+        const activeTickets = tickets.filter(t => {
+          if (t.status === 5 || t.status === '5') return false;
+          const isThisRegion = t.regionId === currentSubmapId || unpinnedMachineIds.has(t.machineId);
+          if (!isThisRegion) return false;
+          const machObj = machines.find(m => m.id === t.machineId || matchesMachineName(t.machineName, m.name));
+          if (machObj && machObj.xPercent != null && machObj.yPercent != null) return false;
+          return true;
+        });
+        if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
+        unpinnedCount = activeTickets.length;
+      } else if (modeType === 'planned_maintenance') {
+        const activePlans = plannedServices.filter(p => {
+          if (p.status !== 'pending' && p.status !== 'in_progress') return false;
+          const machObj = machines.find(m => m.id === p.machineId);
+          if (!machObj || machObj.regionId !== currentSubmapId) return false;
+          return machObj.xPercent == null || machObj.yPercent == null;
+        });
+        activePlans.forEach(p => {
+          const machine = machines.find(m => m.id === p.machineId);
+          const svcState = getServiceStatus(p, machine, plannedWarningDays, now);
+          status = applyServiceStatus(status, svcState, p.status);
+        });
+        unpinnedCount = activePlans.length;
+      }
+
+      return { status, unpinnedCount, unpinnedMachineCount: unpinnedMachines.length };
+    }
   }, [tickets, plannedServices, modeType, machines, currentSubmapId, plannedWarningDays]);
 
   return { pinData, displayPins, unpinnedData };

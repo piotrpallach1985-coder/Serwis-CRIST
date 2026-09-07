@@ -2,6 +2,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import * as XLSX from 'xlsx';
 import { safeParseDate } from '../dateHelpers';
+import { TICKET_STATUS_LABELS, ACTION_ITEM_STATUS_LABELS } from '../constants';
 
 export const generateAuditorReport = async () => {
   try {
@@ -38,7 +39,7 @@ export const generateAuditorReport = async () => {
         'Maszyna ID': t.machineId,
         'Temat': t.topic || '-',
         'Opis': t.description || '-',
-        'Status': t.status === 5 ? 'Zamknięte' : (t.status === 2 ? 'W trakcie' : 'Otwarte'),
+        'Status': TICKET_STATUS_LABELS[t.status] || 'Nieznany',
         'Zgłaszający': t.reportedBy || '-',
         'Urządzenie zgłaszającego': t.reporterDevice || '-',
         'Zakończone przez': t.completedBy || '-',
@@ -91,7 +92,7 @@ export const generateAuditorReport = async () => {
         'Maszyna ID': a.machineId,
         'Opis Problemu': a.problem || '-',
         'Termin (Wymagany)': a.dueDate ? safeParseDate(a.dueDate)?.toLocaleDateString('pl-PL') : '-',
-        'Status': a.status === 'completed' ? 'Wykonano' : 'Otwarte',
+        'Status': ACTION_ITEM_STATUS_LABELS[a.status] || a.status,
         'Zakończone przez': a.completedBy || '-',
         'Data Zgłoszenia': created ? created.toLocaleString('pl-PL') : '-',
         'Data Wykonania': closed ? closed.toLocaleString('pl-PL') : '-',

@@ -36,7 +36,7 @@ const calculateDuration = (createdAt, closedAt) => {
   return res.join(' ');
 };
 
-export default function Tickets({ user, isArchive, initialTicketId, onClearTicketId, initialSearchQuery }) {
+export default function Tickets({ user, isArchive, initialTicketId, onClearTicketId, initialSearchQuery, onClearSearchQuery }) {
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
 
   const ticketState = useTickets({ tickets, machines, regions, isArchive, initialSearchQuery });
@@ -279,7 +279,11 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
           </div>
           {(filterMachine || filterStatus) && (
             <button
-              onClick={() => { setFilterMachine(''); setFilterStatus(''); }}
+              onClick={() => {
+                setFilterMachine('');
+                setFilterStatus('');
+                if (onClearSearchQuery) onClearSearchQuery();
+              }}
               className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
               title="Wyczyść wszystkie filtry"
             >

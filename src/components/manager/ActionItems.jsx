@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
+import { ACTION_ITEM_STATUS, ACTION_ITEM_STATUS_LABELS } from '../../utils/constants';
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 
 export default function ActionItems({ user }) {
@@ -22,7 +23,7 @@ export default function ActionItems({ user }) {
         'Problem / Zadanie': item.problem || '-',
         'Wymagany Termin': dueDate ? dueDate.toLocaleDateString('pl-PL') : '-',
         'Zgłaszający': item.createdBy || '-',
-        'Status': item.status === 'completed' ? 'Zrealizowane' : 'Oczekujące',
+        'Status': ACTION_ITEM_STATUS_LABELS[item.status] || item.status,
         'Zrealizował(a)': item.completedBy || '-',
         'Data Realizacji': completedDate ? completedDate.toLocaleDateString('pl-PL') : '-'
       };
@@ -63,8 +64,8 @@ export default function ActionItems({ user }) {
 
     let filtered = items.filter(item => {
       // 1. Status Filter
-      if (filterStatus === 'pending' && item.status === 'completed') return false;
-      if (filterStatus === 'completed' && item.status !== 'completed') return false;
+      if (filterStatus === ACTION_ITEM_STATUS.PENDING && item.status === ACTION_ITEM_STATUS.COMPLETED) return false;
+      if (filterStatus === ACTION_ITEM_STATUS.COMPLETED && item.status !== ACTION_ITEM_STATUS.COMPLETED) return false;
 
       const machine = machines.find(m => m.id === item.machineId);
 
@@ -92,8 +93,8 @@ export default function ActionItems({ user }) {
     
     // Sort logic (optional, already sorted by createdAt desc by default, but we can keep it as is or sort by dueDate)
     return filtered.sort((a,b) => {
-       const isAClosed = a.status === 'completed';
-       const isBClosed = b.status === 'completed';
+       const isAClosed = a.status === ACTION_ITEM_STATUS.COMPLETED;
+       const isBClosed = b.status === ACTION_ITEM_STATUS.COMPLETED;
        if (isAClosed && !isBClosed) return 1;
        if (!isAClosed && isBClosed) return -1;
        const dA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
@@ -174,7 +175,7 @@ export default function ActionItems({ user }) {
       filteredItems.map(item => {
         const dueDate = item.dueDate ? (typeof item.dueDate.toDate === 'function' ? item.dueDate.toDate() : new Date(item.dueDate)) : null;
         const createdDate = item.createdAt ? (typeof item.createdAt.toDate === 'function' ? item.createdAt.toDate() : new Date(item.createdAt)) : null;
-        const isCompleted = item.status === 'completed';
+        const isCompleted = item.status === ACTION_ITEM_STATUS.COMPLETED;
         const machineName = item.machineName || getMachineName(item.machineId);
 
         return (
@@ -256,7 +257,7 @@ export default function ActionItems({ user }) {
                       {item.createdBy}
                     </td>
                     <td className="px-6 py-4">
-                      {item.status === 'completed' ? (
+                      {item.status === ACTION_ITEM_STATUS.COMPLETED ? (
                         <div className="flex flex-col gap-1 items-start">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider w-fit">
                             <i className="ph ph-check-circle"></i> Zrealizowane

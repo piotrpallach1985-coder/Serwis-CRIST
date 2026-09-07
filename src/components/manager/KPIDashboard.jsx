@@ -2,6 +2,8 @@ import { useManagerContext } from '../../context/ManagerDataContext';
 import { useState, useMemo, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { safeParseDate } from '../../utils/dateHelpers';
+import { TICKET_STATUS } from '../../utils/constants';
 
 
 export default function KPIDashboard() {
@@ -17,7 +19,7 @@ export default function KPIDashboard() {
       try {
         const q = query(collection(db, 'tickets'));
         const snap = await getDocs(q);
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && x.status === 5);
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && x.status === TICKET_STATUS.CLOSED);
         setHistoricalTickets(docs);
       } catch (err) {
         console.error("Błąd pobierania historii KPI:", err);
@@ -35,15 +37,6 @@ export default function KPIDashboard() {
     });
     return Array.from(activeMap.values());
   }, [tickets, historicalTickets]);
-
-
-  const safeParseDate = (dateVal) => {
-    if (!dateVal) return null;
-    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
-    if (dateVal.seconds !== undefined) return new Date(dateVal.seconds * 1000);
-    const d = new Date(dateVal);
-    return isNaN(d.getTime()) ? null : d;
-  };
 
   const filteredTickets = useMemo(() => {
     return allTicketsForKPI.filter(t => {
@@ -71,7 +64,7 @@ export default function KPIDashboard() {
 
   // 1. Podstawowe statystyki
   const totalTickets = filteredTickets.length;
-  const closedTickets = filteredTickets.filter(t => t.status === 5);
+  const closedTickets = filteredTickets.filter(t => t.status === TICKET_STATUS.CLOSED);
   const criticalTickets = filteredTickets.filter(t => t.isCritical);
 
   // 2. Obliczanie średniego czasu naprawy (MTTR) w minutach dla zakończonych
@@ -91,7 +84,7 @@ export default function KPIDashboard() {
   const avgHours = Math.floor(avgRepairMinutes / 60);
   const avgMins = avgRepairMinutes % 60;
 
-  // 3. Maszynę z największą liczbą awarii
+  // 3. Maszyny z największą liczbą awarii
   const machineFaultCounts = {};
   filteredTickets.forEach(t => {
     const mName = t.machineName || 'Nieznana maszyna';
