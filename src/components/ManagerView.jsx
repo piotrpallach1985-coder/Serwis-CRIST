@@ -143,7 +143,7 @@ function ManagerViewInner({ user, onLogout }) {
     <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
 
       {/* === SIDEBAR === */}
-      <div className="flex flex-col flex-shrink-0 h-full relative z-[200]">
+      <div className="flex flex-col flex-shrink-0 h-full relative z-[300]">
         <Sidebar
           currentModule={currentModule}
           activeTab={activeTab}
@@ -160,7 +160,7 @@ function ManagerViewInner({ user, onLogout }) {
       {/* === GŁÓWNA TREŚĆ === */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* MOBILNA GÓRNA BELKA (widoczna tylko na ekranach < lg) */}
-        <div className="lg:hidden bg-[#1B253B] text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-gray-800 shrink-0 z-30">
+        <div className="lg:hidden bg-[#1B253B] text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-gray-800 shrink-0 z-[200]">
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setIsSidebarOpen(true)}

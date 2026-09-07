@@ -120,20 +120,22 @@ export default function Sidebar({
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Dzwoneczek informacyjny w Panelu UR */}
+            {/* Dzwoneczek informacyjny w Panelu UR (widoczny tylko na desktopie, na mobile jest w górnej belce) */}
             {isUrModule && (
-              <NotificationCenter 
-                currentModule={currentModule}
-                user={user}
-                onNavigate={onNavigate}
-                align="left"
-                tickets={tickets}
-                plannedServices={plannedServices}
-                machines={machines}
-                reporters={reporters}
-                actionItems={actionItems}
-                notifications={notifications}
-              />
+              <div className="hidden lg:block">
+                <NotificationCenter 
+                  currentModule={currentModule}
+                  user={user}
+                  onNavigate={onNavigate}
+                  align="left"
+                  tickets={tickets}
+                  plannedServices={plannedServices}
+                  machines={machines}
+                  reporters={reporters}
+                  actionItems={actionItems}
+                  notifications={notifications}
+                />
+              </div>
             )}
             <button 
               onClick={onSidebarClose} 

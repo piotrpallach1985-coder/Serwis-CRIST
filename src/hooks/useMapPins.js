@@ -35,7 +35,7 @@ function matchesMachineName(ticketMachName, machineName) {
   if (!ticketMachName || !machineName) return false;
   const tClean = ticketMachName.toLowerCase().replace(/\s*\(do weryfikacji\)/gi, '').trim();
   const mClean = machineName.toLowerCase().replace(/\s*\(do weryfikacji\)/gi, '').trim();
-  return tClean === mClean || (tClean && (mClean.includes(tClean) || tClean.includes(mClean)));
+  return tClean === mClean;
 }
 
 /**
