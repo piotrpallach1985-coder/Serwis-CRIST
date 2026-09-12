@@ -14,16 +14,21 @@
     "lint": "eslint src --ext .js,.jsx"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.11",
     "firebase": "^10.8.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.344.0",
+    "prop-types": "^15.8.1",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "xlsx": "^0.18.5"
+    "react-window": "^2.3.1",
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

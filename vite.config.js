@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   base: './',
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"] },
-  plugins: [
+  build: { sourcemap: true }, plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -17,14 +17,14 @@ export default defineConfig({
         theme_color: '#ffffff',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'pwa-192x192.jpg',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/jpeg'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-512x512.jpg',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/jpeg'
           }
         ]
       },

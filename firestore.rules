@@ -15,6 +15,10 @@ service cloud.firestore {
       return isSignedIn() && getUserData().role == 'admin';
     }
 
+    function isStaff() {
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'kierownik' || getUserData().role == 'tech');
+    }
+
     // 1. ZGŁASZAJĄCY (Pracownicy)
     match /reporters/{document=**} {
       allow read: if true;
@@ -29,8 +33,6 @@ service cloud.firestore {
     // 2. MASZYNY
     match /machines/{document=**} {
       allow read: if true;
-      
-      // Zalogowany tworzy dowolnie, niezalogowany operator podlega restrykcjom:
       allow create: if isSignedIn() || (
         request.resource.data.name is string
         && request.resource.data.name.size() >= 3
@@ -39,39 +41,55 @@ service cloud.firestore {
         && (!('xPercent' in request.resource.data) || request.resource.data.xPercent == null)
         && (!('yPercent' in request.resource.data) || request.resource.data.yPercent == null)
       );
-                    
       allow update, delete: if isSignedIn();
     }
 
     // 3. ZGŁOSZENIA AWARII (Tickets) - ZERO WYCIEKU
     match /tickets/{ticketId} {
-      // Tylko zalogowany personel widzi historię awarii
       allow read: if isSignedIn();   
-      // Niezalogowany może TYLKO wrzucić zgłoszenie (jak do skrzynki)
-      allow create: if true;          
-      // Zezwól na dopisanie zdjęć przez system offline sync (OfflineSyncManager), blokując modyfikację innych pól
-      allow update: if isSignedIn() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos']);
+      allow create: if isSignedIn() || (
+        request.resource.data.machineId is string &&
+        request.resource.data.machineId.size() > 0 &&
+        request.resource.data.machineId.size() <= 200 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() >= 3 &&
+        request.resource.data.description.size() <= 3000 &&
+        request.resource.data.reportedBy is string &&
+        request.resource.data.reportedBy.size() >= 2 &&
+        request.resource.data.reportedBy.size() <= 120 &&
+        request.resource.data.status == 1 &&
+        request.resource.data.keys().hasOnly(['description','machineId','machineName','status','isCritical','createdAt','photos','reportedBy','regionId'])
+      );
+      allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     // 4. SŁOWNIKI PUBLICZNE (Odczyt dla formularza, edycja dla zalogowanych)
     match /regions/{document=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isStaff();
     }
     match /topics/{document=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isStaff();
     }
     match /services/{document=**} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isStaff();
     }
 
     // 5. POWIADOMIENIA (Operator wysyła, zalogowany zarządza)
     match /notifications/{document=**} {
       allow read: if isSignedIn();
-      allow create: if true;
+      allow create: if isSignedIn() || (
+        request.resource.data.title is string &&
+        request.resource.data.title.size() >= 3 &&
+        request.resource.data.title.size() <= 120 &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() >= 3 &&
+        request.resource.data.message.size() <= 600 &&
+        request.resource.data.read == false
+      );
       allow update, delete: if isSignedIn();
     }
 
@@ -85,16 +103,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /settings/{document=**} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // 7. ZADANIA I SERWISY PLANOWANE (Zalogowany personel)
     match /planned_services/{document=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isStaff();
     }
     match /action_items/{document=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isStaff();
     }
   }
 }
