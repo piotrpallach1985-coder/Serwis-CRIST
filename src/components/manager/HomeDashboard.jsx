@@ -1,16 +1,19 @@
+import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
-import { useManagerContext } from '../../context/ManagerDataContext';
+
 import { usePermissions } from '../../hooks/usePermissions';
 import QRScannerModal from '../shared/QRScannerModal';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { TICKET_STATUS } from '../../utils/constants';
 
 export default function HomeDashboard({ setActiveTab, setCurrentModule, user, onLogout }) {
-  const {
-    tickets = [],
-    plannedServices = [],
-    roles = [],
-    branding = {},
-  } = useManagerContext();
+  const tickets = useManagerStore(state => state.tickets) || [];
+  const machines = useManagerStore(state => state.machines) || [];
+  const plannedServices = useManagerStore(state => state.plannedServices) || [];
+  const roles = useManagerStore(state => state.roles) || [];
+  const isArchive = useManagerStore(state => state.isArchive);
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const branding = useManagerStore(state => state.branding);
 
   const { isAdmin, canManageUsers, canManageRoles, canViewReports } = usePermissions(user, roles);
 
@@ -51,8 +54,8 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
   };
 
   // Statystyki operacyjne dla kafelka UR
-  const activeTicketsCount = tickets.filter(t => t.status !== 5 && t.status !== '5').length;
-  const criticalTicketsCount = tickets.filter(t => t.isCritical && t.status !== 5 && t.status !== '5').length;
+  const activeTicketsCount = tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED).length;
+  const criticalTicketsCount = tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length;
   const overdueServicesCount = plannedServices.filter(s => {
     if (s.status === 'completed' || s.status === 'in_progress') return false;
     if (!s.nextDate) return false;
@@ -67,14 +70,9 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
     <div className="min-h-[100dvh] flex flex-col bg-slate-50 text-slate-800">
       {/* GÓRNY PASEK PULPITU GŁÓWNEGO */}
       <header className="bg-transparent text-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {branding?.appLogoUrl ? (
-            <img src={branding.appLogoUrl} alt="VexoNT Logo" className="h-8 sm:h-10 object-contain" />
-          ) : (
-            <div className="font-black text-2xl tracking-tight text-blue-900 flex items-center">
-              Vexo<span className="text-blue-600">NT</span>
-            </div>
-          )}
+        {/* Lewy róg: Logo Aplikacji */}
+        <div className="flex items-center gap-3">
+          <img src={branding?.appLogoUrl || '/pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
         </div>
 
         {/* Profil i wylogowanie */}
@@ -89,11 +87,11 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           {onLogout && (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-medium transition-colors border border-red-200 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-medium transition-colors border border-red-200 cursor-pointer shadow-sm"
               title="Wyloguj się"
             >
-              <i className="ph ph-sign-out text-base"></i>
-              <span className="hidden sm:inline">Wyloguj</span>
+              <i className="ph ph-sign-out text-base sm:text-lg"></i>
+              <span>Wyloguj</span>
             </button>
           )}
         </div>
@@ -109,41 +107,41 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
       />
 
       {/* GŁÓWNA ZAWARTOŚĆ — 4 KAFELKI */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 max-w-7xl mx-auto w-full animate-fade-in">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 max-w-[1400px] mx-auto w-full animate-fade-in">
         <div className="text-center mb-6 sm:mb-10 flex flex-col items-center">
-          <div className="w-16 h-16 sm:w-24 sm:h-24 bg-white rounded-2xl flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-md mb-3 sm:mb-4 border border-slate-200">
+          <div className="w-20 h-20 sm:w-28 sm:h-28 bg-white rounded-3xl flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-lg mb-3 sm:mb-5 border border-slate-100">
             {branding?.companyLogoUrl ? (
-              <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+              <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-2 sm:p-3" />
             ) : (
-              <span className="text-3xl sm:text-4xl">{branding?.companyName?.charAt(0) || 'C'}</span>
+              <span className="text-4xl sm:text-5xl">{branding?.companyName?.charAt(0) || 'C'}</span>
             )}
           </div>
-          <h1 className="font-extrabold text-lg sm:text-2xl leading-tight tracking-wide text-slate-900">
+          <h1 className="font-black text-xl sm:text-3xl leading-tight tracking-wide text-slate-900">
             {branding?.companyName || 'CRIST S.A.'}
           </h1>
-          <p className="text-[10px] sm:text-sm text-blue-600 uppercase tracking-widest font-bold mb-4 sm:mb-6">
+          <p className="text-[11px] sm:text-sm text-blue-600 uppercase tracking-widest font-bold mb-4 sm:mb-8">
             {branding?.systemSubtitle || 'MAINTENANCE SYSTEM'}
           </p>
           
-          <h2 className="text-base sm:text-3xl font-black text-slate-800 tracking-tight">
+          <h2 className="text-lg sm:text-3xl font-black text-slate-800 tracking-tight">
             Wybierz moduł do pracy
           </h2>
         </div>
 
         {/* SIATKA 4 KAFELKÓW (2 kolumny mobile, 4 desktop) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 w-full max-w-6xl">
           
           {/* SKANER QR DLA MASZYN */}
           <button
             type="button"
             onClick={() => setIsScanning(true)}
-            className="group relative flex flex-col items-center justify-center sm:justify-between p-4 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[140px] sm:min-h-[250px] transform hover:-translate-y-1"
+            className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-blue-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
           >
             <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
-              <div className="w-12 h-12 sm:w-20 sm:h-20 mx-auto bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-4 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+              <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-blue-50/80 text-blue-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
                 <i className="ph ph-qr-code"></i>
               </div>
-              <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 leading-tight">
+              <h3 className="text-base sm:text-2xl font-extrabold text-slate-900 mb-1 leading-tight tracking-tight">
                 Skaner QR
               </h3>
               <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 px-2 mt-2">
@@ -161,13 +159,13 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           <button
             type="button"
             onClick={() => navigateToModule('ur', 'dashboard_tickets')}
-            className="group relative flex flex-col items-center justify-center sm:justify-between p-4 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-red-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[140px] sm:min-h-[250px] transform hover:-translate-y-1"
+            className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-red-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
           >
             <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
-              <div className="w-12 h-12 sm:w-20 sm:h-20 mx-auto bg-red-50 text-red-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-4 group-hover:scale-110 group-hover:bg-red-600 group-hover:text-white transition-all shadow-sm">
+              <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-red-50/80 text-red-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-red-600 group-hover:text-white transition-all shadow-sm">
                 <i className="ph ph-wrench"></i>
               </div>
-              <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 leading-tight">
+              <h3 className="text-base sm:text-2xl font-extrabold text-slate-900 mb-1 leading-tight tracking-tight">
                 Panel UR
               </h3>
               <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 px-2 mt-2">
@@ -175,7 +173,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
               </p>
             </div>
 
-            <div className="hidden sm:flex w-full pt-3 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-red-600 group-hover:text-red-700 mt-auto">
+            <div className="hidden sm:flex w-full pt-4 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-red-600 group-hover:text-red-700 mt-auto">
               <span>Otwórz Panel UR</span>
               <i className="ph ph-arrow-right text-sm"></i>
             </div>
@@ -186,13 +184,13 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
             <button
               type="button"
               onClick={() => navigateToModule('company_admin', 'users')}
-              className="group relative flex flex-col items-center justify-center sm:justify-between p-4 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-500 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[140px] sm:min-h-[250px] transform hover:-translate-y-1"
+              className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-purple-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
             >
               <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
-                <div className="w-12 h-12 sm:w-20 sm:h-20 mx-auto bg-purple-50 text-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-4 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
+                <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-purple-50/80 text-purple-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
                   <i className="ph ph-users-three"></i>
                 </div>
-                <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 leading-tight">
+                <h3 className="text-base sm:text-2xl font-extrabold text-slate-900 mb-1 leading-tight tracking-tight">
                   Administrator
                 </h3>
                 <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 px-2 mt-2">
@@ -200,17 +198,17 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
                 </p>
               </div>
 
-              <div className="hidden sm:flex w-full pt-3 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-purple-600 group-hover:text-purple-700 mt-auto">
+              <div className="hidden sm:flex w-full pt-4 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-purple-600 group-hover:text-purple-700 mt-auto">
                 <span>Zarządzaj firmą</span>
                 <i className="ph ph-arrow-right text-sm"></i>
               </div>
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-4 sm:p-7 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[140px] sm:min-h-[250px]">
-              <div className="w-10 h-10 sm:w-16 sm:h-16 bg-slate-200 text-slate-400 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl mb-2 sm:mb-3">
+            <div className="flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[160px] sm:min-h-[280px]">
+              <div className="w-12 h-12 sm:w-20 sm:h-20 bg-slate-200 text-slate-400 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-2xl sm:text-4xl mb-3 sm:mb-5">
                 <i className="ph ph-lock"></i>
               </div>
-              <h3 className="text-xs sm:text-base font-bold text-slate-500 mb-1 leading-tight">
+              <h3 className="text-sm sm:text-xl font-bold text-slate-500 mb-1 leading-tight tracking-tight">
                 Administrator
               </h3>
               <p className="hidden sm:block text-xs text-slate-400 mt-2">Brak uprawnień do tego modułu.</p>
@@ -222,32 +220,32 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
             <button
               type="button"
               onClick={() => navigateToModule('system_admin', 'settings')}
-              className="group relative flex flex-col items-center justify-center sm:justify-between p-4 sm:p-7 bg-white rounded-2xl border-2 border-slate-200 hover:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-200 text-center cursor-pointer min-h-[140px] sm:min-h-[250px] transform hover:-translate-y-1"
+              className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-slate-800 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
             >
               <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
-                <div className="w-12 h-12 sm:w-20 sm:h-20 mx-auto bg-slate-100 text-slate-700 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-4xl mb-2 sm:mb-4 group-hover:scale-110 group-hover:bg-slate-800 group-hover:text-white transition-all shadow-sm">
+                <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-slate-100/80 text-slate-700 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-slate-800 group-hover:text-white transition-all shadow-sm">
                   <i className="ph ph-gear-six"></i>
                 </div>
-                <h3 className="text-sm sm:text-xl font-bold text-slate-900 mb-1 leading-tight">
-                  Administrator programu
+                <h3 className="text-base sm:text-2xl font-extrabold text-slate-900 mb-1 leading-tight tracking-tight">
+                  Admin Programu
                 </h3>
                 <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 px-2 mt-2">
                   Ustawienia globalne aplikacji, branding, logo, przełączniki modułów i integracje.
                 </p>
               </div>
 
-              <div className="hidden sm:flex w-full pt-3 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-slate-900 mt-auto">
+              <div className="hidden sm:flex w-full pt-4 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-slate-900 mt-auto">
                 <span>Ustawienia systemu</span>
                 <i className="ph ph-arrow-right text-sm"></i>
               </div>
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-4 sm:p-7 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[140px] sm:min-h-[250px]">
-              <div className="w-10 h-10 sm:w-16 sm:h-16 bg-slate-200 text-slate-400 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-3xl mb-2 sm:mb-3">
+            <div className="flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[160px] sm:min-h-[280px]">
+              <div className="w-12 h-12 sm:w-20 sm:h-20 bg-slate-200 text-slate-400 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-2xl sm:text-4xl mb-3 sm:mb-5">
                 <i className="ph ph-lock"></i>
               </div>
-              <h3 className="text-xs sm:text-base font-bold text-slate-500 mb-1 leading-tight">
-                Administrator programu
+              <h3 className="text-sm sm:text-xl font-bold text-slate-500 mb-1 leading-tight tracking-tight">
+                Admin Programu
               </h3>
               <p className="hidden sm:block text-xs text-slate-400 mt-2">Dostępny tylko dla Administratora Technicznego.</p>
             </div>

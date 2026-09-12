@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { usePermissions } from '../usePermissions';
+import { USER_ROLES } from '../../utils/constants';
 
 describe('usePermissions', () => {
   it('should return all false when user is null', () => {
@@ -19,7 +20,7 @@ describe('usePermissions', () => {
   });
 
   it('should grant all permissions to admin', () => {
-    const user = { role: 'admin' };
+    const user = { role: USER_ROLES.ADMIN };
     const { result } = renderHook(() => usePermissions(user, []));
     
     expect(result.current.isAdmin).toBe(true);

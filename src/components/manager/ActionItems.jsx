@@ -1,4 +1,5 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -8,7 +9,8 @@ import { ACTION_ITEM_STATUS, ACTION_ITEM_STATUS_LABELS } from '../../utils/const
 import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 
 export default function ActionItems({ user }) {
-  const { machines } = useManagerContext();
+  const machines = useManagerStore(state => state.machines);
+  const regions = useManagerStore(state => state.regions);
 
   const [items, setItems] = useState([]);
   const handleExportExcel = () => {
@@ -31,28 +33,23 @@ export default function ActionItems({ user }) {
     exportToExcel(dataToExport, 'Tematy_do_realizacji');
   };
 
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterStatus, setFilterStatus] = useState(ACTION_ITEM_STATUS.PENDING);
   const [filterTime, setFilterTime] = useState('all');
   const [filterRegion, setFilterRegion] = useState('');
   const [filterMachine, setFilterMachine] = useState('');
-
-  // Regions list extracted from machines
-  const regions = useMemo(() => {
-    const rSet = new Map();
-    machines.forEach(m => {
-      if (m.regionId) rSet.set(m.regionId, { id: m.regionId, name: m.regionId }); // Simplified
-    });
-    return Array.from(rSet.values());
-  }, [machines]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
 
   useEffect(() => {
     const q = query(collection(db, 'action_items'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
+      setLoading(false);
     }, (err) => {
       alert('Błąd ładowania Tematów do Realizacji: ' + err.message);
       console.error(err);
+      setLoading(false);
     });
     return () => unsub();
   }, []);
@@ -75,6 +72,14 @@ export default function ActionItems({ user }) {
       // 3. Machine Filter
       if (filterMachine && item.machineId !== filterMachine) return false;
 
+      // Search Query
+      if (searchQuery) {
+        const queryLower = searchQuery.toLowerCase();
+        const titleMatch = item.problem?.toLowerCase().includes(queryLower);
+        const machineMatch = machine?.name?.toLowerCase().includes(queryLower);
+        if (!titleMatch && !machineMatch) return false;
+      }
+
       // 4. Time Filter
       if (filterTime !== 'all') {
         if (!item.dueDate) return false;
@@ -93,32 +98,43 @@ export default function ActionItems({ user }) {
     
     // Sort logic (optional, already sorted by createdAt desc by default, but we can keep it as is or sort by dueDate)
     return filtered.sort((a,b) => {
-       const isAClosed = a.status === ACTION_ITEM_STATUS.COMPLETED;
-       const isBClosed = b.status === ACTION_ITEM_STATUS.COMPLETED;
-       if (isAClosed && !isBClosed) return 1;
-       if (!isAClosed && isBClosed) return -1;
-       const dA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-       const dB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-       return dA - dB;
+      // Archiwum: po dacie wykonania (najnowsze na górze)
+      if (filterStatus === ACTION_ITEM_STATUS.COMPLETED || filterStatus === ACTION_ITEM_STATUS.CANCELLED) {
+        const dA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const dB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return dB - dA;
+      }
+      
+      // Aktywne: najstarsze na górze
+      const dA = a.createdAt ? new Date(a.createdAt).getTime() : Infinity;
+      const dB = b.createdAt ? new Date(b.createdAt).getTime() : Infinity;
+      return dA - dB;
     });
-  }, [items, filterStatus, filterTime, filterRegion, filterMachine, machines]);
+  }, [items, filterStatus, filterTime, filterRegion, filterMachine, machines, searchQuery]);
 
   const getMachineName = (id) => machines.find(m => m.id === id)?.name || 'Nieznana maszyna';
 
-  const handleComplete = async (id) => {
-    if (confirm('Czy na pewno chcesz oznaczyć ten temat jako zrealizowany?')) {
-      try {
-        await updateDoc(doc(db, 'action_items', id), {
-          status: 'completed',
-          completedAt: new Date().toISOString(),
-          completedBy: user?.name || 'Nieznany'
-        });
-      } catch (err) {
-        console.error(err);
-        alert('Błąd aktualizacji statusu');
+  
+  const handleStatusChange = async (id, newStatus) => {
+    let confirmMsg = '';
+    if (newStatus === ACTION_ITEM_STATUS.COMPLETED) confirmMsg = 'Czy na pewno chcesz oznaczyć ten temat jako zrealizowany?';
+    if (newStatus === ACTION_ITEM_STATUS.CANCELLED) confirmMsg = 'Czy na pewno chcesz anulować ten temat?';
+    
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    
+    try {
+      const updateData = { status: newStatus };
+      if (newStatus === ACTION_ITEM_STATUS.COMPLETED || newStatus === ACTION_ITEM_STATUS.CANCELLED) {
+        updateData.completedAt = new Date().toISOString();
+        updateData.completedBy = user?.name || 'Nieznany';
       }
+      await updateDoc(doc(db, 'action_items', id), updateData);
+    } catch (err) {
+      console.error(err);
+      alert('Błąd aktualizacji statusu');
     }
   };
+
 
   return (
     <div className="space-y-6 flex flex-col animate-fade-in">
@@ -152,10 +168,12 @@ export default function ActionItems({ user }) {
       {/* FILTRY */}
       <PlannedMaintenanceFilters 
         isArchive={false}
+        searchQuery={searchQuery} setSearchQuery={setSearchQuery}
         filterTime={filterTime} setFilterTime={setFilterTime}
         filterRegion={filterRegion} setFilterRegion={setFilterRegion}
         filterMachine={filterMachine} setFilterMachine={setFilterMachine}
         clearFilters={() => {
+          setSearchQuery('');
           setFilterTime('all');
           setFilterRegion('');
           setFilterMachine('');
@@ -203,16 +221,21 @@ export default function ActionItems({ user }) {
             </div>
             
             <div className="mt-2 flex justify-end">
-              {item.status !== 'completed' ? (
-                    <button 
-                      onClick={() => handleComplete(item.id)} 
-                      className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 font-bold py-1.5 px-4 rounded-lg text-xs transition-colors shadow-sm inline-flex items-center gap-1"
-                    >
-                      <i className="ph ph-check-circle text-base"></i> Potwierdź wykonanie
-                    </button>
-                  ) : (
-                    <span className="text-green-600 font-bold text-xs flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100"><i className="ph ph-check"></i> Wykonano</span>
-                  )}
+                      <select 
+                        value={item.status} 
+                        onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                        className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
+                          item.status === ACTION_ITEM_STATUS.COMPLETED ? 'bg-green-50 text-green-700 border-green-200' :
+                          item.status === ACTION_ITEM_STATUS.IN_PROGRESS ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          item.status === ACTION_ITEM_STATUS.CANCELLED ? 'bg-gray-100 text-gray-500 border-gray-200' :
+                          'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        <option value={ACTION_ITEM_STATUS.PENDING}>Do wykonania</option>
+                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>W trakcie</option>
+                        <option value={ACTION_ITEM_STATUS.COMPLETED}>Potwierdź wykonanie</option>
+                        <option value={ACTION_ITEM_STATUS.CANCELLED}>Anulowane</option>
+                      </select>
             </div>
           </div>
         );
@@ -276,7 +299,21 @@ export default function ActionItems({ user }) {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                          {item.status !== 'completed' ? (<button onClick={() => handleComplete(item.id)} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-bold transition-colors shadow-sm">Potwierdź wykonanie</button>) : (<span className="text-green-600 font-bold text-xs"><i className="ph ph-check"></i> Wykonano</span>)}
+                          <select 
+                        value={item.status} 
+                        onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                        className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
+                          item.status === ACTION_ITEM_STATUS.COMPLETED ? 'bg-green-50 text-green-700 border-green-200' :
+                          item.status === ACTION_ITEM_STATUS.IN_PROGRESS ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          item.status === ACTION_ITEM_STATUS.CANCELLED ? 'bg-gray-100 text-gray-500 border-gray-200' :
+                          'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        <option value={ACTION_ITEM_STATUS.PENDING}>Do wykonania</option>
+                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>W trakcie</option>
+                        <option value={ACTION_ITEM_STATUS.COMPLETED}>Potwierdź wykonanie</option>
+                        <option value={ACTION_ITEM_STATUS.CANCELLED}>Anulowane</option>
+                      </select>
                           
                     </td>
                   </tr>

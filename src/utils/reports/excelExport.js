@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 
 /**
  * Eksportuje podane dane do pliku Excel (.xlsx)
@@ -6,13 +5,14 @@ import * as XLSX from 'xlsx';
  * @param {string} filename - Nazwa pliku wyjściowego (bez rozszerzenia).
  * @param {string} sheetName - Nazwa arkusza w pliku.
  */
-export const exportToExcel = (data, filename = 'raport', sheetName = 'Dane') => {
+export const exportToExcel = async (data, filename = 'raport', sheetName = 'Dane') => {
   if (!data || data.length === 0) {
     alert('Brak danych do wyeksportowania.');
     return;
   }
 
   try {
+    const XLSX = await import('xlsx');
     // 1. Tworzymy nowy skoroszyt
     const workbook = XLSX.utils.book_new();
 

@@ -1,42 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useManagerStore } from '../store/managerStore';
 import { collection, onSnapshot, query, orderBy, where, doc, writeBatch, limit } from 'firebase/firestore';
 import { db } from '../firebase';
+import { TICKET_STATUS } from '../utils/constants';
 
 /**
  * useManagerData — centralny hook danych dla ManagerView.
  * Subskrybuje wszystkie kolekcje Firestore i zwraca dane + ustawienia.
  */
 export function useManagerData() {
-  const [tickets, setTickets] = useState([]);
-  const [machines, setMachines] = useState([]);
-  const [reporters, setReporters] = useState([]);
-  const [services, setServices] = useState([]);
-  const [plannedServices, setPlannedServices] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [actionItems, setActionItems] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [regions, setRegions] = useState([]);
-  const [allowTicketDeletion, setAllowTicketDeletion] = useState(false);
-  const [plannedWarningDays, setPlannedWarningDays] = useState(30);
-  const [branding, setBranding] = useState({
-    companyName: 'CRIST S.A.',
-    systemSubtitle: 'DYSPOZYTORNIA UR',
-    companyLogoUrl: '',
-    appLogoUrl: ''
-  });
+  const { setTickets, setMachines, setReporters, setServices, setPlannedServices, setNotifications, setActionItems, setRoles, setRegions, setAllowTicketDeletion, setPlannedWarningDays, setBranding } = useManagerStore.getState();
 
   useEffect(() => {
     // --- Tickets (aktywne, nie-zarchiwizowane) ---
     const qTickets = query(
       collection(db, 'tickets'),
       orderBy('createdAt', 'desc'),
-      limit(200)
+      limit(500)
     );
     const unsubTickets = onSnapshot(qTickets, (snapshot) => {
       setTickets(
         snapshot.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(t => !t.isDeleted && t.status !== 5)
+          .filter(t => !t.isDeleted && Number(t.status) !== TICKET_STATUS.CLOSED)
       );
     });
 
@@ -61,7 +47,7 @@ export function useManagerData() {
       where('status', '!=', 'completed')
     );
     const unsubPlanned = onSnapshot(qPlanned, (snapshot) => {
-      setPlannedServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
+      setPlannedServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     // --- Powiadomienia (ograniczone do ostatnich) ---
@@ -79,8 +65,13 @@ export function useManagerData() {
     });
 
     // --- Zadania do realizacji ---
-    const unsubActionItems = onSnapshot(collection(db, 'action_items'), (snapshot) => {
-      setActionItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
+    const qActionItems = query(
+      collection(db, 'action_items'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    const unsubActionItems = onSnapshot(qActionItems, (snapshot) => {
+      setActionItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     // --- Role ---
@@ -105,7 +96,7 @@ export function useManagerData() {
     // --- Branding ---
     const unsubBranding = onSnapshot(doc(db, 'settings', 'branding'), (docSnap) => {
       if (docSnap.exists()) {
-        setBranding(prev => ({ ...prev, ...docSnap.data() }));
+        setBranding({ ...useManagerStore.getState().branding, ...docSnap.data() });
       }
     });
 
@@ -124,18 +115,5 @@ export function useManagerData() {
     };
   }, []);
 
-  return {
-    tickets,
-    machines,
-    reporters,
-    services,
-    plannedServices,
-    notifications,
-    actionItems,
-    roles,
-    regions,
-    allowTicketDeletion,
-    plannedWarningDays,
-    branding,
-  };
+  return null;
 }

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
 
 /**
  * NotificationCenter — dzwonek z powiadomieniami systemowymi.
@@ -35,7 +36,7 @@ export default function NotificationCenter({
 
     // 1. Awarie krytyczne (priorytet 1) oraz 2. Pozostałe awarie (priorytet 2)
     if (isUrModule || currentModule === 'tickets') {
-      tickets.filter(t => t.status !== 5 && t.status !== '5').forEach(t => {
+      tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED).forEach(t => {
         const isCrit = !!t.isCritical;
         list.push({
           id: 'dyn_ticket_' + t.id,
@@ -126,7 +127,7 @@ export default function NotificationCenter({
     }
 
     // 5. Maszyny do weryfikacji ((DO WERYFIKACJI)) & 6. Zgłaszający do weryfikacji ((DO WERYFIKACJI))
-    if (isUrModule || currentModule === 'master_data' || user?.role === 'admin') {
+    if (isUrModule || currentModule === 'master_data' || user?.role === USER_ROLES.ADMIN) {
       machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
         list.push({
           id: 'dyn_verif_machine_' + m.id,

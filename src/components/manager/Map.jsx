@@ -1,4 +1,5 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+import MapControls from './MapControls';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -7,6 +8,7 @@ import { safeParseDate } from '../../utils/dateHelpers';
 
 import { useMapPins } from '../../hooks/useMapPins';
 import MapEditModal from './MapEditModal';
+import { USER_ROLES, TICKET_STATUS, SERVICE_STATUS, PIN_STATUS } from '../../utils/constants';
 
 // Globalny cache dla obrazów mapy (działa do wylogowania/odświeżenia)
 const mapImageCache = {};
@@ -16,7 +18,7 @@ export default function ShipyardMap({
   user,
   onNavigateToTickets
 }) {
-  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
+  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
   // --- Tryb widoku ---
   const [mode, setMode] = useState('view');
@@ -29,6 +31,8 @@ export default function ShipyardMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [cachedMainMap, setCachedMainMap] = useState('');
   const [cachedSubmaps, setCachedSubmaps] = useState({});
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomPan, setZoomPan] = useState({ x: 0, y: 0 });
   const [uploadingMap, setUploadingMap] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -114,8 +118,6 @@ export default function ShipyardMap({
   const [editingType, setEditingType] = useState('region');
   const [editingId, setEditingId] = useState('');
   const [draggingPin, setDraggingPin] = useState(null);
-  const [zoomScale, setZoomScale] = useState(1);
-  const [zoomPan, setZoomPan] = useState({ x: 0, y: 0 });
   const [isPanningMap, setIsPanningMap] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const touchDistRef = useRef(null);
@@ -256,9 +258,9 @@ export default function ShipyardMap({
   };
 
   // --- Unpinned chip ---
-  const getUnpinnedColor = () => { if (unpinnedData.status === 'critical') return 'text-red-500'; if (unpinnedData.status === 'in_progress') return 'text-blue-500'; if (unpinnedData.status === 'warning') return 'text-amber-500'; return 'text-emerald-500'; };
-  const getUnpinnedBgColor = () => { if (unpinnedData.status === 'critical') return 'text-red-500/80'; if (unpinnedData.status === 'in_progress') return 'text-blue-500/80'; if (unpinnedData.status === 'warning') return 'text-amber-500/80'; return 'text-emerald-500/80'; };
-  const getUnpinnedPulse = () => unpinnedData.status === 'critical' || unpinnedData.status === 'in_progress' ? 'animate-pulse' : '';
+  const getUnpinnedColor = () => { if (unpinnedData.status === PIN_STATUS.CRITICAL) return 'text-red-500'; if (unpinnedData.status === PIN_STATUS.IN_PROGRESS) return 'text-blue-500'; if (unpinnedData.status === PIN_STATUS.WARNING) return 'text-amber-500'; return 'text-emerald-500'; };
+  const getUnpinnedBgColor = () => { if (unpinnedData.status === PIN_STATUS.CRITICAL) return 'text-red-500/80'; if (unpinnedData.status === PIN_STATUS.IN_PROGRESS) return 'text-blue-500/80'; if (unpinnedData.status === PIN_STATUS.WARNING) return 'text-amber-500/80'; return 'text-emerald-500/80'; };
+  const getUnpinnedPulse = () => unpinnedData.status === PIN_STATUS.CRITICAL || unpinnedData.status === PIN_STATUS.IN_PROGRESS ? 'animate-pulse' : '';
 
   const renderUnpinnedTooltip = () => {
     if (hoveredPin !== 'unpinned_items') return null;
@@ -271,13 +273,28 @@ export default function ShipyardMap({
         <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
           <div className="flex justify-between items-center text-[9px] md:text-xs">
             <span className="text-slate-400">Stan:</span>
-            {unpinnedData.status === 'critical' ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>) : unpinnedData.status === 'in_progress' ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>) : unpinnedData.status === 'warning' ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>)}
+            {unpinnedData.status === PIN_STATUS.CRITICAL ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>) : unpinnedData.status === PIN_STATUS.IN_PROGRESS ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>) : unpinnedData.status === PIN_STATUS.WARNING ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>)}
           </div>
           <div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">Maszynę w rejonie:</span><span className="font-bold">{unpinnedData.unpinnedMachineCount}</span></div>
           <div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span><span className="font-bold">{unpinnedData.unpinnedCount}</span></div>
         </div>
         <div className="flex flex-col gap-2 w-full">
-          <button onClick={(e) => { e.stopPropagation(); if (isFullscreen) document.exitFullscreen?.(); setHoveredPin(null); onNavigateToTickets && onNavigateToTickets(currentSubmapId ? 'Bez pineski' : 'Bez rejonu'); }} className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}>
+          <button onClick={(e) => { 
+            e.stopPropagation(); 
+            if (isFullscreen) document.exitFullscreen?.(); 
+            setHoveredPin(null); 
+            if (onNavigateToTickets) {
+              if (unpinnedData.unpinnedCount === 1 && unpinnedData.itemIds?.length === 1) {
+                if (modeType === 'planned_maintenance') {
+                  onNavigateToTickets({ name: currentSubmapId ? 'Bez pineski' : 'Bez rejonu', serviceId: unpinnedData.itemIds[0] });
+                } else {
+                  onNavigateToTickets({ name: currentSubmapId ? 'Bez pineski' : 'Bez rejonu', ticketId: unpinnedData.itemIds[0] });
+                }
+              } else {
+                onNavigateToTickets(currentSubmapId ? 'Bez pineski' : 'Bez rejonu');
+              }
+            }
+          }} className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}>
             {modeType === 'planned_maintenance' ? 'Przejdż do serwisów' : 'Przejdż do awarii'} <i className="ph ph-arrow-right"></i>
           </button>
         </div>
@@ -288,7 +305,7 @@ export default function ShipyardMap({
 
   // --- Render ---
   return (
-    <div className={`flex flex-col animate-fade-in relative ${isFullscreen ? 'h-screen w-screen bg-slate-900 p-2 sm:p-4' : 'h-full space-y-2'}`} ref={isFullscreen ? null : mapContainerRef}>
+    <div className={`flex flex-col animate-fade-in relative ${isFullscreen ? 'h-screen w-screen bg-slate-900 p-2 sm:p-4' : 'flex-1 w-full space-y-2'}`} ref={isFullscreen ? null : mapContainerRef}>
       {/* Kontener Mapy */}
       <div
         ref={isFullscreen ? mapContainerRef : null}
@@ -312,16 +329,26 @@ export default function ShipyardMap({
         >
           {/* Transform Wrapper */}
           <div className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center" style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 0 }}>
-            <img
-              ref={imgRef}
-              src={currentMapUrl || 'https://placehold.co/1600x900/1e293b/94a3b8?text=BRAK+MAPY.%5CnWgraj+nowa+mape+w+trybie+Edycji.'}
-              alt="Mapa"
-              className={`w-full h-full object-contain transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'} cursor-${mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
-              onClick={handleMapClick}
-              draggable="false"
-              onLoad={(e) => { if (currentMapUrl) mapImageCache[currentMapUrl] = true; setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight }); setImageProgress(100); setTimeout(() => setIsImageLoading(false), 200); }}
-              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/1600x900/1e293b/94a3b8?text=BRAK+MAPY.%5CnWgraj+nowa+mape+w+trybie+Edycji.'; setImageProgress(100); setIsImageLoading(false); }}
-            />
+            {currentMapUrl ? (
+              <img
+                ref={imgRef}
+                src={currentMapUrl}
+                alt="Mapa"
+                className={`w-full h-full object-contain transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'} cursor-${mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
+                onClick={handleMapClick}
+                draggable="false"
+                onLoad={(e) => { mapImageCache[currentMapUrl] = true; setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight }); setImageProgress(100); setTimeout(() => setIsImageLoading(false), 200); }}
+                onError={(e) => { setIsImageLoading(false); }}
+              />
+            ) : (
+              <div 
+                className={`w-full h-full min-w-[800px] min-h-[600px] flex flex-col items-center justify-center bg-slate-800 text-slate-400 font-bold text-xl md:text-3xl text-center p-8 transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'}`}
+                onClick={handleMapClick}
+              >
+                <i className="ph ph-map-trifold text-6xl mb-4 opacity-50"></i>
+                BRAK MAPY.<br/>Wgraj nową mapę w trybie Edycji.
+              </div>
+            )}
           </div>
 
           {/* Loader */}
@@ -350,9 +377,9 @@ export default function ShipyardMap({
                   const isHovered = hoveredPin === pin.id;
                   const isDraggingThis = draggingPin?.id === pin.id;
                   let bgColor = 'bg-emerald-500', ringColor = 'ring-emerald-500/40', isCritical = false, isInProgress = false;
-                  if (pin.status === 'critical') { bgColor = 'bg-red-500'; ringColor = 'ring-red-500/50'; isCritical = true; }
-                  else if (pin.status === 'in_progress') { bgColor = 'bg-blue-500'; ringColor = 'ring-blue-500/50'; isInProgress = true; }
-                  else if (pin.status === 'warning') { bgColor = 'bg-amber-500'; ringColor = 'ring-amber-500/40'; }
+                  if (pin.status === PIN_STATUS.CRITICAL) { bgColor = 'bg-red-500'; ringColor = 'ring-red-500/50'; isCritical = true; }
+                  else if (pin.status === PIN_STATUS.IN_PROGRESS) { bgColor = 'bg-blue-500'; ringColor = 'ring-blue-500/50'; isInProgress = true; }
+                  else if (pin.status === PIN_STATUS.WARNING) { bgColor = 'bg-amber-500'; ringColor = 'ring-amber-500/40'; }
 
                   const { isNearTop, isNearLeft, isNearRight } = tooltipPos;
                   let tooltipPosClass = 'bottom-full left-1/2 -translate-x-1/2 mb-4';
@@ -391,14 +418,26 @@ export default function ShipyardMap({
                           <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
                             <div className="flex justify-between items-center text-[9px] md:text-xs">
                               <span className="text-slate-400">Stan:</span>
-                              {pin.status === 'critical' ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>) : pin.status === 'in_progress' ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>) : pin.status === 'warning' ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>)}
+                              {pin.status === PIN_STATUS.CRITICAL ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>) : pin.status === PIN_STATUS.IN_PROGRESS ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>) : pin.status === PIN_STATUS.WARNING ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>)}
                             </div>
                             {pin.type === 'region' && (<div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">Maszynę w rejonie:</span><span className="font-bold">{pin.machineCount}</span></div>)}
                             <div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span><span className="font-bold">{pin.itemCount}</span></div>
                           </div>
                           <div className="flex flex-col gap-2 w-full">
-                            <button onClick={(e) => { e.stopPropagation(); if (isFullscreen) document.exitFullscreen?.(); onNavigateToTickets(pin.name); }} className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}>
-                              {modeType === 'planned_maintenance' ? 'Przejdż do serwisów' : 'Przejdż do awarii'} <i className="ph ph-arrow-right"></i>
+                            <button onClick={(e) => { 
+                              e.stopPropagation(); 
+                              if (isFullscreen) document.exitFullscreen?.(); 
+                              if (pin.itemCount === 1 && pin.itemIds?.length === 1) {
+                                if (modeType === 'planned_maintenance') {
+                                  onNavigateToTickets({ name: pin.name, serviceId: pin.itemIds[0] });
+                                } else {
+                                  onNavigateToTickets({ name: pin.name, ticketId: pin.itemIds[0] });
+                                }
+                              } else {
+                                onNavigateToTickets(pin.name);
+                              }
+                            }} className={`w-full ${modeType === 'planned_maintenance' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2`}>
+                              {modeType === 'planned_maintenance' ? 'Przejdź do serwisów' : 'Przejdź do awarii'} <i className="ph ph-arrow-right"></i>
                             </button>
                             {pin.type === 'region' && pin.hasSubmap && (
                               <button onClick={(e) => { e.stopPropagation(); setCurrentSubmapId(pin.id); setHoveredPin(null); }} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-[9px] md:text-xs transition-colors flex items-center justify-center gap-2">
@@ -452,7 +491,7 @@ export default function ShipyardMap({
                 <i className="ph ph-arrow-left text-base sm:text-lg"></i><span className="hidden sm:inline">Powrót do Mapy Głównej</span>
               </button>
             )}
-            {(user?.role === 'admin' || user?.permissions?.includes('edit_map')) && (
+            {(user?.role === USER_ROLES.ADMIN || user?.permissions?.includes('edit_map')) && (
               <>
                 <button onClick={() => setMode('view')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-eye text-base sm:text-lg"></i><span className="hidden sm:inline">Podgląd</span></button>
                 <button onClick={() => setMode('edit')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-pencil-simple text-base sm:text-lg"></i><span className="hidden sm:inline">Edycja</span></button>
@@ -473,8 +512,8 @@ export default function ShipyardMap({
                 <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>{unpinnedData.unpinnedMachineCount}</span>
                 {renderUnpinnedTooltip()}
               </div>
-              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Zgłoszone awarie</span><span className="font-bold text-lg text-amber-400">{currentSubmapId ? tickets.filter(t => t.regionId === currentSubmapId && t.status !== 5 && t.status !== '5').length : tickets.filter(t => t.status !== 5 && t.status !== '5').length}</span></div>
-              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Krytyczne</span><span className="font-bold text-lg text-rose-500">{currentSubmapId ? tickets.filter(t => t.regionId === currentSubmapId && t.isCritical && t.status !== 5 && t.status !== '5').length : tickets.filter(t => t.isCritical && t.status !== 5 && t.status !== '5').length}</span></div>
+              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Zgłoszone awarie</span><span className="font-bold text-lg text-amber-400">{currentSubmapId ? tickets.filter(t => t.regionId === currentSubmapId && Number(t.status) !== TICKET_STATUS.CLOSED).length : tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED).length}</span></div>
+              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Krytyczne</span><span className="font-bold text-lg text-rose-500">{currentSubmapId ? tickets.filter(t => t.regionId === currentSubmapId && t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length : tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length}</span></div>
             </div>
           )}
 
@@ -488,17 +527,12 @@ export default function ShipyardMap({
                 <span className={`font-bold text-lg ${getUnpinnedBgColor()}`}>{unpinnedData.unpinnedMachineCount}</span>
                 {renderUnpinnedTooltip()}
               </div>
-              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Planowane (30 dni)</span><span className="font-bold text-lg text-amber-400">{(() => { const now = new Date(); return plannedServices.filter(srv => { if (srv.status === 'completed' || srv.status === 'in_progress') return false; const machine = machines.find(m => m.id === srv.machineId); if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false; if (srv.nextDate && safeParseDate(srv.nextDate) < now) return false; if (srv.nextDate) { const diffDays = Math.ceil(Math.abs(safeParseDate(srv.nextDate) - now) / (1000 * 60 * 60 * 24)); if (diffDays <= 30) return true; } if (srv.targetWorkHours && machine && !( machine.currentWorkHours >= srv.targetWorkHours) && srv.hoursInterval && (srv.targetWorkHours - machine.currentWorkHours) <= 30 * 8) return true; return false; }).length; })()}</span></div>
-              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Przekroczone / Pilne</span><span className="font-bold text-lg text-rose-500">{(() => { const now = new Date(); return plannedServices.filter(srv => { if (srv.status === 'completed' || srv.status === 'in_progress') return false; const machine = machines.find(m => m.id === srv.machineId); if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false; if (srv.nextDate && safeParseDate(srv.nextDate) < now) return true; if (srv.targetWorkHours && machine && machine.currentWorkHours >= srv.targetWorkHours) return true; return false; }).length; })()}</span></div>
+              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Planowane (30 dni)</span><span className="font-bold text-lg text-amber-400">{(() => { const now = new Date(); return plannedServices.filter(srv => { if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === SERVICE_STATUS.IN_PROGRESS) return false; const machine = machines.find(m => m.id === srv.machineId); if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false; if (srv.nextDate && safeParseDate(srv.nextDate) < now) return false; if (srv.nextDate) { const diffDays = Math.ceil(Math.abs(safeParseDate(srv.nextDate) - now) / (1000 * 60 * 60 * 24)); if (diffDays <= 30) return true; } if (srv.targetWorkHours && machine && !( machine.currentWorkHours >= srv.targetWorkHours) && srv.hoursInterval && (srv.targetWorkHours - machine.currentWorkHours) <= 30 * 8) return true; return false; }).length; })()}</span></div>
+              <div className="flex items-center justify-between gap-4"><span className="text-[10px] md:text-sm font-medium text-slate-300">Przekroczone / Pilne</span><span className="font-bold text-lg text-rose-500">{(() => { const now = new Date(); return plannedServices.filter(srv => { if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === SERVICE_STATUS.IN_PROGRESS) return false; const machine = machines.find(m => m.id === srv.machineId); if (currentSubmapId && (!machine || machine.regionId !== currentSubmapId)) return false; if (srv.nextDate && safeParseDate(srv.nextDate) < now) return true; if (srv.targetWorkHours && machine && machine.currentWorkHours >= srv.targetWorkHours) return true; return false; }).length; })()}</span></div>
             </div>
           )}
 
-          {/* Zoom controls */}
-          <div className="absolute bottom-[90px] lg:bottom-4 right-4 z-30 flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl">
-            <button onClick={() => setZoomScale(s => Math.min(parseFloat((s + 0.25).toFixed(2)), 4))} className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors" title="Powiększ (+)">+</button>
-            <button onClick={() => { setZoomScale(1); setZoomPan({ x: 0, y: 0 }); }} className="w-9 h-9 flex items-center justify-center text-[10px] text-slate-300 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-mono font-bold shadow-sm transition-colors" title="Resetuj powiększenie">{Math.round(zoomScale * 100)}%</button>
-            <button onClick={() => setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 0.5))} className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors" title="Pomniejsz (-)">-</button>
-          </div>
+          <MapControls zoomScale={zoomScale} setZoomScale={setZoomScale} setZoomPan={setZoomPan} />
         </div>
       </div>
 

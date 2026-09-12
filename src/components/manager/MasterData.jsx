@@ -7,6 +7,7 @@ import Settings from './Settings';
 import Services from './Services';
 import Topics from './Topics';
 import Reporters from './Reporters';
+import { USER_ROLES } from '../../utils/constants';
 
 export default function MasterData({ user, machines, regions, services, roles }) {
   const [activeSubTab, setActiveSubTab] = useState('machines');
@@ -19,7 +20,7 @@ export default function MasterData({ user, machines, regions, services, roles })
     { id: 'reporters', label: 'Zgłaszający', icon: 'ph-user-list' }
   ];
 
-  if (user.role === 'admin') {
+  if (user.role === USER_ROLES.ADMIN) {
     tabs.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
     tabs.push({ id: 'roles', label: 'Role i Uprawnienia', icon: 'ph-shield-check' });
     tabs.push({ id: 'settings', label: 'Ustawienia', icon: 'ph-gear' });
@@ -27,7 +28,7 @@ export default function MasterData({ user, machines, regions, services, roles })
 
   // Odfiltruj zakładki jeśli użytkownik nie ma uprawnień (podobnie jak w ManagerView)
   let visibleTabs = tabs;
-  if (user.role !== 'admin') {
+  if (user.role !== USER_ROLES.ADMIN) {
     const userRoleDoc = roles.find(r => r.id === user.role);
     const perms = userRoleDoc?.permissions || [];
     visibleTabs = tabs.filter(t => perms.includes(t.id));

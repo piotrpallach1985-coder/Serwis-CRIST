@@ -1,16 +1,62 @@
+import { useManagerStore } from '../../store/managerStore';
 import { useState, useRef, useEffect } from 'react';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import ErrorBoundary from '../ErrorBoundary';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
+
+import { safe } from '../../utils/safeRender';
 
 export default function MachineDTR({ machine, canManage }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [localDtrFiles, setLocalDtrFiles] = useState(machine.dtrFiles || []);
   const fileInputRef = useRef(null);
 
-  const dtrFiles = machine.dtrFiles || [];
+  const user = useManagerStore(state => state.user);
+  const [newNote, setNewNote] = useState('');
+  const [localNotes, setLocalNotes] = useState(machine.techNotes || []);
+
+  useEffect(() => {
+    setLocalDtrFiles(machine.dtrFiles || []);
+    setLocalNotes(machine.techNotes || []);
+  }, [machine.dtrFiles, machine.techNotes]);
+
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    try {
+      const noteObj = {
+        id: Date.now().toString(),
+        text: newNote.trim(),
+        createdAt: new Date().toISOString(),
+        createdBy: user?.name || 'Nieznany'
+      };
+      const updatedNotes = [...localNotes, noteObj];
+      setLocalNotes(updatedNotes);
+      setNewNote('');
+      await updateDoc(doc(db, 'machines', machine.id), {
+        techNotes: updatedNotes
+      });
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Błąd podczas dodawania notatki.');
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    try {
+      const updatedNotes = localNotes.filter(n => n.id !== noteId);
+      setLocalNotes(updatedNotes);
+      await updateDoc(doc(db, 'machines', machine.id), {
+        techNotes: updatedNotes
+      });
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Błąd podczas usuwania notatki.');
+    }
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -34,7 +80,7 @@ export default function MachineDTR({ machine, canManage }) {
       setErrorMsg('Plik jest za duży. Maksymalny rozmiar to 50MB.');
       return;
     }
-    if (dtrFiles.length >= 10) {
+    if (localDtrFiles.length >= 10) {
       setErrorMsg('Możesz dodać maksymalnie 10 plików DTR do maszyny.');
       return;
     }
@@ -67,7 +113,8 @@ export default function MachineDTR({ machine, canManage }) {
             uploadedAt: new Date().toISOString(),
             size: file.size
           };
-          const updatedFiles = [...dtrFiles, newFileObj];
+          const updatedFiles = [...localDtrFiles, newFileObj];
+          setLocalDtrFiles(updatedFiles);
           await updateDoc(doc(db, 'machines', machine.id), {
             dtrFiles: updatedFiles
           });
@@ -87,7 +134,8 @@ export default function MachineDTR({ machine, canManage }) {
     try {
       const storageRef = ref(storage, fileObj.path);
       await deleteObject(storageRef);
-      const updatedFiles = dtrFiles.filter(f => f.id !== fileObj.id);
+      const updatedFiles = localDtrFiles.filter(f => f.id !== fileObj.id);
+      setLocalDtrFiles(updatedFiles);
       await updateDoc(doc(db, 'machines', machine.id), {
         dtrFiles: updatedFiles
       });
@@ -98,6 +146,7 @@ export default function MachineDTR({ machine, canManage }) {
   };
 
   return (
+    <ErrorBoundary>
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4 shrink-0"
          onDragOver={(e) => { e.preventDefault(); if (canManage) setIsDragOver(true); }}
          onDragLeave={() => setIsDragOver(false)}
@@ -152,17 +201,17 @@ export default function MachineDTR({ machine, canManage }) {
           </div>
         )}
 
-        {dtrFiles.length === 0 ? (
+        {localDtrFiles.length === 0 ? (
           <div className="text-center py-6 text-slate-400 text-sm">
             Brak wgranych plików DTR dla tej maszyny.
             {canManage && <div className="text-xs mt-1">Przeciągnij plik PDF tutaj, aby go wgrać.</div>}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {dtrFiles.map(f => (
-              <div key={f.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-blue-200 hover:shadow-sm transition-all group">
+            {localDtrFiles.map(f => (
+              <div key={safe(f.id)} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-blue-200 hover:shadow-sm transition-all group">
                 <a 
-                  href={f.url} 
+                  href={safe(f.url)} 
                   target="_blank" 
                   rel="noreferrer"
                   className="flex items-center gap-3 overflow-hidden flex-1"
@@ -171,11 +220,11 @@ export default function MachineDTR({ machine, canManage }) {
                     <i className="ph ph-file-pdf text-2xl"></i>
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-slate-700 truncate">{f.name}</span>
+                    <span className="text-sm font-bold text-slate-700 truncate">{safe(f.name)}</span>
                     <div className="text-[10px] text-gray-500 flex gap-2">
                       <span>{(f.size / (1024 * 1024)).toFixed(2)} MB</span>
                       <span>•</span>
-                      <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
+                      <span>{safe(new Date(f.uploadedAt).toLocaleDateString())}</span>
                     </div>
                   </div>
                 </a>
@@ -192,7 +241,60 @@ export default function MachineDTR({ machine, canManage }) {
             ))}
           </div>
         )}
+      {/* NOTATKI DZIAŁU TECHNICZNEGO */}
+      <div className="border-t border-slate-200 mt-2">
+        <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <i className="ph ph-notebook text-xl text-blue-600"></i> 
+            Notatki Działu Technicznego
+          </h3>
+        </div>
+        <div className="p-4">
+          {canManage && (
+            <div className="flex gap-2 mb-4">
+              <input 
+                type="text" 
+                value={newNote} 
+                onChange={(e) => setNewNote(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
+                placeholder="Dodaj nową notatkę..." 
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button 
+                onClick={handleAddNote} 
+                disabled={!newNote.trim()}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm"
+              >
+                Dodaj
+              </button>
+            </div>
+          )}
+
+          {localNotes.length === 0 ? (
+            <div className="text-center py-4 text-slate-400 text-sm italic">Brak notatek technicznych.</div>
+          ) : (
+            <div className="space-y-3">
+              {localNotes.map(n => (
+                <div key={safe(n.id)} className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-start">
+                  <div>
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap font-medium">{safe(n.text)}</div>
+                    <div className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                      {safe(n.createdBy)} &bull; {new Date(n.createdAt).toLocaleString('pl-PL')}
+                    </div>
+                  </div>
+                  {canManage && (
+                    <button onClick={() => handleDeleteNote(n.id)} className="text-gray-400 hover:text-red-600 transition-colors shrink-0 ml-2">
+                      <i className="ph ph-trash text-lg"></i>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

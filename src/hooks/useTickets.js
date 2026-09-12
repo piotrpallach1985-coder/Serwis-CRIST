@@ -36,11 +36,19 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
 
   const [filterMachine, setFilterMachine] = useState(initialSearchQuery || '');
   const [filterStatus, setFilterStatus] = useState('');
-  
-  const [visibleCols, setVisibleCols] = useState(() => {
+  const [filterRegion, setFilterRegion] = useState('');
+  const [filterMachineId, setFilterMachineId] = useState('');
+  const [filterTime, setFilterTime] = useState('all');
+
+    const [visibleCols, setVisibleCols] = useState(() => {
     try {
       const saved = localStorage.getItem('ticket_columns');
-      return saved ? JSON.parse(saved) : DEFAULT_COLS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Object.keys(parsed).length === 0) return DEFAULT_COLS;
+        return { ...DEFAULT_COLS, ...parsed };
+      }
+      return DEFAULT_COLS;
     } catch {
       return DEFAULT_COLS;
     }
@@ -112,6 +120,45 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
     return activeTicketsArray
       .filter(t => !t.isDeleted)
       .filter(t => {
+        if (filterStatus && String(t.status) !== String(filterStatus)) return false;
+        
+        // Exact Region filter (from dropdown)
+        if (filterRegion) {
+          const machObj = (machines || []).find(m => m.id === t.machineId || m.name === t.machineName);
+          const regId = t.regionId || machObj?.regionId;
+          const regName = t.regionName;
+          
+          const filterRegObj = (regions || []).find(r => r.id === filterRegion || r.name === filterRegion);
+          const fRegId = filterRegObj ? filterRegObj.id : filterRegion;
+          const fRegName = filterRegObj ? filterRegObj.name : filterRegion;
+
+          if (regId !== fRegId && regName !== fRegName && regName !== fRegId && regId !== fRegName) {
+             return false;
+          }
+        }
+
+        // Exact Machine filter (from dropdown)
+        if (filterMachineId) {
+          const machObjFilter = (machines || []).find(m => m.id === filterMachineId || m.name === filterMachineId);
+          const fMachId = machObjFilter ? machObjFilter.id : filterMachineId;
+          const fMachName = machObjFilter ? machObjFilter.name : filterMachineId;
+          
+          if (t.machineId !== fMachId && t.machineName !== fMachName) {
+            return false;
+          }
+        }
+
+        if (filterTime !== 'all' && isArchive) {
+          if (!t.closedAt) return false;
+          const compDate = new Date(t.closedAt);
+          if (isNaN(compDate.getTime())) return false;
+          const filterYear = parseInt(filterTime.split('-')[0], 10);
+          const filterMonth = parseInt(filterTime.split('-')[1], 10) - 1;
+          if (compDate.getFullYear() !== filterYear || compDate.getMonth() !== filterMonth) {
+            return false;
+          }
+        }
+
         if (!filterMachine) return true;
         const q = filterMachine.toLowerCase().trim();
         if (!q) return true;
@@ -134,7 +181,7 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
         // Znajdź rejon maszyny lub zgłoszenia
         const regId = t.regionId || machObj?.regionId;
         const regObj = regId ? (regions || []).find(r => r.id === regId || r.name.toLowerCase() === regId.toLowerCase()) : null;
-        const regName = regObj ? regObj.name.toLowerCase() : '';
+        const regNameObj = regObj ? regObj.name.toLowerCase() : '';
 
         // Specjalna obsługa filtrów "Bez rejonu" oraz "Bez pineski" z mapy
         if (q === 'bez rejonu') {
@@ -146,7 +193,7 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
 
         // Sprawdzenie powiązania z rejonem
         const isRegionMatch = reg && (reg.includes(q) || q.includes(reg));
-        const isRegObjMatch = regName && (regName.includes(q) || q.includes(regName));
+        const isRegObjMatch = regNameObj && (regNameObj.includes(q) || q.includes(regNameObj));
 
         // Sprawdzenie powiązania z maszyną
         const isMachMatch = mach && (mach.includes(q) || q.includes(mach));
@@ -158,13 +205,17 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
 
         return isRegionMatch || isRegObjMatch || isMachMatch || isMachObjMatch || isTopicMatch || isRepMatch;
       })
-      .filter(t => filterStatus === '' || t.status === Number(filterStatus))
-      .sort((a, b) => {
+            .sort((a, b) => {
+        if (isArchive) {
+          const tA = a.closedAt ? new Date(a.closedAt).getTime() : new Date(a.createdAt).getTime();
+          const tB = b.closedAt ? new Date(b.closedAt).getTime() : new Date(b.createdAt).getTime();
+          return tB - tA;
+        }
         if (a.isCritical && !b.isCritical) return -1;
         if (!a.isCritical && b.isCritical) return 1;
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
-  }, [activeTicketsArray, filterMachine, filterStatus, machines, regions]);
+  }, [activeTicketsArray, filterMachine, filterStatus, filterRegion, filterMachineId, filterTime, machines, regions]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredTickets.map(t => {
@@ -187,6 +238,9 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
   return {
     filterMachine, setFilterMachine,
     filterStatus, setFilterStatus,
+    filterRegion, setFilterRegion,
+    filterMachineId, setFilterMachineId,
+    filterTime, setFilterTime,
     visibleCols, toggleColumn,
     filteredTickets,
     activeTickets: activeTicketsArray,

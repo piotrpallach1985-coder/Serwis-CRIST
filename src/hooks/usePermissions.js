@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { USER_ROLES } from '../utils/constants';
 
 /**
  * usePermissions — hook obliczający uprawnienia na podstawie roli użytkownika i konfiguracji ról w bazie.
@@ -21,7 +22,7 @@ export function usePermissions(user, roles) {
       };
     }
 
-    const isAdmin = user.role === 'admin';
+    const isAdmin = user.role === USER_ROLES.ADMIN;
     const isManager = user.role === 'manager' || isAdmin;
 
     // Szukamy konfiguracji roli w bazie (opcjonalne - może nie istnieć)

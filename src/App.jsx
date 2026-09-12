@@ -1,11 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import Login from './components/Login';
-import OperatorView from './components/OperatorView';
-import ManagerView from './components/ManagerView';
 import OfflineSyncManager from './components/OfflineSyncManager';
+import ErrorBoundary from './components/ErrorBoundary';
+import { USER_ROLES } from './utils/constants';
+
+const ManagerView = lazy(() => import('./components/ManagerView'));
+const OperatorView = lazy(() => import('./components/OperatorView'));
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+    <div className="flex flex-col items-center">
+      <i className="ph ph-spinner animate-spin text-4xl text-blue-600 mb-4"></i>
+      <p className="text-gray-500 font-medium animate-pulse">Ładowanie modułu...</p>
+    </div>
+  </div>
+);
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -17,7 +29,7 @@ export default function App() {
   });
 
   const [urlMachineId, setUrlMachineId] = useState(null);
-  const [adminView, setAdminView] = useState('manager'); // Domyślny widok dla admina
+  const [adminView, setAdminView] = useState(USER_ROLES.MANAGER); // Domyślny widok dla admina
 
   // Listen to Auth State
   useEffect(() => {
@@ -25,7 +37,7 @@ export default function App() {
       if (firebaseUser) {
         if (firebaseUser.isAnonymous) {
           // Anonimowy operator
-          setUser({ name: 'Nieznany Zgłaszający', role: 'operator', uid: firebaseUser.uid });
+          setUser({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: firebaseUser.uid });
         } else {
           // Zwykły użytkownik – pobieramy jego rolę z bazy
           try {
@@ -80,7 +92,7 @@ export default function App() {
       setCurrentModule(null);
     } else {
       const params = new URLSearchParams(window.location.search);
-      const mod = params.get('module') || (userData.role === 'operator' ? 'operator' : 'home');
+      const mod = params.get('module') || (userData.role === USER_ROLES.OPERATOR ? 'operator' : 'home');
       setCurrentModule(mod);
     }
   };
@@ -92,7 +104,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const machineParam = params.get('machine');
     if (machineParam) {
-      if (user && user.role !== 'operator') {
+      if (user && user.role !== USER_ROLES.OPERATOR) {
         const params = new URLSearchParams(window.location.search);
         params.set('module', 'master_data');
         params.set('tab', 'machines');
@@ -127,35 +139,39 @@ export default function App() {
 
   // Jeśli użytkownik jest zalogowany, ale nie wybrano modułu w URL
   if (!currentModule) {
-    if (user.role === 'operator') {
+    if (user.role === USER_ROLES.OPERATOR) {
       return <Login onLogin={handleSetUser} currentUser={user} />;
     }
     // Dla pracowników i adminów domyślnym modułem po zalogowaniu jest Pulpit Główny
     return (
       <>
         <OfflineSyncManager />
-        <ManagerView 
-          user={user} 
-          onLogout={() => handleSetUser(null)} 
-          onSwitchView={user.role === 'admin' ? () => setAdminView('operator') : null}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ManagerView 
+            user={user} 
+            onLogout={() => handleSetUser(null)} 
+            onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.OPERATOR) : null}
+          />
+        </Suspense>
       </>
     );
   }
 
   // Ustalenie aktywnego widoku na podstawie roli i ew. wyboru admina
-  const currentView = (user.role === 'admin' || user.role === 'kierownik' || user.role === 'tech') ? adminView : user.role;
+  const currentView = (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.MANAGER || user.role === USER_ROLES.TECH) ? adminView : user.role;
 
-  if (currentView === 'operator') {
+  if (currentView === USER_ROLES.OPERATOR) {
     return (
       <>
         <OfflineSyncManager />
-        <OperatorView 
-          user={user} 
-          onLogout={() => handleSetUser(null)} 
-          initialMachineId={urlMachineId}
-          onSwitchView={user.role === 'admin' ? () => setAdminView('manager') : null}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <OperatorView 
+            user={user} 
+            onLogout={() => handleSetUser(null)} 
+            initialMachineId={urlMachineId}
+            onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.MANAGER) : null}
+          />
+        </Suspense>
       </>
     );
   }
@@ -163,11 +179,13 @@ export default function App() {
   return (
     <>
       <OfflineSyncManager />
-      <ManagerView 
-        user={user} 
-        onLogout={() => handleSetUser(null)} 
-        onSwitchView={user.role === 'admin' ? () => setAdminView('operator') : null}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <ManagerView 
+          user={user} 
+          onLogout={() => handleSetUser(null)} 
+          onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.OPERATOR) : null}
+        />
+      </Suspense>
     </>
   );
 }

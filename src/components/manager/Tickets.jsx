@@ -1,5 +1,5 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
-import { useState, useEffect } from 'react';
+import { useManagerStore } from '../../store/managerStore';
+import { useState, useEffect, useCallback } from 'react';
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,9 +7,17 @@ import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
 import TicketDetails from './TicketDetails';
+import TicketFilters from './TicketFilters';
+import ErrorBoundary from '../ErrorBoundary';
+import TicketTable from './TicketTable';
 import TicketTableRow from './TicketTableRow';
 import TicketMobileCard from './TicketMobileCard';
 import { useTickets } from '../../hooks/useTickets';
+import DebouncedInput from './DebouncedInput';
+import { safe } from "../../utils/safeRender";
+import { useToast } from '../../hooks/useToast';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
+import { TICKET_STATUS } from '../../utils/constants';
 
 const STATUSES = {
   1: { label: 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200' },
@@ -37,22 +45,28 @@ const calculateDuration = (createdAt, closedAt) => {
 };
 
 export default function Tickets({ user, isArchive, initialTicketId, onClearTicketId, initialSearchQuery, onClearSearchQuery }) {
-  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
+  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
   const ticketState = useTickets({ tickets, machines, regions, isArchive, initialSearchQuery });
-  const { filterMachine, setFilterMachine, filterStatus, setFilterStatus, visibleCols, toggleColumn, filteredTickets, activeTickets, loadingArchive, hasMoreArchive, fetchArchive, handleExportExcel } = ticketState;
+  const { filterMachine, setFilterMachine, filterStatus, setFilterStatus, filterRegion, setFilterRegion, filterMachineId, setFilterMachineId, filterTime, setFilterTime, visibleCols, toggleColumn, filteredTickets, activeTickets, loadingArchive, hasMoreArchive, fetchArchive, handleExportExcel } = ticketState;
 
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterMachine, filterStatus, filterRegion, filterMachineId, filterTime]);
+
+  const currentItems = filteredTickets.slice(0, currentPage * itemsPerPage);
+  const hasMoreLocalItems = currentItems.length < filteredTickets.length;
   const [comment, setComment] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [loading, setLoading] = useState(false);
   const [etr, setEtr] = useState('');
   const [showColumnPicker, setShowColumnPicker] = useState(false);
-  const [toastConfig, setToastConfig] = useState({ message: '', type: 'success' });
-  const [confirmModalConfig, setConfirmModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, confirmText: 'Tak' });
-
-  const showToast = (message, type = 'success') => setToastConfig({ message, type });
-  const closeConfirmModal = () => setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+  const { toastConfig, showToast, hideToast } = useToast();
+  const { confirmConfig: confirmModalConfig, showConfirm, hideConfirm: closeConfirmModal, setConfirmConfig: setConfirmModalConfig } = useConfirmModal();
 
   const handleDeleteTicket = (ticketId) => {
     setConfirmModalConfig({
@@ -113,7 +127,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
     const ticketRef = doc(db, 'tickets', ticketId);
     try {
       const currentData = activeTickets.find(t => t.id === ticketId);
-      if (!currentData) throw new Error("Zgłoszenie nie istnieje w aktualnym widoku!");
+      if (!currentData) throw new Error("Zgłoszenie nie istnieje w systemie!");
       
       const updateData = {
         history: arrayUnion({
@@ -126,8 +140,8 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
       };
 
       if (photoUrls.length > 0) updateData.photos = arrayUnion(...photoUrls);
-      if (newStatus !== undefined) updateData.status = newStatus;
-      if (newStatus === 5) {
+      if (newStatus !== undefined && newStatus !== null) updateData.status = newStatus;
+      if (Number(newStatus) === TICKET_STATUS.CLOSED) {
         updateData.closedAt = new Date().toISOString();
         updateData.completedBy = user.name;
       }
@@ -144,6 +158,10 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
       setComment('');
       setEtr('');
       showToast('Zgłoszenie zostało zaktualizowane.');
+      if (Number(newStatus) === TICKET_STATUS.CLOSED) {
+        setSelectedTicketId(null);
+        if (onClearTicketId) onClearTicketId();
+      }
     } catch (err) {
       showToast("Błąd aktualizacji: " + err.message, 'error');
     }
@@ -169,6 +187,12 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
 
   const currentTicket = activeTickets.find(t => t.id === selectedTicketId);
 
+  const openDetails = useCallback((ticket) => {
+    setSelectedTicketId(ticket.id);
+    setSelectedService(ticket.assignedTo || '');
+    setEtr(ticket.etr || '');
+  }, []);
+
   if (selectedTicketId && !currentTicket) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -180,7 +204,8 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
 
   if (selectedTicketId && currentTicket) {
     return (
-      <TicketDetails
+      <ErrorBoundary>
+        <TicketDetails
         machines={machines}
         currentTicket={currentTicket}
         setSelectedTicketId={setSelectedTicketId}
@@ -197,116 +222,81 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         setEtr={setEtr}
         loading={loading}
         allowTicketDeletion={allowTicketDeletion}
-        toastConfig={toastConfig}
-        setToastConfig={setToastConfig}
-        confirmModalConfig={confirmModalConfig}
-        setConfirmModalConfig={setConfirmModalConfig}
+        showToast={showToast}
+        showConfirm={showConfirm}
         STATUSES={STATUSES}
         isArchive={isArchive}
       />
+      </ErrorBoundary>
     );
   }
-
-  const openDetails = (ticket) => {
-    setSelectedTicketId(ticket.id);
-    setSelectedService(ticket.assignedTo || '');
-    setEtr(ticket.etr || '');
-  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       {!isArchive && (
-        <div className="hidden lg:grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-6 mb-6">
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
+        <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 max-w-2xl">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
               <i className="ph ph-warning-circle"></i>
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-bold text-gray-800">{activeTickets.length}</div>
-              <div className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aktywne</div>
+              <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{safe(activeTickets.length)}</div>
+              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">Aktywne awarie</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
+          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
               <i className="ph ph-siren"></i>
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-bold text-gray-800">{activeTickets.filter(t => t.isCritical).length}</div>
-              <div className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider">Krytyczne</div>
-            </div>
-          </div>
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
-              <i className="ph ph-hourglass-high"></i>
-            </div>
-            <div>
-              <div className="text-lg sm:text-2xl font-bold text-gray-800">{activeTickets.filter(t => t.status === 3).length}</div>
-              <div className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider">Oczekujące</div>
-            </div>
-          </div>
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-1.5 sm:gap-4">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-lg sm:text-2xl shrink-0">
-              <i className="ph ph-wrench"></i>
-            </div>
-            <div>
-              <div className="text-lg sm:text-2xl font-bold text-gray-800">{activeTickets.filter(t => t.status === 4).length}</div>
-              <div className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider">W Naprawie</div>
+              <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{activeTickets.filter(t => t.isCritical).length}</div>
+              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">Awarie krytyczne</div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-4 lg:items-center justify-between bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-          <div className="relative w-full sm:w-72">
-            <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-            <input type="text" placeholder="Szukaj (maszyna, temat)..." value={filterMachine} onChange={(e) => setFilterMachine(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 transition-all shadow-sm" />
-          </div>
-          <div className="relative w-full sm:w-48">
-            <i className="ph ph-funnel absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 appearance-none shadow-sm cursor-pointer">
-              <option value="">Wszystkie statusy</option>
-              {!isArchive && (
-                <>
-                  <option value="1">Otwarte (Zgłoszone)</option>
-                  <option value="2">Weryfikacja UT</option>
-                  <option value="3">Oczekujące na naprawę</option>
-                  <option value="4">W trakcie naprawy</option>
-                </>
-              )}
-              {isArchive && <option value="5">Zakończone</option>}
-            </select>
-          </div>
-          {(filterMachine || filterStatus) && (
-            <button
-              onClick={() => {
-                setFilterMachine('');
-                setFilterStatus('');
-                if (onClearSearchQuery) onClearSearchQuery();
-              }}
-              className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-              title="Wyczyść wszystkie filtry"
-            >
-              <i className="ph ph-x text-base font-bold"></i> Usuń filtr
-            </button>
-          )}
-        </div>
+      <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
+        <TicketFilters
+          filterMachine={filterMachine} setFilterMachine={setFilterMachine}
+          filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+          filterRegion={filterRegion} setFilterRegion={setFilterRegion}
+          filterMachineId={filterMachineId} setFilterMachineId={setFilterMachineId}
+          filterTime={filterTime} setFilterTime={setFilterTime}
+          isArchive={isArchive}
+          regions={regions}
+          machines={machines}
+          onClearSearchQuery={onClearSearchQuery}
+        />
         
         <div className="flex gap-2 w-full lg:w-auto">
-          <div className="relative">
-            <button onClick={() => setShowColumnPicker(!showColumnPicker)} className="w-full lg:w-auto bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-              <i className="ph ph-columns text-lg"></i> Widok
+          <div className="relative w-full lg:w-auto hidden lg:block">
+              <button onClick={() => setShowColumnPicker(!showColumnPicker)} className="w-full lg:w-auto bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
+                <i className="ph ph-columns text-lg"></i> Widok
             </button>
             {showColumnPicker && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-4">
+              <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] p-4">
                 <div className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">Dostosuj kolumny</div>
                 <div className="space-y-2">
-                  {Object.keys(visibleCols).map(key => (
-                    <label key={key} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
-                      <input type="checkbox" checked={visibleCols[key]} onChange={() => toggleColumn(key)} className="rounded text-blue-600" />
-                      {key}
-                    </label>
-                  ))}
+                  {Object.keys(visibleCols).map(key => {
+                    const COL_LABELS = {
+                      date: isArchive ? 'Zakończono / Zgłoszono' : 'Data zgłoszenia',
+                      region: 'Miejsce (Rejon)',
+                      machine: 'Maszyna',
+                      bay: 'Przelot/Inf.',
+                      topic: 'Temat',
+                      reporter: 'Zgłaszający',
+                      status: 'Status',
+                      service: 'Przypisany serwis',
+                      duration: 'Czas trwania'
+                    };
+                    return (
+                      <label key={key} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked={visibleCols[key]} onChange={() => toggleColumn(key)} className="rounded text-blue-600" />
+                        {COL_LABELS[key] || key}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -317,58 +307,23 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
-        {filteredTickets.length === 0 ? (
-          <div className="col-span-full p-6 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-200">Brak zgłoszeń spełniających kryteria.</div>
-        ) : (
-          filteredTickets.map(ticket => (
-            <TicketMobileCard key={ticket.id} ticket={ticket} machines={machines} STATUSES={STATUSES} onOpenDetails={openDetails} />
-          ))
-        )}
-      </div>
-
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-bold text-gray-500">
-              <tr>
-                {visibleCols.date && <th className="px-6 py-4">Data zgłoszenia</th>}
-                {visibleCols.region && <th className="px-6 py-4">Miejsce (Rejon)</th>}
-                {visibleCols.machine && <th className="px-6 py-4">Maszynę</th>}
-                {visibleCols.bay && <th className="px-6 py-4">Przelot/Inf.</th>}
-                {visibleCols.topic && <th className="px-6 py-4">Temat</th>}
-                {visibleCols.reporter && <th className="px-6 py-4">Zgłaszający</th>}
-                {visibleCols.status && <th className="px-6 py-4">Status</th>}
-                {visibleCols.service && <th className="px-6 py-4">Przypisany Serwis</th>}
-                {visibleCols.duration && <th className="px-6 py-4">Czas trwania</th>}
-                <th className="px-6 py-4 w-12 text-center">Akcje</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredTickets.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="px-6 py-12 text-center text-gray-500 border-dashed border-2 border-gray-100 m-4">
-                    Brak zgłoszeń spełniających kryteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredTickets.map(ticket => (
-                  <TicketTableRow key={ticket.id} ticket={ticket} visibleCols={visibleCols} STATUSES={STATUSES} machines={machines} calculateDuration={calculateDuration} onOpenDetails={openDetails} />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {isArchive && hasMoreArchive && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-center">
-            <button onClick={() => fetchArchive(true)} disabled={loadingArchive} className="px-6 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded transition-colors disabled:opacity-50">
-              {loadingArchive ? 'Ładowanie...' : 'Załaduj więcej'}
-            </button>
-          </div>
-        )}
-      </div>
+            <TicketTable 
+        filteredTickets={filteredTickets}
+        currentItems={currentItems}
+        visibleCols={visibleCols}
+        isArchive={isArchive}
+        STATUSES={STATUSES}
+        machines={machines}
+        calculateDuration={calculateDuration}
+        openDetails={openDetails}
+        hasMoreLocalItems={hasMoreLocalItems}
+        setCurrentPage={setCurrentPage}
+        hasMoreArchive={hasMoreArchive}
+        fetchArchive={fetchArchive}
+        loadingArchive={loadingArchive}
+      />
       
-      {toastConfig.message && <Toast message={toastConfig.message} type={toastConfig.type} onClose={() => setToastConfig({ message: '', type: 'success' })} />}
+      {toastConfig.show && <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />}
       <ConfirmModal isOpen={confirmModalConfig.isOpen} title={confirmModalConfig.title} message={confirmModalConfig.message} onConfirm={confirmModalConfig.onConfirm} onCancel={closeConfirmModal} confirmText={confirmModalConfig.confirmText} />
     </div>
   );

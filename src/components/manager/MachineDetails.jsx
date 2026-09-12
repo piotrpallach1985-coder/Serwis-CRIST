@@ -2,6 +2,7 @@ import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { safeParseDate } from '../../utils/dateHelpers';
 import MachineDTR from './MachineDTR';
+import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
 
 
 export default function MachineDetails({ isFromQR, onScanNext, machine, user, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
@@ -70,6 +71,11 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
               <div>
                 <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">Rejon / Miejsce</div>
                 <div className="font-semibold text-gray-800 text-base">{regionName}</div>
+                {regions.find(r => r.id === machine.regionId)?.mapImageUrl && (
+                  <a href={regions.find(r => r.id === machine.regionId).mapImageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs flex items-center gap-1 hover:underline mt-0.5">
+                    <i className="ph ph-map-trifold"></i> Podmapa
+                  </a>
+                )}
               </div>
               <div>
                 <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">Numer Wewnętrzny</div>
@@ -111,7 +117,7 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
             </div>
           </div>
 
-        <MachineDTR machine={machine} canManage={user?.role === 'admin' || (user?.permissions || []).includes('manage_dtr')} />
+        <MachineDTR machine={machine} canManage={user?.role === USER_ROLES.ADMIN || (user?.permissions || []).includes('manage_dtr')} />
 
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center gap-3">
@@ -135,11 +141,11 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.tickets.map(t => (
-                      <div key={t.id} onClick={() => onOpenTicket && onOpenTicket(t.id, t.status === 5, machine.id)} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
+                      <div key={t.id} onClick={() => onOpenTicket && onOpenTicket(t.id, Number(t.status) === TICKET_STATUS.CLOSED, machine.id)} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
                         <div className="flex justify-between items-start mb-2">
                           <div className="font-bold text-gray-800">{t.topic || 'Inne'}</div>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${t.status === 5 ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-600'}`}>
-                            {t.status === 5 ? 'Zamknięte' : 'Otwarte'}
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${Number(t.status) === TICKET_STATUS.CLOSED ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-600'}`}>
+                            {Number(t.status) === TICKET_STATUS.CLOSED ? 'Zamknięte' : 'Otwarte'}
                           </span>
                         </div>
                         <div className="text-sm text-gray-600 mb-2">{t.description || '-'}</div>

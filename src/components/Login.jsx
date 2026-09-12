@@ -4,6 +4,7 @@ import { doc, getDoc, collection, query, getDocs, limit, onSnapshot } from 'fire
 import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 import { generateAuditorReport } from '../utils/reports/auditorExport';
 import { db, auth } from '../firebase';
+import { USER_ROLES } from '../utils/constants';
 
 export default function Login({ onLogin, currentUser }) {
   const [isScanning, setIsScanning] = useState(false);
@@ -100,7 +101,7 @@ export default function Login({ onLogin, currentUser }) {
       console.warn('Anonymous sign-in failed', e);
     }
     window.history.replaceState({ module: 'operator' }, '', `?module=operator`);
-    onLogin({ name: 'Nieznany Zgłaszający', role: 'operator', uid: auth.currentUser?.uid || 'anon' });
+    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: auth.currentUser?.uid || 'anon' });
   };
 
   const handleTileClick = (target) => {
@@ -114,76 +115,76 @@ export default function Login({ onLogin, currentUser }) {
 
   const tiles = [
     {
-      id: 'operator',
-      title: 'Zgłoszenie Awarii',
-      desc: 'Dla pracowników hali. Brak konieczności zakładania konta. Zgłoszenia bezpośrednio ze stanowiska.',
-      icon: 'ph-warning-circle',
+      id: 'dtr_scanner',
+      title: 'Skaner QR',
+      desc: '',
+      icon: 'ph-qr-code',
       color: 'bg-blue-600 hover:bg-blue-700',
       iconBg: 'bg-blue-50 text-blue-600',
-      action: handleOperatorBypass
+      action: () => setIsScanning(true)
     },
     {
-      id: 'tickets',
-      title: 'Awarie UR',
-      desc: 'Rejestr zgłoszonych awarii i interwencji ad-hoc. Mapa stoczni i zarządzanie biletami.',
+      id: 'ur_panel',
+      title: 'Panel UR',
+      desc: '',
       icon: 'ph-wrench',
       color: 'bg-red-600 hover:bg-red-700',
       iconBg: 'bg-red-50 text-red-600',
       action: () => handleTileClick('tickets')
     },
     {
-      id: 'planned_maintenance',
-      title: 'Serwis UR',
-      desc: 'Serwis planowany, przeglądy okresowe maszyn, harmonogramy i liczniki roboczogodzin.',
-      icon: 'ph-calendar-check',
-      color: 'bg-green-600 hover:bg-green-700',
-      iconBg: 'bg-green-50 text-green-600',
-      action: () => handleTileClick('planned_maintenance')
-    },
-    {
       id: 'master_data',
-      title: 'Administracja',
-      desc: 'Zarządzanie bazą maszyn, rejonami stoczni, użytkownikami i prawami dostępu (Master Data).',
+      title: 'Administrator',
+      desc: '',
       icon: 'ph-database',
       color: 'bg-[#111827] hover:bg-gray-800',
       iconBg: 'bg-gray-100 text-[#111827]',
       action: () => handleTileClick('master_data')
     },
     {
-      id: 'dtr_scanner',
-      title: 'Maszyny / DTR',
-      desc: 'Skanuj kod QR na hali, aby odczytać dokumenty DTR.',
-      icon: 'ph-qr-code',
-      color: 'bg-blue-600 hover:bg-blue-700',
-      iconBg: 'bg-blue-50 text-blue-600',
-      action: () => setIsScanning(true)
-    },
+      id: 'admin_program',
+      title: 'Administrator Programu',
+      desc: '',
+      icon: 'ph-gear',
+      color: 'bg-gray-600 hover:bg-gray-700',
+      iconBg: 'bg-gray-50 text-gray-600',
+      action: () => alert('Panel Administratora Programu w budowie')
+    }
   ];
 
   return (
     <div className="min-h-[100svh] bg-[#f8f9fa] flex flex-col items-center justify-center p-2 pt-16 sm:p-4 sm:pt-4 text-[#111827] relative">
+      
+      {/* GÓRNY PASEK LOGO (Logo aplikacji) */}
+      <div className="absolute top-4 left-4 z-50">
+        <img src={branding?.appLogoUrl || '/pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
+      </div>
       
       {currentUser && currentUser.role !== 'operator' && (
         <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-2 rounded-xl shadow-sm border border-gray-100">
           <div className="font-bold text-gray-800 text-xs sm:text-sm">
             <span className="hidden sm:inline">Zalogowano jako: </span><span className="text-blue-600">{currentUser.name}</span>
           </div>
-          <button onClick={() => onLogin(null)} className="ml-2 text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={() => onLogin(null)} className="ml-2 flex items-center gap-1.5 text-gray-400 hover:text-gray-600 transition-colors font-bold text-xs sm:text-sm">
             <i className="ph ph-sign-out text-lg sm:text-xl"></i>
+            <span>Wyloguj</span>
           </button>
         </div>
       )}
 
       <div className="mb-6 md:mb-12 text-center animate-fade-in-up mt-8 sm:mt-0">
-        <div className="flex justify-center mb-4 md:mb-6">
-          {branding.companyLogoUrl ? (
-            <img src={branding.companyLogoUrl} alt="Company Logo" className="max-h-16 max-w-[200px] object-contain rounded-2xl overflow-hidden" />
-          ) : (
-            <i className="ph ph-buildings text-5xl text-[#111827]"></i>
-          )}
-        </div>
-        <h1 className="text-xl md:text-3xl font-extrabold tracking-tight mb-1 md:mb-2">{branding.companyName}</h1>
-        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{branding.systemSubtitle}</p>
+        <div className="flex justify-center mb-3 sm:mb-5">
+            <div className="w-20 h-20 sm:w-28 sm:h-28 bg-white rounded-3xl flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-lg border border-slate-100 shrink-0">
+              {branding.companyLogoUrl ? (
+                <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-2 sm:p-3" />
+              ) : (
+                <span className="text-4xl sm:text-5xl">{branding?.companyName?.charAt(0) || 'C'}</span>
+              )}
+            </div>
+          </div>
+          <h1 className="font-black text-xl sm:text-2xl leading-tight tracking-wide text-blue-900 mb-6">
+            VexoNT &bull; MAINTANCE SYSTEM
+          </h1>
       </div>
 
       {!currentUser ? (
@@ -231,7 +232,9 @@ export default function Login({ onLogin, currentUser }) {
                     <i className={`ph ${tile.icon} text-xl md:text-3xl`}></i>
                   </div>
                   <h2 className="text-sm md:text-xl font-bold mb-1 md:mb-2 text-gray-800 leading-tight">{tile.title}</h2>
-                  <p className="text-gray-500 text-[10px] md:text-sm mb-2 md:mb-6 line-clamp-3 md:line-clamp-3 leading-tight">{tile.desc}</p>
+                  {tile.desc && (
+                    <p className="text-gray-500 text-[10px] md:text-sm mb-2 md:mb-6 line-clamp-3 md:line-clamp-3 leading-tight">{tile.desc}</p>
+                  )}
                 </div>
                 <button
                   onClick={tile.action}

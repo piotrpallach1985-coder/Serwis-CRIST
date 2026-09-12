@@ -1,7 +1,6 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64 } from './pdfHelpers';
+import { TICKET_STATUS } from '../constants';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -19,7 +18,10 @@ const getImageDimensions = (base64) => {
   });
 };
 
-export const generateMachineHistoryPDF = async (machine, tickets, plannedServices) => {
+export const generateMachineHistoryPDF = async (machine, tickets, services) => {
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
+
   if (!machine) return;
 
   try {
@@ -79,7 +81,7 @@ export const generateMachineHistoryPDF = async (machine, tickets, plannedService
         date ? date.toLocaleDateString('pl-PL') : '-',
         n(t.reportedBy || '-'),
         n(problemDesc),
-        n(t.status === 5 ? 'Zamkniete' : 'Otwarte'),
+        n(Number(t.status) === TICKET_STATUS.CLOSED ? 'Zamkniete' : 'Otwarte'),
         n(t.completedBy || (t.history?.length ? t.history[t.history.length - 1].user : '-'))
       ];
     });

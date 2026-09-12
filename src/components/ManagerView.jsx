@@ -1,6 +1,7 @@
+import { useManagerStore } from '../store/managerStore';
 import { checkAndTriggerDueServices } from '../services/plannedServices.service';
 import { useState, useEffect } from 'react';
-import { ManagerDataProvider, useManagerContext } from '../context/ManagerDataContext';
+import { ManagerDataProvider } from '../context/ManagerDataContext';
 import { usePermissions } from '../hooks/usePermissions';
 import Sidebar from './manager/Sidebar';
 
@@ -21,6 +22,7 @@ import Reporters from './manager/Reporters';
 import PlannedMaintenance from './manager/PlannedMaintenance';
 import ActionItems from './manager/ActionItems';
 import NotificationCenter from './manager/NotificationCenter';
+import { USER_ROLES } from '../utils/constants';
 
 function ManagerViewInner({ user, onLogout }) {
   // --- Routing ---
@@ -42,16 +44,33 @@ function ManagerViewInner({ user, onLogout }) {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [globalTicketId, setGlobalTicketId] = useState(null);
-  const [globalServiceId, setGlobalServiceId] = useState(null);
+  const [globalTicketId, setGlobalTicketId] = useState(() => new URLSearchParams(window.location.search).get('openTicket'));
+  const [globalServiceId, setGlobalServiceId] = useState(() => new URLSearchParams(window.location.search).get('openService'));
+  const [globalMachineId, setGlobalMachineId] = useState(() => new URLSearchParams(window.location.search).get('openMachine'));
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
+  const clearUrlParam = (paramName) => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.has(paramName)) {
+      p.delete(paramName);
+      const newUrl = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+      window.history.replaceState(window.history.state, '', newUrl);
+    }
+  };
+
   // --- Dane z Firebase (context) ---
-  const {
-    tickets, machines, reporters, services, plannedServices,
-    notifications, actionItems, roles, regions,
-    allowTicketDeletion, plannedWarningDays, branding,
-  } = useManagerContext();
+  const tickets = useManagerStore(state => state.tickets);
+  const machines = useManagerStore(state => state.machines);
+  const reporters = useManagerStore(state => state.reporters);
+  const services = useManagerStore(state => state.services);
+  const plannedServices = useManagerStore(state => state.plannedServices);
+  const notifications = useManagerStore(state => state.notifications);
+  const actionItems = useManagerStore(state => state.actionItems);
+  const roles = useManagerStore(state => state.roles);
+  const regions = useManagerStore(state => state.regions);
+  const allowTicketDeletion = useManagerStore(state => state.allowTicketDeletion);
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const branding = useManagerStore(state => state.branding);
 
   // --- Uprawnienia (hook) ---
   const { canEditPlanned, canDeletePlanned, isAdmin } = usePermissions(user, roles);
@@ -75,6 +94,7 @@ function ManagerViewInner({ user, onLogout }) {
       if (t) setActiveTab(t);
       if (openTicket) setGlobalTicketId(openTicket);
       if (openService) setGlobalServiceId(openService);
+      if (openMachine) setGlobalMachineId(openMachine);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -83,7 +103,7 @@ function ManagerViewInner({ user, onLogout }) {
 
   // --- Weryfikacja terminów serwisów (po pierwszym załadowaniu maszyn) ---
   useEffect(() => {
-    if (machines.length > 0 && user?.role !== 'operator') {
+    if (machines.length > 0 && user?.role !== USER_ROLES.OPERATOR) {
       const machinesMap = machines.reduce((acc, curr) => { acc[curr.id] = curr; return acc; }, {});
       checkAndTriggerDueServices(machinesMap);
     }
@@ -109,15 +129,16 @@ function ManagerViewInner({ user, onLogout }) {
       setGlobalTicketId(extra.ticketId);
       params.set('openTicket', extra.ticketId);
     }
-    if (extra.machineId) {
-      params.set('openMachine', extra.machineId);
-    }
     if (extra.serviceId) {
       setGlobalServiceId(extra.serviceId);
       params.set('openService', extra.serviceId);
     }
+    if (extra.machineId) {
+      setGlobalMachineId(extra.machineId);
+      params.set('openMachine', extra.machineId);
+    }
     
-    window.history.pushState({ module, tab }, '', '?' + params.toString());
+    window.history.pushState({ module, tab, ...extra }, '', '?' + params.toString());
   };
 
   // --- Widok Pulpitu Głównego (Home) — bez paska bocznego ---
@@ -203,13 +224,23 @@ function ManagerViewInner({ user, onLogout }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
 
           {/* Moduł: Awarie - mapa */}
           {activeTab === 'dashboard_tickets' && (
             <MapComponent
               modeType="tickets" user={user}
-              onNavigateToTickets={(query) => { setGlobalSearchQuery(query); setActiveTab('tickets'); }}
+              onNavigateToTickets={(navData) => { 
+                if (typeof navData === 'string') {
+                  setGlobalSearchQuery(navData); setActiveTab('tickets');
+                } else if (navData.ticketId) {
+                  handleNavigate('ur', 'tickets', { ticketId: navData.ticketId });
+                } else if (navData.serviceId) {
+                  handleNavigate('ur', 'planned_maintenance', { serviceId: navData.serviceId });
+                } else {
+                  setGlobalSearchQuery(navData.name); setActiveTab('tickets');
+                }
+              }}
             />
           )}
 
@@ -217,7 +248,17 @@ function ManagerViewInner({ user, onLogout }) {
           {activeTab === 'dashboard_planned' && (
             <MapComponent
               modeType="planned_maintenance" user={user}
-              onNavigateToTickets={(query) => { setGlobalSearchQuery(query); setActiveTab('planned_maintenance'); }}
+              onNavigateToTickets={(navData) => { 
+                if (typeof navData === 'string') {
+                  setGlobalSearchQuery(navData); setActiveTab('planned_maintenance');
+                } else if (navData.ticketId) {
+                  handleNavigate('ur', 'tickets', { ticketId: navData.ticketId });
+                } else if (navData.serviceId) {
+                  handleNavigate('ur', 'planned_maintenance', { serviceId: navData.serviceId });
+                } else {
+                  setGlobalSearchQuery(navData.name); setActiveTab('planned_maintenance');
+                }
+              }}
             />
           )}
 
@@ -227,7 +268,7 @@ function ManagerViewInner({ user, onLogout }) {
               user={user}
               initialSearchQuery={globalSearchQuery}
               onClearSearchQuery={() => setGlobalSearchQuery('')}
-              initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)}
+              initialTicketId={globalTicketId} onClearTicketId={() => { setGlobalTicketId(null); clearUrlParam('openTicket'); }}
             />
           )}
           {activeTab === 'archive' && (
@@ -236,7 +277,7 @@ function ManagerViewInner({ user, onLogout }) {
               isArchive={true}
               initialSearchQuery={globalSearchQuery}
               onClearSearchQuery={() => setGlobalSearchQuery('')}
-              initialTicketId={globalTicketId} onClearTicketId={() => setGlobalTicketId(null)}
+              initialTicketId={globalTicketId} onClearTicketId={() => { setGlobalTicketId(null); clearUrlParam('openTicket'); }}
             />
           )}
 
@@ -248,7 +289,7 @@ function ManagerViewInner({ user, onLogout }) {
               initialSearchQuery={globalSearchQuery}
               onClearSearchQuery={() => setGlobalSearchQuery('')}
               canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
-              initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)}
+              initialServiceId={globalServiceId} onClearServiceId={() => { setGlobalServiceId(null); clearUrlParam('openService'); }}
             />
           )}
           {activeTab === 'archive_planned' && (
@@ -258,7 +299,7 @@ function ManagerViewInner({ user, onLogout }) {
               initialSearchQuery={globalSearchQuery}
               onClearSearchQuery={() => setGlobalSearchQuery('')}
               canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
-              initialServiceId={globalServiceId} onClearServiceId={() => setGlobalServiceId(null)}
+              initialServiceId={globalServiceId} onClearServiceId={() => { setGlobalServiceId(null); clearUrlParam('openService'); }}
             />
           )}
 
@@ -268,8 +309,10 @@ function ManagerViewInner({ user, onLogout }) {
 
           {/* Master Data */}
           {activeTab === 'machines' && (
-            <Machines
+            <Machines 
               user={user}
+              initialMachineId={globalMachineId}
+              onClearMachineId={() => { setGlobalMachineId(null); clearUrlParam('openMachine'); }}
               onOpenTicket={(id, isArchived, machineId) => {
                 setGlobalTicketId(id);
                 setCurrentModule('ur');

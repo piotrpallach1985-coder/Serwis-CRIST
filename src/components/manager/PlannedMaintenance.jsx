@@ -1,4 +1,5 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getDocs, startAfter, where, limit, collection, query, orderBy, arrayUnion, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -24,7 +25,11 @@ export default function PlannedMaintenance({
   initialSearchQuery = '',
   onClearSearchQuery,
 }) {
-  const { plannedServices, machines, regions, plannedWarningDays, allowTicketDeletion } = useManagerContext();
+  const plannedServices = useManagerStore(state => state.plannedServices);
+  const machines = useManagerStore(state => state.machines);
+  const regions = useManagerStore(state => state.regions);
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const allowTicketDeletion = useManagerStore(state => state.allowTicketDeletion);
 
   // --- Dane ---
   const [servicesLoaded, setServicesLoaded] = useState(false);
@@ -132,7 +137,7 @@ export default function PlannedMaintenance({
         }
       }
 
-      if (filterTime !== 'all' && !isArchive) {
+            if (filterTime !== 'all' && !isArchive) {
         let isWithinTime = false;
         if (srv.nextDate) {
           const nDate = safeParseDate(srv.nextDate);
@@ -145,9 +150,23 @@ export default function PlannedMaintenance({
         }
         if (!isWithinTime) return false;
       }
+      if (filterTime !== 'all' && isArchive) {
+        // filterTime is in YYYY-MM format
+        if (!srv.completedAt) return false;
+        const compDate = safeParseDate(srv.completedAt);
+        if (!compDate) return false;
+        const yyyy = compDate.getFullYear().toString();
+        const mm = (compDate.getMonth() + 1).toString().padStart(2, '0');
+        if (`${yyyy}-${mm}` !== filterTime) return false;
+      }
       return true;
     });
     return filtered.sort((a, b) => {
+      if (isArchive) {
+        const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return dateB - dateA;
+      }
       const getStatusScore = (srv) => {
         if (srv.status === 'completed') return 0;
         if (srv.status === 'in_progress') return 5;
@@ -183,7 +202,7 @@ export default function PlannedMaintenance({
       const isCritA = a.priority === 'Krytyczny' ? 1 : 0, isCritB = b.priority === 'Krytyczny' ? 1 : 0;
       return isCritB - isCritA;
     });
-  }, [services, machines, filterTime, filterRegion, filterMachine, isArchive]);
+  }, [services, machines, regions, filterTime, filterRegion, filterMachine, searchQuery, isArchive, plannedWarningDays]);
 
   const getStatusColor = (srv, machine) => {
     if (srv.status === 'completed') return 'bg-emerald-100 text-emerald-700';
@@ -365,8 +384,8 @@ export default function PlannedMaintenance({
         srv={srv} machine={machine} user={user}
         isArchive={isArchive} allowTicketDeletion={allowTicketDeletion}
         canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
-        getMachineRegionName={getMachineRegionName} machines={machines}
-        onBack={() => setSelectedServiceId(null)}
+        getMachineRegionName={getMachineRegionName} machines={machines} regions={regions}
+        onBack={() => window.history.back()}
         onDelete={handleDelete} onSetInProgress={handleSetInProgress}
         onComplete={handleCompleteService} onUpdateRbg={handleUpdateRbg}
         onAddNote={handleAddNote} onAddFutureNote={handleAddFutureNote}
@@ -445,7 +464,7 @@ export default function PlannedMaintenance({
       />
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col">
-        <PlannedMaintenanceList
+        <PlannedMaintenanceList isArchive={isArchive}
           viewMode={viewMode} filteredServices={filteredServices} columns={columns}
           getMachine={getMachine} getStatusColor={getStatusColor} getMachineRegionName={getMachineRegionName}
           machines={machines} setSelectedServiceId={setSelectedServiceId}

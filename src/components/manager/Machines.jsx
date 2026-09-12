@@ -1,4 +1,5 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import { useState, useEffect } from 'react';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -7,19 +8,35 @@ import { safeParseDate } from '../../utils/dateHelpers';
 import { QRCodeSVG } from 'qrcode.react';
 
 import MachineDetails from './MachineDetails';
+import MachineFilters from './MachineFilters';
+import MachineTable from './MachineTable';
 import MachineForm from './MachineForm';
 import MachineCard from './MachineCard';
 import ConfirmModal from './ConfirmModal';
 import QRScannerModal from '../shared/QRScannerModal';
 import Toast from './Toast';
 import { useMachines } from '../../hooks/useMachines';
+import DebouncedInput from './DebouncedInput';
+import { useToast } from '../../hooks/useToast';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
 
-export default function Machines({ user, onOpenTicket, onOpenService }) {
-  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
+export default function Machines({ user, onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
+  const tickets = useManagerStore(state => state.tickets);
+  const machines = useManagerStore(state => state.machines);
+  const reporters = useManagerStore(state => state.reporters);
+  const services = useManagerStore(state => state.services);
+  const plannedServices = useManagerStore(state => state.plannedServices);
+  const notifications = useManagerStore(state => state.notifications);
+  const actionItems = useManagerStore(state => state.actionItems);
+  const roles = useManagerStore(state => state.roles);
+  const regions = useManagerStore(state => state.regions);
+  const allowTicketDeletion = useManagerStore(state => state.allowTicketDeletion);
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const branding = useManagerStore(state => state.branding);
 
-  const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel } = useMachines(machines, regions);
-  
   const [editingId, setEditingId] = useState(null);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel } = useMachines(machines, regions, showDeleted);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [qrModalMachine, setQrModalMachine] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
@@ -28,11 +45,28 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   
-  const [toastConfig, setToastConfig] = useState({ message: '', type: 'success' });
-  const [confirmModalConfig, setConfirmModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, confirmText: 'Tak' });
+  const { toastConfig, showToast, hideToast } = useToast();
+  const { confirmConfig: confirmModalConfig, showConfirm, hideConfirm: closeConfirmModal, setConfirmConfig: setConfirmModalConfig } = useConfirmModal();
   const [initialOpenProcessed, setInitialOpenProcessed] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterRegion]);
+
+  const currentItems = filteredMachines.slice(0, currentPage * itemsPerPage);
+  const hasMoreLocalItems = currentItems.length < filteredMachines.length;
+
+  useEffect(() => {
+    if (initialMachineId && machines.length > 0) {
+      const targetMachine = machines.find(m => m.id === initialMachineId);
+      if (targetMachine) {
+        handleViewMachine(targetMachine, true);
+        if (onClearMachineId) onClearMachineId();
+      }
+    }
+  }, [initialMachineId, machines, onClearMachineId]);  useEffect(() => {
     if (!initialOpenProcessed && machines.length > 0) {
       const params = new URLSearchParams(window.location.search);
       const openMachineId = params.get('openMachine');
@@ -41,13 +75,15 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
         if (targetMachine) {
           handleViewMachine(targetMachine, true);
         }
+        params.delete('openMachine');
+        const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        window.history.replaceState(window.history.state, '', newUrl);
       }
       setInitialOpenProcessed(true);
     }
   }, [machines, initialOpenProcessed]);
 
-  const showToast = (message, type = 'success') => setToastConfig({ message, type });
-  const closeConfirmModal = () => setConfirmModalConfig(prev => ({ ...prev, isOpen: false }));
+
 
   const handleDeleteMachine = (id, name) => {
     setConfirmModalConfig({
@@ -215,7 +251,7 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
       />
       {selectedMachine ? (
         <MachineDetails
-          machine={selectedMachine}
+          machine={machines.find(m => m.id === selectedMachine.id) || selectedMachine}
           history={machineHistory}
           loading={loadingHistory}
           isFromQR={isFromQRScan}
@@ -234,16 +270,16 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
         <>
 
 
-          <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div>
-              <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejestr Urządzeń</h2>
-              <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj maszynami i generuj kody QR</p>
-            </div>
-            <button onClick={() => { setEditingId(null); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-              <i className="ph ph-plus text-lg"></i> Dodaj Maszynę
-            </button>
-          </div>
-
+                    <MachineFilters
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            filterRegion={filterRegion}
+            setFilterRegion={setFilterRegion}
+            regions={regions}
+            showDeleted={showDeleted}
+            setShowDeleted={setShowDeleted}
+            onAddMachine={() => { setEditingId(null); setIsFormOpen(true); }}
+          />
           <MachineForm 
             isOpen={isFormOpen} 
             onClose={() => setIsFormOpen(false)} 
@@ -252,23 +288,8 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
             onSaved={showToast}
             onError={(err) => showToast(err, 'error')}
           />
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
             <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                <div className="relative w-full sm:w-72">
-                  <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-                  <input type="text" placeholder="Szukaj (nazwa, nr wew)..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all shadow-sm" />
-                </div>
-                <div className="relative w-full sm:w-48">
-                  <i className="ph ph-funnel absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-                  <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 appearance-none shadow-sm cursor-pointer">
-                    <option value="">Wszystkie Rejony</option>
-                    <option value="bez_rejonu">Bez rejonu</option>
-                    {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </div>
-              </div>
               <div className="flex gap-2 w-full md:w-auto">
                 <button onClick={() => setIsScanning(true)} className="flex-1 md:flex-none bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
                   <i className="ph ph-qr-code text-lg"></i> Skanuj
@@ -278,62 +299,17 @@ export default function Machines({ user, onOpenTicket, onOpenService }) {
                 </button>
               </div>
             </div>
-            
-            <div className="p-4 md:p-6 overflow-x-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:hidden">
-                {filteredMachines.length === 0 ? (
-                  <div className="col-span-full p-6 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300">Brak maszyn spełniających kryteria.</div>
-                ) : (
-                  filteredMachines.map(m => (
-                    <MachineCard key={m.id} machine={m} regions={regions} onClick={handleViewMachine} />
-                  ))
-                )}
-              </div>
-              <table className="w-full text-left hidden lg:table border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 text-gray-700 text-sm">
-                    <th className="px-6 py-3 border-b">Nazwa Maszyny</th>
-                    <th className="px-6 py-3 border-b">Nr wew. / Opis</th>
-                    <th className="px-6 py-3 border-b">Rejon / Hala</th>
-                    <th className="px-6 py-3 border-b text-right">Akcje</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMachines.length === 0 ? (
-                    <tr><td colSpan="4" className="p-6 text-center text-gray-500">Brak maszyn spełniających kryteria.</td></tr>
-                  ) : (
-                    filteredMachines.map(m => (
-                      <tr key={m.id} className={"border-b border-gray-100 transition-colors " + (m.name.includes('(DO WERYFIKACJI)') ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-blue-50')}>
-                        <td className="p-4">
-                          <div className="font-semibold text-gray-800 text-base">{m.name}</div>
-                          <div className="text-xs font-mono text-gray-400 mt-1">ID: {m.id}</div>
-                        </td>
-                        <td className="p-4">
-                          <div className="font-bold text-gray-700">{m.internalId || '-'}</div>
-                          {m.additionalDescription && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{m.additionalDescription}</div>}
-                        </td>
-                        <td className="p-4 text-gray-600">
-                          {regions.find(r => r.id === m.regionId)?.name || '-'}
-                          {m.bay && ` / ${m.bay}`}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex gap-1.5 justify-end">
-                            <button onClick={() => handleViewMachine(m)} className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm">
-                              Szczegóły <i className="ph ph-caret-right"></i>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <MachineTable
+              filteredMachines={filteredMachines}
+              currentItems={currentItems}
+              regions={regions}
+              handleViewMachine={handleViewMachine}
+            />
           </div>
         </>
       )}
 
-      {toastConfig.message && <Toast message={toastConfig.message} type={toastConfig.type} onClose={() => setToastConfig({ message: '', type: 'success' })} />}
+      {toastConfig.show && <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />}
       <ConfirmModal isOpen={confirmModalConfig.isOpen} title={confirmModalConfig.title} message={confirmModalConfig.message} onConfirm={confirmModalConfig.onConfirm} onCancel={closeConfirmModal} confirmText={confirmModalConfig.confirmText} />
     </div>
   );

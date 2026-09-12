@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64, getImageDimensions } from './pdfHelpers';
 
@@ -41,6 +39,9 @@ const fetchPhotoData = async (url) => {
 };
 
 export const generateServicePDF = async (service, machine) => {
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
+
   if (!service) return;
 
   try {

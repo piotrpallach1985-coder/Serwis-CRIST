@@ -1,9 +1,10 @@
+import { TICKET_STATUS } from '../../utils/constants';
 export default function Dashboard({ tickets, machines }) {
   // Obliczenia statystyk
-  const activeTickets = tickets.filter(t => t.status !== 5);
+  const activeTickets = tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED);
   const criticalTickets = activeTickets.filter(t => t.isCritical);
   const completedToday = tickets.filter(t => {
-    if (t.status !== 5 || !t.closedAt) return false;
+    if (Number(t.status) !== TICKET_STATUS.CLOSED || !t.closedAt) return false;
     const closedDate = t.closedAt.toDate ? t.closedAt.toDate() : new Date(t.closedAt);
     const today = new Date();
     return closedDate.toDateString() === today.toDateString();

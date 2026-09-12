@@ -3,6 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../../App';
 import { onAuthStateChanged } from 'firebase/auth';
+import { USER_ROLES } from '../../utils/constants';
 
 vi.mock('../../firebase', () => ({
   auth: {},
@@ -21,7 +22,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('../Login', () => ({
-  default: ({ onLogin }) => <div data-testid="login-view"><button onClick={() => onLogin({uid: '123', role: 'admin', name: 'Admin'})}>Login As Admin</button></div>
+  default: ({ onLogin }) => <div data-testid="login-view"><button onClick={() => onLogin({uid: '123', role: USER_ROLES.ADMIN, name: 'Admin'})}>Login As Admin</button></div>
 }));
 
 vi.mock('../ManagerView', () => ({

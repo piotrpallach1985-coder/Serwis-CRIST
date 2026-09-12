@@ -57,7 +57,9 @@ export const SERVICE_STATUS_LABELS = Object.freeze({
  */
 export const ACTION_ITEM_STATUS = Object.freeze({
   PENDING: 'pending',     // Do wykonania / otwarte
+  IN_PROGRESS: 'in_progress', // W trakcie
   COMPLETED: 'completed', // Zrealizowane
+  CANCELLED: 'cancelled', // Anulowane
 });
 
 /**
@@ -66,7 +68,9 @@ export const ACTION_ITEM_STATUS = Object.freeze({
  */
 export const ACTION_ITEM_STATUS_LABELS = Object.freeze({
   [ACTION_ITEM_STATUS.PENDING]: 'Oczekujące',
+  [ACTION_ITEM_STATUS.IN_PROGRESS]: 'W trakcie',
   [ACTION_ITEM_STATUS.COMPLETED]: 'Zrealizowane',
+  [ACTION_ITEM_STATUS.CANCELLED]: 'Anulowane',
 });
 
 /**

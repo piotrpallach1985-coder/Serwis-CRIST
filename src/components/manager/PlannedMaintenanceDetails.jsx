@@ -4,6 +4,7 @@ import ChecklistExecutor from '../checklists/ChecklistExecutor';
 import PlannedMaintenanceRbgModal from './PlannedMaintenanceRbgModal';
 import PlannedMaintenanceCompletionModal from './PlannedMaintenanceCompletionModal';
 import PlannedMaintenanceFormModal from './PlannedMaintenanceFormModal';
+import { USER_ROLES } from '../../utils/constants';
 
 /**
  * PlannedMaintenanceDetails — Widok szczegółowy jednego serwisu planowego.
@@ -19,6 +20,7 @@ export default function PlannedMaintenanceDetails({
   canDeletePlanned,
   getMachineRegionName,
   machines,
+  regions = [],
   // Akcje
   onBack,
   onDelete,
@@ -122,6 +124,11 @@ export default function PlannedMaintenanceDetails({
                     <i className="ph ph-engine text-lg text-slate-400"></i>
                     {machine?.name || <>{srv.machineName || 'Nieznana maszyna'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>}
                     {' '}({getMachineRegionName(machine?.regionId)})
+                    {(regions || []).find(r => r.id === machine?.regionId)?.mapImageUrl && (
+                      <a href={(regions || []).find(r => r.id === machine?.regionId).mapImageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline ml-2 inline-flex items-center gap-1">
+                        <i className="ph ph-map-trifold"></i> Podmapa
+                      </a>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -279,48 +286,7 @@ export default function PlannedMaintenanceDetails({
         </div>
       </div>
 
-      {/* Spostrzeżenia i uwagi na przyszłość */}
-      <div className="mt-4 bg-amber-50 p-3 rounded-xl border border-amber-200">
-        <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2 mb-2">
-          <i className="ph ph-lightbulb text-xl text-amber-600"></i>
-          Spostrzeżenia i uwagi na przyszłość
-        </h3>
-        <div className="space-y-2 mb-3">
-          {(!srv.futureNotes || srv.futureNotes.length === 0) ? (
-            <p className="text-sm text-amber-700 italic">Brak zapisanych uwag.</p>
-          ) : (
-            srv.futureNotes.map((note, idx) => (
-              <div key={idx} className="bg-white p-2.5 rounded-lg shadow-sm border border-amber-100 flex flex-col">
-                <p className="text-xs text-gray-800 whitespace-pre-wrap">{note.text}</p>
-                <div className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex justify-between items-center">
-                  <span>Dodał: {note.author}</span>
-                  <span>{new Date(note.createdAt).toLocaleString()}</span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        {!isCompleted && (
-          <div className="flex flex-col gap-2">
-            <textarea
-              value={newFutureNote}
-              onChange={e => setNewFutureNote(e.target.value)}
-              className="w-full p-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-xs resize-y"
-              rows="2"
-              placeholder="Wpisz nowe spostrzeżenia lub uwagi..."
-            />
-            <div className="flex justify-end">
-              <button
-                onClick={() => onAddFutureNote(srv.id, newFutureNote, () => setNewFutureNote(''))}
-                disabled={!newFutureNote.trim()}
-                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center"
-              >
-                <i className="ph ph-plus-circle mr-1"></i> Zapisz uwagę
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+
 
       {/* Modals */}
       <PlannedMaintenanceRbgModal
@@ -357,7 +323,7 @@ export default function PlannedMaintenanceDetails({
         machines={machines} handleSaveService={handleSaveService}
       />
 
-      <MachineDTR machine={machines.find(m => m.id === srv?.machineId)} canManage={user?.role === 'manager' || user?.role === 'admin'} />
+      <MachineDTR machine={machines.find(m => m.id === srv?.machineId)} canManage={user?.role === 'manager' || user?.role === USER_ROLES.ADMIN} />
 
       {/* Lightbox */}
       {lightboxImg && (

@@ -1,10 +1,11 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function Services() {
-  const { services } = useManagerContext();
+  const services = useManagerStore(state => state.services);
 
   const [newService, setNewService] = useState('');
   const [contactName, setContactName] = useState('');

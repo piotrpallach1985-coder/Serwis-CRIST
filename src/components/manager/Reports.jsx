@@ -1,4 +1,5 @@
-﻿import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+﻿
 import React, { useState, useEffect } from 'react';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
@@ -6,7 +7,9 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function Reports() {
-  const { tickets, machines, plannedServices } = useManagerContext();
+  const tickets = useManagerStore(state => state.tickets);
+  const machines = useManagerStore(state => state.machines);
+  const plannedServices = useManagerStore(state => state.plannedServices);
 
   const [loading, setLoading] = useState(false);
   const [localWarningDays, setLocalWarningDays] = useState(30);

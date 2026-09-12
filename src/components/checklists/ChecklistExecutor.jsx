@@ -22,6 +22,7 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
+  const [lockedSteps, setLockedSteps] = useState({});
 
   const updateResponse = (id, value) => {
     setResponses(prev => ({ ...prev, [id]: value }));

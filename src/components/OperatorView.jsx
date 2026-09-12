@@ -237,7 +237,8 @@ return () => window.removeEventListener('popstate', handlePopState);
 
 
       <header className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-md">
-        <div>
+        <div className="flex items-center gap-3">
+          <img src="/pwa-192x192.jpg" alt="VexoNT Logo" className="h-8 w-8 object-contain rounded-md" />
           <h1 className="text-xl font-bold flex items-center gap-2">
             Zgłoś Awarię
             <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></span>
@@ -254,9 +255,9 @@ return () => window.removeEventListener('popstate', handlePopState);
               <span className="hidden sm:inline">Dyspozytornia</span>
             </button>
           )}
-          <button onClick={onLogout} className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded transition-colors">
+          <button onClick={onLogout} className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded transition-colors text-sm sm:text-base">
             <i className="ph ph-sign-out text-xl"></i>
-            <span className="hidden sm:inline">Wyjdź</span>
+            <span>Wyjdź</span>
           </button>
         </div>
       </header>

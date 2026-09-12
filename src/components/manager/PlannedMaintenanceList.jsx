@@ -1,8 +1,10 @@
 import React from 'react';
 import ServiceCalendar from './ServiceCalendar';
-import { safeParseDate } from '../../utils/dateHelpers';
+import { safeParseDate as utilSafeParseDate } from '../../utils/dateHelpers';
+import { SERVICE_STATUS } from '../../utils/constants';
 
 export default function PlannedMaintenanceList({
+  isArchive,
   viewMode,
   filteredServices,
   columns,
@@ -14,6 +16,21 @@ export default function PlannedMaintenanceList({
   setRbgUpdateModal,
   setNewRbgValue
 }) {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 30;
+  
+  React.useEffect(() => { 
+    setCurrentPage(1); 
+  }, [filteredServices]);
+  
+  const currentItems = filteredServices.slice(0, currentPage * itemsPerPage);
+  const hasMore = currentItems.length < filteredServices.length;
+  const safeParseDate = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   return (
     <>
       {viewMode === 'calendar' ? (
@@ -30,24 +47,24 @@ export default function PlannedMaintenanceList({
                   {columns.name && <th className="px-6 py-4">Typ Serwisu</th>}
                   {columns.machine && <th className="px-6 py-4">Maszyna</th>}
                   {columns.region && <th className="px-6 py-4">Rejon</th>}
-                  {columns.nextDate && <th className="px-6 py-4">Termin</th>}
+                  {columns.nextDate && <th className="px-6 py-4">{isArchive ? 'Zakończono' : 'Termin'}</th>}
                   {columns.rbg && <th className="px-6 py-4">Termin (RBG)</th>}
                   {columns.priority && <th className="px-6 py-4">Priorytet</th>}
                   {columns.status && <th className="px-6 py-4">Status</th>}
                   {columns.actions && <th className="px-6 py-4 w-12 text-center">Akcje</th>}
-</tr>
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredServices.length === 0 ? (
                   <tr>
                     <td colSpan="10" className="px-4 py-8 text-center text-gray-400">Brak serwisów pasujących do kryteriów.</td>
                   </tr>
-                ) : filteredServices.map(srv => {
+                ) : currentItems.map(srv => {
                   const machine = getMachine(srv.machineId);
-                  const isCompleted = srv.status === 'completed';
+                  const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;
                   const rowColor = getStatusColor(srv, machine);
   const isOverdue = (() => {
-    if (srv.status === 'completed') return false;
+    if (srv.status === SERVICE_STATUS.COMPLETED) return false;
     if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
       const parsedDate = safeParseDate(srv.nextDate);
       if (parsedDate && parsedDate < new Date()) return true;
@@ -76,12 +93,16 @@ export default function PlannedMaintenanceList({
                       )}
                       {columns.nextDate && (
                         <td className="px-6 py-4">
-                          {srv.triggerType === 'calendar' || srv.triggerType === 'mixed' ? (
+                          {isArchive ? (
+                            <div className="text-sm font-bold text-slate-800">
+                              {srv.completedAt ? safeParseDate(srv.completedAt)?.toLocaleDateString('pl-PL') || '-' : '-'}
+                            </div>
+                          ) : (srv.triggerType === 'calendar' || srv.triggerType === 'mixed' ? (
                             <div className="text-sm">
-                              <div className="font-bold text-slate-800">{srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString() : '-'}</div>
+                              <div className="font-bold text-slate-800">{srv.nextDate ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-' : '-'}</div>
                               <div className="text-[10px] font-bold text-slate-400 mt-0.5">CO {srv.calendarIntervalDays} DNI</div>
                             </div>
-                          ) : <span className="text-slate-300">-</span>}
+                          ) : <span className="text-slate-300">-</span>)}
                         </td>
                       )}
                       {columns.rbg && (
@@ -105,7 +126,7 @@ export default function PlannedMaintenanceList({
                       {columns.status && (
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${rowColor}`}>
-                            {isCompleted ? 'Zako\u0144czone' : srv.status === 'in_progress' ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
+                            {isCompleted ? 'Zako\u0144czone' : srv.status === SERVICE_STATUS.IN_PROGRESS ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
                           </span>
                         </td>
                       )}
@@ -119,21 +140,30 @@ export default function PlannedMaintenanceList({
 </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </tbody></table>
+    {hasMore && (
+      <div className="p-4 flex justify-center border-t border-gray-100 bg-gray-50">
+        <button 
+          onClick={() => setCurrentPage(p => p+1)} 
+          className="px-6 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-bold rounded-lg transition-all"
+        >
+          Załaduj kolejne 30 (pozostało {filteredServices.length - currentItems.length})
+        </button>
+      </div>
+    )}
           </div>
 
           {/* Mobile Cards View */}
           <div className="md:hidden flex flex-col gap-4 mt-2 p-2">
             {filteredServices.length === 0 ? (
               <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak serwisów pasujących do kryteriów.</div>
-            ) : filteredServices.map(srv => {
+            ) : currentItems.map(srv => {
               const machine = getMachine(srv.machineId);
-              const isCompleted = srv.status === 'completed';
+              const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;
               const rowColor = getStatusColor(srv, machine);
 
               const isOverdue = (() => {
-                      if (srv.status === 'completed') return false;
+                      if (srv.status === SERVICE_STATUS.COMPLETED) return false;
                       if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
                         const parsedDate = safeParseDate(srv.nextDate);
       if (parsedDate && parsedDate < new Date()) return true;
@@ -170,9 +200,14 @@ Wysoki
                   
                   <div className="flex justify-between items-end pt-2 border-t border-slate-100 cursor-pointer" onClick={() => setSelectedServiceId(srv.id)}>
                       <div className="flex flex-col gap-1">
-                        {(srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
+                        {isArchive ? (
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1 font-bold">
+                            Zakończono: {srv.completedAt ? safeParseDate(srv.completedAt)?.toLocaleDateString('pl-PL') || '-' : '-'}
+                          </span>
+                        ) : (srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
                           <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            {srv.nextDate ? safeParseDate(srv.nextDate).toLocaleDateString('pl-PL') : '-'}
+                            <i className="ph ph-calendar text-blue-500 mr-1.5"></i>
+                            {srv.nextDate ? safeParseDate(srv.nextDate)?.toLocaleDateString('pl-PL') || '-' : '-'}
                           </span>
                         )}
                         {(srv.triggerType === 'hours' || srv.triggerType === 'mixed') && (
@@ -188,7 +223,7 @@ Wysoki
                         </div>
                       ) : (
                         <div className={`border px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${rowColor}`}>
-                          {srv.status === 'in_progress' ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
+                          {srv.status === SERVICE_STATUS.IN_PROGRESS ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
                         </div>
                       )}
                     </div>

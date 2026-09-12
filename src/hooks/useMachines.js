@@ -8,13 +8,13 @@ import { exportToExcel } from '../utils/reports/excelExport';
  * @param {Array<Object>} [regions=[]] Lista rejonów stoczni
  * @returns {Object} Stan i metody filtrowania maszyn
  */
-export function useMachines(machines = [], regions = []) {
+export function useMachines(machines = [], regions = [], showDeleted = false) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
 
   const filteredMachines = useMemo(() => {
     return machines
-      .filter(m => !m.isDeleted)
+      .filter(m => showDeleted ? true : !m.isDeleted)
       .filter(m => {
         const queryLower = searchQuery.toLowerCase().trim();
         const isNoRegionQuery = queryLower === 'bez rejonu';

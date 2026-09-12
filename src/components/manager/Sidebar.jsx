@@ -1,7 +1,9 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import React from 'react';
 import NotificationCenter from './NotificationCenter';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { TICKET_STATUS } from '../../utils/constants';
 
 export default function Sidebar({
   // Nawigacja
@@ -17,19 +19,17 @@ export default function Sidebar({
   onLogout,
   onNavigate
 }) {
-  const {
-    tickets = [],
-    machines = [],
-    reporters = [],
-    services = [],
-    plannedServices = [],
-    notifications = [],
-    actionItems = [],
-    roles = [],
-    regions = [],
-    plannedWarningDays = 30,
-    branding = {}
-  } = useManagerContext();
+  const tickets = useManagerStore(state => state.tickets) || [];
+  const machines = useManagerStore(state => state.machines) || [];
+  const reporters = useManagerStore(state => state.reporters) || [];
+  const services = useManagerStore(state => state.services) || [];
+  const plannedServices = useManagerStore(state => state.plannedServices) || [];
+  const notifications = useManagerStore(state => state.notifications) || [];
+  const actionItems = useManagerStore(state => state.actionItems) || [];
+  const roles = useManagerStore(state => state.roles) || [];
+  const regions = useManagerStore(state => state.regions) || [];
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays) || 30;
+  const branding = useManagerStore(state => state.branding) || {};
 
   const handleItemClick = (tabId) => {
     onTabChange(tabId);
@@ -50,8 +50,8 @@ export default function Sidebar({
   };
 
   // Obliczenia badge'y dla modułu UR
-  const newTicketsCount = tickets.filter(t => t.status === 1 || t.status === '1').length;
-  const criticalTicketsCount = tickets.filter(t => t.isCritical && t.status !== 5 && t.status !== '5').length;
+  const activeTicketsCount = tickets.length;
+  const criticalTicketsCount = tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length;
 
   // 2. Przedawnione serwisy (Krytyczne - termin minął wg daty lub roboczogodzin)
   const overdueServicesCount = plannedServices.filter(s => {
@@ -79,6 +79,9 @@ export default function Sidebar({
     return diff <= plannedWarningDays;
   }).length;
 
+  const inProgressServicesCount = plannedServices.filter(s => s.status === 'in_progress').length;
+  const totalActionableServicesCount = upcomingServicesCount + inProgressServicesCount;
+
   const openActionItemsCount = actionItems.filter(i => i.status !== 'completed').length;
   const unverifiedMachinesCount = machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).length;
   const unverifiedReportersCount = reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).length;
@@ -100,22 +103,12 @@ export default function Sidebar({
         {/* NAGŁÓWEK SIDEBARA */}
         <div className="flex-shrink-0 h-20 bg-[#161f30] px-5 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-inner flex-shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-lg flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-inner flex-shrink-0">
               {branding?.companyLogoUrl ? (
                 <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
               ) : (
                 branding?.companyName?.charAt(0) || 'C'
               )}
-            </div>
-            <div className="overflow-hidden">
-              <div className="font-bold text-sm sm:text-base leading-tight tracking-wide truncate">
-                {branding?.companyName || 'CRIST S.A.'}
-              </div>
-              <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold truncate">
-                {isUrModule && 'PANEL AWARII & SERWISU'}
-                {isCompanyAdmin && 'ADMINISTRATOR FIRMY'}
-                {isSystemAdmin && 'ADMINISTRATOR PROGRAMU'}
-              </div>
             </div>
           </div>
 
@@ -182,9 +175,9 @@ export default function Sidebar({
                     <i className="ph ph-list-dashes text-xl shrink-0"></i>
                     <span className="text-sm truncate">Zgłoszone awarie</span>
                   </div>
-                  {newTicketsCount > 0 && (
+                  {activeTicketsCount > 0 && (
                     <span className={`${criticalTicketsCount > 0 ? 'bg-red-600 text-white font-bold' : 'bg-yellow-400 text-slate-950 font-extrabold'} text-[10px] px-2 py-0.5 rounded-full shrink-0 shadow-xs`}>
-                      {newTicketsCount}
+                      {activeTicketsCount}
                     </span>
                   )}
                 </button>
@@ -233,9 +226,9 @@ export default function Sidebar({
                     <i className="ph ph-calendar-check text-xl shrink-0"></i>
                     <span className="text-sm truncate">Lista serwisów</span>
                   </div>
-                  {upcomingServicesCount > 0 && (
+                  {totalActionableServicesCount > 0 && (
                     <span className="bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 shadow-xs">
-                      {upcomingServicesCount}
+                      {totalActionableServicesCount}
                     </span>
                   )}
                 </button>
@@ -407,14 +400,32 @@ export default function Sidebar({
             </button>
             
             {/* PRZYCISK WYLOGUJ */}
-            <button 
-              onClick={onLogout}
-              className="flex items-center justify-center gap-2 py-2 px-3 bg-red-950/40 hover:bg-red-900/60 active:bg-red-950 rounded-xl text-sm font-medium text-red-300 hover:text-red-200 transition-all border border-red-900/50 cursor-pointer shadow-xs"
-              title="Wyloguj się z konta"
-            >
-              <i className="ph ph-sign-out text-lg"></i>
-              <span>Wyloguj</span>
-            </button>
+          <button
+            onClick={() => {
+              if (window.navigator && navigator.serviceWorker) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for(let registration of registrations) {
+                    registration.unregister();
+                  }
+                });
+              }
+              window.location.reload(true);
+            }}
+            className="flex items-center justify-center gap-2 py-2 px-3 bg-blue-950/40 hover:bg-blue-900/60 active:bg-blue-950 rounded-xl text-sm font-medium text-blue-300 hover:bg-blue-200 transition-all border border-blue-900/50 cursor-pointer shadow-xs mb-2"
+            title="Wymuś odświeżenie pamięci podręcznej aplikacji"
+          >
+            <i className="ph ph-arrows-clockwise text-lg"></i>
+            <span>Odśwież (Cache)</span>
+          </button>
+          
+          <button
+            onClick={onLogout}
+            className="flex items-center justify-center gap-2 py-2 px-3 bg-red-950/40 hover:bg-red-900/60 active:bg-red-950 rounded-xl text-sm font-medium text-red-300 hover:text-red-200 transition-all border border-red-900/50 cursor-pointer shadow-xs"
+            title="Wyloguj się z konta"
+          >
+            <i className="ph ph-sign-out text-lg"></i>
+            <span>Wyloguj</span>
+          </button>
           </div>
         </div>
 

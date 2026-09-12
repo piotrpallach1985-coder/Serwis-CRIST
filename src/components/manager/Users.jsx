@@ -3,6 +3,7 @@ import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimest
 import { db, firebaseConfig } from '../../firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { USER_ROLES } from '../../utils/constants';
 
 // Inicjalizacja dodatkowej instancji Firebase Auth tylko do tworzenia kont,
 // aby nie wylogowało aktualnie zalogowanego Managera
@@ -58,7 +59,7 @@ export default function Users() {
         setEmail('');
         
         setName('');
-        setRole('admin');
+        setRole(USER_ROLES.ADMIN);
         setPhone('');
       } else {
         // Tworzenie NOWEGO konta w bezpiecznym module Authentication
@@ -76,7 +77,7 @@ export default function Users() {
         setEmail('');
         
         setName('');
-        setRole('admin');
+        setRole(USER_ROLES.ADMIN);
         setPhone('');
       }
     } catch (err) {
@@ -114,7 +115,7 @@ export default function Users() {
           <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Użytkownicy (Konta dostępowe)</h2>
           <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj autoryzowanymi użytkownikami systemu (logowanie, aplikacja)</p>
         </div>
-        <button onClick={() => { setEditingId(null); setEmail('');  setName(''); setRole('admin'); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
+        <button onClick={() => { setEditingId(null); setEmail('');  setName(''); setRole(USER_ROLES.ADMIN); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
           <i className="ph ph-plus text-lg"></i> Dodaj Użytkownika
         </button>
       </div>
@@ -206,7 +207,7 @@ export default function Users() {
                       setEmail('');
                       
                       setName('');
-                      setRole('admin');
+                      setRole(USER_ROLES.ADMIN);
                       setPhone('');
                     }}
                     className="px-6 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors"
@@ -249,7 +250,7 @@ export default function Users() {
   </div>
   <div className="text-sm space-y-1 mb-1">
     <div className="flex items-center gap-1.5"><i className="ph ph-phone text-gray-400"></i> {item.phone || '-'}</div>
-    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> Rola: <span className="font-bold">{item.role === 'admin' ? 'Administrator' : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
+    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> Rola: <span className="font-bold">{item.role === USER_ROLES.ADMIN ? 'Administrator' : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
   </div>
   <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
     <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> Edytuj</button>
@@ -287,9 +288,9 @@ export default function Users() {
                       <td className="px-6 py-4 text-gray-600">{u.phone || "-"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                        u.role === USER_ROLES.ADMIN ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {u.role === 'admin' ? 'Administrator' : 
+                        {u.role === USER_ROLES.ADMIN ? 'Administrator' : 
                          rolesList.find(r => r.id === u.role)?.name || u.role}
                       </span>
                     </td>

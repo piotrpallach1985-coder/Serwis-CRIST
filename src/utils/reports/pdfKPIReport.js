@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64 } from './pdfHelpers';
 import { TICKET_STATUS, SERVICE_STATUS } from '../constants';
@@ -20,7 +18,10 @@ const getImageDimensions = (base64) => {
   });
 };
 
-export const generateKPIReportPDF = async (tickets, plannedServices, machines, dateRangeTitle) => {
+export const generateKPIReportPDF = async (tickets, services, machines, periodTitle) => {
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
+
   try {
     const doc = new jsPDF();
     const logoBase64 = await getBrandingLogoBase64();

@@ -1,10 +1,11 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
-import * as XLSX from 'xlsx';
 import { safeParseDate } from '../dateHelpers';
 import { TICKET_STATUS_LABELS, ACTION_ITEM_STATUS_LABELS } from '../constants';
 
 export const generateAuditorReport = async () => {
+  const XLSX = await import('xlsx');
+
   try {
     const reportData = {};
 

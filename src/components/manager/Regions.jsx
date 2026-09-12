@@ -14,15 +14,19 @@ export default function Regions() {
   const [editingId, setEditingId] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
     const unsubRegions = onSnapshot(collection(db, "regions"), (snapshot) => {
-      setRegions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
+      const fetchedRegions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      fetchedRegions.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setRegions(fetchedRegions);
     });
     const unsubMachines = onSnapshot(collection(db, "machines"), (snapshot) => {
-      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
+      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => {
+    console.log('DEBUG REGIONS LENGTH:', regions.length, 'MAPPED ROWS:', regions.filter(r => showDeleted ? true : !r.isDeleted).length);
+  return () => {
       unsubRegions();
       unsubMachines();
     };
@@ -85,8 +89,21 @@ export default function Regions() {
     setName(r.name);
     setDescription(r.description || '');
     setEditingId(r.id);
+    setMapImageUrl(r.mapImageUrl || '');
+    setMapFile(null);
     setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRestore = async (id) => {
+    if (window.confirm('Czy na pewno chcesz przywrócić ten rejon?')) {
+      try {
+        await updateDoc(doc(db, "regions", id), { isDeleted: false });
+        alert('Rejon przywrócony pomyślnie.');
+      } catch (err) {
+        alert("Błąd: " + err.message);
+      }
+    }
   };
 
   const handleDelete = async (id) => {
@@ -109,16 +126,19 @@ export default function Regions() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-        <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejony (Miejsca)</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj rejonami zakladu używanymi w systemie.</p>
+    <div className="space-y-6 pb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
+          <div>
+            <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Rejony (Miejsca)</h2>
+            <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj rejonami zakladu używanymi w systemie.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => { setEditingId(null); setName(''); setDescription(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
+              <i className="ph ph-plus text-lg"></i> Dodaj Rejon
+            </button>
+          </div>
         </div>
-        <button onClick={() => { setEditingId(null); setName(''); setDescription(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-          <i className="ph ph-plus text-lg"></i> Dodaj Rejon
-        </button>
-      </div>
 
       <div className="p-6">
         {isFormOpen && (
@@ -204,9 +224,9 @@ export default function Regions() {
     {regions.length === 0 ? (
       <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak danych.</div>
     ) : (
-      regions.map(item => (
+      regions.filter(r => showDeleted ? true : !r.isDeleted).map(item => (
         
-<div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+<div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col ${item.isDeleted ? "opacity-50" : ""}`}>
   <div className="flex justify-between items-start mb-2">
     <h4 className="font-bold text-[#002b5e] text-lg">{item.name || 'Bez nazwy'}</h4>
     {item.mapImageUrl && (
@@ -216,12 +236,12 @@ export default function Regions() {
     )}
   </div>
   <p className="text-sm text-gray-600 mb-1">{item.description || '-'}</p>
-  <div className="text-xs text-gray-500 mb-2 font-bold uppercase">Maszyny w rejonie:</div>
-  <div className="flex flex-wrap gap-1 mb-2">
-    {machines.filter(m => m.regionId === item.id).length > 0 ? (
-      machines.filter(m => m.regionId === item.id).map(m => (
-        <span key={m.id} className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">{m.name}</span>
-      ))
+    <div className="text-xs text-gray-500 mb-2 font-bold uppercase">Maszyny w rejonie:</div>
+    <div className="flex flex-wrap gap-1 mb-2">
+      {machines.filter(m => m.regionId === item.id && !m.isDeleted).length > 0 ? (
+        machines.filter(m => m.regionId === item.id && !m.isDeleted).map(m => (
+          <span key={m.id} className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">{m.name}</span>
+        ))
     ) : (
       <span className="text-gray-400 italic">Brak przypisanych maszyn</span>
     )}
@@ -235,7 +255,7 @@ export default function Regions() {
       ))
     )}
   </div>
-  <table className="w-full text-left hidden lg:table border-collapse hidden lg:table">
+          <table className="w-full text-left hidden lg:table border-collapse hidden lg:table relative">
             <thead>
               <tr className="bg-gray-50 border-y border-gray-200">
                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Nazwa Rejonu</th>
@@ -246,10 +266,10 @@ export default function Regions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {regions.map(r => {
-                const regionMachines = machines.filter(m => m.regionId === r.id);
+              {regions.filter(r => showDeleted ? true : !r.isDeleted).map(r => {
+                const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted);
                 return (
-                  <tr key={r.id} className="hover:bg-gray-50">
+                  <tr key={r.id} className={`hover:bg-gray-50 ${r.isDeleted ? "opacity-50" : ""}`}>
                                           <td className="px-6 py-4 font-bold text-gray-800">{r.name || 'Bez nazwy'}</td>
                     <td className="px-6 py-4 text-gray-600">{r.description || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
@@ -294,7 +314,7 @@ export default function Regions() {
               })}
               {regions.length === 0 && (
                 <tr>
-                  <td colSpan="3" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
                     Brak zdefiniowanych rejonów.
                   </td>
                 </tr>
@@ -304,5 +324,6 @@ export default function Regions() {
         </div>
       </div>
     </div>
+      </div>
   );
 }

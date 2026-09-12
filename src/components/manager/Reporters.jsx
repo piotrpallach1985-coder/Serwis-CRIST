@@ -1,10 +1,11 @@
+import { useManagerStore } from '../../store/managerStore';
 import { useState } from 'react';
 import { addDoc, doc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { useManagerContext } from '../../context/ManagerDataContext';
+
 
 export default function Reporters() {
-  const { reporters = [] } = useManagerContext();
+  const reporters = useManagerStore(state => state.reporters) || [];
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [position, setPosition] = useState('');

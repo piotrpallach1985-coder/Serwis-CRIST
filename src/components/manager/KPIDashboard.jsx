@@ -1,13 +1,26 @@
-import { useManagerContext } from '../../context/ManagerDataContext';
+import { useManagerStore } from '../../store/managerStore';
+
 import { useState, useMemo, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../utils/constants';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 
 export default function KPIDashboard() {
-  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerContext();
+  const tickets = useManagerStore(state => state.tickets);
+  const machines = useManagerStore(state => state.machines);
+  const reporters = useManagerStore(state => state.reporters);
+  const services = useManagerStore(state => state.services);
+  const plannedServices = useManagerStore(state => state.plannedServices);
+  const notifications = useManagerStore(state => state.notifications);
+  const actionItems = useManagerStore(state => state.actionItems);
+  const roles = useManagerStore(state => state.roles);
+  const regions = useManagerStore(state => state.regions);
+  const allowTicketDeletion = useManagerStore(state => state.allowTicketDeletion);
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const branding = useManagerStore(state => state.branding);
 
   const [period, setPeriod] = useState('7');
 
@@ -91,32 +104,57 @@ export default function KPIDashboard() {
     machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
   });
 
-  const sortedMachines = Object.entries(machineFaultCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5); // Top 5 najbardziej awaryjnych
+  const sortedMachines = Object.entries(machineFaultCounts).sort((a, b) => b[1] - a[1]);
+  const topMachinesData = sortedMachines.slice(0, 5).map(([name, count]) => ({ name, count })).reverse();
+
+  // 4. Status zgłoszeń (Pie Chart)
+  const statusCounts = filteredTickets.reduce((acc, t) => {
+    acc[t.status] = (acc[t.status] || 0) + 1;
+    return acc;
+  }, {});
+  
+  const statusData = [
+    { name: 'Otwarte', value: statusCounts[TICKET_STATUS.OPEN] || 0, color: '#f43f5e' },
+    { name: 'W trakcie', value: statusCounts[TICKET_STATUS.IN_PROGRESS] || 0, color: '#f59e0b' },
+    { name: 'Zamknięte', value: statusCounts[TICKET_STATUS.CLOSED] || 0, color: '#10b981' },
+  ].filter(s => s.value > 0);
+
+  // 5. Trend (Line Chart)
+  const trendData = useMemo(() => {
+    const counts = {};
+    filteredTickets.forEach(t => {
+      const date = safeParseDate(t.createdAt);
+      if (!date) return;
+      const dateStr = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
+      counts[dateStr] = (counts[dateStr] || 0) + 1;
+    });
+    return Object.entries(counts).map(([date, count]) => ({ date, count })).slice(-10);
+  }, [filteredTickets]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 lg:p-8 space-y-6">
       
-      
-      {/* Pasek filtrów */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap gap-4 justify-between items-center">
-        <div className="font-bold text-gray-700 flex items-center gap-2">
-          <i className="ph ph-funnel text-lg"></i>
-          Okres analizy:
+      {/* Header i Filtry */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-gray-800">Dashboard KPI</h2>
+        <div className="flex items-center gap-3">
+          <div className="font-bold text-gray-700 flex items-center gap-2">
+            <i className="ph ph-funnel text-lg"></i>
+            Okres analizy:
+          </div>
+          <select 
+            value={period} 
+            onChange={(e) => setPeriod(e.target.value)}
+            className="bg-gray-50 border border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium"
+          >
+            <option value="all">Wszystkie zgłoszenia</option>
+            <option value="7">Ostatnie 7 dni</option>
+            <option value="30">Ostatnie 30 dni</option>
+            <option value="90">Ostatnie 90 dni</option>
+            <option value="month">Obecny miesiąc</option>
+            <option value="prev_month">Poprzedni miesiąc</option>
+          </select>
         </div>
-        <select 
-          value={period} 
-          onChange={(e) => setPeriod(e.target.value)}
-          className="bg-gray-50 border border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium"
-        >
-          <option value="all">Wszystkie zgłoszenia</option>
-          <option value="7">Ostatnie 7 dni</option>
-          <option value="30">Ostatnie 30 dni</option>
-          <option value="90">Ostatnie 90 dni</option>
-          <option value="month">Obecny miesiąc</option>
-          <option value="prev_month">Poprzedni miesiąc</option>
-        </select>
       </div>
 
       
@@ -184,6 +222,90 @@ export default function KPIDashboard() {
       </div>
 
 
+      {/* WYKRESY */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        
+        {/* Wykres - Najbardziej awaryjne maszyny */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4">
+          <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <i className="ph ph-chart-bar text-lg text-blue-600"></i>
+            Top 5 Najbardziej Awaryjnych Maszyn
+          </h3>
+          <div className="h-64 w-full">
+            {topMachinesData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMachinesData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(value) => [value, 'Awarie']} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500">Brak danych</div>
+            )}
+          </div>
+        </div>
+
+        {/* Wykres - Status zgłoszeń */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4">
+          <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <i className="ph ph-chart-pie-slice text-lg text-blue-600"></i>
+            Status Zgłoszeń
+          </h3>
+          <div className="h-64 w-full">
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500">Brak danych</div>
+            )}
+          </div>
+        </div>
+        
+        {/* Wykres - Trend Zgłoszeń */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4 lg:col-span-2">
+          <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <i className="ph ph-chart-line-up text-lg text-blue-600"></i>
+            Trend Zgłoszeń (Ilość awarii w czasie)
+          </h3>
+          <div className="h-64 w-full">
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip formatter={(value) => [value, 'Awarie']} />
+                  <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={3} activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500">Brak danych</div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
       {/* Tabela awaryjności maszyn */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-gray-700 flex items-center gap-2">
@@ -194,7 +316,7 @@ export default function KPIDashboard() {
           {sortedMachines.length === 0 ? (
             <div className="p-6 text-center text-gray-500">Brak danych do wygenerowania statystyk maszyn.</div>
           ) : (
-            sortedMachines.map(([name, count], index) => (
+            sortedMachines.slice(0, 5).map(([name, count], index) => (
               <div key={name} className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-900 font-bold text-xs flex items-center justify-center">
