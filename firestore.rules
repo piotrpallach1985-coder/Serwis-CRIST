@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FUNKCJE POMOCNICZE ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -11,110 +10,94 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function isTenantUser(tenantId) {
+      return isSignedIn() && (getUserData().tenantId == tenantId || (tenantId == 'crist' && !('tenantId' in getUserData())) || isSuperAdmin());
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && getUserData().role == 'superadmin';
+    }
+
     function isAdmin() {
-      return isSignedIn() && getUserData().role == 'admin';
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'superadmin');
     }
 
     function isStaff() {
-      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'kierownik' || getUserData().role == 'tech');
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'superadmin' || getUserData().role == 'kierownik' || getUserData().role == 'tech');
     }
 
-    // 1. ZGŁASZAJĄCY (Pracownicy)
-    match /reporters/{document=**} {
-      allow read: if true;
-      allow create: if isSignedIn() || (
-        request.resource.data.name is string 
-        && request.resource.data.name.size() >= 3 
-        && request.resource.data.name.size() <= 80
-      );
-      allow update, delete: if isSignedIn();
-    }
-
-    // 2. MASZYNY
-    match /machines/{document=**} {
-      allow read: if true;
-      allow create: if isSignedIn() || (
-        request.resource.data.name is string
-        && request.resource.data.name.size() >= 3
-        && request.resource.data.name.size() <= 120
-        && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\).*')
-        && (!('xPercent' in request.resource.data) || request.resource.data.xPercent == null)
-        && (!('yPercent' in request.resource.data) || request.resource.data.yPercent == null)
-      );
-      allow update, delete: if isSignedIn();
-    }
-
-    // 3. ZGŁOSZENIA AWARII (Tickets) - ZERO WYCIEKU
-    match /tickets/{ticketId} {
-      allow read: if isSignedIn();   
-      allow create: if isSignedIn() || (
-        request.resource.data.machineId is string &&
-        request.resource.data.machineId.size() > 0 &&
-        request.resource.data.machineId.size() <= 200 &&
-        request.resource.data.description is string &&
-        request.resource.data.description.size() >= 3 &&
-        request.resource.data.description.size() <= 3000 &&
-        request.resource.data.reportedBy is string &&
-        request.resource.data.reportedBy.size() >= 2 &&
-        request.resource.data.reportedBy.size() <= 120 &&
-        request.resource.data.status == 1 &&
-        request.resource.data.keys().hasOnly(['description','machineId','machineName','status','isCritical','createdAt','photos','reportedBy','regionId'])
-      );
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // 4. SŁOWNIKI PUBLICZNE (Odczyt dla formularza, edycja dla zalogowanych)
-    match /regions/{document=**} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-    match /topics/{document=**} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-    match /services/{document=**} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-
-    // 5. POWIADOMIENIA (Operator wysyła, zalogowany zarządza)
-    match /notifications/{document=**} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() || (
-        request.resource.data.title is string &&
-        request.resource.data.title.size() >= 3 &&
-        request.resource.data.title.size() <= 120 &&
-        request.resource.data.message is string &&
-        request.resource.data.message.size() >= 3 &&
-        request.resource.data.message.size() <= 600 &&
-        request.resource.data.read == false
-      );
-      allow update, delete: if isSignedIn();
-    }
-
-    // 6. MODUŁY KRYTYCZNE / ADMIN (Tylko rola 'admin' może modyfikować)
+    // Użytkownicy - tylko admin może zarządzać wszystkimi
     match /users/{document=**} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    match /roles/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /settings/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
+
+    // Centralny rejestr firm (SaaS) - Tylko superadmin
+    match /tenant_registry/{document=**} {
+      allow read, write: if isSuperAdmin();
     }
 
-    // 7. ZADANIA I SERWISY PLANOWANE (Zalogowany personel)
-    match /planned_services/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isStaff();
-    }
-    match /action_items/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isStaff();
+    // Reguły dla tenantów (Multi-Tenancy)
+    match /tenants/{tenantId} {
+      match /reporters/{document=**} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isTenantUser(tenantId);
+      }
+
+      match /machines/{document=**} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isTenantUser(tenantId);
+      }
+
+      match /tickets/{ticketId} {
+        allow read: if isSignedIn();   
+        allow create: if isSignedIn();
+        allow update: if isSignedIn();
+        allow delete: if isTenantUser(tenantId);
+      }
+
+      match /regions/{document=**} {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
+      
+      match /topics/{document=**} {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
+      
+      match /services/{document=**} {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
+      
+      match /roles/{document=**} {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isAdmin();
+      }
+
+      match /notifications/{document=**} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isTenantUser(tenantId);
+      }
+
+      match /settings/{document=**} {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isAdmin();
+      }
+
+      match /planned_services/{document=**} {
+        allow read: if isSignedIn();
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
+      
+      match /action_items/{document=**} {
+        allow read: if isSignedIn();
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
     }
   }
 }
