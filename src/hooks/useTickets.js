@@ -4,6 +4,7 @@ import { collection, query, where, orderBy, limit, getDocs, startAfter, updateDo
 import { db } from '../firebase';
 import { safeParseDate } from '../utils/dateHelpers';
 import { TICKET_STATUS, TICKET_STATUS_LABELS } from '../utils/constants';
+import { useManagerStore } from '../store/managerStore';
 
 const DEFAULT_COLS = {
   date: true,
@@ -29,6 +30,7 @@ const DEFAULT_COLS = {
  * @returns {Object} Stan i akcje obsługi zgłoszeń
  */
 export function useTickets({ tickets = [], machines = [], regions = [], isArchive = false, initialSearchQuery = '' }) {
+  const tenantId = useManagerStore(state => state.tenantId) || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   const [internalArchive, setInternalArchive] = useState([]);
   const [lastArchiveDoc, setLastArchiveDoc] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
@@ -75,18 +77,19 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
   };
 
   const fetchArchive = async (loadMore = false) => {
+    if (!tenantId) return;
     if (loadingArchive || (!hasMoreArchive && loadMore)) return;
     setLoadingArchive(true);
     try {
       let q = query(
-        collection(db, 'tickets'),
+        collection(db, 'tenants', tenantId, 'tickets'),
         where('status', '==', TICKET_STATUS.CLOSED),
         orderBy('closedAt', 'desc'),
         limit(50)
       );
       if (loadMore && lastArchiveDoc) {
         q = query(
-          collection(db, 'tickets'),
+          collection(db, 'tenants', tenantId, 'tickets'),
           where('status', '==', TICKET_STATUS.CLOSED),
           orderBy('closedAt', 'desc'),
           startAfter(lastArchiveDoc),

@@ -54,12 +54,12 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
 
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
-    doc.text(n(`Okres raportowy: ${dateRangeTitle}`), 14, 30);
+    doc.text(n(`Okres raportowy: ${periodTitle}`), 14, 30);
     doc.text(n(`Wygenerowano: ${new Date().toLocaleDateString('pl-PL')}`), 14, 36);
 
     // --- OBLICZENIA ---
     const closedTickets = tickets.filter(t => t.status === TICKET_STATUS.CLOSED);
-    const completedServices = plannedServices.filter(s => s.status === SERVICE_STATUS.COMPLETED);
+    const completedServices = services.filter(s => s.status === SERVICE_STATUS.COMPLETED);
 
     // 1. MTTR
     let totalRepairTimeMs = 0;
@@ -100,10 +100,10 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
     
         const openTicketsCount = tickets.filter(t => t.status !== TICKET_STATUS.CLOSED).length;
     const reportedTicketsCount = tickets.length;
-    const allPlannedCount = plannedServices.length;
+    const allPlannedCount = services.length;
 
     const now = new Date();
-    const overdueServicesCount = plannedServices.filter(srv => {
+    const overdueServicesCount = services.filter(srv => {
         if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === SERVICE_STATUS.IN_PROGRESS) return false;
         let isOverdue = false;
         const machine = machines.find(m => m.id === srv.machineId);

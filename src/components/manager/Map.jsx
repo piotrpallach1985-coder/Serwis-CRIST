@@ -40,7 +40,7 @@ export default function ShipyardMap({
   useEffect(() => {
     // dynamicznie importujemy żeby uniknąć duplikacji z ManagerView
     
-      const unsub = onSnapshot(doc(db, 'settings', 'map'), (docSnap) => {
+      const unsub = onSnapshot(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', 'map'), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setMapConfig({ url: data.mapUrl || '', defaultZoom: data.defaultZoom || 1, defaultPan: { x: data.defaultPanX || 0, y: data.defaultPanY || 0 } });
@@ -77,9 +77,9 @@ export default function ShipyardMap({
       async () => {
         const url = await getDownloadURL(uploadTask.snapshot.ref);
         if (currentSubmapId !== null) {
-          await updateDoc(doc(db, 'regions', currentSubmapId), { mapImageUrl: url });
+          await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions', currentSubmapId), { mapImageUrl: url });
         } else {
-          setDoc(doc(db, 'settings', 'map'), { mapUrl: url }, { merge: true });
+          setDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', 'map'), { mapUrl: url }, { merge: true });
         }
         setUploadingMap(false);
         setUploadProgress(0);
@@ -89,8 +89,16 @@ export default function ShipyardMap({
 
   const saveDefaultView = async () => {
     try {
-      setDoc(doc(db, 'settings', 'map'), { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y }, { merge: true });
-    } catch (error) { console.error('Błąd zapisywania widoku:', error); }
+      if (currentSubmapId !== null) {
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions', currentSubmapId), { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
+      } else {
+        await setDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', 'map'), { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y }, { merge: true });
+      }
+      alert('Domyślny kadr został zapisany poprawnie.');
+    } catch (error) { 
+      console.error('Błąd zapisywania widoku:', error); 
+      alert('Wystąpił błąd podczas zapisywania kadru: ' + error.message);
+    }
   };
 
   // --- Stan pinezek (modal) ---
@@ -104,7 +112,10 @@ export default function ShipyardMap({
     : mapConfig.url;
 
   useEffect(() => {
-    if (!currentMapUrl) return;
+      if (!currentMapUrl) {
+        setIsImageLoading(false);
+        return;
+      }
     if (mapImageCache[currentMapUrl]) { setIsImageLoading(false); setImageProgress(100); return; }
     setIsImageLoading(true); setImageProgress(0);
     const safetyTimeout = setTimeout(() => { setIsImageLoading(false); setImageProgress(100); mapImageCache[currentMapUrl] = true; }, 4000);
@@ -162,7 +173,15 @@ export default function ShipyardMap({
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       if (hoveredPin !== pinId && e?.currentTarget) {
         const rect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({ isNearTop: rect.top < 200, isNearLeft: rect.left < 250, isNearRight: window.innerWidth - rect.right < 250 });
+          let containerRect = { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
+          if (mapContainerRef.current) {
+            containerRect = mapContainerRef.current.getBoundingClientRect();
+          }
+          setTooltipPos({ 
+            isNearTop: (rect.top - containerRect.top) < 200, 
+            isNearLeft: (rect.left - containerRect.left) < 250, 
+            isNearRight: (containerRect.right - rect.right) < 250 
+          });
       }
       setHoveredPin(pinId);
     }
@@ -220,7 +239,7 @@ export default function ShipyardMap({
     try {
       const updateData = { xPercent, yPercent };
       if (type === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
-      await updateDoc(doc(db, type === 'region' ? 'regions' : 'machines', id), updateData);
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), type === 'region' ? 'regions' : 'machines', id), updateData);
     } catch (error) { console.error('Błąd zapisywania pinezki:', error); }
   };
 
@@ -245,14 +264,14 @@ export default function ShipyardMap({
     try {
       const updateData = { xPercent: tempPos.xPercent, yPercent: tempPos.yPercent };
       if (editingType === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
-      await updateDoc(doc(db, editingType === 'region' ? 'regions' : 'machines', editingId), updateData);
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), editingType === 'region' ? 'regions' : 'machines', editingId), updateData);
       setIsModalOpen(false); setTempPos(null);
     } catch (error) { console.error('Błąd podczas zapisywania pinezki:', error); alert('Wystąpił błąd zapisu.'); }
   };
 
   const handleDeletePin = async (id, type) => {
     if (confirm('Czy na pewno chcesz usunąć tę pinezkę z mapy?')) {
-      try { await updateDoc(doc(db, type === 'region' ? 'regions' : 'machines', id), { xPercent: null, yPercent: null }); }
+      try { await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), type === 'region' ? 'regions' : 'machines', id), { xPercent: null, yPercent: null }); }
       catch (error) { console.error('Błąd usuwania pinezki:', error); }
     }
   };
@@ -355,7 +374,7 @@ export default function ShipyardMap({
           {(isImageLoading && !mapImageCache[currentMapUrl]) && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
               <i className="ph ph-spinner-gap animate-spin text-5xl mb-4 text-blue-500"></i>
-              <h3 className="text-base md:text-xl font-bold mb-2">Ładowanie mapy...</h3>
+              <h3 className="text-base md:text-xl font-bold mb-2">Ładowanie mapy...</h3>
               <div className="w-64 h-2 bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${imageProgress}%` }}></div></div>
               <p className="mt-2 text-[10px] md:text-sm text-slate-400 font-mono">{imageProgress}%</p>
             </div>
@@ -491,7 +510,7 @@ export default function ShipyardMap({
                 <i className="ph ph-arrow-left text-base sm:text-lg"></i><span className="hidden sm:inline">Powrót do Mapy Głównej</span>
               </button>
             )}
-            {(user?.role === USER_ROLES.ADMIN || user?.permissions?.includes('edit_map')) && (
+            {((user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || user?.permissions?.includes('edit_map')) && (
               <>
                 <button onClick={() => setMode('view')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-eye text-base sm:text-lg"></i><span className="hidden sm:inline">Podgląd</span></button>
                 <button onClick={() => setMode('edit')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-pencil-simple text-base sm:text-lg"></i><span className="hidden sm:inline">Edycja</span></button>

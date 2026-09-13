@@ -6,6 +6,7 @@ import Login from './components/Login';
 import OfflineSyncManager from './components/OfflineSyncManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import { USER_ROLES } from './utils/constants';
+import { useManagerStore } from './store/managerStore';
 
 const ManagerView = lazy(() => import('./components/ManagerView'));
 const OperatorView = lazy(() => import('./components/OperatorView'));
@@ -37,7 +38,10 @@ export default function App() {
       if (firebaseUser) {
         if (firebaseUser.isAnonymous) {
           // Anonimowy operator
-          setUser({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: firebaseUser.uid });
+          const tenantParam = new URLSearchParams(window.location.search).get('tenant');
+          const tIdAnon = tenantParam || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+          useManagerStore.getState().setTenantId(tIdAnon);
+          setUser({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: firebaseUser.uid, tenantId: tIdAnon });
         } else {
           // Zwykły użytkownik – pobieramy jego rolę z bazy
           try {
@@ -45,11 +49,14 @@ export default function App() {
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const userData = userDoc.data();
+              const tId = userData.tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+              useManagerStore.getState().setTenantId(tId);
               setUser({
                 uid: firebaseUser.uid,
                 name: userData.name || firebaseUser.email,
                 role: userData.role || 'brak',
-                permissions: userData.permissions || []
+                permissions: userData.permissions || [],
+                tenantId: userData.tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'
               });
               const params = new URLSearchParams(window.location.search);
               if (!params.get('module')) {
@@ -85,6 +92,7 @@ export default function App() {
   const handleSetUser = (userData) => {
     // onLogin z Login.jsx wciąż działa, by natychmiast odświeżyć UI bez czekania na hook firestore
     setUser(userData);
+    if (userData?.tenantId) { useManagerStore.getState().setTenantId(userData.tenantId); }
     if (!userData) { 
       auth.signOut(); // Trwałe wylogowanie z bazy
       setUrlMachineId(null); 
@@ -150,7 +158,7 @@ export default function App() {
           <ManagerView 
             user={user} 
             onLogout={() => handleSetUser(null)} 
-            onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.OPERATOR) : null}
+            onSwitchView={(user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN) ? () => setAdminView(USER_ROLES.OPERATOR) : null}
           />
         </Suspense>
       </>
@@ -158,7 +166,7 @@ export default function App() {
   }
 
   // Ustalenie aktywnego widoku na podstawie roli i ew. wyboru admina
-  const currentView = (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.MANAGER || user.role === USER_ROLES.TECH) ? adminView : user.role;
+  const currentView = ((user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN) || user.role === USER_ROLES.MANAGER || user.role === USER_ROLES.TECH) ? adminView : user.role;
 
   if (currentView === USER_ROLES.OPERATOR) {
     return (
@@ -169,7 +177,7 @@ export default function App() {
             user={user} 
             onLogout={() => handleSetUser(null)} 
             initialMachineId={urlMachineId}
-            onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.MANAGER) : null}
+            onSwitchView={(user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN) ? () => setAdminView(USER_ROLES.MANAGER) : null}
           />
         </Suspense>
       </>
@@ -183,7 +191,7 @@ export default function App() {
         <ManagerView 
           user={user} 
           onLogout={() => handleSetUser(null)} 
-          onSwitchView={user.role === USER_ROLES.ADMIN ? () => setAdminView(USER_ROLES.OPERATOR) : null}
+          onSwitchView={(user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN) ? () => setAdminView(USER_ROLES.OPERATOR) : null}
         />
       </Suspense>
     </>

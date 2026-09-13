@@ -78,7 +78,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         closeConfirmModal();
         setLoading(true);
         try {
-          await updateDoc(doc(db, 'tickets', ticketId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (user?.name || 'System') });
+          await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets', ticketId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (user?.name || 'System') });
           setSelectedTicketId(null);
           showToast('Zgłoszenie zostało trwale usunięte.');
         } catch (err) {
@@ -100,7 +100,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         setLoading(true);
         try {
           const currentData = activeTickets.find(t => t.id === ticketId);
-          await updateDoc(doc(db, 'tickets', ticketId), {
+          await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets', ticketId), {
             isManuallyArchived: true, status: 5,
             closedAt: currentData?.closedAt || new Date().toISOString(),
             completedBy: currentData?.completedBy || user.name,
@@ -124,7 +124,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
 
   const handleUpdate = async (ticketId, newStatus, actionText, newEtr = null, photoUrls = [], noteText = '') => {
     setLoading(true);
-    const ticketRef = doc(db, 'tickets', ticketId);
+    const ticketRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets', ticketId);
     try {
       const currentData = activeTickets.find(t => t.id === ticketId);
       if (!currentData) throw new Error("Zgłoszenie nie istnieje w systemie!");
@@ -193,7 +193,8 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
     setEtr(ticket.etr || '');
   }, []);
 
-  if (selectedTicketId && !currentTicket) {
+  const renderContent = () => {
+    if (selectedTicketId && !currentTicket) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
@@ -323,9 +324,16 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         loadingArchive={loadingArchive}
       />
       
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {renderContent()}
       {toastConfig.show && <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />}
       <ConfirmModal isOpen={confirmModalConfig.isOpen} title={confirmModalConfig.title} message={confirmModalConfig.message} onConfirm={confirmModalConfig.onConfirm} onCancel={closeConfirmModal} confirmText={confirmModalConfig.confirmText} />
-    </div>
+    </>
   );
 }
 

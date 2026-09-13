@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function Roles() {
   const [roles, setRoles] = useState([]);
@@ -66,13 +67,13 @@ export default function Roles() {
   const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
 
   useEffect(() => {
-    const unsubMod = onSnapshot(doc(db, 'settings', 'general'), (snap) => {
+    const unsubMod = onSnapshot(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', 'general'), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
         setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false });
       }
     });
-    const unsub = onSnapshot(collection(db, "roles"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'roles'), (snapshot) => {
       setRoles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
     return () => { unsub(); unsubMod(); };
@@ -91,9 +92,9 @@ export default function Roles() {
     setLoading(true);
     try {
       if (editingId) {
-        await updateDoc(doc(db, "roles", editingId), { name, permissions });
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'roles', editingId), { name, permissions });
       } else {
-        await addDoc(collection(db, "roles"), {
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'roles'), {
           name,
           permissions,
           createdAt: serverTimestamp()
@@ -118,7 +119,7 @@ export default function Roles() {
 
   const handleDelete = async (id) => {
     if (confirm("Czy na pewno chcesz usunąć tę rolę? UWAGA: Użytkownicy z tą rolą stracą wszystkie dostępy!")) {
-      await updateDoc(doc(db, "roles", id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'roles', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
     }
   };
 

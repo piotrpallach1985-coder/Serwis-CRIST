@@ -79,6 +79,7 @@ export const ACTION_ITEM_STATUS_LABELS = Object.freeze({
  * @enum {string}
  */
 export const USER_ROLES = Object.freeze({
+  SUPERADMIN: 'superadmin',
   ADMIN: 'admin',
   MANAGER: 'kierownik',
   MANAGER_ALT: 'manager',

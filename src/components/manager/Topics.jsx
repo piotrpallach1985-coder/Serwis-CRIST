@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, deleteDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function Topics() {
   const [topics, setTopics] = useState([]);
@@ -10,7 +11,7 @@ export default function Topics() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'topics'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'), (snapshot) => {
       setTopics(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
     return () => unsubscribe();
@@ -23,9 +24,9 @@ export default function Topics() {
     setLoading(true);
     try {
       if (editingId) {
-        updateDoc(doc(db, 'topics', editingId), { text: newTopic.trim() });
+        updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics', editingId), { text: newTopic.trim() });
       } else {
-        const newTopicRef = doc(collection(db, 'topics'));
+        const newTopicRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'));
         setDoc(newTopicRef, {
           text: newTopic.trim(),
         }).catch(err => console.error(err));
@@ -43,7 +44,7 @@ export default function Topics() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten temat z listy podpowiedzi?')) {
-      await updateDoc(doc(db, 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
     }
   };
 
@@ -65,7 +66,7 @@ export default function Topics() {
       "Wymiana części eksploatacyjnych"
     ];
     for (const text of defaults) {
-      const newDocRef = doc(collection(db, 'topics'));
+      const newDocRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'));
       setDoc(newDocRef, { text }).catch(err => console.error(err));
     }
   };

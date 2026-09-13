@@ -72,9 +72,9 @@ export default function PlannedMaintenance({
     if (loadingArchive || (!hasMoreArchive && loadMore)) return;
     setLoadingArchive(true);
     try {
-      let q = query(collection(db, 'planned_services'), orderBy('createdAt', 'desc'), limit(100));
+      let q = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'planned_services'), orderBy('createdAt', 'desc'), limit(100));
       if (loadMore && lastArchiveDocRef.current) {
-        q = query(collection(db, 'planned_services'), orderBy('createdAt', 'desc'), startAfter(lastArchiveDocRef.current), limit(100));
+        q = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'planned_services'), orderBy('createdAt', 'desc'), startAfter(lastArchiveDocRef.current), limit(100));
       }
       const snapshot = await getDocs(q);
       const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted && item.status === 'completed');
@@ -343,7 +343,7 @@ export default function PlannedMaintenance({
       const historyEntry = { date: new Date().toISOString(), user: user.name, action: 'Zakończono serwis', note: completionNotes, checklistSummary };
       await markServiceCompleted(completionModal.id, { completedBy: user.name, notes: completionNotes, checklistResponses, historyEntry }, nextPlanData);
       if (createActionItem && actionItemProblem.trim()) {
-        await addDoc(collection(db, 'action_items'), { machineId: completionModal.machineId || '', plannedServiceId: completionModal.id || '', problem: actionItemProblem.trim(), dueDate: actionItemDueDate ? new Date(actionItemDueDate).toISOString() : null, status: 'pending', createdAt: new Date().toISOString(), createdBy: user.name || 'Nieznany' });
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'action_items'), { machineId: completionModal.machineId || '', plannedServiceId: completionModal.id || '', problem: actionItemProblem.trim(), dueDate: actionItemDueDate ? new Date(actionItemDueDate).toISOString() : null, status: 'pending', createdAt: new Date().toISOString(), createdBy: user.name || 'Nieznany' });
       }
       setCompletionModal(null); setCompletionNotes(''); setChecklistResponses({}); setCreateNewPlan(true); setCreateActionItem(false); setActionItemProblem(''); setActionItemDueDate('');
     } catch (err) { console.error(err); alert('Błąd: ' + err.message); }
@@ -353,7 +353,7 @@ export default function PlannedMaintenance({
     if (!noteText?.trim()) return;
     try {
       const noteObj = { text: noteText.trim(), author: user?.name || 'Nieznany', createdAt: new Date().toISOString() };
-      await updateDoc(doc(db, 'planned_services', serviceId), { futureNotes: arrayUnion(noteObj) });
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'planned_services', serviceId), { futureNotes: arrayUnion(noteObj) });
       if (onDone) onDone();
     } catch (err) { console.error(err); alert('Błąd dodawania notatki: ' + err.message); }
   };

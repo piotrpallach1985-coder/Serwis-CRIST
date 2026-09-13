@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 import { generateAuditorReport } from '../utils/reports/auditorExport';
 import { db, auth } from '../firebase';
 import { USER_ROLES } from '../utils/constants';
+import { useManagerStore } from '../store/managerStore';
 
 export default function Login({ onLogin, currentUser }) {
   const [isScanning, setIsScanning] = useState(false);
@@ -15,7 +16,7 @@ export default function Login({ onLogin, currentUser }) {
     } catch (e) {
       console.warn('Anonymous sign-in failed', e);
     }
-    window.history.replaceState({ module: 'master_data', tab: 'machines' }, '', '?module=master_data&tab=machines&openMachine=' + machineId);
+    window.history.replaceState({ module: 'operator' }, '', '?module=operator&machine=' + machineId);
     onLogin(currentUser);
   };
   
@@ -28,6 +29,7 @@ export default function Login({ onLogin, currentUser }) {
   const [dbStatus, setDbStatus] = useState('checking'); 
   const [loginModalTarget, setLoginModalTarget] = useState(null); 
 
+  const tenantId = useManagerStore(state => state.tenantId);
   const [branding, setBranding] = useState({
     companyName: 'CRIST S.A.',
     systemSubtitle: 'MAINT SYSTEM PORTAL',
@@ -36,24 +38,48 @@ export default function Login({ onLogin, currentUser }) {
   });
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'general'), (snap) => {
+    const currentTenantId = tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+    const unsub = onSnapshot(doc(db, 'tenants', currentTenantId, 'settings', 'general'), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
         setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false });
       }
     });
     return () => unsub();
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "branding"), (docSnap) => {
+    const currentTenantId = tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+    
+    // Subskrypcja GLOBALNYCH ustawień (Logo Aplikacji - VexoNT)
+    let globalAppLogo = '';
+    const unsubGlobal = onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), (globalSnap) => {
+      if (globalSnap.exists()) {
+        globalAppLogo = globalSnap.data().appLogoUrl || '';
+        setBranding(prev => ({ ...prev, appLogoUrl: globalAppLogo }));
+      }
+    });
+
+    const unsub = onSnapshot(doc(db, 'tenants', currentTenantId, 'settings', "branding"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setBranding(prev => ({ ...prev, ...data }));
+        setBranding(prev => ({ 
+          companyName: data.companyName || currentTenantId.toUpperCase(),
+          systemSubtitle: data.systemSubtitle || 'MAINT SYSTEM PORTAL',
+          companyLogoUrl: data.companyLogoUrl || '',
+          appLogoUrl: data.appLogoUrl || prev.appLogoUrl 
+        }));
+      } else {
+        setBranding({ 
+          companyName: currentTenantId.toUpperCase(),
+          systemSubtitle: 'MAINT SYSTEM PORTAL',
+          companyLogoUrl: '',
+          appLogoUrl: '' 
+        });
       }
     });
     return () => unsub();
-  }, []);
+  }, [tenantId]);
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -72,13 +98,25 @@ export default function Login({ onLogin, currentUser }) {
         setErrorMsg('Zalogowano, ale brak przypisanej roli w bazie danych.');
       } else {
         const userData = userDoc.data();
-        const targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
-        window.history.replaceState({ module: targetModule, tab: targetModule === 'home' ? 'home' : undefined }, '', `?module=${targetModule}${targetModule === 'home' ? '&tab=home' : ''}`);
+        let targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
+          let targetTab = targetModule === 'home' ? 'home' : undefined;
+          
+          if (userData.role === 'superadmin') {
+            targetModule = 'system_admin';
+            targetTab = 'superadmin';
+          }
+
+          window.history.replaceState(
+            { module: targetModule, tab: targetTab }, 
+            '', 
+            `?module=${targetModule}${targetTab ? '&tab=' + targetTab : ''}`
+          );
         onLogin({ 
           uid: user.uid,
           name: userData.name || user.email, 
           role: userData.role || 'brak', 
-          permissions: userData.permissions || [] 
+          permissions: userData.permissions || [],
+          tenantId: userData.tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist' 
         });
         setLoginModalTarget(null);
       }
@@ -157,7 +195,7 @@ export default function Login({ onLogin, currentUser }) {
       
       {/* GÓRNY PASEK LOGO (Logo aplikacji) */}
       <div className="absolute top-4 left-4 z-50">
-        <img src={branding?.appLogoUrl || '/pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
+        <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
       </div>
       
       {currentUser && currentUser.role !== 'operator' && (

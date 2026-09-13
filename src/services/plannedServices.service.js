@@ -1,3 +1,4 @@
+import { useManagerStore } from '../store/managerStore';
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, query, where, arrayUnion, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { createNotification } from './notifications.service';
@@ -16,7 +17,7 @@ import { SERVICE_STATUS, TIME_THRESHOLDS } from '../utils/constants';
  * @returns {Promise<import('firebase/firestore').DocumentReference>} Referencja do utworzonego dokumentu
  */
 export const addPlannedService = async (serviceData) => {
-  return await addDoc(collection(db, 'planned_services'), {
+  return await addDoc(collection(db, 'tenants', tenantId, 'planned_services'), {
     ...serviceData,
     createdAt: serverTimestamp(),
     status: SERVICE_STATUS.PENDING,
@@ -32,7 +33,8 @@ export const addPlannedService = async (serviceData) => {
  * @returns {Promise<void>}
  */
 export const updatePlannedService = async (serviceId, data) => {
-  return await updateDoc(doc(db, 'planned_services', serviceId), data);
+  const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+  return await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), data);
 };
 
 /**
@@ -42,7 +44,8 @@ export const updatePlannedService = async (serviceId, data) => {
  * @returns {Promise<void>}
  */
 export const deletePlannedService = async (serviceId) => {
-  return await updateDoc(doc(db, 'planned_services', serviceId), { 
+  const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+  return await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), { 
     isDeleted: true, 
     deletedAt: serverTimestamp(), 
     deletedBy: 'System' 
@@ -60,7 +63,7 @@ export const deletePlannedService = async (serviceId) => {
  */
 export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null, actionItemData = null) => {
   const batch = writeBatch(db);
-  const serviceRef = doc(db, 'planned_services', serviceId);
+  const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceId);
   
   const payload = {
     status: SERVICE_STATUS.COMPLETED,
@@ -86,13 +89,13 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
     if (nextDateRaw && typeof nextDateRaw.toISOString === 'function') {
       nextDataObj.nextDate = nextDateRaw.toISOString();
     }
-    const newServiceRef = doc(collection(db, 'planned_services'));
+    const newServiceRef = doc(collection(db, 'tenants', tenantId, 'planned_services'));
     batch.set(newServiceRef, nextDataObj);
   }
 
   // Generujemy action item (tematy do realizacji), jeśli dodano podczas odbioru
   if (actionItemData) {
-    const newActionItemRef = doc(collection(db, 'action_items'));
+    const newActionItemRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'action_items'));
     batch.set(newActionItemRef, actionItemData);
   }
 
@@ -110,7 +113,7 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
 export const checkAndTriggerDueServices = async (machinesMap) => {
   try {
     const q = query(
-      collection(db, 'planned_services'), 
+      collection(db, 'tenants', tenantId, 'planned_services'), 
       where('status', '==', SERVICE_STATUS.PENDING)
     );
     const snapshot = await getDocs(q);
@@ -156,7 +159,7 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
 
         if (shouldAlert) {
           // Wysyłamy powiadomienie do batcha
-          const newNotifRef = doc(collection(db, 'notifications'));
+          const newNotifRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'notifications'));
           batch.set(newNotifRef, {
             title: `Planowany Serwis: ${machine.name}`,
             message: alertMessage,

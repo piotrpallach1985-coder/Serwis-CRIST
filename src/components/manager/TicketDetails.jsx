@@ -222,7 +222,7 @@ export default function TicketDetails({
                                         <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 2, "Weryfikacja zgłoszenia", etr)} className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-md transition-all">
                                           Przyjęcie zgłoszenia (Rozpocznij weryfikację)
                                         </button>
-                                        {user?.role === USER_ROLES.ADMIN && (
+                                        {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) && (
                                           <button 
                                             disabled={loading} 
                                             onClick={() => {
@@ -296,7 +296,7 @@ export default function TicketDetails({
                                 )}
 
                                 {/* Admin Actions for closed/archived */}
-                                {user?.role === USER_ROLES.ADMIN && step.id === TICKET_STATUS.CLOSED && (
+                                {(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) && step.id === TICKET_STATUS.CLOSED && (
                                   <div className="space-y-3 pt-3 border-t border-[#e8e4db]">
                                     {!isArchive && (
                                       <button 
@@ -501,7 +501,7 @@ export default function TicketDetails({
 
       {machines?.some(m => m.id === currentTicket.machineId) && (
         <div className="mt-8">
-          <MachineDTR machine={machines?.find(m => m.id === currentTicket.machineId)} canManage={user?.role === 'manager' || user?.role === USER_ROLES.ADMIN} />
+          <MachineDTR machine={machines?.find(m => m.id === currentTicket.machineId)} canManage={user?.role === 'manager' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)} />
         </div>
       )}
 

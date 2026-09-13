@@ -5,8 +5,10 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import jsQR from 'jsqr';
 import { Html5Qrcode } from 'html5-qrcode';
 import OperatorForm from './OperatorForm';
+import { useManagerStore } from '../store/managerStore';
 
 export default function OperatorView({ user, onLogout, initialMachineId, onSwitchView }) {
+  const tenantId = useManagerStore(state => state.tenantId) || new URLSearchParams(window.location.search).get('tenant') || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
   const [topicsList, setTopicsList] = useState([]);
@@ -71,7 +73,7 @@ return () => window.removeEventListener('popstate', handlePopState);
         if (authUser) {
           // Firebase Auth confirms we have a token, safe to attach listeners
 
-      unsubscribeMachines = onSnapshot(collection(db, "machines"), async (querySnapshot) => {
+      unsubscribeMachines = onSnapshot(collection(db, 'tenants', tenantId, 'machines'), async (querySnapshot) => {
         const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
         setMachines(machinesData);
 
@@ -81,7 +83,7 @@ return () => window.removeEventListener('popstate', handlePopState);
             setSelectedMachine(targetMachine);
             handleStepChange('form');
           } else {
-            const docRef = doc(db, "machines", initialMachineId);
+            const docRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', initialMachineId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
               setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
@@ -91,15 +93,15 @@ return () => window.removeEventListener('popstate', handlePopState);
         }
       }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
 
-      unsubscribeTopics = onSnapshot(collection(db, "topics"), (querySnapshot) => {
+      unsubscribeTopics = onSnapshot(collection(db, 'tenants', tenantId, 'topics'), (querySnapshot) => {
         setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
       }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
 
-      unsubscribeReporters = onSnapshot(collection(db, "reporters"), (querySnapshot) => {
+      unsubscribeReporters = onSnapshot(collection(db, 'tenants', tenantId, 'reporters'), (querySnapshot) => {
         setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
       }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
 
-      unsubscribeRegions = onSnapshot(collection(db, "regions"), (querySnapshot) => {
+      unsubscribeRegions = onSnapshot(collection(db, 'tenants', tenantId, 'regions'), (querySnapshot) => {
         setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
       }, (error) => console.error("SNAPSHOT ERROR FOR regions:", error));
               }
@@ -307,38 +309,7 @@ return () => window.removeEventListener('popstate', handlePopState);
               </div>
             )}
             
-            <div className="mt-8 border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-medium text-gray-700 mb-3">Lub wpisz nazwę i wybierz z listy</h3>
-              <input 
-                type="text"
-                list="machine-datalist"
-                placeholder="Zacznij wpisywać nazwę maszyny..."
-                className="w-full max-w-md mx-auto block p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white text-left mb-4 shadow-sm"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const m = machines.find(machine => `${machine.name} ${machine.bay ? `(${machine.bay})` : ''}` === val);
-                  if (m) {
-                    setSelectedMachine(m);
-                    handleStepChange('form');
-                  }
-                }}
-              />
-              <datalist id="machine-datalist">
-                {machines.map(m => (
-                  <option key={m.id} value={`${m.name} ${m.bay ? `(${m.bay})` : ''}`} />
-                ))}
-              </datalist>
-              
-              <button 
-                onClick={() => {
-                  setSelectedMachine({ id: 'manual', name: '' });
-                  handleStepChange('form');
-                }}
-                className="w-full max-w-md mx-auto p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-400 transition-colors"
-              >
-                + Brak na liście? Dodaj maszynę ręcznie
-              </button>
-            </div>
+            
           </div>
         )}
         
@@ -383,13 +354,7 @@ return () => window.removeEventListener('popstate', handlePopState);
             >
               Zgłoś kolejną awarię
             </button>
-            <button 
-              onClick={() => {
-                window.location.href = window.location.pathname;
-              }} 
-              className="w-full sm:w-auto mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-xl transition-all uppercase tracking-widest text-sm shadow-xl shadow-red-600/20 active:scale-95">
-                {'Powr\u00F3t'}
-              </button>
+            
           </div>
         )}
       </main>

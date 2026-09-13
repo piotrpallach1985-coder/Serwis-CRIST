@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function Regions() {
   const [regions, setRegions] = useState([]);
@@ -17,12 +18,12 @@ export default function Regions() {
   const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
-    const unsubRegions = onSnapshot(collection(db, "regions"), (snapshot) => {
+    const unsubRegions = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions'), (snapshot) => {
       const fetchedRegions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       fetchedRegions.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setRegions(fetchedRegions);
     });
-    const unsubMachines = onSnapshot(collection(db, "machines"), (snapshot) => {
+    const unsubMachines = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines'), (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     console.log('DEBUG REGIONS LENGTH:', regions.length, 'MAPPED ROWS:', regions.filter(r => showDeleted ? true : !r.isDeleted).length);
@@ -58,13 +59,13 @@ export default function Regions() {
       }
 
       if (editingId) {
-        await updateDoc(doc(db, "regions", editingId), { 
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions', editingId), { 
           name: name.trim(), 
           description: description.trim(),
           mapImageUrl: finalImageUrl
         });
       } else {
-        await addDoc(collection(db, "regions"), {
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions'), {
           name: name.trim(),
           description: description.trim(),
           mapImageUrl: finalImageUrl,
@@ -98,7 +99,7 @@ export default function Regions() {
   const handleRestore = async (id) => {
     if (window.confirm('Czy na pewno chcesz przywrócić ten rejon?')) {
       try {
-        await updateDoc(doc(db, "regions", id), { isDeleted: false });
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions', id), { isDeleted: false });
         alert('Rejon przywrócony pomyślnie.');
       } catch (err) {
         alert("Błąd: " + err.message);
@@ -108,7 +109,7 @@ export default function Regions() {
 
   const handleDelete = async (id) => {
     try {
-      const machinesQuery = query(collection(db, 'machines'), where('regionId', '==', id));
+      const machinesQuery = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines'), where('regionId', '==', id));
       const machinesSnapshot = await getDocs(machinesQuery);
       
       if (!machinesSnapshot.empty) {
@@ -117,7 +118,7 @@ export default function Regions() {
       }
       
       if (confirm("Czy na pewno chcesz usunąć ten rejon?")) {
-        await updateDoc(doc(db, "regions", id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'regions', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       }
     } catch (err) {
       console.error(err);

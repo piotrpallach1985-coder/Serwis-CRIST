@@ -22,7 +22,7 @@ export function usePermissions(user, roles) {
       };
     }
 
-    const isAdmin = user.role === USER_ROLES.ADMIN;
+    const isAdmin = (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN) || user.role === USER_ROLES.SUPERADMIN;
     const isManager = user.role === 'manager' || isAdmin;
 
     // Szukamy konfiguracji roli w bazie (opcjonalne - może nie istnieć)

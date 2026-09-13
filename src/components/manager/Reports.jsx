@@ -15,7 +15,7 @@ export default function Reports() {
   const [localWarningDays, setLocalWarningDays] = useState(30);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "general"), (docSnap) => {
+    const unsub = onSnapshot(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', "general"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.localWarningDays !== undefined) {
@@ -29,7 +29,7 @@ export default function Reports() {
   const handleGenerateAuditorReport = async () => {
     setLoading(true);
     try {
-      await generateAuditorReport();
+      await generateAuditorReport(useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist');
     } catch (err) {
       alert('Błąd podczas generowania raportu: ' + err.message);
     } finally {
@@ -39,7 +39,7 @@ export default function Reports() {
 
   const saveWarningDays = async (val) => {
     try {
-      await setDoc(doc(db, "settings", "general"), {
+      await setDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', "general"), {
         localWarningDays: parseInt(val, 10)
       }, { merge: true });
     } catch (e) {

@@ -3,6 +3,7 @@ import { generateKPIReportPDF } from '../../../utils/reports/pdfKPIReport';
 import { safeParseDate } from '../../../utils/dateHelpers';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { useManagerStore } from '../../../store/managerStore';
 
 export default function KPIReportPanel({ machines }) {
   const [reportPeriod, setReportPeriod] = useState('30'); // '30', '90', 'all'
@@ -12,10 +13,10 @@ export default function KPIReportPanel({ machines }) {
     setLoading(true);
     try {
       // Pobieranie wszystkich danych na żądanie (w tym zamkniętych awarii)
-      const ticketsSnap = await getDocs(collection(db, 'tickets'));
+      const ticketsSnap = await getDocs(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets'));
       const tickets = ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
       
-      const plannedSnap = await getDocs(collection(db, 'planned_services'));
+      const plannedSnap = await getDocs(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'planned_services'));
       const plannedServices = plannedSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
 
       const now = new Date();

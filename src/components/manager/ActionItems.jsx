@@ -42,7 +42,7 @@ export default function ActionItems({ user }) {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'action_items'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'action_items'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
       setLoading(false);
@@ -128,7 +128,7 @@ export default function ActionItems({ user }) {
         updateData.completedAt = new Date().toISOString();
         updateData.completedBy = user?.name || 'Nieznany';
       }
-      await updateDoc(doc(db, 'action_items', id), updateData);
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'action_items', id), updateData);
     } catch (err) {
       console.error(err);
       alert('Błąd aktualizacji statusu');

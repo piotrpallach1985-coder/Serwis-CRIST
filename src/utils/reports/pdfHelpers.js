@@ -1,10 +1,11 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { FALLBACK_LOGO_BASE64 } from './logoBase64';
+import { useManagerStore } from '../../store/managerStore';
 
 export const getBrandingLogoBase64 = async () => {
   try {
-    const d = await getDoc(doc(db, "settings", "branding"));
+    const d = await getDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'settings', "branding"));
     if (d.exists()) {
       const data = d.data();
       // Jeśli w bazie mamy zapisaną miniaturę Base64, zwracamy ją natychmiast bez żadnych zapytań sieciowych (0ms, 0 błędów CORS).

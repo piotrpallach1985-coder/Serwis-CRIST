@@ -26,9 +26,9 @@ export default function Reporters() {
         position: position.trim()
       };
       if (editingId) {
-        await updateDoc(doc(db, 'reporters', editingId), payload);
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'reporters', editingId), payload);
       } else {
-        await addDoc(collection(db, 'reporters'), payload);
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'reporters'), payload);
       }
       setName('');
       setPhone('');
@@ -45,7 +45,7 @@ export default function Reporters() {
   const handleDelete = async (id, reporterName) => {
     if (window.confirm(`Czy na pewno chcesz usunąć pracownika: ${reporterName}?`)) {
       try {
-        await updateDoc(doc(db, 'reporters', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'reporters', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       } catch (err) {
         alert("Błąd podczas usuwania: " + err.message);
       }

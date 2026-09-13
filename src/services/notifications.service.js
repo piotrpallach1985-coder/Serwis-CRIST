@@ -1,6 +1,7 @@
 import { collection, addDoc, updateDoc, doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db, messaging } from '../firebase';
 import { getToken, onMessage } from 'firebase/messaging';
+import { useManagerStore } from '../store/managerStore';
 
 export const requestPushPermission = async (userId) => {
   if (!messaging) return null;
@@ -17,7 +18,7 @@ export const requestPushPermission = async (userId) => {
       
       if (currentToken) {
         // Zapisujemy token do profilu użytkownika
-        const userRef = doc(db, 'users', userId);
+        const userRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'users', userId);
         await updateDoc(userRef, {
           fcmTokens: arrayUnion(currentToken)
         });
@@ -41,7 +42,7 @@ export const listenToForegroundMessages = (callback) => {
 
 
 export const createNotification = async (notifData) => {
-  return await addDoc(collection(db, 'notifications'), {
+  return await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'notifications'), {
     ...notifData,
     createdAt: serverTimestamp(),
     read: false
@@ -49,6 +50,6 @@ export const createNotification = async (notifData) => {
 };
 
 export const markNotificationAsRead = async (notifId) => {
-  const notifRef = doc(db, 'notifications', notifId);
+  const notifRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'notifications', notifId);
   return await updateDoc(notifRef, { read: true });
 };

@@ -14,7 +14,6 @@ import Machines from './manager/Machines';
 import Regions from './manager/Regions';
 import Roles from './manager/Roles';
 import Users from './manager/Users';
-import Settings from './manager/Settings';
 import Reports from './manager/Reports';
 import Services from './manager/Services';
 import Topics from './manager/Topics';
@@ -22,24 +21,28 @@ import Reporters from './manager/Reporters';
 import PlannedMaintenance from './manager/PlannedMaintenance';
 import ActionItems from './manager/ActionItems';
 import NotificationCenter from './manager/NotificationCenter';
+import SuperAdminPanel from './manager/SuperAdminPanel';
+
 import { USER_ROLES } from '../utils/constants';
 
 function ManagerViewInner({ user, onLogout }) {
   // --- Routing ---
   const [currentModule, setCurrentModule] = useState(() => {
     const p = new URLSearchParams(window.location.search);
+    if (!window.location.search && user?.role === 'superadmin') return 'system_admin';
     const m = p.get('module') || 'home';
     if (m === 'tickets' || m === 'planned_maintenance' || m === 'master_data') return 'ur';
     return m;
   });
   const [activeTab, setActiveTab] = useState(() => {
     const p = new URLSearchParams(window.location.search);
+    if (!window.location.search && user?.role === 'superadmin') return 'superadmin';
     const m = p.get('module') || 'home';
     const t = p.get('tab');
     if (t) return t;
     if (m === 'home') return 'home';
     if (m === 'company_admin') return 'users';
-    if (m === 'system_admin') return 'settings';
+    if (m === 'system_admin') return 'superadmin';
     return 'dashboard_tickets';
   });
 
@@ -156,7 +159,7 @@ function ManagerViewInner({ user, onLogout }) {
   const getModuleTitle = () => {
     if (currentModule === 'ur') return 'Panel Awarii i Serwisu';
     if (currentModule === 'company_admin') return 'Administrator Firmy';
-    if (currentModule === 'system_admin') return 'Administrator Programu';
+    if (currentModule === 'system_admin') return 'Super Panel SaaS';
     return 'System CMMS';
   };
 
@@ -180,6 +183,7 @@ function ManagerViewInner({ user, onLogout }) {
 
       {/* === GŁÓWNA TREŚĆ === */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        
         {/* MOBILNA GÓRNA BELKA (widoczna tylko na ekranach < lg) */}
         <div className="lg:hidden bg-[#1B253B] text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-gray-800 shrink-0 z-[200]">
           <div className="flex items-center gap-2.5">
@@ -305,6 +309,7 @@ function ManagerViewInner({ user, onLogout }) {
 
           {/* Inne */}
           {activeTab === 'action_items' && <ActionItems user={user} />}
+          {activeTab === 'superadmin' && <SuperAdminPanel user={user} onNavigate={handleNavigate} />}
           {activeTab === 'kpi' && <KPIDashboard />}
 
           {/* Master Data */}
@@ -339,8 +344,7 @@ function ManagerViewInner({ user, onLogout }) {
           {activeTab === 'reporters' && <Reporters />}
           {activeTab === 'users' && <Users />}
           {activeTab === 'roles' && <Roles />}
-          {activeTab === 'settings' && <Settings />}
-          {activeTab === 'reports' && <Reports />}
+                    {activeTab === 'reports' && <Reports />}
 
         </div>
       </main>

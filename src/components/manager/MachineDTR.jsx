@@ -36,7 +36,7 @@ export default function MachineDTR({ machine, canManage }) {
       const updatedNotes = [...localNotes, noteObj];
       setLocalNotes(updatedNotes);
       setNewNote('');
-      await updateDoc(doc(db, 'machines', machine.id), {
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
         techNotes: updatedNotes
       });
     } catch (err) {
@@ -49,7 +49,7 @@ export default function MachineDTR({ machine, canManage }) {
     try {
       const updatedNotes = localNotes.filter(n => n.id !== noteId);
       setLocalNotes(updatedNotes);
-      await updateDoc(doc(db, 'machines', machine.id), {
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
         techNotes: updatedNotes
       });
     } catch (err) {
@@ -115,7 +115,7 @@ export default function MachineDTR({ machine, canManage }) {
           };
           const updatedFiles = [...localDtrFiles, newFileObj];
           setLocalDtrFiles(updatedFiles);
-          await updateDoc(doc(db, 'machines', machine.id), {
+          await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
             dtrFiles: updatedFiles
           });
         } catch (err) {
@@ -136,7 +136,7 @@ export default function MachineDTR({ machine, canManage }) {
       await deleteObject(storageRef);
       const updatedFiles = localDtrFiles.filter(f => f.id !== fileObj.id);
       setLocalDtrFiles(updatedFiles);
-      await updateDoc(doc(db, 'machines', machine.id), {
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
         dtrFiles: updatedFiles
       });
     } catch (err) {

@@ -323,7 +323,7 @@ export default function PlannedMaintenanceDetails({
         machines={machines} handleSaveService={handleSaveService}
       />
 
-      <MachineDTR machine={machines.find(m => m.id === srv?.machineId)} canManage={user?.role === 'manager' || user?.role === USER_ROLES.ADMIN} />
+      <MachineDTR machine={machines.find(m => m.id === srv?.machineId)} canManage={user?.role === 'manager' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)} />
 
       {/* Lightbox */}
       {lightboxImg && (

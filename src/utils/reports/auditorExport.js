@@ -3,7 +3,7 @@ import { db } from '../../firebase';
 import { safeParseDate } from '../dateHelpers';
 import { TICKET_STATUS_LABELS, ACTION_ITEM_STATUS_LABELS } from '../constants';
 
-export const generateAuditorReport = async () => {
+export const generateAuditorReport = async (tenantId) => {
   const XLSX = await import('xlsx');
 
   try {
@@ -11,7 +11,7 @@ export const generateAuditorReport = async () => {
 
     // Helper to fetch collection
     const fetchCol = async (colName) => {
-      const snap = await getDocs(collection(db, colName));
+      const snap = await getDocs(collection(db, 'tenants', tenantId, colName));
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     };
 

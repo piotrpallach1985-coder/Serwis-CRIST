@@ -9,12 +9,32 @@ import { TICKET_STATUS } from '../utils/constants';
  * Subskrybuje wszystkie kolekcje Firestore i zwraca dane + ustawienia.
  */
 export function useManagerData() {
+  const tenantId = useManagerStore(state => state.tenantId);
   const { setTickets, setMachines, setReporters, setServices, setPlannedServices, setNotifications, setActionItems, setRoles, setRegions, setAllowTicketDeletion, setPlannedWarningDays, setBranding } = useManagerStore.getState();
 
   useEffect(() => {
+    if (!tenantId) return;
+    
+    // Zabezpieczenie przed "wylewaniem" starych danych po przełączeniu firmy
+    setTickets([]);
+    setMachines([]);
+    setReporters([]);
+    setServices([]);
+    setPlannedServices([]);
+    setNotifications([]);
+    setActionItems([]);
+    setRoles([]);
+    setRegions([]);
+    setBranding({ 
+      companyName: tenantId.toUpperCase(), 
+      systemSubtitle: 'DYSPOZYTORNIA UR', 
+      companyLogoUrl: '', 
+      appLogoUrl: useManagerStore.getState().branding.appLogoUrl || '' 
+    });
+
     // --- Tickets (aktywne, nie-zarchiwizowane) ---
     const qTickets = query(
-      collection(db, 'tickets'),
+      collection(db, 'tenants', tenantId, 'tickets'),
       orderBy('createdAt', 'desc'),
       limit(500)
     );
@@ -27,23 +47,23 @@ export function useManagerData() {
     });
 
     // --- Maszyny ---
-    const unsubMachines = onSnapshot(collection(db, 'machines'), (snapshot) => {
+    const unsubMachines = onSnapshot(collection(db, 'tenants', tenantId, 'machines'), (snapshot) => {
       setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
     });
 
     // --- Zgłaszający ---
-    const unsubReporters = onSnapshot(collection(db, 'reporters'), (snapshot) => {
+    const unsubReporters = onSnapshot(collection(db, 'tenants', tenantId, 'reporters'), (snapshot) => {
       setReporters(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
     });
 
     // --- Słownik serwisów ---
-    const unsubServices = onSnapshot(collection(db, 'services'), (snapshot) => {
+    const unsubServices = onSnapshot(collection(db, 'tenants', tenantId, 'services'), (snapshot) => {
       setServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
     });
 
     // --- Serwisy planowane ---
     const qPlanned = query(
-      collection(db, 'planned_services'),
+      collection(db, 'tenants', tenantId, 'planned_services'),
       where('status', '!=', 'completed')
     );
     const unsubPlanned = onSnapshot(qPlanned, (snapshot) => {
@@ -52,7 +72,7 @@ export function useManagerData() {
 
     // --- Powiadomienia (ograniczone do ostatnich) ---
     const qNotifications = query(
-      collection(db, 'notifications'),
+      collection(db, 'tenants', tenantId, 'notifications'),
       orderBy('createdAt', 'desc'),
       limit(100)
     );
@@ -66,7 +86,7 @@ export function useManagerData() {
 
     // --- Zadania do realizacji ---
     const qActionItems = query(
-      collection(db, 'action_items'),
+      collection(db, 'tenants', tenantId, 'action_items'),
       orderBy('createdAt', 'desc'),
       limit(100)
     );
@@ -75,17 +95,17 @@ export function useManagerData() {
     });
 
     // --- Role ---
-    const unsubRoles = onSnapshot(collection(db, 'roles'), (snapshot) => {
+    const unsubRoles = onSnapshot(collection(db, 'tenants', tenantId, 'roles'), (snapshot) => {
       setRoles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
     });
 
     // --- Rejony ---
-    const unsubRegions = onSnapshot(collection(db, 'regions'), (snapshot) => {
+    const unsubRegions = onSnapshot(collection(db, 'tenants', tenantId, 'regions'), (snapshot) => {
       setRegions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted));
     });
 
     // --- Ustawienia ogólne ---
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+    const unsubSettings = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.allowTicketDeletion !== undefined) setAllowTicketDeletion(data.allowTicketDeletion);
@@ -94,9 +114,16 @@ export function useManagerData() {
     });
 
     // --- Branding ---
-    const unsubBranding = onSnapshot(doc(db, 'settings', 'branding'), (docSnap) => {
+    const unsubBranding = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'branding'), (docSnap) => {
       if (docSnap.exists()) {
-        setBranding({ ...useManagerStore.getState().branding, ...docSnap.data() });
+        const data = docSnap.data();
+          const currentGlobalAppLogo = useManagerStore.getState().branding.appLogoUrl;
+          setBranding({ 
+            companyName: data.companyName || tenantId.toUpperCase(),
+            systemSubtitle: data.systemSubtitle || 'DYSPOZYTORNIA UR',
+            companyLogoUrl: data.companyLogoUrl || '',
+            appLogoUrl: data.appLogoUrl || currentGlobalAppLogo
+          });
       }
     });
 
@@ -113,7 +140,7 @@ export function useManagerData() {
       unsubSettings();
       unsubBranding();
     };
-  }, []);
+  }, [tenantId]);
 
   return null;
 }

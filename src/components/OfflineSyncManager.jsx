@@ -3,6 +3,7 @@ import { getOfflinePhotos, removeOfflinePhoto } from '../utils/offlineStorage';
 import { db, storage } from '../firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { useManagerStore } from '../store/managerStore';
 
 export default function OfflineSyncManager() {
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function OfflineSyncManager() {
             await uploadString(fileRef, photo.base64Data, 'data_url');
             const url = await getDownloadURL(fileRef);
             
-            const ticketRef = doc(db, 'tickets', photo.ticketId);
+            const ticketRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets', photo.ticketId);
             await updateDoc(ticketRef, {
               photos: arrayUnion(url)
             });

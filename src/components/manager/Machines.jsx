@@ -93,7 +93,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
       confirmText: 'Usuń maszynę',
       onConfirm: async () => {
         try {
-          await updateDoc(doc(db, 'machines', id), { isDeleted: true, deletedAt: serverTimestamp() });
+          await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', id), { isDeleted: true, deletedAt: serverTimestamp() });
           showToast('Maszyna usunięta z widoku');
           if (selectedMachine?.id === id) setSelectedMachine(null);
         } catch (err) {
@@ -108,7 +108,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
   const handleVerifyMachine = async (id, name) => {
     try {
       const cleanName = name.replace('(DO WERYFIKACJI)', '').trim();
-      await updateDoc(doc(db, 'machines', id), { name: cleanName });
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', id), { name: cleanName });
       showToast('Maszyna zweryfikowana.');
     } catch (err) {
       showToast('Błąd: ' + err.message, 'error');
@@ -150,20 +150,20 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
     setLoadingHistory(true);
     try {
       // 1. Pobierz wszystkie zgłoszenia powiązane z tą maszyną (włącznie ze statusem 5 / archiwalnymi)
-      const qTicketsById = query(collection(db, 'tickets'), where('machineId', '==', m.id));
+      const qTicketsById = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets'), where('machineId', '==', m.id));
       const snapTickets = await getDocs(qTicketsById);
       let machineTickets = snapTickets.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
 
       // Sprawdź powiązania po nazwie maszyny (obsługa wariantów z dopiskiem i bez dopisku np. "(DO WERYFIKACJI)")
       const cleanName = m.name ? m.name.replace(/\s*\(DO WERYFIKACJI\)/gi, '').trim() : '';
       if (cleanName) {
-        const qTicketsByName = query(collection(db, 'tickets'), where('machineName', '==', m.name));
+        const qTicketsByName = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets'), where('machineName', '==', m.name));
         const snapByName = await getDocs(qTicketsByName);
         const byNameDocs = snapByName.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
 
         let byCleanDocs = [];
         if (cleanName !== m.name) {
-          const qTicketsByClean = query(collection(db, 'tickets'), where('machineName', '==', cleanName));
+          const qTicketsByClean = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets'), where('machineName', '==', cleanName));
           const snapByClean = await getDocs(qTicketsByClean);
           byCleanDocs = snapByClean.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
         }
@@ -183,7 +183,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
       });
 
       // 2. Pobierz wszystkie serwisy powiązane z tą maszyną (włącznie ze statusem 'completed')
-      const qServices = query(collection(db, 'planned_services'), where('machineId', '==', m.id));
+      const qServices = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'planned_services'), where('machineId', '==', m.id));
       const snapServices = await getDocs(qServices);
       let machineServices = snapServices.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
 

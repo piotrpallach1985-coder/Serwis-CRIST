@@ -28,14 +28,14 @@ export default function Services() {
     if (!newService.trim()) return;
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'services', editingId), {
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'services', editingId), {
           name: newService.trim(),
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
           contactPhone: contactPhone.trim()
         });
       } else {
-        await addDoc(collection(db, 'services'), { 
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'services'), { 
           name: newService.trim(),
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
@@ -66,7 +66,7 @@ export default function Services() {
   const handleDelete = async (id, name) => {
     if (window.confirm(`Czy na pewno chcesz usunąć dział "${name}" z bazy danych?\n(Historia powiązanych z nim napraw pozostanie nienaruszona)`)) {
       try {
-        await updateDoc(doc(db, 'services', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'services', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       } catch (error) {
         console.error('Błąd usuwania serwisu:', error);
         alert('Nie udało się usunąć serwisu.');

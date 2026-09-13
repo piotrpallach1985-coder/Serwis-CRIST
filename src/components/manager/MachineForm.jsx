@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function MachineForm({ isOpen, onClose, editingMachine, regions, onSaved, onError }) {
   const [name, setName] = useState('');
@@ -38,7 +39,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
         if (n.includes('(DO WERYFIKACJI)')) {
           n = n.replace('(DO WERYFIKACJI)', '').trim();
         }
-        await updateDoc(doc(db, 'machines', editingMachine.id), {
+        await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', editingMachine.id), {
           name: n,
           bay: bay.trim(),
           regionId,
@@ -47,7 +48,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
         });
         onSaved('Zaktualizowano maszynę');
       } else {
-        await addDoc(collection(db, 'machines'), {
+        await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines'), {
           name: name.trim(),
           bay: bay.trim(),
           regionId,

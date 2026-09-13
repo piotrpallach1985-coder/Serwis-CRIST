@@ -150,7 +150,7 @@ export default function Sidebar({
             <>
               {/* SEKCJA 1: AWARIE */}
               <div className="space-y-1">
-                <div className="px-3 py-1.5 text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center justify-between">
+                  <div className="px-3 py-1.5 text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Awarie UR</span>
                   {criticalTicketsCount > 0 && (
                     <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold shadow-xs">
@@ -189,17 +189,24 @@ export default function Sidebar({
                   <i className="ph ph-archive text-xl shrink-0"></i>
                   <span className="text-sm">Archiwum Awarii</span>
                 </button>
-
-                <button
-                  onClick={() => handleItemClick('kpi')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-xl transition-all duration-200 group text-left ${activeTab === 'kpi' ? 'bg-red-500/20 text-red-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <i className="ph ph-chart-line-up text-xl shrink-0"></i>
-                  <span className="text-sm">Analiza Awarii (KPI)</span>
-                </button>
               </div>
+                
+                <div className="space-y-1 pt-2 border-t border-gray-800/80">
+                  <div className="px-3 py-1.5 text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Analiza (KPI)</span>
+                  </div>
+                  <button
+                    onClick={() => handleItemClick('kpi')}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-xl transition-all duration-200 group text-left ${activeTab === 'kpi' ? 'bg-blue-500/20 text-blue-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <i className="ph ph-chart-line-up text-xl shrink-0"></i>
+                    <span className="text-sm">Raporty KPI</span>
+                  </button>
+                </div>
 
-              {/* SEKCJA 2: SERWISY */}
+    {branding?.modules?.planned_services !== false && (
+    <>
+  {/* SEKCJA 2: SERWISY */}
               <div className="space-y-1 pt-2 border-t border-gray-800/80">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Serwisy UR</span>
@@ -257,6 +264,9 @@ export default function Sidebar({
                 </button>
               </div>
 
+              </>
+              )}
+              
               {/* SEKCJA 3: DANE BAZOWE */}
               <div className="space-y-1 pt-2 border-t border-gray-800/80">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-blue-400 uppercase tracking-wider">
@@ -354,29 +364,9 @@ export default function Sidebar({
               </button>
             </div>
           )}
-
-          {/* ========================================================================= */}
-          {/* MODUŁ: PANEL ADMINISTRATORA PROGRAMU */}
-          {/* ========================================================================= */}
-          {isSystemAdmin && (
-            <div className="space-y-1">
-              <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Administrator Programu
-              </div>
-
-              <button
-                onClick={() => handleItemClick('settings')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'settings' ? 'bg-slate-700 text-white font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-              >
-                <i className="ph ph-gear-six text-xl shrink-0"></i>
-                <span className="text-sm">Ustawienia & Moduły</span>
-              </button>
-            </div>
-          )}
-
         </div>
 
-        {/* STOPKA SIDEBARA — PROFIL + DWA PRZYCISKI (GŁÓWNY i WYLOGUJ) */}
+        {/* STOPKA SIDEBARA */}
         <div className="flex-shrink-0 bg-[#121927] border-t border-gray-800 p-4">
           <div className="flex items-center gap-3 mb-3.5 px-1">
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shadow-inner shrink-0">
@@ -388,49 +378,56 @@ export default function Sidebar({
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-2">
-            {/* PRZYCISK GŁÓWNY (Powrót do 4 kafelków) */}
-            <button 
+          {user?.role === 'superadmin' && (
+            <button
+              onClick={() => onNavigate('system_admin', 'superadmin')}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-yellow-950/40 hover:bg-yellow-900/60 active:bg-yellow-950 rounded-xl text-sm font-medium text-yellow-300 hover:text-yellow-200 transition-all border border-yellow-900/50 cursor-pointer shadow-xs mb-2"
+              title="Zarządzanie systemem SaaS"
+            >
+              <i className="ph ph-crown text-lg"></i>
+              <span>Zarządzanie SaaS</span>
+            </button>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button
               onClick={handleReturnHome}
-              className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 active:bg-gray-900 rounded-xl text-sm font-medium text-gray-200 hover:text-white transition-all border border-gray-700 cursor-pointer shadow-xs"
-              title="Wróć do Pulpitu Głównego"
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-slate-800/80 hover:bg-slate-700/80 active:bg-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all border border-slate-700/50 cursor-pointer shadow-xs"
+              title="Wróc do ekranu głównego"
             >
               <i className="ph ph-house text-lg text-blue-400"></i>
               <span>Główny</span>
             </button>
             
-            {/* PRZYCISK WYLOGUJ */}
-          <button
-            onClick={() => {
-              if (window.navigator && navigator.serviceWorker) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for(let registration of registrations) {
-                    registration.unregister();
-                  }
-                });
-              }
-              window.location.reload(true);
-            }}
-            className="flex items-center justify-center gap-2 py-2 px-3 bg-blue-950/40 hover:bg-blue-900/60 active:bg-blue-950 rounded-xl text-sm font-medium text-blue-300 hover:bg-blue-200 transition-all border border-blue-900/50 cursor-pointer shadow-xs mb-2"
-            title="Wymuś odświeżenie pamięci podręcznej aplikacji"
-          >
-            <i className="ph ph-arrows-clockwise text-lg"></i>
-            <span>Odśwież (Cache)</span>
-          </button>
+            <button
+              onClick={() => {
+                if (window.navigator && navigator.serviceWorker) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                      registration.unregister();
+                    }
+                  });
+                }
+                window.location.reload(true);
+              }}
+              className="flex items-center justify-center gap-2 py-2 px-3 bg-blue-950/40 hover:bg-blue-900/60 active:bg-blue-950 rounded-xl text-sm font-medium text-blue-300 hover:text-blue-200 transition-all border border-blue-900/50 cursor-pointer shadow-xs"
+              title="Wymuś odświeżenie pamięci podręcznej aplikacji"
+            >
+              <i className="ph ph-arrows-clockwise text-lg"></i>
+              <span>Odśwież</span>
+            </button>
+          </div>
           
           <button
             onClick={onLogout}
-            className="flex items-center justify-center gap-2 py-2 px-3 bg-red-950/40 hover:bg-red-900/60 active:bg-red-950 rounded-xl text-sm font-medium text-red-300 hover:text-red-200 transition-all border border-red-900/50 cursor-pointer shadow-xs"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-red-950/40 hover:bg-red-900/60 active:bg-red-950 rounded-xl text-sm font-medium text-red-300 hover:text-red-200 transition-all border border-red-900/50 cursor-pointer shadow-xs"
             title="Wyloguj się z konta"
           >
             <i className="ph ph-sign-out text-lg"></i>
             <span>Wyloguj</span>
           </button>
-          </div>
         </div>
-
       </aside>
     </>
   );
 }
-

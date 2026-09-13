@@ -108,7 +108,8 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
                   <div className="font-bold text-gray-700">Kod QR Maszyny</div>
                   <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl shadow-sm">
                     <div id={"qr-svg-" + machine.id}><QRCodeSVG value={qrValue} size={150} /></div>
-                  </div>
+                    </div>
+                    <div className="text-[10px] text-gray-400 font-medium mt-1">Wygenerowano: {new Date().toLocaleDateString('pl-PL')}</div>
                   <div className="text-xs text-gray-400 text-center px-4">
                     Operatorzy mogą zeskanować ten kod, aby szybko zgłosić awarię tej maszyny.
                   </div>
@@ -117,7 +118,7 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
             </div>
           </div>
 
-        <MachineDTR machine={machine} canManage={user?.role === USER_ROLES.ADMIN || (user?.permissions || []).includes('manage_dtr')} />
+        <MachineDTR machine={machine} canManage={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('manage_dtr')} />
 
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center gap-3">

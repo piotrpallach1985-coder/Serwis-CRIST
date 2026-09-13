@@ -3,6 +3,7 @@ import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
+import { useManagerStore } from '../../store/managerStore';
 
 /**
  * NotificationCenter — dzwonek z powiadomieniami systemowymi.
@@ -127,7 +128,7 @@ export default function NotificationCenter({
     }
 
     // 5. Maszyny do weryfikacji ((DO WERYFIKACJI)) & 6. Zgłaszający do weryfikacji ((DO WERYFIKACJI))
-    if (isUrModule || currentModule === 'master_data' || user?.role === USER_ROLES.ADMIN) {
+    if (isUrModule || currentModule === 'master_data' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)) {
       machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
         list.push({
           id: 'dyn_verif_machine_' + m.id,
@@ -193,7 +194,7 @@ export default function NotificationCenter({
   const markAsRead = async (notifId) => {
     if (!notifId || notifId.toString().startsWith('dyn_')) return;
     try {
-      await updateDoc(doc(db, 'notifications', notifId), { read: true });
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'notifications', notifId), { read: true });
     } catch (e) {
       console.error('Błąd aktualizacji powiadomienia:', e);
     }
@@ -205,7 +206,7 @@ export default function NotificationCenter({
       const batch = writeBatch(db);
       relevantNotifications
         .filter(n => !n.isDynamic)
-        .forEach(n => batch.delete(doc(db, 'notifications', n.id)));
+        .forEach(n => batch.delete(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'notifications', n.id)));
       await batch.commit();
     } catch (e) {
       console.error('Błąd usuwania powiadomień:', e);

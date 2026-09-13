@@ -1,9 +1,10 @@
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useManagerStore } from '../store/managerStore';
 
 export const logCrashToFirebase = async (error, stackInfo = '', type = 'runtime') => {
   try {
-    await addDoc(collection(db, 'crash_reports'), {
+    await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'crash_reports'), {
       type,
       error: error?.message || String(error),
       stackTrace: error?.stack || stackInfo,
@@ -13,7 +14,7 @@ export const logCrashToFirebase = async (error, stackInfo = '', type = 'runtime'
       resolved: false
     });
   } catch (e) {
-    console.error('B³¹d raportowania crashy do Firebase:', e);
+    console.error('Bï¿½ï¿½d raportowania crashy do Firebase:', e);
   }
 };
 

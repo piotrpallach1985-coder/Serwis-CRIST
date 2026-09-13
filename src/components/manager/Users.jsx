@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { USER_ROLES } from '../../utils/constants';
+import { useManagerStore } from '../../store/managerStore';
 
 // Inicjalizacja dodatkowej instancji Firebase Auth tylko do tworzenia kont,
 // aby nie wylogowało aktualnie zalogowanego Managera
@@ -18,6 +19,7 @@ if (existingApp) {
 const secondaryAuth = getAuth(secondaryApp);
 
 export default function Users() {
+  const tenantId = useManagerStore(state => state.tenantId) || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   const [usersList, setUsersList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [email, setEmail] = useState('');
@@ -29,10 +31,10 @@ export default function Users() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('tenantId', '==', tenantId)), (snapshot) => {
       setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
-    const unsubRoles = onSnapshot(collection(db, 'roles'), (snapshot) => {
+    const unsubRoles = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'roles'), (snapshot) => {
       setRolesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
     return () => {
@@ -52,6 +54,7 @@ export default function Users() {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           role: role,
+          tenantId: tenantId,
           phone: phone
         });
         setEditingId(null);
@@ -63,24 +66,28 @@ export default function Users() {
         setPhone('');
       } else {
         // Tworzenie NOWEGO konta w bezpiecznym module Authentication
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), Math.random().toString(36).slice(-10) + "Aa1!");
+        const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+          const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), tempPassword);
         const newUid = userCredential.user.uid;
 
         // Zapisanie roli i nazwy do bazy danych (BEZ HASŁA!)
         await setDoc(doc(db, 'users', newUid), {
-          email: email.trim().toLowerCase(),
-          name: name.trim(),
-          role: role,
-          phone: phone
-        });
+            email: email.trim().toLowerCase(),
+            name: name.trim(),
+            role: role,
+            phone: phone,
+            tenantId: tenantId
+          });
 
         setEmail('');
         
         setName('');
         setRole(USER_ROLES.ADMIN);
         setPhone('');
-      }
-    } catch (err) {
+          
+          alert(`Użytkownik został utworzony pomyślnie!\n\nE-mail: ${email.trim().toLowerCase()}\nTymczasowe hasło: ${tempPassword}\n\nSkopiuj to hasło i przekaż użytkownikowi.`);
+        }
+      } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
         alert('Ten e-mail jest już zarejestrowany w systemie.'); } else {
@@ -250,7 +257,7 @@ export default function Users() {
   </div>
   <div className="text-sm space-y-1 mb-1">
     <div className="flex items-center gap-1.5"><i className="ph ph-phone text-gray-400"></i> {item.phone || '-'}</div>
-    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> Rola: <span className="font-bold">{item.role === USER_ROLES.ADMIN ? 'Administrator' : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
+    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> Rola: <span className="font-bold">{(item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN) ? 'Administrator' : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
   </div>
   <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
     <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> Edytuj</button>
@@ -288,9 +295,9 @@ export default function Users() {
                       <td className="px-6 py-4 text-gray-600">{u.phone || "-"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        u.role === USER_ROLES.ADMIN ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                        (u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {u.role === USER_ROLES.ADMIN ? 'Administrator' : 
+                        {(u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? 'Administrator' : 
                          rolesList.find(r => r.id === u.role)?.name || u.role}
                       </span>
                     </td>

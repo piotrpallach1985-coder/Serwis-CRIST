@@ -72,7 +72,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
       <header className="bg-transparent text-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         {/* Lewy róg: Logo Aplikacji */}
         <div className="flex items-center gap-3">
-          <img src={branding?.appLogoUrl || '/pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
+          <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
         </div>
 
         {/* Profil i wylogowanie */}
@@ -129,13 +129,13 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
         </div>
 
         {/* SIATKA 4 KAFELKÓW (2 kolumny mobile, 4 desktop) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 w-full max-w-6xl">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-8 w-full max-w-5xl">
           
           {/* SKANER QR DLA MASZYN */}
           <button
             type="button"
             onClick={() => setIsScanning(true)}
-            className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-blue-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
+            className="w-[calc(50%-0.5rem)] sm:w-[280px] group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-blue-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
           >
             <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
               <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-blue-50/80 text-blue-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
@@ -159,7 +159,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           <button
             type="button"
             onClick={() => navigateToModule('ur', 'dashboard_tickets')}
-            className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-red-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
+            className="w-[calc(50%-0.5rem)] sm:w-[280px] group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-red-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
           >
             <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
               <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-red-50/80 text-red-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-red-600 group-hover:text-white transition-all shadow-sm">
@@ -184,7 +184,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
             <button
               type="button"
               onClick={() => navigateToModule('company_admin', 'users')}
-              className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-purple-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
+              className="w-[calc(50%-0.5rem)] sm:w-[280px] group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-purple-400 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
             >
               <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
                 <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-purple-50/80 text-purple-600 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
@@ -204,7 +204,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
               </div>
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[160px] sm:min-h-[280px]">
+            <div className="w-[calc(50%-0.5rem)] sm:w-[280px] flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[160px] sm:min-h-[280px]">
               <div className="w-12 h-12 sm:w-20 sm:h-20 bg-slate-200 text-slate-400 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-2xl sm:text-4xl mb-3 sm:mb-5">
                 <i className="ph ph-lock"></i>
               </div>
@@ -216,40 +216,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           )}
 
           {/* PANEL ADMINISTRATORA PROGRAMU */}
-          {canAccessProgramAdmin ? (
-            <button
-              type="button"
-              onClick={() => navigateToModule('system_admin', 'settings')}
-              className="group relative flex flex-col items-center justify-center sm:justify-between p-5 sm:p-8 bg-white rounded-3xl border border-slate-100 hover:border-slate-800 shadow-md hover:shadow-2xl transition-all duration-300 text-center cursor-pointer min-h-[160px] sm:min-h-[280px] transform hover:-translate-y-2"
-            >
-              <div className="my-auto py-1 sm:py-2 flex flex-col items-center">
-                <div className="w-14 h-14 sm:w-24 sm:h-24 mx-auto bg-slate-100/80 text-slate-700 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6 group-hover:scale-110 group-hover:bg-slate-800 group-hover:text-white transition-all shadow-sm">
-                  <i className="ph ph-gear-six"></i>
-                </div>
-                <h3 className="text-base sm:text-2xl font-extrabold text-slate-900 mb-1 leading-tight tracking-tight">
-                  Admin Programu
-                </h3>
-                <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 px-2 mt-2">
-                  Ustawienia globalne aplikacji, branding, logo, przełączniki modułów i integracje.
-                </p>
-              </div>
-
-              <div className="hidden sm:flex w-full pt-4 border-t border-slate-100 items-center justify-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-slate-900 mt-auto">
-                <span>Ustawienia systemu</span>
-                <i className="ph ph-arrow-right text-sm"></i>
-              </div>
-            </button>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center opacity-60 min-h-[160px] sm:min-h-[280px]">
-              <div className="w-12 h-12 sm:w-20 sm:h-20 bg-slate-200 text-slate-400 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-2xl sm:text-4xl mb-3 sm:mb-5">
-                <i className="ph ph-lock"></i>
-              </div>
-              <h3 className="text-sm sm:text-xl font-bold text-slate-500 mb-1 leading-tight tracking-tight">
-                Admin Programu
-              </h3>
-              <p className="hidden sm:block text-xs text-slate-400 mt-2">Dostępny tylko dla Administratora Technicznego.</p>
-            </div>
-          )}
+          
 
         </div>
       </main>

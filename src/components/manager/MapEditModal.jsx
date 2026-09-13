@@ -21,7 +21,7 @@ export default function MapEditModal({
       if (currentSubmapId !== null) {
         return machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
       }
-      return machines.filter(m => !m.regionId && (m.xPercent == null || m.yPercent == null));
+      return machines.filter(m => m.xPercent == null || m.yPercent == null);
     }
   };
 

@@ -30,7 +30,7 @@ export default function KPIDashboard() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const q = query(collection(db, 'tickets'));
+        const q = query(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'tickets'));
         const snap = await getDocs(q);
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && x.status === TICKET_STATUS.CLOSED);
         setHistoricalTickets(docs);

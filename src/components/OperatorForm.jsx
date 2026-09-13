@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useToast } from '../hooks/useToast';
 import { useTicketSubmit } from '../hooks/useTicketSubmit';
+import { useManagerStore } from '../store/managerStore';
 import Toast from './manager/Toast';
 import { collection, doc, setDoc, serverTimestamp, getDoc, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
@@ -20,6 +21,9 @@ export default function OperatorForm({
   reportersList,
   stopLiveScanner
 }) {
+  const branding = useManagerStore(state => state.branding);
+  const tenantId = useManagerStore(state => state.tenantId) || 'crist';
+  const companyName = branding?.companyName || (tenantId === 'crist' ? 'CRIST S.A.' : tenantId.toUpperCase());
   const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
@@ -38,9 +42,6 @@ export default function OperatorForm({
   const [errorMsg, setErrorMsg] = useState(null);
   const [pendingPhotos, setPendingPhotos] = useState([]);
   const [uploadProgress, setUploadProgress] = useState('');
-  const [captchaA] = useState(Math.floor(Math.random() * 10) + 1);
-  const [captchaB] = useState(Math.floor(Math.random() * 10) + 1);
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [acceptedRodo, setAcceptedRodo] = useState(false);
   const { toastConfig, showToast, hideToast } = useToast();
 
@@ -83,9 +84,6 @@ export default function OperatorForm({
       reporterPhone,
       isCritical,
       pendingPhotos,
-      captchaAnswer,
-      captchaA,
-      captchaB,
       acceptedRodo,
       reporterDeviceId,
       isOnline,
@@ -151,7 +149,21 @@ export default function OperatorForm({
                       </select>
                     </div>
                   ) : (
-                    <div className="font-black text-xl text-slate-800 break-words mt-1">{selectedMachine.name}</div>
+                    <>
+                      <div className="font-black text-xl text-slate-800 break-words mt-1">{selectedMachine.name}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMachine({ 
+                            id: 'manual', 
+                            name: '', 
+                            regionId: selectedMachine.regionId || '' 
+                          });
+                        }}
+                        className="mt-3 flex items-center gap-2 text-xs text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                      >
+                        <i className="ph ph-pencil-simple text-sm"></i> Wprowadź maszynę ręcznie / Inna maszyna</button>
+                    </>
                   )}
                 </div>
                 {!initialMachineId && (
@@ -360,23 +372,7 @@ export default function OperatorForm({
               
               {/* Sekcja Antyspam + RODO */}
               <div className="mt-8 mb-6 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Weryfikacja bezpieczeństwa (Ile to jest {captchaA} + {captchaB}?) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={captchaAnswer}
-                      onChange={(e) => setCaptchaAnswer(e.target.value)}
-                      placeholder="Podaj wynik..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 mt-4">
+                  <div className="flex items-start gap-3 mt-4">
                   <div className="flex items-center h-5">
                     <input
                       id="rodo"

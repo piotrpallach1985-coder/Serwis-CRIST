@@ -20,7 +20,7 @@ export default function MasterData({ user, machines, regions, services, roles })
     { id: 'reporters', label: 'Zgłaszający', icon: 'ph-user-list' }
   ];
 
-  if (user.role === USER_ROLES.ADMIN) {
+  if ((user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN)) {
     tabs.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
     tabs.push({ id: 'roles', label: 'Role i Uprawnienia', icon: 'ph-shield-check' });
     tabs.push({ id: 'settings', label: 'Ustawienia', icon: 'ph-gear' });

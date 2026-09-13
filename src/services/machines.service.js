@@ -1,5 +1,6 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useManagerStore } from '../store/managerStore';
 
 /**
  * Zwiększa lub ustawia licznik roboczogodzin dla maszyny.
@@ -7,7 +8,7 @@ import { db } from '../firebase';
  */
 export const updateMachineWorkHours = async (machineId, newHours, isDelta = false) => {
   try {
-    const machineRef = doc(db, 'machines', machineId);
+    const machineRef = doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machineId);
     
     // Jeśli isDelta, dodajemy wartość, w przeciwnym razie nadpisujemy. 
     // Ponieważ potrzebujemy odczytać starą wartość dla delty, najpierw moglibyśmy ją pobrać.
@@ -28,13 +29,13 @@ export const updateMachineWorkHours = async (machineId, newHours, isDelta = fals
 };
 
 export const addMachine = async (machineData) => {
-  return await addDoc(collection(db, 'machines'), machineData);
+  return await addDoc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines'), machineData);
 };
 
 export const updateMachine = async (machineId, machineData) => {
-  return await updateDoc(doc(db, 'machines', machineId), machineData);
+  return await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machineId), machineData);
 };
 
 export const deleteMachine = async (machineId) => {
-  return await updateDoc(doc(db, 'machines', machineId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
+  return await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machineId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
 };

@@ -4,12 +4,14 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { savePhotoToIndexedDB } from '../utils/offlineStorage';
 import { TICKET_STATUS } from '../utils/constants';
+import { useManagerStore } from '../store/managerStore';
 
 export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
 
   const submitTicket = async (formData) => {
+    const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
     const {
       selectedMachine,
       topic,
@@ -18,9 +20,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       reporterPhone,
       isCritical,
       pendingPhotos,
-      captchaAnswer,
-      captchaA,
-      captchaB,
+      
       acceptedRodo,
       reporterDeviceId,
       isOnline,
@@ -66,7 +66,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
     // 1. Zabezpieczenie przed duplikowaniem (2 godziny)
     if (selectedMachine.id !== 'manual') {
       try {
-        const q = query(collection(db, 'tickets'), where('machineId', '==', selectedMachine.id));
+        const q = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', selectedMachine.id));
         const snap = await getDocs(q);
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         let foundDuplicate = null;
@@ -93,10 +93,10 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       const reporterNameTrimmed = reporterName.trim();
       if (reporterNameTrimmed) {
         try {
-          const repQ = query(collection(db, 'reporters'), where('name', '==', reporterNameTrimmed));
+          const repQ = query(collection(db, 'tenants', tenantId, 'reporters'), where('name', '==', reporterNameTrimmed));
           const repSnap = await getDocs(repQ);
           if (repSnap.empty) {
-            await addDoc(collection(db, 'reporters'), {
+            await addDoc(collection(db, 'tenants', tenantId, 'reporters'), {
               name: reporterNameTrimmed + " (DO WERYFIKACJI)",
               phone: reporterPhone.trim(),
               createdAt: new Date().toISOString()
@@ -110,7 +110,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       let finalMachineId = selectedMachine.id;
       
       if (finalMachineId === 'manual') {
-        const newMachineRef = await addDoc(collection(db, 'machines'), {
+        const newMachineRef = await addDoc(collection(db, 'tenants', tenantId, 'machines'), {
           name: selectedMachine.name + ' (DO WERYFIKACJI)',
           regionId: selectedMachine.regionId || '',
           bay: selectedMachine.bay || '',
@@ -124,7 +124,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         finalMachineId = newMachineRef.id;
       }
 
-      const ticketRef = doc(collection(db, 'tickets'));
+      const ticketRef = doc(collection(db, 'tenants', tenantId, 'tickets'));
       const regionObj = regions.find(r => r.id === selectedMachine.regionId);
       let uploadedUrls = [];
       let saveToOfflineQueue = false;
@@ -188,7 +188,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       }
 
       // Zapis powiadomienia w tle
-      const newNotifRef = doc(collection(db, "notifications"));
+      const newNotifRef = doc(collection(db, 'tenants', tenantId, 'notifications'));
       setDoc(newNotifRef, {
         title: isCritical ? "KRYTYCZNA AWARIA!" : "Nowe zgłoszenie awarii",
         message: `Maszyna: ${selectedMachine.name} - ${topic}`,
