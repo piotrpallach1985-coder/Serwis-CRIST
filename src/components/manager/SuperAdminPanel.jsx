@@ -267,7 +267,7 @@ export default function SuperAdminPanel({ user, onNavigate }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 h-full overflow-y-auto">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6 h-full overflow-y-auto overflow-x-hidden">
       
       {/* Global Branding Section */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -307,9 +307,9 @@ export default function SuperAdminPanel({ user, onNavigate }) {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-r from-gray-900 to-blue-900 text-white p-6 rounded-2xl shadow-lg gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-r from-gray-900 to-blue-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg gap-4 w-full">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 truncate">
             <Crown className="text-yellow-400" /> Super Panel SaaS
           </h1>
           <p className="text-gray-300 mt-2 text-sm sm:text-base">Zarządzanie klientami (Multi-Tenancy) i ich licencjami</p>
@@ -325,8 +325,8 @@ export default function SuperAdminPanel({ user, onNavigate }) {
       {loading ? (
         <div className="text-center py-12 text-gray-500 font-medium">Ładowanie rejestru firm...</div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full max-w-full">
+          <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className="bg-gray-50/80 border-b border-gray-200">
                 <tr>
@@ -417,7 +417,7 @@ export default function SuperAdminPanel({ user, onNavigate }) {
               </button>
             </div>
             
-            <form onSubmit={handleSave} className="p-6 space-y-6 overflow-y-auto">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
               
               <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center border border-slate-300 overflow-hidden shrink-0">

@@ -193,10 +193,7 @@ export default function Login({ onLogin, currentUser }) {
   return (
     <div className="min-h-[100svh] bg-[#f8f9fa] flex flex-col items-center justify-center p-2 pt-16 sm:p-4 sm:pt-4 text-[#111827] relative">
       
-      {/* GÓRNY PASEK LOGO (Logo aplikacji) */}
-      <div className="absolute top-4 left-4 z-50">
-        <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-lg" />
-      </div>
+      
       
       {currentUser && currentUser.role !== 'operator' && (
         <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-2 rounded-xl shadow-sm border border-gray-100">
@@ -212,13 +209,9 @@ export default function Login({ onLogin, currentUser }) {
 
       <div className="mb-6 md:mb-12 text-center animate-fade-in-up mt-8 sm:mt-0">
         <div className="flex justify-center mb-3 sm:mb-5">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 bg-white rounded-3xl flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-lg border border-slate-100 shrink-0">
-              {branding.companyLogoUrl ? (
-                <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-2 sm:p-3" />
-              ) : (
-                <span className="text-4xl sm:text-5xl">{branding?.companyName?.charAt(0) || 'C'}</span>
-              )}
-            </div>
+            <div className="shrink-0">
+                <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain" />
+              </div>
           </div>
           <h1 className="font-black text-xl sm:text-2xl leading-tight tracking-wide text-blue-900 mb-6">
             VexoNT &bull; MAINTANCE SYSTEM

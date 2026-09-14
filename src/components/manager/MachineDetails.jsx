@@ -1,5 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useManagerStore } from '../../store/managerStore';
+// from 'qrcode.react';
 import { safeParseDate } from '../../utils/dateHelpers';
 import MachineDTR from './MachineDTR';
 import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
@@ -8,7 +10,8 @@ import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
 export default function MachineDetails({ isFromQR, onScanNext, machine, user, history, loading, onBack, onPrint, onGeneratePDF, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';
   const baseUrl = window.location.origin + window.location.pathname;
-  const qrValue = `${baseUrl}?machine=${machine.id}`;
+  const currentTenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
+  const qrValue = `${baseUrl}?tenant=${currentTenantId}&machine=${machine.id}`;
 
   return (
     <div className="bg-[#f8f9fa] w-full flex flex-col h-full animate-fade-in relative text-[#111827]">
@@ -118,7 +121,7 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
             </div>
           </div>
 
-        <MachineDTR machine={machine} canManage={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('manage_dtr')} />
+        <MachineDTR machine={machine} user={user} canManage={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('manage_dtr')} />
 
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center gap-3">

@@ -7,15 +7,13 @@ import { db, storage } from '../../firebase';
 
 import { safe } from '../../utils/safeRender';
 
-export default function MachineDTR({ machine, canManage }) {
+export default function MachineDTR({ machine, user, canManage }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [localDtrFiles, setLocalDtrFiles] = useState(machine.dtrFiles || []);
   const fileInputRef = useRef(null);
-
-  const user = useManagerStore(state => state.user);
   const [newNote, setNewNote] = useState('');
   const [localNotes, setLocalNotes] = useState(machine.techNotes || []);
 
@@ -42,19 +40,6 @@ export default function MachineDTR({ machine, canManage }) {
     } catch (err) {
       console.error(err);
       setErrorMsg('Błąd podczas dodawania notatki.');
-    }
-  };
-
-  const handleDeleteNote = async (noteId) => {
-    try {
-      const updatedNotes = localNotes.filter(n => n.id !== noteId);
-      setLocalNotes(updatedNotes);
-      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
-        techNotes: updatedNotes
-      });
-    } catch (err) {
-      console.error(err);
-      setErrorMsg('Błąd podczas usuwania notatki.');
     }
   };
 
@@ -152,7 +137,7 @@ export default function MachineDTR({ machine, canManage }) {
          onDragLeave={() => setIsDragOver(false)}
          onDrop={handleDrop}
     >
-      <div className={`p-4 border-b flex justify-between items-center transition-colors ${isDragOver ? 'bg-blue-50 border-blue-200' : 'border-slate-200'}`}>
+      <div className={`p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${isDragOver ? 'bg-blue-50 border-blue-200' : 'border-slate-200'}`}>
         <div className="flex flex-col">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <i className="ph ph-files text-xl text-blue-500"></i> Dokumentacja DTR
@@ -282,11 +267,7 @@ export default function MachineDTR({ machine, canManage }) {
                       {safe(n.createdBy)} &bull; {new Date(n.createdAt).toLocaleString('pl-PL')}
                     </div>
                   </div>
-                  {canManage && (
-                    <button onClick={() => handleDeleteNote(n.id)} className="text-gray-400 hover:text-red-600 transition-colors shrink-0 ml-2">
-                      <i className="ph ph-trash text-lg"></i>
-                    </button>
-                  )}
+                  
                 </div>
               ))}
             </div>

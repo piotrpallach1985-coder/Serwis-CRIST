@@ -94,10 +94,11 @@ export default function App() {
     setUser(userData);
     if (userData?.tenantId) { useManagerStore.getState().setTenantId(userData.tenantId); }
     if (!userData) { 
-      auth.signOut(); // Trwałe wylogowanie z bazy
-      setUrlMachineId(null); 
-      window.history.replaceState({}, '', window.location.pathname); 
-      setCurrentModule(null);
+      auth.signOut();
+        setUrlMachineId(null); 
+        window.history.replaceState({}, '', window.location.pathname); 
+        setCurrentModule(null);
+        useManagerStore.getState().setTenantId(import.meta.env.VITE_DEFAULT_TENANT || 'crist');
     } else {
       const params = new URLSearchParams(window.location.search);
       const mod = params.get('module') || (userData.role === USER_ROLES.OPERATOR ? 'operator' : 'home');

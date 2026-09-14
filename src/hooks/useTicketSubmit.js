@@ -40,10 +40,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
     }
     const cleanedPhone = reporterPhone.replace(/\D/g, '');
     
-    if (parseInt(captchaAnswer) !== captchaA + captchaB) {
-      showToast('Weryfikacja antyspamowa: Niepoprawny wynik z dodawania!', 'error');
-      return false;
-    }
+    
     if (!acceptedRodo) {
       showToast('Musisz zaakceptować zasady przetwarzania danych osobowych (RODO).', 'error');
       return false;

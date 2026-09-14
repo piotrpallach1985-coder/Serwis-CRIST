@@ -126,31 +126,42 @@ export default function OperatorForm({
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             {/* Karta szczegółów wybranej maszyny */}
             <div className="bg-blue-50/70 p-5 border-b border-blue-100">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div className="flex-1 w-full sm:mr-4">
-                  <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded">Zgłoszenie dla maszyny</span>
-                  {selectedMachine.id === 'manual' ? (
-                    <div className="mt-2 flex flex-col gap-2">
-                      <input 
-                        type="text" 
-                        value={selectedMachine.name || ''} 
-                        onChange={(e) => setSelectedMachine({...selectedMachine, name: e.target.value})} 
-                        className="w-full p-2 border border-blue-300 rounded font-bold text-lg focus:outline-none focus:border-blue-900 bg-white" 
-                        placeholder="Wpisz nazwę maszyny..." 
-                        autoFocus
-                      />
-                      <select
-                        value={selectedMachine.regionId || ''}
-                        onChange={(e) => setSelectedMachine({...selectedMachine, regionId: e.target.value})}
-                        className="w-full p-2 border border-blue-300 rounded font-medium text-sm text-slate-700 focus:outline-none focus:border-blue-900 bg-white"
-                      >
-                        <option value="" disabled>-- Wybierz rejon (opcjonalnie) --</option>
-                        {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                      </select>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="font-black text-xl text-slate-800 break-words mt-1">{selectedMachine.name}</div>
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  
+                  {/* Lewa strona: Nazwa / Input */}
+                  <div className="flex-1 w-full flex flex-col items-start gap-1">
+                    <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded inline-block mb-1">
+                      Zgłoszenie dla maszyny
+                    </span>
+                    {selectedMachine.id === 'manual' ? (
+                      <div className="mt-1 flex flex-col gap-2 w-full">
+                        <input 
+                          type="text" 
+                          value={selectedMachine.name || ''} 
+                          onChange={(e) => setSelectedMachine({...selectedMachine, name: e.target.value})} 
+                          className="w-full p-2 border border-blue-300 rounded font-bold text-lg focus:outline-none focus:border-blue-900 bg-white" 
+                          placeholder="Wpisz nazwę maszyny..." 
+                          autoFocus
+                        />
+                        <select
+                          value={selectedMachine.regionId || ''}
+                          onChange={(e) => setSelectedMachine({...selectedMachine, regionId: e.target.value})}
+                          className="w-full p-2 border border-blue-300 rounded font-medium text-sm text-slate-700 focus:outline-none focus:border-blue-900 bg-white"
+                        >
+                          <option value="" disabled>-- Wybierz rejon (opcjonalnie) --</option>
+                          {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="font-black text-2xl sm:text-3xl text-slate-800 break-words mt-1 w-full leading-tight pr-2">
+                        {selectedMachine.name}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Prawa strona: Przycisk Inna Maszyna / Powrót */}
+                  <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto mt-3 sm:mt-0">
+                    {selectedMachine.id !== 'manual' && (
                       <button
                         type="button"
                         onClick={() => {
@@ -160,25 +171,28 @@ export default function OperatorForm({
                             regionId: selectedMachine.regionId || '' 
                           });
                         }}
-                        className="mt-3 flex items-center gap-2 text-xs text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-2 text-sm text-yellow-900 bg-yellow-400 hover:bg-yellow-300 border-2 border-yellow-500 font-bold px-6 py-2.5 rounded-xl transition-colors shadow-sm w-full sm:w-auto whitespace-nowrap"
                       >
-                        <i className="ph ph-pencil-simple text-sm"></i> Wprowadź maszynę ręcznie / Inna maszyna</button>
-                    </>
-                  )}
+                        <i className="ph ph-pencil-simple text-xl"></i>
+                        <span>Inna Maszyna</span>
+                      </button>
+                    )}
+                    
+                    {!initialMachineId && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          stopLiveScanner();
+                          setSelectedMachine(null);
+                          handleStepChange('scan');
+                        }} 
+                        className="flex items-center justify-center gap-2 text-white hover:text-white font-bold text-sm bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl transition-colors shadow-sm w-full sm:w-auto whitespace-nowrap"
+                      >
+                        <i className="ph ph-arrow-left text-lg"></i> {'Powrót'}
+                      </button>
+                    )}
+                    </div>
                 </div>
-                {!initialMachineId && (
-                  <button 
-                    onClick={() => {
-                      stopLiveScanner();
-                      setSelectedMachine(null);
-                      handleStepChange('scan');
-                    }} 
-                    className="mb-6 flex items-center gap-2 text-white hover:text-white font-bold text-sm bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
-                  >
-                    <i className="ph ph-arrow-left text-lg"></i> {'Powr\u00F3t'}
-                    </button>
-                )}
-              </div>
 
               {selectedMachine.id !== 'manual' && (
                 <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-blue-200/60 text-xs">

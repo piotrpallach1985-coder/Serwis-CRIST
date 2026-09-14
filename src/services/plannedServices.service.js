@@ -17,6 +17,7 @@ import { SERVICE_STATUS, TIME_THRESHOLDS } from '../utils/constants';
  * @returns {Promise<import('firebase/firestore').DocumentReference>} Referencja do utworzonego dokumentu
  */
 export const addPlannedService = async (serviceData) => {
+  const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   return await addDoc(collection(db, 'tenants', tenantId, 'planned_services'), {
     ...serviceData,
     createdAt: serverTimestamp(),
@@ -62,6 +63,7 @@ export const deletePlannedService = async (serviceId) => {
  * @returns {Promise<void>}
  */
 export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null, actionItemData = null) => {
+  const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   const batch = writeBatch(db);
   const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceId);
   
@@ -111,6 +113,7 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
  * @returns {Promise<void>}
  */
 export const checkAndTriggerDueServices = async (machinesMap) => {
+  const tenantId = useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist';
   try {
     const q = query(
       collection(db, 'tenants', tenantId, 'planned_services'), 

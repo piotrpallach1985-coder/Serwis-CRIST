@@ -143,18 +143,35 @@ return () => window.removeEventListener('popstate', handlePopState);
         (decodedText) => {
           stopLiveScanner();
           let machineId = decodedText;
-          if (decodedText.includes('?machine=')) {
-            const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-            machineId = urlParams.get('machine');
-          }
+            let tenantFromQr = null;
+            if (decodedText.includes('?')) {
+              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+              machineId = urlParams.get('machine') || machineId;
+              tenantFromQr = urlParams.get('tenant');
+            }
+            
+            // Walidacja cross-tenant dla operatora (live scanner w apce)
+            if (tenantFromQr && tenantFromQr !== tenantId) {
+              // Anonimowy operator skanujący inna firmę z poziomu apki -> przekierowanie do tej firmy (przeładowanie PWA w kontekście nowej firmy)
+              window.location.href = decodedText;
+              return;
+            }
           if (machineId) {
             if (machineId === initialMachineId) {
-              const targetMachine = machinesRef.current.find(m => m.id === machineId);
+              const targetMachine = machinesRef.current.find(m => 
+                  m.id === machineId || 
+                  (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
+                  (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+                );
               if (targetMachine) { setSelectedMachine(targetMachine); handleStepChange('form'); }
             } else {
-              const foundMachine = machinesRef.current.find(m => m.id === machineId);
+              const foundMachine = machinesRef.current.find(m => 
+                  m.id === machineId || 
+                  (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
+                  (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+                );
               if (foundMachine) { setSelectedMachine(foundMachine); handleStepChange('form'); }
-              else { alert('Nie znaleziono maszyny: ' + machineId); handleStepChange('scan'); }
+              else { alert('Nie znaleziono maszyny w Twojej firmie. Upewnij się, że kod QR jest zaktualizowany.'); handleStepChange('scan'); }
             }
           } else { alert('Nieprawidlowy QR'); }
         },
@@ -240,7 +257,6 @@ return () => window.removeEventListener('popstate', handlePopState);
 
       <header className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-3">
-          <img src="/pwa-192x192.jpg" alt="VexoNT Logo" className="h-8 w-8 object-contain rounded-md" />
           <h1 className="text-xl font-bold flex items-center gap-2">
             Zgłoś Awarię
             <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></span>
@@ -276,27 +292,27 @@ return () => window.removeEventListener('popstate', handlePopState);
 
         {step === 'scan' && (
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
-            <h2 className="text-xl font-semibold mb-4">Skanuj kod QR na maszynie</h2>
-            
-            {isLiveScanning ? (
-              <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-700">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-white font-bold text-sm flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
-                    Skanowanie na żywo (Skieruj aparat na QR)
-                  </span>
-                  <button 
-                    onClick={stopLiveScanner}
-                    className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
-                  >
-                    Zamknij kamerę
-                  </button>
+            <h2 className="text-xl font-black mb-6 uppercase tracking-wider text-slate-800">OPCJE ZGŁOSZEŃ</h2>
+              
+              {isLiveScanning ? (
+                <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-700">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-white font-bold text-sm flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                      Skanowanie na żywo (Skieruj aparat na QR)
+                    </span>
+                    <button 
+                      onClick={stopLiveScanner}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                    >
+                      Zamknij kamerę
+                    </button>
+                  </div>
+                  <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
                 </div>
-                <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <button
+              ) : (
+                <div className="space-y-4">
+                  <button
                     onClick={startLiveScanner}
                     className="w-full max-w-md mx-auto py-5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 relative overflow-hidden group"
                   >
@@ -305,8 +321,44 @@ return () => window.removeEventListener('popstate', handlePopState);
                       <div className="absolute left-0 w-full h-1 bg-red-500 opacity-90 shadow-[0_0_12px_4px_rgba(239,68,68,0.9)] animate-scan z-10"></div>
                     </div>
                     <span className="text-2xl tracking-wide">Skanuj kod QR</span>
-                  </button>
-              </div>
+                    </button>
+
+                  <div className="flex flex-col gap-3 mt-6 text-left">
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
+                      <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
+                        <i className="ph ph-device-mobile-camera text-4xl"></i>
+                        <i className="ph ph-wrench text-lg absolute -bottom-1 -right-1 text-slate-800 bg-white rounded-full p-0.5 shadow-sm border border-slate-100"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">1. Zgłoś tę maszynę (Standard):</h3>
+                        <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">Zeskanuj kod QR bezpośrednio na urządzeniu i zgłoś usterkę.</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
+                      <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
+                        <i className="ph ph-qr-code text-4xl"></i>
+                        <i className="ph ph-plus-circle text-lg absolute -bottom-1 -right-1 text-slate-800 bg-white rounded-full p-0.5 shadow-sm border border-slate-100"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">2. Zgłoś inną maszynę:</h3>
+                        <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">Użyj dowolnego kodu QR, aby wskazać inną maszynę lub dodać nową (dla dowolnego rejonu).</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
+                      <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
+                        <i className="ph ph-device-mobile text-4xl"></i>
+                        <i className="ph ph-wifi-high text-xl absolute top-0 right-0 text-blue-500 animate-pulse"></i>
+                        <span className="absolute bottom-1 right-1 text-[9px] font-black bg-slate-800 text-white px-1 rounded">NFC</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">3. Szybki odczyt NFC:</h3>
+                        <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">Zamiast skanować aparatem, włącz NFC i przyłóż telefon do znacznika.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
             )}
             
             

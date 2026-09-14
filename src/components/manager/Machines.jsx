@@ -71,9 +71,18 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
       const params = new URLSearchParams(window.location.search);
       const openMachineId = params.get('openMachine');
       if (openMachineId) {
-        const targetMachine = machines.find(m => m.id === openMachineId);
+        // Spróbuj znaleźć maszynę również po starym internalId w razie czego
+        const targetMachine = machines.find(m => 
+          m.id === openMachineId || 
+          (m.qrCode && m.qrCode === openMachineId) || 
+          (m.internalId && m.internalId.toLowerCase() === openMachineId.toLowerCase())
+        );
+        
         if (targetMachine) {
           handleViewMachine(targetMachine, true);
+        } else {
+          // Dodajemy alert jeśli nie znaleziono maszyny
+          alert('Nie znaleziono zeskanowanej maszyny w bazie tej firmy.');
         }
         params.delete('openMachine');
         const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
@@ -125,26 +134,26 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
         <head>
           <title>Drukuj QR - ${name}</title>
           <style>
-            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
-            h2 { margin: 10px 0 5px; font-size: 24px; }
-            p { margin: 0; color: #555; }
-          </style>
-        </head>
-        <body>
-          <div class="qr-container">
-            ${svgData}
-            <h2>${name}</h2>
-            <p>ID: ${id}</p>
-          </div>
-          <script>window.onload = function() { window.print(); window.close(); }</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+              body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+              .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
+              h2 { margin: 10px 0 5px; font-size: 24px; }
+              p { margin: 0; color: #555; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="qr-container">
+              ${svgData}
+              <h2>${name}</h2>
+              <p>Wygenerowano: ${new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+            </div>
+            <script>window.onload = function() { window.print(); window.close(); }</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    };
 
-  const handleViewMachine = async (m, fromQR = false) => {
+    const handleViewMachine = async (m, fromQR = false) => {
     setSelectedMachine(m);
     setIsFromQRScan(fromQR);
     setLoadingHistory(true);
@@ -205,7 +214,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
     }
   };
 
-  const handleScanSuccess = (decoded) => {
+  const handleScanSuccess = (decoded, rawQr) => {
     setIsScanning(false);
     if (!decoded) {
       showToast('Błąd odczytu QR: brak danych.', 'error');
@@ -213,6 +222,8 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
     }
 
     let machineId = typeof decoded === 'string' ? decoded.trim() : String(decoded);
+    const originalRaw = rawQr || machineId;
+
     if (machineId.includes('?machine=')) {
       try {
         const queryPart = machineId.split('?')[1];
@@ -228,13 +239,13 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
 
     const found = machines.find(m =>
       m.id === machineId ||
-      (m.qrCode && m.qrCode === machineId) ||
+      (m.qrCode && (m.qrCode === machineId || m.qrCode === originalRaw)) ||
       (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
     );
 
     if (found) {
       handleViewMachine(found, true);
-      showToast(`Wczytano maszynę: ${found.name}`, 'success');
+      showToast('Wczytano maszyne: ' + found.name, 'success');
     } else {
       showToast('Nie znaleziono maszyny z tego kodu QR.', 'error');
     }
@@ -246,7 +257,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
         isOpen={isScanning}
         onClose={() => setIsScanning(false)}
         onScanSuccess={handleScanSuccess}
-        title="Skanuj kod QR (Baza Urządzeń)"
+        title="Skanuj kod QR (Baza Urzadzen)"
         subtitle="Skieruj aparat na kod QR maszyny, aby otworzyć jej detale."
       />
       {selectedMachine ? (

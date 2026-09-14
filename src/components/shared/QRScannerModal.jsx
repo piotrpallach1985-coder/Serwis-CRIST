@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function QRScannerModal({ 
   isOpen, 
@@ -30,11 +31,28 @@ export default function QRScannerModal({
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
             let machineId = decodedText;
-            if (decodedText.includes('?machine=')) {
-              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-              machineId = urlParams.get('machine');
-            }
-            if (isMounted) onScanSuccess(machineId);
+              let tenantFromQr = null;
+              
+              if (decodedText.includes('?')) {
+                try {
+                  const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                  machineId = urlParams.get('machine') || machineId;
+                  tenantFromQr = urlParams.get('tenant');
+                } catch (e) {}
+              }
+
+              // Walidacja cross-tenant
+              const currentTenantId = useManagerStore.getState().tenantId;
+              if (tenantFromQr && currentTenantId && tenantFromQr !== currentTenantId) {
+                alert('Błąd: Skanowana maszyna należy do innej firmy! Zmień aktywną firmę, aby uzyskać dostęp.');
+                // Zatrzymujemy działanie - nie wywołujemy onScanSuccess
+                return;
+              }
+
+              // Oczyszczamy z ewentualnych spacji
+              machineId = typeof machineId === 'string' ? machineId.trim() : machineId;
+
+              if (isMounted) onScanSuccess(machineId, decodedText);
           },
           () => {} // Ignoruj błędy odczytu (np. brak kodu w kadrze)
         ).catch(err => {

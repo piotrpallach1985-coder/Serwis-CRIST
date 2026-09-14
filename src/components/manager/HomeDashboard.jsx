@@ -28,19 +28,31 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
     }
   }, []);
 
-  const handleScanSuccess = (machineId) => {
-    setIsScanning(false);
-    setCurrentModule('ur');
+  const handleScanSuccess = (machineId, rawQr) => {
+      setIsScanning(false);
+      
+      const targetMachine = machines.find(m => 
+        m.id === machineId || 
+        (m.qrCode && (m.qrCode === machineId || m.qrCode === rawQr)) || 
+        (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+      );
+      
+      if (!targetMachine) {
+        alert('Nie znaleziono zeskanowanej maszyny w bazie tej firmy.');
+        return;
+      }
+
+      setCurrentModule('ur');
     setActiveTab('machines');
-    const newUrl = `?module=ur&tab=machines&openMachine=${machineId}`;
-    window.history.pushState(
-      { module: 'ur', tab: 'machines', openMachine: machineId },
-      '',
-      newUrl
-    );
-    window.dispatchEvent(new PopStateEvent('popstate', {
-      state: { module: 'ur', tab: 'machines', openMachine: machineId }
-    }));
+    const newUrl = `?module=ur&tab=machines&openMachine=${targetMachine.id}`;
+      window.history.pushState(
+        { module: 'ur', tab: 'machines', openMachine: targetMachine.id },
+        '',
+        newUrl
+      );
+      window.dispatchEvent(new PopStateEvent('popstate', {
+        state: { module: 'ur', tab: 'machines', openMachine: targetMachine.id }
+      }));
   };
 
   const navigateToModule = (moduleName, defaultTab) => {
@@ -77,7 +89,17 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
 
         {/* Profil i wylogowanie */}
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="hidden sm:flex flex-col text-right">
+            {user?.role === 'superadmin' && (
+              <button
+                type="button"
+                onClick={() => navigateToModule('system_admin', 'superadmin')}
+                className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-sm bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-xl transition-all shadow-md transform hover:-translate-y-0.5 border border-yellow-400/50"
+              >
+                <i className="ph ph-crown text-xl"></i>
+                Zarządzanie SaaS
+              </button>
+            )}
+            <div className="hidden sm:flex flex-col text-right">
             <span className="text-xs font-bold text-slate-800">{user?.name || 'Użytkownik'}</span>
             <span className="text-[10px] text-slate-500 capitalize">{user?.role || 'Operator'}</span>
           </div>
@@ -180,7 +202,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           </button>
 
           {/* PANEL ADMINISTRATORA FIRMY */}
-          {canAccessCompanyAdmin ? (
+                      {canAccessCompanyAdmin ? (
             <button
               type="button"
               onClick={() => navigateToModule('company_admin', 'users')}
