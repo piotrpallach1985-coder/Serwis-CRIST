@@ -34,7 +34,8 @@ service cloud.firestore {
 
     // Centralny rejestr firm (SaaS) - Tylko superadmin
     match /tenant_registry/{document=**} {
-      allow read, write: if isSuperAdmin();
+      allow read: if document == '_global_settings_' || isSuperAdmin();
+      allow write: if isSuperAdmin();
     }
 
     // Reguły dla tenantów (Multi-Tenancy)
@@ -97,6 +98,11 @@ service cloud.firestore {
       match /action_items/{document=**} {
         allow read: if isSignedIn();
         allow write: if isTenantUser(tenantId) && isStaff();
+      }
+
+      match /crash_reports/{document=**} {
+        allow create: if true;
+        allow read, update, delete: if isTenantUser(tenantId) && isAdmin();
       }
     }
   }
