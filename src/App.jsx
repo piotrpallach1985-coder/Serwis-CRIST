@@ -115,12 +115,12 @@ export default function App() {
     if (machineParam) {
       if (user && user.role !== USER_ROLES.OPERATOR) {
         const params = new URLSearchParams(window.location.search);
-        params.set('module', 'master_data');
+        params.set('module', 'ur');
         params.set('tab', 'machines');
         params.set('openMachine', machineParam);
         params.delete('machine');
-        window.history.replaceState({ module: 'master_data', tab: 'machines', openMachine: machineParam }, '', '?' + params.toString());
-        setCurrentModule('master_data');
+        window.history.replaceState({ module: 'ur', tab: 'machines', openMachine: machineParam }, '', '?' + params.toString());
+        setCurrentModule('ur');
       } else {
         setUrlMachineId(machineParam);
         window.history.replaceState({ module: 'operator' }, '', '?module=operator&machine=' + machineParam);

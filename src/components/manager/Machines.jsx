@@ -247,7 +247,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
       handleViewMachine(found, true);
       showToast('Wczytano maszyne: ' + found.name, 'success');
     } else {
-      showToast('Nie znaleziono maszyny z tego kodu QR.', 'error');
+      showToast('Nie znaleziono maszyny: ' + machineId, 'error');
     }
   };
 

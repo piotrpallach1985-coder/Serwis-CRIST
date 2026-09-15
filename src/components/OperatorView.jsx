@@ -38,6 +38,7 @@ return () => window.removeEventListener('popstate', handlePopState);
     window.history.pushState({ step: newStep }, '', `?module=operator&step=${newStep}`);
   };
   const [isLiveScanning, setIsLiveScanning] = useState(false);
+    const [nfcStatus, setNfcStatus] = useState("unsupported");
   const html5QrcodeRef = useRef(null);
 
   // Status sieci
@@ -88,6 +89,8 @@ return () => window.removeEventListener('popstate', handlePopState);
             if (docSnap.exists()) {
               setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
               handleStepChange('form');
+            } else {
+              alert("Błąd: Nie znaleziono maszyny z URL o ID: " + initialMachineId);
             }
           }
         }
@@ -171,7 +174,7 @@ return () => window.removeEventListener('popstate', handlePopState);
                   (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
                 );
               if (foundMachine) { setSelectedMachine(foundMachine); handleStepChange('form'); }
-              else { alert('Nie znaleziono maszyny w Twojej firmie. Upewnij się, że kod QR jest zaktualizowany.'); handleStepChange('scan'); }
+              else { alert('Nie znaleziono maszyny: ' + machineId); handleStepChange('scan'); }
             }
           } else { alert('Nieprawidlowy QR'); }
         },
@@ -181,48 +184,8 @@ return () => window.removeEventListener('popstate', handlePopState);
           setErrorMsg(err.message || 'Błąd uruchamiania kamery.');
         });
         
-        let nfcAbortController = null;
-        if ('NDEFReader' in window) {
-          try {
-            nfcAbortController = new AbortController();
-            const ndef = new window.NDEFReader();
-            ndef.scan({ signal: nfcAbortController.signal }).then(() => {
-              ndef.onreading = event => {
-                const decoder = new TextDecoder();
-                for (const record of event.message.records) {
-                  const decodedText = decoder.decode(record.data);
-                  
-                  stopLiveScanner();
-                  let machineId = decodedText;
-                  let tenantFromQr = null;
-                  if (decodedText.includes('?')) {
-                    const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-                    machineId = urlParams.get('machine') || machineId;
-                    tenantFromQr = urlParams.get('tenant');
-                  }
-                  
-                  if (tenantFromQr && tenantFromQr !== tenantId) {
-                    window.location.href = decodedText;
-                    return;
-                  }
-                  
-                  if (machineId) {
-                    const foundMachine = machinesRef.current.find(m => 
-                      m.id === machineId || 
-                      (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
-                      (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
-                    );
-                    if (foundMachine) { setSelectedMachine(foundMachine); handleStepChange('form'); }
-                    else { alert('Nie znaleziono maszyny o tym kodzie NFC w bazie.'); handleStepChange('scan'); }
-                  }
-                }
-              };
-            }).catch(err => console.error("NFC start error", err));
-          } catch(e) {}
-        }
-
         return () => {
-          if (nfcAbortController) nfcAbortController.abort();
+          
           if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
           const container = document.getElementById('qr-reader');
           if (container) container.innerHTML = '';
@@ -268,7 +231,7 @@ return () => window.removeEventListener('popstate', handlePopState);
             setSelectedMachine(foundMachine);
             handleStepChange('form');
           } else {
-            alert('Nie znaleziono maszyny o tym kodzie w bazie.');
+            alert('Nie znaleziono maszyny: ' + machineId);
             handleStepChange('scan');
           }
         } else {
