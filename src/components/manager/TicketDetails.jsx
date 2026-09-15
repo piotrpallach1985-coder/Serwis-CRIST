@@ -195,18 +195,18 @@ export default function TicketDetails({
 
                       return (
                         <div key={step.id} className="relative flex items-start group min-h-[80px]">
-                          {/* Liniowa łączówka */}
-                          {step.id !== 5 && (
-                            <div className="absolute left-4 top-10 bottom-[-10px] w-0.5 bg-gray-200 z-0"></div>
-                          )}
-                          
-                          {/* Kółko z numerem */}
-                          <div className={`relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-sm mt-1 mr-4 transition-all ${isActive ? 'bg-[#111827] border-[#111827] text-white shadow-md' : isPast ? 'bg-white border-green-500 text-green-500' : 'bg-white border-gray-200 text-gray-300'}`}>
-                            {isPast ? <i className="ph ph-check font-bold"></i> : step.id}
-                          </div>
-                          
-                          {/* Karta z treścią */}
-                          <div className={`flex-1 mb-2 md:mb-4 rounded-xl transition-all duration-300 ${isActive ? 'bg-[#f4f1eb] p-2 sm:p-4 shadow-sm border border-[#e8e4db]' : 'p-2 sm:p-3'}`}>
+                            {/* Liniowa łączówka */}
+                            {step.id !== 5 && (
+                              <div className="absolute left-4 top-10 bottom-[-10px] w-0.5 bg-gray-200 z-0"></div>
+                            )}
+                            
+                            {/* Kółko z numerem */}
+                            <div className={`relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-sm mt-3 mr-4 transition-all ${isActive ? 'bg-[#111827] border-[#111827] text-white shadow-md' : isPast ? 'bg-white border-green-500 text-green-500' : 'bg-white border-gray-200 text-gray-300'}`}>
+                              {isPast ? <i className="ph ph-check font-bold"></i> : step.id}
+                            </div>
+                            
+                            {/* Karta z treścią */}
+                            <div className={`flex-1 mb-2 md:mb-4 rounded-xl transition-all duration-300 relative z-0 ${isActive ? 'bg-[#f4f1eb] py-4 pr-4 pl-[3.5rem] sm:pl-[4rem] shadow-sm border border-[#e8e4db] -ml-[3rem] -mt-1' : 'py-3 pr-3'}`}>
                             <h4 className={`text-sm md:text-lg transition-colors ${isActive ? 'font-extrabold text-gray-900' : isPast ? 'font-bold text-gray-500' : 'font-medium text-gray-400'}`}>
                               {step.label}
                             </h4>

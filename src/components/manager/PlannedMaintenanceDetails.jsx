@@ -189,51 +189,109 @@ export default function PlannedMaintenanceDetails({
                     Przegląd według obowiązującego standardu DTR maszyny.
                   </div>
                 )}
+                              </div>
               </div>
+            </div>
+            {/* Nowy Panel Kroki Realizacji (jak w awariach) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6">
+              <div className="bg-[#111827] text-white p-4 px-6 flex items-center gap-3">
+                <i className="ph ph-faders text-xl"></i>
+                <h3 className="font-bold text-sm tracking-widest uppercase">
+                  DZIAŁ TECHNICZNY - KROKI REALIZACJI
+                </h3>
+              </div>
+              
+              <div className="p-4 md:p-5 space-y-6 bg-gray-50/50">
+                <div className="mt-2">
+                  {[
+                    { id: 1, label: 'Wyczekujący (Do weryfikacji)' },
+                    { id: 2, label: 'Realizacja serwisu (W trakcie)' },
+                    { id: 3, label: 'Zakończony' }
+                  ].map(step => {
+                    let currentStepNum = 1;
+                    if (srv.status === 'in_progress') currentStepNum = 2;
+                    else if (isCompleted || srv.status === 'completed') currentStepNum = 3;
+                    
+                    const isActive = step.id === currentStepNum;
+                    const isPast = step.id < currentStepNum;
 
-              {/* Przyciski akcji */}
-              <div className="flex flex-wrap gap-4 pt-6 border-t border-slate-200">
-                {!isCompleted && srv.status !== 'in_progress' && (
-                  <button onClick={() => onSetInProgress(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
-                    <i className="ph ph-play-circle text-xl"></i> Rozpocznij Serwis
-                  </button>
-                )}
-                {!isCompleted && srv.status === 'in_progress' && (
-                  <>
-                    {(!srv.checklist || srv.checklist.length === 0) ? (
-                      <button onClick={() => setCompletionModal(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
-                        <i className="ph ph-check-circle text-xl"></i> Zakończ Serwis
-                      </button>
-                    ) : (
-                      <div className="w-full mt-6 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="text-xl font-bold mb-4 text-slate-800 border-b pb-2">Lista Kontrolna (Wymagana do zamknięcia)</h3>
-                        <ChecklistExecutor
-                          steps={srv.checklist}
-                          onComplete={(responses) => {
-                            setChecklistResponses(responses);
-                            setCompletionModal(srv);
-                          }}
-                        />
+                    return (
+                      <div key={step.id} className="relative flex items-start group min-h-[80px]">
+                        {/* Liniowa łączówka */}
+                        {step.id !== 3 && (
+                          <div className="absolute left-4 top-10 bottom-[-10px] w-0.5 bg-gray-200 z-0"></div>
+                        )}
+                        
+                        {/* Kółko z numerem */}
+                        <div className={`relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-sm mt-3 mr-4 transition-all ${isActive ? 'bg-[#111827] border-[#111827] text-white shadow-md' : isPast ? 'bg-white border-green-500 text-green-500' : 'bg-white border-gray-200 text-gray-300'}`}>
+                          {isPast ? <i className="ph ph-check font-bold"></i> : step.id}
+                        </div>
+                        
+                        {/* Karta z treścią */}
+                        <div className={`flex-1 mb-2 md:mb-4 rounded-xl transition-all duration-300 relative z-0 ${isActive ? 'bg-[#f4f1eb] py-4 pr-4 pl-[3.5rem] sm:pl-[4rem] shadow-sm border border-[#e8e4db] -ml-[3rem] -mt-1' : 'py-3 pr-3'}`}>
+                          <h4 className={`text-sm md:text-lg transition-colors ${isActive ? 'font-extrabold text-gray-900' : isPast ? 'font-bold text-gray-500' : 'font-medium text-gray-400'}`}>
+                            {step.label}
+                          </h4>
+                          
+                          {isActive && (
+                            <div className="mt-5 space-y-5 animate-fade-in">
+                              
+                              <div className="space-y-4">
+                                {step.id === 1 && !isCompleted && srv.status !== 'in_progress' && (
+                                  <div className="flex flex-col sm:flex-row gap-3">
+                                    <button onClick={() => onSetInProgress(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                                      <i className="ph ph-play-circle text-xl"></i> Rozpocznij Serwis
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {step.id === 2 && !isCompleted && srv.status === 'in_progress' && (
+                                  <div className="flex flex-col gap-4">
+                                    {(!srv.checklist || srv.checklist.length === 0) ? (
+                                      <button onClick={() => setCompletionModal(srv)} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                                        <i className="ph ph-check-circle text-xl"></i> Zakończ Serwis
+                                      </button>
+                                    ) : (
+                                      <div className="w-full bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                        <h3 className="text-xl font-bold mb-4 text-slate-800 border-b pb-2">Lista Kontrolna (Wymagana do zamknięcia)</h3>
+                                        <ChecklistExecutor
+                                          steps={srv.checklist}
+                                          onComplete={(responses) => {
+                                            setChecklistResponses(responses);
+                                            setCompletionModal(srv);
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </>
-                )}
-                {!isCompleted && srv.status !== 'in_progress' && canEditPlanned && (
-                  <button onClick={() => onEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
-                    <i className="ph ph-pencil-simple text-xl"></i> Edytuj
-                  </button>
-                )}
-                {canDeletePlanned && (!isArchive || allowTicketDeletion) && (
-                  <button onClick={() => { onDelete(srv.id); onBack(); }} className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-red-200">
-                    <i className="ph ph-trash text-xl"></i> Usuń
-                  </button>
-                )}
+                    );
+                  })}
+                </div>
+                
+                {/* Additional Buttons (Edit/Delete) at the bottom of the timeline panel */}
+                <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-200 mt-2">
+                  {!isCompleted && srv.status !== 'in_progress' && canEditPlanned && (
+                    <button onClick={() => onEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
+                      <i className="ph ph-pencil-simple text-xl"></i> Edytuj
+                    </button>
+                  )}
+                  {canDeletePlanned && (!isArchive || allowTicketDeletion) && (
+                    <button onClick={() => { onDelete(srv.id); onBack(); }} className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-red-200">
+                      <i className="ph ph-trash text-xl"></i> Usuń
+                    </button>
+                  )}
+                                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* PRAWA KOLUMNA — Historia */}
+          {/* PRAWA KOLUMNA — Historia */}
         <div className="w-full lg:w-1/3">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
             <h4 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2">
@@ -281,13 +339,11 @@ export default function PlannedMaintenanceDetails({
               {(!srv.history || srv.history.length === 0) && (
                 <div className="text-sm text-slate-400 italic pl-6">Brak historii zdarzeń.</div>
               )}
+                                        </div>
             </div>
           </div>
         </div>
-      </div>
-
-
-
+  
       {/* Modals */}
       <PlannedMaintenanceRbgModal
         rbgUpdateModal={rbgUpdateModal}

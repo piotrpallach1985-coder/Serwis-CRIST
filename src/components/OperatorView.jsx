@@ -177,15 +177,57 @@ return () => window.removeEventListener('popstate', handlePopState);
         },
         () => {}
       ).catch(err => {
-        console.error('Scanner error:', err);
-        setErrorMsg(err.message || 'Blad uruchamiania kamery.');
-      });
-      return () => {
-        if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
-        const container = document.getElementById('qr-reader');
-        if (container) container.innerHTML = '';
-      };
-    }
+          console.error('Scanner error:', err);
+          setErrorMsg(err.message || 'Błąd uruchamiania kamery.');
+        });
+        
+        let nfcAbortController = null;
+        if ('NDEFReader' in window) {
+          try {
+            nfcAbortController = new AbortController();
+            const ndef = new window.NDEFReader();
+            ndef.scan({ signal: nfcAbortController.signal }).then(() => {
+              ndef.onreading = event => {
+                const decoder = new TextDecoder();
+                for (const record of event.message.records) {
+                  const decodedText = decoder.decode(record.data);
+                  
+                  stopLiveScanner();
+                  let machineId = decodedText;
+                  let tenantFromQr = null;
+                  if (decodedText.includes('?')) {
+                    const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                    machineId = urlParams.get('machine') || machineId;
+                    tenantFromQr = urlParams.get('tenant');
+                  }
+                  
+                  if (tenantFromQr && tenantFromQr !== tenantId) {
+                    window.location.href = decodedText;
+                    return;
+                  }
+                  
+                  if (machineId) {
+                    const foundMachine = machinesRef.current.find(m => 
+                      m.id === machineId || 
+                      (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
+                      (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+                    );
+                    if (foundMachine) { setSelectedMachine(foundMachine); handleStepChange('form'); }
+                    else { alert('Nie znaleziono maszyny o tym kodzie NFC w bazie.'); handleStepChange('scan'); }
+                  }
+                }
+              };
+            }).catch(err => console.error("NFC start error", err));
+          } catch(e) {}
+        }
+
+        return () => {
+          if (nfcAbortController) nfcAbortController.abort();
+          if (html5QrcodeRef.current) { try { html5QrcodeRef.current.stop().catch(()=>{}); } catch(e) {} }
+          const container = document.getElementById('qr-reader');
+          if (container) container.innerHTML = '';
+        };
+      }
   }, [isLiveScanning, initialMachineId]);
   const handleFileScan = (e) => {
     const file = e.target.files[0];
@@ -299,7 +341,7 @@ return () => window.removeEventListener('popstate', handlePopState);
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-white font-bold text-sm flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
-                      Skanowanie na żywo (Skieruj aparat na QR)
+                      Skanowanie na żywo (QR lub NFC)
                     </span>
                     <button 
                       onClick={stopLiveScanner}
