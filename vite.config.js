@@ -15,6 +15,10 @@ export default defineConfig({
         short_name: 'CRIST Awarie',
         description: 'System zarzadzania awariami i serwisem dla CRIST S.A.',
         theme_color: '#ffffff',
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: '/Serwis-CRIST/',
+        start_url: '/Serwis-CRIST/?source=pwa',
         icons: [
           {
             src: 'pwa-192x192.jpg',
