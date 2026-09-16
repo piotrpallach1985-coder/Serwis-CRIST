@@ -121,7 +121,12 @@ export default function MachineDetails({ isFromQR, onScanNext, machine, user, hi
             </div>
           </div>
 
-        <MachineDTR machine={machine} user={user} canManage={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('manage_dtr')} />
+        <MachineDTR 
+          machine={machine} 
+          user={user} 
+          canManage={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('manage_dtr')} 
+          canDeleteNotes={(user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || (user?.permissions || []).includes('delete_machine_notes')}
+        />
 
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center gap-3">

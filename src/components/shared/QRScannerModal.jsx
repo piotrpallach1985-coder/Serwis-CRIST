@@ -6,19 +6,23 @@ export default function QRScannerModal({
   isOpen, 
   onClose, 
   onScanSuccess, 
-  title = "Skanuj kod QR lub użyj NFC",
-  subtitle = "Skieruj aparat na kod QR, aby automatycznie odczytać maszynę."
+  title,
+  subtitle,
+  mode = 'qr' // 'qr' lub 'nfc'
 }) {
   const html5QrcodeRef = useRef(null);
   const [initError, setInitError] = useState(null);
   const [nfcStatus, setNfcStatus] = useState('unsupported'); // unsupported, supported, active, error
 
+  // Ustawienie domyślnych tytułów w zależności od trybu
+  const displayTitle = title || (mode === 'nfc' ? "Odczyt NFC" : "Skanuj kod QR");
+  const displaySubtitle = subtitle || (mode === 'nfc' ? "Zbliż telefon do znacznika NFC, aby automatycznie odczytać maszynę." : "Skieruj aparat na kod QR, aby automatycznie odczytać maszynę.");
+
+  // Efekt dla kamery QR
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || mode !== 'qr') return;
 
     setInitError(null);
-    setNfcStatus('NDEFReader' in window ? 'supported' : 'unsupported');
-    
     let isMounted = true;
     let scanner = null;
 
@@ -80,9 +84,81 @@ export default function QRScannerModal({
         }
       }
     };
-  }, [isOpen, onScanSuccess]);
+  }, [isOpen, onScanSuccess, mode]);
 
-  const startNfc = async () => {
+  // Efekt dla autostartu NFC
+  useEffect(() => {
+    if (!isOpen || mode !== 'nfc') return;
+    
+    if (!('NDEFReader' in window)) {
+      setNfcStatus('unsupported');
+      return;
+    }
+    
+    let isMounted = true;
+    let ndef = null;
+    let abortController = new AbortController();
+
+    const startAutoNfc = async () => {
+      try {
+        ndef = new window.NDEFReader();
+        // Skanowanie NFC po otwarciu okna (o ile przeglądarka pozwoli z automatu, 
+        // ale modal wywoływany jest z kliknięcia więc powinno przejść)
+        await ndef.scan({ signal: abortController.signal });
+        if (isMounted) setNfcStatus('active');
+        
+        ndef.addEventListener("reading", event => {
+          try {
+            const decoder = new TextDecoder();
+            for (const record of event.message.records) {
+              let decodedText = decoder.decode(record.data);
+              
+              let machineId = decodedText;
+              let tenantFromQr = null;
+              if (decodedText.includes('?')) {
+                try {
+                  const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                  machineId = urlParams.get('machine') || machineId;
+                  tenantFromQr = urlParams.get('tenant');
+                } catch (e) {}
+              }
+
+              const currentTenantId = useManagerStore.getState().tenantId;
+              if (tenantFromQr && currentTenantId && tenantFromQr !== currentTenantId) {
+                alert('Błąd: Skanowana maszyna należy do innej firmy!');
+                return;
+              }
+
+              machineId = typeof machineId === 'string' ? machineId.trim() : machineId;
+              machineId = machineId.replace(/^[^\w]+/, ''); // usuń binarne prefixy URL
+              
+              if (isMounted) onScanSuccess(machineId, decodedText);
+            }
+          } catch (e) {
+            console.error("Błąd dekodowania NFC:", e);
+            alert("Błąd dekodowania NFC: " + e.message);
+          }
+        });
+        
+        ndef.addEventListener("readingerror", () => {
+          if (isMounted) alert("NFC nie mogło odczytać tagu. Może tag jest pusty lub niekompatybilny?");
+        });
+      } catch (error) {
+        console.error("NFC start error:", error);
+        if (isMounted) setNfcStatus('error');
+      }
+    };
+
+    startAutoNfc();
+
+    return () => {
+      isMounted = false;
+      abortController.abort(); // Zatrzymaj czytnik NFC przy zamykaniu
+    };
+  }, [isOpen, onScanSuccess, mode]);
+
+
+  const startManualNfc = async () => {
     if (!('NDEFReader' in window)) {
         alert("Twoja przeglądarka nie wspiera Web NFC.");
         return;
@@ -97,8 +173,6 @@ export default function QRScannerModal({
           const decoder = new TextDecoder();
           for (const record of event.message.records) {
             let decodedText = decoder.decode(record.data);
-            
-            alert("TEST NFC W APCE. Złapano: " + decodedText);
             
             let machineId = decodedText;
             let tenantFromQr = null;
@@ -141,52 +215,71 @@ export default function QRScannerModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 animate-fade-in backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 relative flex flex-col gap-4">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative flex flex-col gap-6">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-xl text-slate-800">{displayTitle}</h3>
           <button 
             onClick={onClose} 
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg transition-colors text-sm shadow-md"
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm shadow-md"
           >
-            <i className="ph ph-arrow-left"></i> Powrót
+            <i className="ph ph-x text-lg"></i> Zamknij
           </button>
         </div>
         
-        {initError ? (
-          <div className="text-red-600 text-center p-4 bg-red-50 rounded-lg border border-red-200">
-            Błąd dostępu do kamery: {initError}
-          </div>
-        ) : (
-          <div id="unified-qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
-        )}
-        
-        {nfcStatus === 'supported' && (
-          <button 
-            onClick={startNfc}
-            className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors border border-blue-300 shadow-sm"
-          >
-            <i className="ph ph-wifi-high text-xl"></i> Włącz czytnik NFC
-          </button>
+        {mode === 'qr' && (
+          <>
+            {initError ? (
+              <div className="text-red-600 text-center p-4 bg-red-50 rounded-xl border border-red-200">
+                Błąd dostępu do kamery: {initError}
+              </div>
+            ) : (
+              <div id="unified-qr-reader" className="w-full rounded-2xl overflow-hidden bg-black min-h-[300px] shadow-inner"></div>
+            )}
+          </>
         )}
 
-        {nfcStatus === 'active' && (
-          <div className="flex items-center justify-center gap-3 p-4 bg-blue-50 text-blue-800 rounded-xl border-2 border-blue-200 shadow-inner animate-pulse">
-            <i className="ph ph-wifi-high text-3xl"></i>
-            <div className="flex flex-col">
-              <span className="text-sm font-black uppercase tracking-wider">Odczyt NFC Aktywny</span>
-              <span className="text-xs">Zbliż telefon do naklejki...</span>
-            </div>
+        {mode === 'nfc' && (
+          <div className="flex flex-col items-center justify-center py-10 gap-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            {nfcStatus === 'active' ? (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20"></div>
+                  <div className="w-24 h-24 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shadow-lg relative z-10">
+                    <i className="ph ph-waves text-6xl"></i>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <h4 className="text-lg font-black uppercase tracking-wider text-slate-800">Odczyt Aktywny</h4>
+                  <p className="text-sm text-slate-500 mt-2">Zbliż telefon do naklejki NFC (zazwyczaj na pleckach telefonu)</p>
+                </div>
+              </>
+            ) : nfcStatus === 'unsupported' ? (
+              <>
+                <div className="w-20 h-20 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center shadow-inner">
+                  <i className="ph ph-waves text-5xl opacity-50"></i>
+                </div>
+                <div className="text-center px-4">
+                  <h4 className="text-lg font-bold text-slate-700">NFC niedostępne</h4>
+                  <p className="text-sm text-slate-500 mt-2">Twoje urządzenie lub przeglądarka nie wspiera aktywnego czytnika Web NFC.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center shadow-inner">
+                  <i className="ph ph-warning text-5xl"></i>
+                </div>
+                <div className="text-center px-4">
+                  <h4 className="text-lg font-bold text-red-600">Brak uprawnień</h4>
+                  <p className="text-sm text-slate-500 mt-2">Odrzucono zgodę na NFC lub wystąpił błąd sprzętowy.</p>
+                  <button onClick={startManualNfc} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-md">Spróbuj ponownie</button>
+                </div>
+              </>
+            )}
           </div>
         )}
         
-        {nfcStatus === 'error' && (
-          <div className="text-sm text-red-600 text-center bg-red-50 p-2 rounded-lg border border-red-100">
-            Odczyt NFC odrzucony (wymagana zgoda systemu).
-          </div>
-        )}
-        
-        <p className="text-xs text-center text-slate-500">
-          {subtitle}
+        <p className="text-xs text-center text-slate-400 font-medium">
+          {displaySubtitle}
         </p>
       </div>
     </div>

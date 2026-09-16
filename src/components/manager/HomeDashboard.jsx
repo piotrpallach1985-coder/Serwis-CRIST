@@ -18,6 +18,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
   const { isAdmin, canManageUsers, canManageRoles, canViewReports } = usePermissions(user, roles);
 
   const [isScanning, setIsScanning] = useState(false);
+  const [scannerMode, setScannerMode] = useState('qr');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -124,8 +125,9 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
         isOpen={isScanning}
         onClose={() => setIsScanning(false)}
         onScanSuccess={handleScanSuccess}
-        title="Skaner Kodów QR Maszyny"
-        subtitle="Skieruj aparat na tabliczkę QR urządzenia, aby przejść do karty technicznej."
+        mode={scannerMode}
+        title={scannerMode === 'qr' ? "Skaner Kodów QR" : "Odczyt NFC"}
+        subtitle={scannerMode === 'qr' ? "Skieruj aparat na kod QR, aby otworzyć maszynę." : "Zbliż telefon do naklejki NFC maszyny."}
       />
 
       {/* GŁÓWNA ZAWARTOŚĆ — 4 KAFELKI */}
@@ -154,49 +156,60 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
           </div>
   
           {/* SIATKA 3 KAFELKÓW (Zgodna ze zrzutem ekranu) */}
-          <div className="w-full max-w-md sm:max-w-3xl mx-auto px-2">
-            <div className="flex flex-wrap sm:flex-nowrap justify-center gap-4 sm:gap-6 mb-4 sm:mb-6">
-              
-              {/* SKANER QR/NFC */}
-              <button
-                type="button"
-                onClick={() => setIsScanning(true)}
-                className="w-[calc(50%-0.5rem)] sm:w-1/2 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-blue-400 shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[260px] transform hover:-translate-y-1"
-              >
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto bg-gradient-to-br from-[#1b5fcc] to-[#8644e5] text-white rounded-2xl sm:rounded-[1.75rem] flex items-center justify-center mb-3 sm:mb-6 shadow-md group-hover:scale-105 transition-transform">
-                  <div className="flex items-center gap-1 sm:gap-1.5">
+          <div className="w-full max-w-md sm:max-w-4xl mx-auto px-2">
+              <div className="flex flex-wrap sm:flex-nowrap justify-center gap-4 sm:gap-6 mb-4 sm:mb-6">
+                
+                {/* SKANER QR */}
+                <button
+                  type="button"
+                  onClick={() => { setScannerMode('qr'); setIsScanning(true); }}
+                  className="w-[calc(50%-0.5rem)] sm:w-1/3 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-blue-400 shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1"
+                >
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-[#1b5fcc] to-[#3a7dfc] text-white rounded-2xl sm:rounded-[1.5rem] flex items-center justify-center mb-3 sm:mb-5 shadow-md group-hover:scale-105 transition-transform">
                     <i className="ph ph-qr-code text-3xl sm:text-5xl"></i>
-                    <i className="ph ph-waves text-xl sm:text-3xl"></i>
                   </div>
-                </div>
-                <h3 className="text-sm sm:text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
-                  Skaner QR/NFC
-                </h3>
-              </button>
-  
-              {/* PANEL UR */}
-              <button
-                type="button"
-                onClick={() => navigateToModule('ur', 'dashboard_tickets')}
-                className="w-[calc(50%-0.5rem)] sm:w-1/2 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-orange-400 shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[260px] transform hover:-translate-y-1"
-              >
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto border-[3px] sm:border-[5px] border-[#ed6d24] text-[#ed6d24] rounded-full flex items-center justify-center mb-3 sm:mb-6 shadow-sm group-hover:scale-105 group-hover:bg-[#ed6d24] group-hover:text-white transition-all">
-                  <i className="ph ph-wrench text-3xl sm:text-5xl"></i>
-                </div>
-                <h3 className="text-sm sm:text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
-                  Panel UR
-                </h3>
-              </button>
-  
-            </div>
-            
-            {/* ADMINISTRATOR (Wyśrodkowany na dole) */}
+                  <h3 className="text-sm sm:text-lg font-extrabold text-slate-900 leading-tight tracking-tight">
+                    Skaner QR
+                  </h3>
+                </button>
+
+                {/* SKANER NFC */}
+                <button
+                  type="button"
+                  onClick={() => { setScannerMode('nfc'); setIsScanning(true); }}
+                  className="w-[calc(50%-0.5rem)] sm:w-1/3 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-purple-400 shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1"
+                >
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-[#6b21a8] to-[#a855f7] text-white rounded-2xl sm:rounded-[1.5rem] flex items-center justify-center mb-3 sm:mb-5 shadow-md group-hover:scale-105 transition-transform">
+                    <i className="ph ph-waves text-3xl sm:text-5xl"></i>
+                  </div>
+                  <h3 className="text-sm sm:text-lg font-extrabold text-slate-900 leading-tight tracking-tight">
+                    Odczyt NFC
+                  </h3>
+                </button>
+    
+                {/* PANEL UR */}
+                <button
+                  type="button"
+                  onClick={() => navigateToModule('ur', 'dashboard_tickets')}
+                  className="w-[calc(50%-0.5rem)] sm:w-1/3 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-orange-400 shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1"
+                >
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto border-[3px] sm:border-[4px] border-[#ed6d24] text-[#ed6d24] rounded-full flex items-center justify-center mb-3 sm:mb-5 shadow-sm group-hover:scale-105 group-hover:bg-[#ed6d24] group-hover:text-white transition-all">
+                    <i className="ph ph-wrench text-3xl sm:text-5xl"></i>
+                  </div>
+                  <h3 className="text-sm sm:text-lg font-extrabold text-slate-900 leading-tight tracking-tight">
+                    Panel UR
+                  </h3>
+                </button>
+    
+              </div>
+              
+              {/* ADMINISTRATOR (Wyśrodkowany na dole) */}
             <div className="flex justify-center">
               {canAccessCompanyAdmin ? (
                 <button
                   type="button"
                   onClick={() => navigateToModule('company_admin', 'users')}
-                  className="w-1/2 min-w-[160px] sm:w-[50%] group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-[#0948b3] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[260px] transform hover:-translate-y-1"
+                  className="w-1/2 min-w-[160px] sm:w-1/3 group relative flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-3xl sm:rounded-[2.5rem] border border-slate-100 hover:border-[#0948b3] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[260px] transform hover:-translate-y-1"
                 >
                   <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto bg-[#eef2f6] text-[#0948b3] rounded-2xl sm:rounded-[1.75rem] flex items-center justify-center mb-3 sm:mb-6 group-hover:scale-105 transition-transform shadow-sm">
                     <div className="relative flex items-center justify-center">
@@ -209,7 +222,7 @@ export default function HomeDashboard({ setActiveTab, setCurrentModule, user, on
                   </h3>
                 </button>
               ) : (
-                <div className="w-1/2 min-w-[160px] sm:w-[50%] flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl sm:rounded-[2.5rem] border-2 border-dashed border-slate-200 text-center opacity-60 aspect-square sm:aspect-auto sm:min-h-[260px]">
+                <div className="w-1/2 min-w-[160px] sm:w-1/3 flex flex-col items-center justify-center p-5 sm:p-8 bg-slate-50 rounded-3xl sm:rounded-[2.5rem] border-2 border-dashed border-slate-200 text-center opacity-60 aspect-square sm:aspect-auto sm:min-h-[260px]">
                   <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto bg-slate-200 text-slate-400 rounded-2xl sm:rounded-[1.75rem] flex items-center justify-center text-3xl sm:text-5xl mb-3 sm:mb-6">
                     <i className="ph ph-lock"></i>
                   </div>

@@ -38,7 +38,8 @@ return () => window.removeEventListener('popstate', handlePopState);
     window.history.pushState({ step: newStep }, '', `?module=operator&step=${newStep}`);
   };
   const [isLiveScanning, setIsLiveScanning] = useState(false);
-    const [nfcStatus, setNfcStatus] = useState("unsupported");
+  const [nfcStatus, setNfcStatus] = useState("unsupported");
+  const nfcAbortControllerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
 
   // Status sieci
@@ -130,6 +131,102 @@ return () => window.removeEventListener('popstate', handlePopState);
     const startLiveScanner = () => {
     setIsLiveScanning(true);
     setErrorMsg(null);
+  };
+
+
+  const startNfcLive = async () => {
+    if (!('NDEFReader' in window)) {
+        alert("Twoja przeglądarka nie wspiera Web NFC.");
+        return;
+    }
+    
+    // Anuluj poprzednie skanowanie jeśli istnieje
+    if (nfcAbortControllerRef.current) {
+      nfcAbortControllerRef.current.abort();
+    }
+    nfcAbortControllerRef.current = new AbortController();
+
+    try {
+      const ndef = new window.NDEFReader();
+      await ndef.scan({ signal: nfcAbortControllerRef.current.signal });
+      setNfcStatus('active');
+      
+      ndef.addEventListener("reading", event => {
+        try {
+          const decoder = new TextDecoder();
+          for (const record of event.message.records) {
+            let decodedText = decoder.decode(record.data);
+            
+            let machineId = decodedText;
+            let tenantFromQr = null;
+            if (decodedText.includes('?')) {
+              try {
+                const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                machineId = urlParams.get('machine') || machineId;
+                tenantFromQr = urlParams.get('tenant');
+              } catch (e) {}
+            }
+
+            if (tenantFromQr && tenantFromQr !== tenantId) {
+              window.location.href = decodedText;
+              return;
+            }
+
+            machineId = typeof machineId === 'string' ? machineId.trim() : machineId;
+            machineId = machineId.replace(/^[^\w]+/, ''); // FIX: usuwamy tylko znaki BĘDĄCE NIE-LITERAMI z początku
+            
+            if (machineId) {
+              if (machineId === initialMachineId) {
+                const targetMachine = machinesRef.current.find(m => 
+                    m.id === machineId || 
+                    (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
+                    (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+                  );
+                if (targetMachine) { 
+                  setSelectedMachine(targetMachine); 
+                  stopNfcLive(); 
+                  handleStepChange('form'); 
+                }
+              } else {
+                const foundMachine = machinesRef.current.find(m => 
+                    m.id === machineId || 
+                    (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText)) || 
+                    (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+                  );
+                if (foundMachine) { 
+                  setSelectedMachine(foundMachine); 
+                  stopNfcLive(); 
+                  handleStepChange('form'); 
+                } else { 
+                  alert('Nie znaleziono maszyny: ' + machineId); 
+                  stopNfcLive(); 
+                  handleStepChange('scan'); 
+                }
+              }
+            } else { alert('Nieprawidłowy odczyt NFC'); }
+          }
+        } catch (e) {
+          console.error("Błąd dekodowania NFC:", e);
+          alert("Błąd dekodowania NFC: " + e.message);
+        }
+      });
+      
+      ndef.addEventListener("readingerror", () => {
+          alert("NFC nie mogło odczytać tagu.");
+      });
+    } catch (error) {
+      console.error("NFC start error:", error);
+      alert("NFC Error: " + error.message);
+      setNfcStatus('error');
+    }
+  };
+
+  const stopNfcLive = () => {
+    if (nfcAbortControllerRef.current) {
+      nfcAbortControllerRef.current.abort();
+      nfcAbortControllerRef.current = null;
+    }
+    setNfcStatus('unsupported');
   };
 
   const stopLiveScanner = () => {
@@ -299,34 +396,66 @@ return () => window.removeEventListener('popstate', handlePopState);
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
             <h2 className="text-xl font-black mb-6 uppercase tracking-wider text-slate-800">OPCJE ZGŁOSZEŃ</h2>
               
-              {isLiveScanning ? (
-                <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-700">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-white font-bold text-sm flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
-                      Skanowanie na żywo (QR lub NFC)
-                    </span>
+              {nfcStatus === 'active' ? (
+                  <div className="bg-slate-50 p-8 rounded-2xl shadow-sm border-2 border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-purple-400 rounded-full animate-ping opacity-20"></div>
+                      <div className="w-24 h-24 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center shadow-lg relative z-10">
+                        <i className="ph ph-waves text-6xl"></i>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black uppercase tracking-wider text-slate-800">NFC Aktywne</h4>
+                      <p className="text-slate-500 mt-2 font-medium">Zbliż plecki telefonu do naklejki NFC.</p>
+                    </div>
                     <button 
-                      onClick={stopLiveScanner}
-                      className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                      onClick={stopNfcLive}
+                      className="mt-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-6 py-2 rounded-xl transition-colors"
                     >
-                      Zamknij kamerę
+                      Anuluj
                     </button>
                   </div>
-                  <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <button
-                    onClick={startLiveScanner}
-                    className="w-full max-w-md mx-auto py-5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 relative overflow-hidden group"
-                  >
-                    <div className="relative w-20 h-20 flex items-center justify-center rounded-xl overflow-hidden">
-                      <i className="ph ph-qr-code text-[80px] text-white/90"></i>
-                      <div className="absolute left-0 w-full h-1 bg-red-500 opacity-90 shadow-[0_0_12px_4px_rgba(239,68,68,0.9)] animate-scan z-10"></div>
+                ) : isLiveScanning ? (
+                  <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-700">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-white font-bold text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                        Skaner aparatu
+                      </span>
+                      <button 
+                        onClick={stopLiveScanner}
+                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                      >
+                        Zamknij kamerę
+                      </button>
                     </div>
-                    <span className="text-2xl tracking-wide">Skanuj kod QR</span>
-                    </button>
+                    <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[250px]"></div>
+                  </div>
+                ) : (
+                <div className="space-y-4">
+                  <div className="flex gap-4 max-w-md mx-auto w-full">
+                      {/* Skanuj QR */}
+                      <button
+                        onClick={startLiveScanner}
+                        className="flex-1 py-5 px-2 bg-gradient-to-br from-[#1b5fcc] to-[#3a7dfc] hover:opacity-90 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 relative overflow-hidden group"
+                      >
+                        <div className="relative w-16 h-16 flex items-center justify-center rounded-xl overflow-hidden">
+                          <i className="ph ph-qr-code text-[60px] text-white/90"></i>
+                        </div>
+                        <span className="text-xl tracking-wide">Skanuj QR</span>
+                      </button>
+
+                      {/* Skanuj NFC */}
+                      <button
+                        onClick={startNfcLive}
+                        className="flex-1 py-5 px-2 bg-gradient-to-br from-[#6b21a8] to-[#a855f7] hover:opacity-90 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 relative overflow-hidden group"
+                      >
+                        <div className="relative w-16 h-16 flex items-center justify-center rounded-xl overflow-hidden">
+                          <i className="ph ph-waves text-[60px] text-white/90"></i>
+                        </div>
+                        <span className="text-xl tracking-wide">Odczyt NFC</span>
+                      </button>
+                    </div>
 
                   <div className="flex flex-col gap-3 mt-6 text-left">
                     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">

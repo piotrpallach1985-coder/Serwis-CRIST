@@ -7,7 +7,7 @@ import { db, storage } from '../../firebase';
 
 import { safe } from '../../utils/safeRender';
 
-export default function MachineDTR({ machine, user, canManage }) {
+export default function MachineDTR({ machine, user, canManage, canDeleteNotes }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
@@ -21,6 +21,20 @@ export default function MachineDTR({ machine, user, canManage }) {
     setLocalDtrFiles(machine.dtrFiles || []);
     setLocalNotes(machine.techNotes || []);
   }, [machine.dtrFiles, machine.techNotes]);
+
+  const handleDeleteNote = async (noteId) => {
+    if (!window.confirm("Czy na pewno chcesz usunąć tę notatkę?")) return;
+    try {
+      const updatedNotes = localNotes.filter(n => n.id !== noteId);
+      setLocalNotes(updatedNotes);
+      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'machines', machine.id), {
+        techNotes: updatedNotes
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Błąd podczas usuwania notatki');
+    }
+  };
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -261,14 +275,22 @@ export default function MachineDTR({ machine, user, canManage }) {
             <div className="space-y-3">
               {localNotes.map(n => (
                 <div key={safe(n.id)} className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-start">
-                  <div>
-                    <div className="text-sm text-gray-800 whitespace-pre-wrap font-medium">{safe(n.text)}</div>
-                    <div className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
-                      {safe(n.createdBy)} &bull; {new Date(n.createdAt).toLocaleString('pl-PL')}
+                    <div className="flex-1 mr-2">
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap font-medium">{safe(n.text)}</div>
+                      <div className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                        {safe(n.createdBy)} &bull; {new Date(n.createdAt).toLocaleString('pl-PL')}
+                      </div>
                     </div>
+                    {canDeleteNotes && (
+                      <button 
+                        onClick={() => handleDeleteNote(n.id)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shrink-0"
+                        title="Usuń notatkę"
+                      >
+                        <i className="ph ph-trash"></i>
+                      </button>
+                    )}
                   </div>
-                  
-                </div>
               ))}
             </div>
           )}

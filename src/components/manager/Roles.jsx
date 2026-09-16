@@ -40,7 +40,8 @@ export default function Roles() {
         { id: 'users', label: 'Użytkownicy' },
         { id: 'roles', label: 'Role i Uprawnienia' },
         { id: 'reports', label: 'Raportowanie' },
-        { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' }
+        { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' },
+        { id: 'delete_machine_notes', label: 'Usuwanie Notatek Tech.' }
       ]
     },
       {
