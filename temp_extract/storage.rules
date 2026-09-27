@@ -1,0 +1,54 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // === FUNKCJE POMOCNICZE ===
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Maksymalny rozmiar pliku: 30 MB
+    function isValidSize() {
+      return request.resource.size < 30 * 1024 * 1024;
+    }
+
+    // Tylko dozwolone typy plików (obrazy + PDF)
+    function isValidType() {
+      return request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf';
+    }
+
+    // === ZDJĘCIA AWARII ===
+    // Zalogowany użytkownik może wgrywać zdjęcia awarii (np. z TicketDetails)
+    // Niezalogowani NIE mogą (formularz operatora zapisuje zdjęcia tylko przez zalogowanych)
+    match /tickets/{ticketId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidSize() && isValidType();
+    }
+
+    // === ZDJĘCIA MASZYN / DTR ===
+    match /machine_photos/{machineId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidSize() && isValidType();
+    }
+
+    // === LOGO APLIKACJI (branding) ===
+    // Blokujemy anonimowych operatorów, pozwalając na wgranie logo tylko pracownikom z mailem
+    match /branding/{fileName} {
+      allow read: if true; // Logo musi być widoczne na stronie logowania
+      allow write: if isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous' && isValidSize() && isValidType();
+    }
+
+    // === DOKUMENTY DTR (instrukcje maszyn) ===
+    match /dtr_documents/{machineId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidSize();
+    }
+
+    // === DOMYŚLNA REGUŁA: DENY ALL ===
+    // Wszystko inne jest zablokowane
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

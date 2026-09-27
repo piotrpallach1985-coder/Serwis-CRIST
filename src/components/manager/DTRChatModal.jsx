@@ -1,0 +1,165 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
+import { app } from '../../firebase';
+import DictationButton from '../shared/DictationButton';
+
+export default function DTRChatModal({ isOpen, onClose, document, allDocuments, machineName }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const isGlobal = !document && allDocuments && allDocuments.length > 0;
+  const docsToAnalyze = isGlobal ? allDocuments : (document ? [document] : []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMessages([
+        { 
+          role: 'model', 
+          text: isGlobal 
+            ? `Cześć! Przeanalizowałem całą dokumentację maszyny **${machineName}** (${docsToAnalyze.length} plików). W czym mogę pomóc?`
+            : `Cześć! Przeanalizowałem dokument **${document?.name}**. W czym mogę pomóc?` 
+        }
+      ]);
+      setInput('');
+    }
+  }, [isOpen, document, allDocuments, machineName]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async (e) => {
+    if (e) e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const vertexAI = getVertexAI(app);
+      const model = getGenerativeModel(vertexAI, { 
+        model: 'gemini-2.5-flash',
+        systemInstruction: "Jesteś eksperckim asystentem technicznym dla mechaników. Opieraj swoje odpowiedzi wyłącznie na załączonych dokumentach PDF. Zawsze podawaj nazwę dokumentu i numer strony, z której wziąłeś informację, jeśli to możliwe. Bądź zwięzły i konkretny, mechanik stoi przy maszynie i nie ma czasu czytać elaboratów."
+      });
+
+      // Zbuduj request do API z gs:// URI (Vertex AI potrafi to czytać bez pobierania!)
+      const parts = docsToAnalyze.map(doc => ({
+        fileData: {
+          fileUri: `gs://${app.options.storageBucket}/${doc.path}`,
+          mimeType: 'application/pdf'
+        }
+      }));
+
+      // Dodaj historię czatu oraz najnowsze zapytanie
+      const chatHistoryText = messages.filter(m => m.role !== 'system').map(m => `${m.role === 'user' ? 'Mechanik' : 'Asystent'}: ${m.text}`).join('\n');
+      
+      parts.push({ text: `Historia czatu:\n${chatHistoryText}\n\nAktualne zapytanie mechanika: ${userMessage}` });
+
+      const response = await model.generateContent({
+        contents: [{ role: 'user', parts }]
+      });
+
+      const responseText = response.response.text();
+      setMessages(prev => [...prev, { role: 'model', text: responseText }]);
+
+    } catch (error) {
+      console.error('Błąd Gemini:', error);
+      let errorMsg = 'Wystąpił błąd podczas analizy. Upewnij się, że usługa Vertex AI jest włączona w konsoli Firebase.';
+      if (error.message && error.message.includes('API key not valid')) errorMsg = 'Klucz API lub konfiguracja Vertex AI jest nieprawidłowa.';
+      setMessages(prev => [...prev, { role: 'model', text: `❌ ${errorMsg} (${error.message})`, isError: true }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col h-[85vh] sm:h-[80vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="bg-slate-800 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 text-white">
+            <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400">
+              <i className="ph ph-sparkle text-xl"></i>
+            </div>
+            <div>
+              <h2 className="font-bold text-lg leading-tight">Asystent DTR (AI)</h2>
+              <p className="text-xs text-slate-300 font-medium">
+                {isGlobal ? `Cała dokumentacja maszyny (${docsToAnalyze.length} plików)` : document?.name}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors"
+          >
+            <i className="ph ph-x text-lg"></i>
+          </button>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                msg.role === 'user' 
+                  ? 'bg-blue-600 text-white rounded-tr-sm' 
+                  : msg.isError
+                    ? 'bg-red-50 text-red-700 border border-red-200 rounded-tl-sm'
+                    : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
+              }`}>
+                <div className="whitespace-pre-wrap">{msg.text}</div>
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-white text-slate-800 border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm shadow-sm flex items-center gap-2">
+                <i className="ph ph-spinner animate-spin text-blue-500 text-lg"></i>
+                <span className="text-slate-500 font-medium">Analizuję dokumentację...</span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-3 bg-white border-t border-slate-200 shrink-0">
+          <form onSubmit={handleSend} className="relative flex items-center gap-2">
+            <DictationButton 
+              onResult={(text) => setInput(prev => prev ? prev + ' ' + text : text)}
+              className="!w-10 !h-10 shrink-0"
+            />
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Zapytaj o parametry, schematy, błędy..."
+              className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl transition-colors shrink-0"
+            >
+              <i className="ph ph-paper-plane-tilt text-lg"></i>
+            </button>
+          </form>
+          <div className="text-center mt-2">
+            <span className="text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1">
+              <i className="ph ph-shield-check"></i> Vertex AI przetwarza pliki wewnątrz Google Cloud (0 pobierania)
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
