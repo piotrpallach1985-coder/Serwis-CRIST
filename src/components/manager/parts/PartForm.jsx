@@ -76,8 +76,42 @@ export default function PartForm({ part, onClose, user }) {
     }
   };
 
+  
+  const buildTree = (allMachines, parentId = null, depth = 0) => {
+    return allMachines
+      .filter(m => parentId ? m.parentId === parentId : (!m.parentId || m.parentId === ''))
+      .map(m => {
+        const children = buildTree(allMachines, m.id, depth + 1);
+        return { ...m, depth, children };
+      });
+  };
+
+  const flattenTree = (treeNodes) => {
+    let flat = [];
+    treeNodes.forEach(node => {
+      flat.push(node);
+      if (node.children) {
+        flat = flat.concat(flattenTree(node.children));
+      }
+    });
+    return flat;
+  };
+
+  const machineTree = buildTree(machines);
+  let flatMachines = flattenTree(machineTree);
+
+  // If there's a search, we just filter the flat list to keep it simple and searchable
+  if (machineSearch.trim()) {
+    const q = machineSearch.toLowerCase().trim();
+    flatMachines = flatMachines.filter(m => m.name.toLowerCase().includes(q));
+  }
+
+  // Filter out already selected machines from the dropdown view
+  const dropdownMachines = flatMachines.filter(m => !compatibleMachines.includes(m.id));
+
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-fade-in my-8 flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl shrink-0">
           <h2 className="text-xl font-extrabold text-gray-800">
@@ -194,26 +228,29 @@ export default function PartForm({ part, onClose, user }) {
                     className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
                   />
                   {showDropdown && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto pb-4">
-                      {machines.filter(m => !compatibleMachines.includes(m.id) && m.name.toLowerCase().includes(machineSearch.toLowerCase())).length === 0 ? (
-                        <div className="p-4 text-center text-gray-500 text-sm">Brak wyników</div>
-                      ) : (
-                        machines
-                          .filter(m => !compatibleMachines.includes(m.id) && m.name.toLowerCase().includes(machineSearch.toLowerCase()))
-                          .map(m => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => toggleMachine(m.id)}
-                              className="w-full text-left px-4 py-3 hover:bg-blue-50 text-sm font-semibold text-gray-700 transition-colors border-b border-gray-50 last:border-0 flex items-center justify-between"
-                            >
-                              <span>{m.name}</span>
-                              <i className="ph ph-plus text-blue-600"></i>
-                            </button>
-                          ))
-                      )}
-                    </div>
-                  )}
+                      <div className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto pb-4">
+                        {dropdownMachines.length === 0 ? (
+                          <div className="p-4 text-center text-gray-500 text-sm">Brak wyników</div>
+                        ) : (
+                          dropdownMachines.map(m => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => toggleMachine(m.id)}
+                                className="w-full text-left hover:bg-blue-50 text-sm font-semibold text-gray-700 transition-colors border-b border-gray-50 last:border-0 flex items-center justify-between"
+                                style={{ padding: `0.75rem 1rem 0.75rem ${m.depth * 1.5 + 1}rem` }}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
+                                  {!m.depth && <i className="ph ph-engine text-gray-400"></i>}
+                                  <span>{m.name}</span>
+                                </div>
+                                <i className="ph ph-plus text-blue-600 shrink-0"></i>
+                              </button>
+                            ))
+                        )}
+                      </div>
+                    )}
                 </div>
               </div>
             </form>
