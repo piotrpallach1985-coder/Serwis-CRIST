@@ -11,6 +11,16 @@ import { exportToExcel } from '../utils/reports/excelExport';
 export function useMachines(machines = [], regions = []) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
+  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+
+  const toggleNode = (id) => {
+    setCollapsedNodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
 
   const filteredMachines = useMemo(() => {
     const activeMachines = machines.filter(m => !m.isDeleted);
@@ -36,8 +46,11 @@ export function useMachines(machines = [], regions = []) {
     const flattenTree = (nodes) => {
       let flat = [];
       nodes.forEach(n => {
-        flat.push(n);
-        if (n.children) {
+        const hasChildren = n.children && n.children.length > 0;
+        const isCollapsed = collapsedNodes.has(n.id);
+        flat.push({ ...n, hasChildren, isCollapsed });
+        
+        if (hasChildren && !isCollapsed) {
           flat = flat.concat(flattenTree(n.children));
         }
       });
@@ -67,7 +80,7 @@ export function useMachines(machines = [], regions = []) {
 
         return matchName && matchRegion;
       });
-  }, [machines, searchQuery, filterRegion]);
+  }, [machines, searchQuery, filterRegion, collapsedNodes]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredMachines.map(m => ({
@@ -85,6 +98,7 @@ export function useMachines(machines = [], regions = []) {
     searchQuery, setSearchQuery,
     filterRegion, setFilterRegion,
     filteredMachines,
-    handleExportExcel
+    handleExportExcel,
+    toggleNode
   };
 }

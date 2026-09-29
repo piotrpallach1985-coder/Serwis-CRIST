@@ -75,17 +75,17 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
         });
         onSaved('Zaktualizowano maszynę');
       } else {
-        await addMachine({
-          name: name.trim(),
-          bay: bay.trim(),
-          regionId,
-          internalId: internalId.trim(),
-          parentId: parentId || null,
-          additionalDescription: additionalDescription.trim(),
-          isDeleted: false,
-          currentWorkHours: 0
-        });
-        onSaved('Maszyna została dodana pomyślnie.');
+        const res = await addMachine({
+            name: name.trim(),
+            bay: bay.trim(),
+            regionId,
+            internalId: internalId.trim(),
+            parentId: parentId || null,
+            additionalDescription: additionalDescription.trim(),
+            isDeleted: false,
+            currentWorkHours: 0
+          });
+          onSaved('Maszyna została dodana pomyślnie.', res.id);
       }
       onClose();
     } catch (err) {

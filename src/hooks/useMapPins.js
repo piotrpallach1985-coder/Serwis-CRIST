@@ -49,12 +49,13 @@ export function useMapPins({
   tickets,
   plannedServices,
   modeType,
-  machines,
+  machines: allMachines,
   regions,
   plannedWarningDays,
   currentSubmapId,
   draggingPin,
 }) {
+  const machines = useMemo(() => allMachines.filter(m => !m.parentId || m.parentId === ""), [allMachines]);
   const pinData = useMemo(() => {
     const pins = [];
     const now = new Date();

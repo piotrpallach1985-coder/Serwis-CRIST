@@ -14,9 +14,23 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
       )}
       
       <div className="pt-1">
-        <h4 className="font-bold text-[#002b5e] text-base leading-tight mb-1 flex items-start gap-1.5" style={{ marginLeft: `${(machine.depth || 0) * 1}rem` }}>
-          {(machine.depth > 0) && <i className="ph ph-arrow-elbow-down-right text-gray-400 mt-0.5"></i>}
-          {machine.name}
+        <h4 
+          className="font-bold text-[#002b5e] text-base leading-tight mb-1 flex items-center gap-1.5" 
+          style={{ marginLeft: `${(machine.depth || 0) * 1}rem` }}
+          onClick={(e) => { 
+            if (machine.hasChildren) { 
+              e.stopPropagation(); 
+              toggleNode(machine.id); 
+            }
+          }}
+        >
+          {(machine.depth > 0) && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
+          {machine.hasChildren && (
+            <button className="text-gray-500 hover:text-blue-600 focus:outline-none flex items-center justify-center w-6 h-6 rounded hover:bg-blue-50 transition-colors">
+              <i className={`ph ${machine.isCollapsed ? 'ph-caret-right' : 'ph-caret-down'}`}></i>
+            </button>
+          )}
+          <span className={machine.hasChildren ? 'cursor-pointer hover:text-blue-600' : ''}>{machine.name}</span>
         </h4>
         <p className="text-xs font-mono text-gray-400 mb-1">ID: {machine.id}</p>
         

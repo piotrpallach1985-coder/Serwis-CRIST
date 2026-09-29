@@ -47,7 +47,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
 
   const [editingId, setEditingId] = useState(null);
   
-  const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel } = useMachines(machines, regions);
+  const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel, toggleNode } = useMachines(machines, regions);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formInitialParentId, setFormInitialParentId] = useState(null);
   const [qrModalMachine, setQrModalMachine] = useState(null);
@@ -389,7 +389,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             setFilterRegion={setFilterRegion}
             regions={regions}
             
-            onAddMachine={() => { setEditingId(null); setIsFormOpen(true); }}
+            onAddMachine={() => { setEditingId(null); setFormInitialParentId(selectedMachine ? selectedMachine.id : null); setIsFormOpen(true); }}
           />
           <MachineForm 
             isOpen={isFormOpen} 
@@ -397,7 +397,16 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
         initialParentId={formInitialParentId}
             regions={regions}
-            onSaved={showToast}
+            onSaved={(msg, newMachineId) => {
+    showToast(msg, 'success');
+    if (newMachineId) {
+      setTimeout(() => {
+        const machinesList = useManagerStore.getState().machines;
+        const newM = machinesList.find(m => m.id === newMachineId);
+        if (newM) handleViewMachine(newM, false, true);
+      }, 600);
+    }
+  }}
             onError={(err) => showToast(err, 'error')}
           />
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
@@ -417,6 +426,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             </div>
             <MachineTable
               filteredMachines={filteredMachines}
+                toggleNode={toggleNode}
               currentItems={currentItems}
               regions={regions}
               handleViewMachine={handleViewMachine}
@@ -432,7 +442,16 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         onClose={() => setIsFormOpen(false)} 
         editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
         regions={regions}
-        onSaved={showToast}
+        onSaved={(msg, newMachineId) => {
+    showToast(msg, 'success');
+    if (newMachineId) {
+      setTimeout(() => {
+        const machinesList = useManagerStore.getState().machines;
+        const newM = machinesList.find(m => m.id === newMachineId);
+        if (newM) handleViewMachine(newM, false, true);
+      }, 600);
+    }
+  }}
         onError={(err) => showToast(err, 'error')}
       />
       <ConfirmModal isOpen={confirmModalConfig.isOpen} title={confirmModalConfig.title} message={confirmModalConfig.message} onConfirm={confirmModalConfig.onConfirm} onCancel={closeConfirmModal} confirmText={confirmModalConfig.confirmText} />

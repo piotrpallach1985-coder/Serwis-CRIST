@@ -8,7 +8,8 @@ export default function MachineTable({
   currentItems,
   regions,
   handleViewMachine,
-  handleCopyNfc
+  handleCopyNfc,
+  toggleNode
 }) {
   const columns = [
     {
@@ -16,9 +17,18 @@ export default function MachineTable({
       accessor: 'name',
       render: (m) => (
         <>
-          <div className="font-semibold text-gray-800 text-base flex items-center gap-2">
-            {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400" style={{ marginLeft: `${m.depth * 1.5}rem` }}></i>}
-            {m.name}
+          <div className="font-semibold text-gray-800 text-base flex items-center gap-1.5 w-fit cursor-pointer hover:text-blue-600 transition-colors" onClick={(e) => { if (m.hasChildren) { e.stopPropagation(); toggleNode(m.id); } else { e.stopPropagation(); handleViewMachine(m); } }}>
+            <div style={{ marginLeft: `${m.depth * 1.5}rem` }} className="flex items-center gap-1.5">
+              {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
+              {m.hasChildren ? (
+                 <button className="text-gray-500 hover:text-blue-600 focus:outline-none p-1 rounded hover:bg-blue-50 transition-colors">
+                   <i className={`ph ${m.isCollapsed ? 'ph-caret-right' : 'ph-caret-down'}`}></i>
+                 </button>
+              ) : (
+                <span className="w-6"></span>
+              )}
+              <span>{m.name}</span>
+            </div>
           </div>
           <div className="text-xs font-mono text-gray-400 mt-1">ID: {m.id}</div>
         </>
@@ -82,6 +92,7 @@ export default function MachineTable({
             regions={regions} 
             onClick={handleViewMachine} 
             handleCopyNfc={handleCopyNfc} 
+            toggleNode={toggleNode}
           />
         )}
       />
@@ -94,5 +105,6 @@ MachineTable.propTypes = {
   currentItems: PropTypes.array.isRequired,
   regions: PropTypes.array.isRequired,
   handleViewMachine: PropTypes.func.isRequired,
-  handleCopyNfc: PropTypes.func.isRequired
+  handleCopyNfc: PropTypes.func.isRequired,
+  toggleNode: PropTypes.func
 };
