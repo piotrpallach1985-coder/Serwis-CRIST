@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 
@@ -13,6 +14,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 export default function ActionItems({ }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines);
   const regions = useManagerStore(state => state.regions);
@@ -25,14 +27,14 @@ export default function ActionItems({ }) {
       const completedDate = safeParseDate(item.completedAt);
       return {
         'ID': item.id,
-        'Data Zgłoszenia': createdDate ? createdDate.toLocaleDateString('pl-PL') : '-',
-        'Maszynę': item.machineName || getMachineName(item.machineId) || '-',
-        'Problem / Zadanie': item.problem || '-',
-        'Wymagany Termin': dueDate ? dueDate.toLocaleDateString('pl-PL') : '-',
-        'Zgłaszający': item.createdBy || '-',
-        'Status': ACTION_ITEM_STATUS_LABELS[item.status] || item.status,
-        'Zrealizował(a)': item.completedBy || '-',
-        'Data Realizacji': completedDate ? completedDate.toLocaleDateString('pl-PL') : '-'
+        [t('admin.action_items.created_date')]: createdDate ? createdDate.toLocaleDateString('pl-PL') : '-',
+        [t('admin.action_items.machine')]: item.machineName || getMachineName(item.machineId) || '-',
+        [t('admin.action_items.problem_task')]: item.problem || '-',
+        [t('admin.action_items.required_date')]: dueDate ? dueDate.toLocaleDateString('pl-PL') : '-',
+        [t('admin.action_items.reporter')]: item.createdBy || '-',
+        [t('admin.action_items.status')]: ACTION_ITEM_STATUS_LABELS[item.status] || item.status,
+        [t('admin.action_items.completed')]: item.completedBy || '-',
+        [t('admin.action_items.created_date')]: completedDate ? completedDate.toLocaleDateString('pl-PL') : '-'
       };
     });
     exportToExcel(dataToExport, 'Tematy_do_realizacji');
@@ -116,7 +118,7 @@ export default function ActionItems({ }) {
     });
   }, [items, filterStatus, filterTime, filterRegion, filterMachine, machines, searchQuery]);
 
-  const getMachineName = (id) => machines.find(m => m.id === id)?.name || 'Nieznana maszyna';
+  const getMachineName = (id) => machines.find(m => m.id === id)?.name || t('admin.action_items.unknown_machine');
 
   
   const handleStatusChange = async (id, newStatus) => {
@@ -146,10 +148,10 @@ export default function ActionItems({ }) {
         <div>
           <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-slate-800 flex items-center gap-1.5">
             <i className="ph ph-clipboard-text text-2xl text-blue-600"></i>
-            Tematy do Realizacji
+            {t("admin.action_items.title")}
           </h2>
           <p className="text-slate-500 text-[10px] md:text-xs mt-1 leading-tight">
-            Akcje i problemy zgłoszone podczas serwisów planowanych
+            {t("admin.action_items.subtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
@@ -158,12 +160,12 @@ export default function ActionItems({ }) {
             className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-green-200 transition-colors"
           >
             <i className="ph ph-file-xls text-lg"></i>
-            Eksportuj (.xlsx)
+            {t("admin.action_items.export_excel")}
           </button>
           <div className="flex bg-slate-100 rounded-lg p-1 overflow-x-auto max-w-full hide-scrollbar">
-          <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Wszystkie</button>
-          <button onClick={() => setFilterStatus('pending')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'pending' ? 'bg-amber-500 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Oczekujące</button>
-          <button onClick={() => setFilterStatus('completed')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'completed' ? 'bg-green-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>Zrealizowane</button>
+          <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'all' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>{t("admin.action_items.filter_all")}</button>
+          <button onClick={() => setFilterStatus('pending')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'pending' ? 'bg-amber-500 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>{t("admin.action_items.filter_pending")}</button>
+          <button onClick={() => setFilterStatus('completed')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterStatus === 'completed' ? 'bg-green-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>{t("admin.action_items.filter_completed")}</button>
         </div>
         </div>
 
@@ -192,7 +194,7 @@ export default function ActionItems({ }) {
           
   <div className="lg:hidden flex flex-col gap-1.5 p-2">
     {filteredItems.length === 0 ? (
-      <div className="col-span-full"><EmptyState title="Brak tematów" message="Nie znaleziono tematów do realizacji dla wybranych filtrów." icon="ph-clipboard-text" /></div>
+      <div className="col-span-full"><EmptyState title={t("admin.action_items.no_items_title")} message={t("admin.action_items.no_items_desc")} icon="ph-clipboard-text" /></div>
     ) : (
       filteredItems.map(item => {
         const dueDate = item.dueDate ? (typeof item.dueDate.toDate === 'function' ? item.dueDate.toDate() : new Date(item.dueDate)) : null;
@@ -204,23 +206,23 @@ export default function ActionItems({ }) {
           <div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col relative ${isCompleted ? 'border-green-500 border-l-4' : 'border-blue-500 border-l-4'}`}>
             {isCompleted && (
               <div className="absolute top-0 right-0 bg-green-500 text-white px-2.5 py-1 rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm">
-                Zrealizowane
+                {t("admin.action_items.completed")}
               </div>
             )}
             {!isCompleted && (
               <div className="absolute top-0 right-0 bg-blue-500 text-white px-2.5 py-1 rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm">
-                Oczekujące
+                {t("admin.action_items.filter_pending")}
               </div>
             )}
             
             <div className="pt-2">
-              <h4 className="font-bold text-[#002b5e] text-lg leading-tight mb-1">{machineName || 'Brak maszyny'}</h4>
-              <p className="text-sm font-semibold text-slate-700 mb-2">{item.problem || 'Brak opisu'}</p>
+              <h4 className="font-bold text-[#002b5e] text-lg leading-tight mb-1">{machineName || t('admin.action_items.no_machine')}</h4>
+              <p className="text-sm font-semibold text-slate-700 mb-2">{item.problem || t('admin.action_items.no_desc')}</p>
               
               <div className="text-xs text-slate-500 space-y-1">
-                <div className="flex items-center gap-1"><i className="ph ph-calendar-blank"></i> Zgłoszono: {createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</div>
-                <div className="flex items-center gap-1"><i className="ph ph-warning-circle"></i> Wymagany termin: {dueDate ? dueDate.toLocaleDateString('pl-PL') : '-'}</div>
-                <div className="flex items-center gap-1"><i className="ph ph-user"></i> Zgłosił: {item.createdBy || '-'}</div>
+                <div className="flex items-center gap-1"><i className="ph ph-calendar-blank"></i> {t("admin.action_items.reported_at")}{createdDate ? createdDate.toLocaleDateString('pl-PL') : '-'}</div>
+                <div className="flex items-center gap-1"><i className="ph ph-warning-circle"></i> {t("admin.action_items.due_date")}{dueDate ? dueDate.toLocaleDateString('pl-PL') : '-'}</div>
+                <div className="flex items-center gap-1"><i className="ph ph-user"></i> {t("admin.action_items.reported_by")}{item.createdBy || '-'}</div>
               </div>
             </div>
             
@@ -235,10 +237,10 @@ export default function ActionItems({ }) {
                           'bg-amber-50 text-amber-700 border-amber-200'
                         }`}
                       >
-                        <option value={ACTION_ITEM_STATUS.PENDING}>Do wykonania</option>
-                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>W trakcie</option>
-                        <option value={ACTION_ITEM_STATUS.COMPLETED}>Potwierdź wykonanie</option>
-                        <option value={ACTION_ITEM_STATUS.CANCELLED}>Anulowane</option>
+                        <option value={ACTION_ITEM_STATUS.PENDING}>{t("admin.action_items.status_pending")}</option>
+                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>{t("admin.action_items.status_in_progress")}</option>
+                        <option value={ACTION_ITEM_STATUS.COMPLETED}>{t("admin.action_items.status_confirm_completed")}</option>
+                        <option value={ACTION_ITEM_STATUS.CANCELLED}>{t("admin.action_items.status_cancelled")}</option>
                       </select>
             </div>
           </div>
@@ -249,20 +251,20 @@ export default function ActionItems({ }) {
   <table className="hidden lg:table w-full text-sm text-left">
             <thead className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-100">
               <tr>
-                <th className="px-6 py-4">Data Zgłoszenia</th>
-                <th className="px-6 py-4">Maszynę</th>
-                <th className="px-6 py-4">Problem / Zadanie</th>
-                <th className="px-6 py-4">Wymagany Termin</th>
-                <th className="px-6 py-4">Zgłaszający</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Akcje</th>
+                <th className="px-6 py-4">{t("admin.action_items.created_date")}</th>
+                <th className="px-6 py-4">{t("admin.action_items.machine")}</th>
+                <th className="px-6 py-4">{t("admin.action_items.problem_task")}</th>
+                <th className="px-6 py-4">{t("admin.action_items.required_date")}</th>
+                <th className="px-6 py-4">{t("admin.action_items.reporter")}</th>
+                <th className="px-6 py-4">{t("admin.action_items.status")}</th>
+                <th className="px-6 py-4 text-right">{t("admin.action_items.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-0">
-                    <EmptyState title="Brak tematów" message="Nie znaleziono tematów do realizacji dla wybranych filtrów." icon="ph-clipboard-text" />
+                    <EmptyState title={t("admin.action_items.no_items_title")} message={t("admin.action_items.no_items_desc")} icon="ph-clipboard-text" />
                   </td>
                 </tr>
               ) : (
@@ -278,7 +280,7 @@ export default function ActionItems({ }) {
                       {item.problem}
                     </td>
                     <td className="px-6 py-4 font-bold text-red-600">
-                      {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Brak'}
+                      {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : t('admin.action_items.none')}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
                       {item.createdBy}
@@ -287,18 +289,18 @@ export default function ActionItems({ }) {
                       {item.status === ACTION_ITEM_STATUS.COMPLETED ? (
                         <div className="flex flex-col gap-1 items-start">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider w-fit">
-                            <i className="ph ph-check-circle"></i> Zrealizowane
+                            <i className="ph ph-check-circle"></i> {t("admin.action_items.completed")}
                           </span>
                           <span className="text-[10px] text-slate-500 font-medium">
-                            przez: <span className="font-bold text-slate-700">{item.completedBy || 'System'}</span>
+                            {t("admin.action_items.by")}<span className="font-bold text-slate-700">{item.completedBy || 'System'}</span>
                           </span>
                           <span className="text-[10px] text-slate-400">
-                            dn. {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : '-'}
+                            {t("admin.action_items.on_day")}{item.completedAt ? new Date(item.completedAt).toLocaleDateString() : '-'}
                           </span>
                         </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
-                          <i className="ph ph-clock"></i> Oczekujące
+                          <i className="ph ph-clock"></i> {t("admin.action_items.filter_pending")}
                         </span>
                       )}
                     </td>
@@ -313,10 +315,10 @@ export default function ActionItems({ }) {
                           'bg-amber-50 text-amber-700 border-amber-200'
                         }`}
                       >
-                        <option value={ACTION_ITEM_STATUS.PENDING}>Do wykonania</option>
-                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>W trakcie</option>
-                        <option value={ACTION_ITEM_STATUS.COMPLETED}>Potwierdź wykonanie</option>
-                        <option value={ACTION_ITEM_STATUS.CANCELLED}>Anulowane</option>
+                        <option value={ACTION_ITEM_STATUS.PENDING}>{t("admin.action_items.status_pending")}</option>
+                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>{t("admin.action_items.status_in_progress")}</option>
+                        <option value={ACTION_ITEM_STATUS.COMPLETED}>{t("admin.action_items.status_confirm_completed")}</option>
+                        <option value={ACTION_ITEM_STATUS.CANCELLED}>{t("admin.action_items.status_cancelled")}</option>
                       </select>
                           
                     </td>

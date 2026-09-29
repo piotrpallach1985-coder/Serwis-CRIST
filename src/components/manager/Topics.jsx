@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, deleteDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,6 +8,7 @@ import DictationButton from '../shared/DictationButton';
 import { addTopic, updateTopic, checkTopicInUse } from '../../services/dictionary.service';
 
 export default function Topics() {
+  const { t } = useTranslation();
   const [topics, setTopics] = useState([]);
   const [newTopic, setNewTopic] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,11 +80,11 @@ export default function Topics() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Tematy Zgłoszeń (Podpowiedzi)</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj szybkimi tematami awarii dla zgłaszających</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.topics.title")}</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.topics.subtitle")}</p>
         </div>
         <button onClick={() => { setEditingId(null); setNewTopic(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
-          <i className="ph ph-plus text-lg"></i> Dodaj Temat
+          <i className="ph ph-plus text-lg"></i> {t("admin.topics.add_topic")}
         </button>
       </div>
 
@@ -92,7 +94,7 @@ export default function Topics() {
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
                 <i className="ph ph-chat-text text-blue-600"></i>
-                {editingId ? 'Edytuj temat podpowiedzi' : 'Dodaj nowy temat do podpowiedzi'}
+                {editingId ? t("admin.topics.edit_topic") : t("admin.topics.add_new_topic")}
               </h2>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
                 <i className="ph ph-x text-2xl"></i>
@@ -101,7 +103,7 @@ export default function Topics() {
             <div className="p-6">
               <form onSubmit={handleAddTopic} className="flex flex-col gap-4">
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Treść zgłoszenia (Temat)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.topics.topic_content")}</label>
             <div className="relative">
               <input 
                 type="text" 
@@ -124,7 +126,7 @@ export default function Topics() {
                     Anuluj
                   </button>
                   <button disabled={loading} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">
-                    {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz' : 'Dodaj temat')}
+                    {loading ? t('admin.topics.saving') : (editingId ? t('admin.topics.save') : t('admin.topics.add_topic'))}
                   </button>
                 </div>
               </form>
@@ -135,26 +137,26 @@ export default function Topics() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="font-bold text-gray-700">Lista Zapisanych Tematów</h3>
+          <h3 className="font-bold text-gray-700">{t("admin.topics.saved_topics_list")}</h3>
           {topics.length === 0 && (
             <button onClick={handleSeedDefaults} className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded font-bold hover:bg-blue-200 transition-colors">
-              Wgraj domyślne tematy
+              {t("admin.topics.load_defaults")}
             </button>
           )}
         </div>
         <ul className="divide-y divide-gray-100 p-2 md:p-0 flex flex-col gap-2 md:block">
           {topics.length === 0 ? (
-            <li className="p-8 text-center text-gray-500">Brak zapisanych tematów. Wgraj domyślne lub dodaj własny.</li>
+            <li className="p-8 text-center text-gray-500">{t("admin.topics.empty_list")}</li>
           ) : (
             topics.map(t => (
               <li key={t.id} className="p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 hover:bg-gray-50 border border-gray-200 md:border-0 rounded-xl md:rounded-none bg-white">
                 <span className="font-medium text-gray-800">{t.text}</span>
                 <div className="flex justify-end gap-1.5 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-2 md:pt-0 w-full md:w-auto">
                     <button onClick={() => handleEdit(t)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
-                      <i className="ph ph-pencil-simple"></i> Edytuj
+                      <i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}
                     </button>
                     <button onClick={() => handleDelete(t.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
-                      <i className="ph ph-trash"></i> Usuń
+                      <i className="ph ph-trash"></i> {t("admin.users.delete")}
                     </button>
                   </div>
               </li>

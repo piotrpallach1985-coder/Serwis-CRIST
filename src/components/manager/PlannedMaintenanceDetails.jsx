@@ -481,7 +481,7 @@ export default function PlannedMaintenanceDetails({
                 <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-200 mt-2">
                   {!isCompleted && srv.status !== 'in_progress' && canEditPlanned && (
                     <button onClick={() => onEdit(srv)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-slate-300">
-                      <i className="ph ph-pencil-simple text-xl"></i> Edytuj
+                      <i className="ph ph-pencil-simple text-xl"></i> {t("admin.users.edit")}
                     </button>
                   )}
                   {canDeletePlanned && (!isArchive || allowTicketDeletion) && (

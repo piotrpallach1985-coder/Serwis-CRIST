@@ -1,6 +1,7 @@
 import { useManagerStore } from '../../store/managerStore';
 import { addService, updateService, checkServiceInUse } from '../../services/dictionary.service';
 
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -8,6 +9,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 export default function Services() {
+  const { t } = useTranslation();
   const services = useManagerStore(state => state.services);
 
   const [newService, setNewService] = useState('');
@@ -81,11 +83,11 @@ export default function Services() {
     <div className="w-full space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Podwykonawcy / Serwis</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj dostępnymi jednostkami, do których można przypisać awarię</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.services.title")}</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.services.subtitle")}</p>
         </div>
         <button onClick={() => { setEditingId(null); setNewService(''); setContactName(''); setContactEmail(''); setContactPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center gap-2">
-          <i className="ph ph-plus text-lg"></i> Dodaj Serwis
+          <i className="ph ph-plus text-lg"></i> {t("admin.services.add_service")}
         </button>
       </div>
 
@@ -94,7 +96,7 @@ export default function Services() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl animate-fade-in flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800">
-                {editingId ? 'Edytuj Serwis / Podwykonawcę' : 'Dodaj Serwis / Podwykonawcę'}
+                {editingId ? t("admin.services.edit_service") : t("admin.services.add_new_service")}
               </h2>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
                 <i className="ph ph-x text-2xl"></i>
@@ -105,7 +107,7 @@ export default function Services() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
             <input 
               type="text" 
-              placeholder="Nazwa działu (np. Elektrycy)" 
+              placeholder={t("admin.services.dept_name_placeholder")} 
               value={newService} 
               onChange={e => setNewService(e.target.value)} 
               className="p-3 border rounded outline-none focus:border-blue-900" 
@@ -113,21 +115,21 @@ export default function Services() {
             />
             <input 
               type="text" 
-              placeholder="Osoba kontaktowa (Opcjonalnie)" 
+              placeholder={t("admin.services.contact_person_placeholder")} 
               value={contactName} 
               onChange={e => setContactName(e.target.value)} 
               className="p-3 border rounded outline-none focus:border-blue-900" 
             />
             <input 
               type="email" 
-              placeholder="Adres e-mail (Opcjonalnie)" 
+              placeholder={t("admin.services.email_placeholder")} 
               value={contactEmail} 
               onChange={e => setContactEmail(e.target.value)} 
               className="p-3 border rounded outline-none focus:border-blue-900" 
             />
             <input 
               type="tel" 
-              placeholder="Telefon (np. 123 456 789)" 
+              placeholder={t("admin.services.phone_placeholder")} 
               value={contactPhone} 
               onChange={handlePhoneChange} 
               pattern="^(\d{3}\s?){3}$"
@@ -152,7 +154,7 @@ export default function Services() {
                 Anuluj
               </button>
             <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors min-w-[120px]">
-              {editingId ? 'Zapisz zmiany' : 'Dodaj'}
+              {editingId ? t('admin.services.save_changes') : t('admin.services.add')}
             </button>
           </div>
         </form>
@@ -163,7 +165,7 @@ export default function Services() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-gray-700">
-          Dostępne jednostki przypisania
+          {t("admin.services.available_units")}
         </div>
         <ul className="divide-y divide-gray-100 p-2 md:p-0 flex flex-col gap-2 md:block">
           {services.map(s => (
@@ -181,16 +183,16 @@ export default function Services() {
               </div>
               <div className="flex justify-end gap-1.5 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-2 md:pt-0">
                   <button onClick={() => handleEdit(s)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs">
-                    <i className="ph ph-pencil-simple"></i> Edytuj
+                    <i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}
                   </button>
                   <button onClick={() => handleDelete(s.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs">
-                    <i className="ph ph-trash"></i> Usuń
+                    <i className="ph ph-trash"></i> {t("admin.users.delete")}
                   </button>
                 </div>
             </li>
           ))}
           {services.length === 0 && (
-            <li className="p-4 text-gray-500 text-center">Brak zdefiniowanych serwisów.</li>
+            <li className="p-4 text-gray-500 text-center">{t("admin.services.empty_list")}</li>
           )}
         </ul>
       </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,6 +8,7 @@ import { addRole, updateRole, checkRoleInUse } from '../../services/dictionary.s
 
 
 export default function Roles() {
+  const { t } = useTranslation();
   const [roles, setRoles] = useState([]);
   const [name, setName] = useState('');
   
@@ -42,7 +44,7 @@ export default function Roles() {
         { id: 'topics', label: 'Tematy Zgłoszeń' },
         { id: 'reporters', label: 'Zgłaszający' },
         { id: 'users', label: 'Użytkownicy' },
-        { id: 'roles', label: 'Role i Uprawnienia' },
+        { id: 'roles', label: t("admin.roles.title") },
         { id: 'reports', label: 'Raportowanie' },
         { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' },
         { id: 'delete_machine_notes', label: 'Usuwanie Notatek Tech.' }
@@ -132,11 +134,11 @@ export default function Roles() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Role i Uprawnienia</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj dostępem do różnych części aplikacji dla grup pracowników.</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.roles.title")}</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.roles.subtitle")}</p>
         </div>
         <button onClick={() => { setEditingId(null); setName(''); setPermissions([]); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 md:px-5 md:py-2.5 text-xs md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-          <i className="ph ph-plus text-lg"></i> Dodaj Rolę
+          <i className="ph ph-plus text-lg"></i> {t("admin.roles.add_role")}
         </button>
       </div>
 
@@ -147,7 +149,7 @@ export default function Roles() {
               <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
                 <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
                   <i className="ph ph-shield-star text-blue-600"></i>
-                  {editingId ? 'Edytuj Rolę' : 'Dodaj nową rolę i ustawienia'}
+                  {editingId ? t("admin.roles.edit_role") : t("admin.roles.add_new_role")}
                 </h2>
                 <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
                   <i className="ph ph-x text-2xl"></i>
@@ -156,7 +158,7 @@ export default function Roles() {
               <div className="p-6 overflow-y-auto">
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa Roli <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">{t("admin.roles.role_name")} <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={name}
@@ -168,7 +170,7 @@ export default function Roles() {
           </div>
 
           <div className="mb-6 space-y-6">
-            <label className="block text-sm font-bold text-gray-700">Dostęp do zakładek według modułów:</label>
+            <label className="block text-sm font-bold text-gray-700">{t("admin.roles.tab_access")}</label>
             
             <div className="space-y-6">
               {availablePermissionsGrouped.filter(g => {
@@ -195,7 +197,7 @@ export default function Roles() {
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-3 italic">
-              Uwaga: Zakładki &quot;Użytkownicy i Dostępy&quot;, &quot;Role i Uprawnienia&quot; oraz &quot;Ustawienia Systemu&quot; są zarezerwowane wyłącznie dla systemowego Administratora i nie można ich przydzielić do innych ról.
+              Uwaga: Zakładki &quot;Użytkownicy i Dostępy&quot;, &quot;{t("admin.roles.title")}&quot; oraz &quot;Ustawienia Systemu&quot; są zarezerwowane wyłącznie dla systemowego Administratora i nie można ich przydzielić do innych ról.
             </p>
           </div>
 
@@ -212,7 +214,7 @@ export default function Roles() {
                     disabled={loading}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg shadow-sm transition-colors min-w-[150px]"
                   >
-                    {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj Rolę')}
+                    {loading ? t('admin.roles.saving') : (editingId ? t('admin.roles.save_changes') : t('admin.roles.add_role'))}
                   </button>
                 </div>
               </form>
@@ -224,13 +226,13 @@ export default function Roles() {
         <div className="overflow-x-auto">
 <div className="lg:hidden flex flex-col gap-1.5 p-2">
     {roles.length === 0 ? (
-      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak danych.</div>
+      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.roles.no_data")}</div>
     ) : (
       roles.map(item => (
         
 <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col">
   <h4 className="font-bold text-[#002b5e] text-base mb-1">{item.name || 'Bez nazwy'}</h4>
-  <div className="text-xs text-gray-500 mb-1 font-bold uppercase">Dostępne zakładki:</div>
+  <div className="text-xs text-gray-500 mb-1 font-bold uppercase">{t("admin.roles.available_tabs")}</div>
   <div className="flex flex-wrap gap-1 mb-1">
     {(item.permissions || []).map(p => {
        const tabLabel = ['dashboard_tickets','dashboard_planned','tickets','planned_maintenance','action_items','machines','regions','services','users','roles','settings','reports','archive','archive_planned'].includes(p) ? p : p;
@@ -238,7 +240,7 @@ export default function Roles() {
     })}
   </div>
   <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
-    <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> Edytuj</button>
+    <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> {t("admin.roles.edit")}</button>
     <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs w-10"><i className="ph ph-trash"></i></button>
   </div>
 </div>
@@ -249,9 +251,9 @@ export default function Roles() {
   <table className="w-full text-left hidden lg:table border-collapse hidden lg:table">
             <thead>
               <tr className="bg-gray-50 border-y border-gray-200">
-                <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Nazwa Roli</th>
-                <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Dostępne Zakładki</th>
-                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Akcje</th>
+                <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{t("admin.roles.role_name")}</th>
+                <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{t("admin.roles.available_tabs_header")}</th>
+                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">{t("admin.roles.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -269,17 +271,17 @@ export default function Roles() {
                         ) : null;
                       })}
                       {(!r.permissions || r.permissions.length === 0) && (
-                        <span className="text-gray-400 text-sm italic">Brak dostępów</span>
+                        <span className="text-gray-400 text-sm italic">{t("admin.roles.no_access")}</span>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1.5">
                         <button onClick={() => handleEdit(r)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm">
-                          <i className="ph ph-pencil-simple"></i> Edytuj
+                          <i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}
                         </button>
                         <button onClick={() => handleDelete(r.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm">
-                          <i className="ph ph-trash"></i> Usuń
+                          <i className="ph ph-trash"></i> {t("admin.users.delete")}
                         </button>
                       </div>
                     </td>
@@ -288,7 +290,7 @@ export default function Roles() {
               {roles.length === 0 && (
                 <tr>
                   <td colSpan="3" className="px-6 py-8 text-center text-gray-500">
-                    Brak zdefiniowanych ról. Utwórz pierwszą powyżej.
+                    {t("admin.roles.empty_list")}
                   </td>
                 </tr>
               )}

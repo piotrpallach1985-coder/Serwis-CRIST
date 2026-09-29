@@ -1,4 +1,5 @@
 import { useManagerStore } from '../../store/managerStore';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { addDoc, doc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -8,6 +9,7 @@ import { addReporter, updateReporter, checkReporterInUse } from '../../services/
 
 
 export default function Reporters() {
+  const { t } = useTranslation();
   const reporters = useManagerStore(state => state.reporters) || [];
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -75,11 +77,11 @@ export default function Reporters() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Pracownicy Zgłaszający</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj bazą osób zgłaszających awarie</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.reporters.title")}</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.reporters.subtitle")}</p>
         </div>
         <button onClick={() => { setEditingId(null); setName(''); setPhone(''); setPosition(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-          <i className="ph ph-plus text-lg"></i> Dodaj Pracownika
+          <i className="ph ph-plus text-lg"></i> {t("admin.reporters.add_reporter")}
         </button>
       </div>
 
@@ -89,7 +91,7 @@ export default function Reporters() {
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
                 <i className="ph ph-user-plus text-blue-600"></i>
-                {editingId ? 'Edytuj Pracownika' : 'Dodaj Nowego Pracownika'}
+                {editingId ? t("admin.reporters.edit_reporter") : t("admin.reporters.add_new_reporter")}
               </h2>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
                 <i className="ph ph-x text-2xl"></i>
@@ -100,7 +102,7 @@ export default function Reporters() {
               <form onSubmit={handleAdd} className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Imię i Nazwisko</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.reporters.name_label")}</label>
             <input 
               type="text" 
               value={name} 
@@ -111,7 +113,7 @@ export default function Reporters() {
             />
           </div>
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stanowisko</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.reporters.position_label")}</label>
             <input 
               type="text" 
               value={position} 
@@ -122,7 +124,7 @@ export default function Reporters() {
             />
           </div>
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Numer Telefonu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.reporters.phone_label")}</label>
             <input 
               type="tel" 
               value={phone} 
@@ -158,7 +160,7 @@ export default function Reporters() {
               disabled={loading}
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg transition-colors min-w-[150px]"
             >
-              {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj pracownika')}
+              {loading ? t('admin.reporters.saving') : (editingId ? t('admin.reporters.save_changes') : t('admin.reporters.add_reporter'))}
             </button>
           </div>
         </form>
@@ -169,14 +171,14 @@ export default function Reporters() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">Lista Pracowników Zgłaszających</h2>
-          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold">Łącznie: {reporters.length}</span>
+          <h2 className="text-lg font-bold text-gray-800">{t("admin.reporters.reporters_list")}</h2>
+          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold">{t("admin.reporters.total")}{reporters.length}</span>
         </div>
         <div className="overflow-x-auto">
           
 <div className="lg:hidden flex flex-col gap-1.5 p-2">
   {sortedReporters.length === 0 ? (
-    <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak danych.</div>
+    <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.reporters.no_data")}</div>
   ) : (
     sortedReporters.map(item => {
     const isVerifying = (item.name || '').includes('(DO WERYFIKACJI)');
@@ -193,7 +195,7 @@ export default function Reporters() {
           <div className="flex items-center gap-1.5"><i className="ph ph-phone text-gray-400"></i> <span className="font-mono">{item.phone || '-'}</span></div>
         </div>
         <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
-          <button onClick={() => handleEdit(item)} className="p-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg flex-1 font-bold text-xs flex items-center justify-center gap-1"><i className="ph ph-pencil-simple"></i> Edytuj</button>
+          <button onClick={() => handleEdit(item)} className="p-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg flex-1 font-bold text-xs flex items-center justify-center gap-1"><i className="ph ph-pencil-simple"></i> {t("admin.reporters.edit")}</button>
           <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs w-10 flex items-center justify-center"><i className="ph ph-trash"></i></button>
         </div>
       </div>
@@ -204,16 +206,16 @@ export default function Reporters() {
 <table className="w-full text-left border-collapse hidden lg:table">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-sm">
-                <th className="p-4 border-b">Imię i Nazwisko</th>
-                <th className="p-4 border-b">Stanowisko</th>
-                <th className="p-4 border-b">Numer Telefonu</th>
-                <th className="p-4 border-b text-right">Akcje</th>
+                <th className="p-4 border-b">{t("admin.reporters.name_label")}</th>
+                <th className="p-4 border-b">{t("admin.reporters.position_label")}</th>
+                <th className="p-4 border-b">{t("admin.reporters.phone_label")}</th>
+                <th className="p-4 border-b text-right">{t("admin.reporters.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {sortedReporters.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="p-6 text-center text-gray-500">Brak pracowników w bazie.</td>
+                  <td colSpan="3" className="p-6 text-center text-gray-500">{t("admin.reporters.empty_list")}</td>
                 </tr>
               ) : (
                 sortedReporters.map(r => (
@@ -228,7 +230,7 @@ export default function Reporters() {
                           className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-2 px-4 rounded transition-colors inline-flex items-center gap-1.5"
                         >
                           <i className="ph ph-pencil-simple"></i>
-                          Edytuj
+                          {t("admin.users.edit")}
                         </button>
                         <button 
                           onClick={() => handleDelete(r.id, r.name)}
@@ -236,7 +238,7 @@ export default function Reporters() {
                           title="Usuń pracownika"
                         >
                           <i className="ph ph-trash"></i>
-                          Usuń
+                          {t("admin.users.delete")}
                         </button>
                       </div>
                     </td>

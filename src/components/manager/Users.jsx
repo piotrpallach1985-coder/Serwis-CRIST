@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase';
@@ -22,6 +23,7 @@ if (existingApp) {
 const secondaryAuth = getAuth(secondaryApp);
 
 export default function Users() {
+  const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const limits = useManagerStore(state => state.limits);
   const [usersList, setUsersList] = useState([]);
@@ -127,11 +129,11 @@ export default function Users() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">Użytkownicy (Konta dostępowe)</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">Zarządzaj autoryzowanymi użytkownikami systemu (logowanie, aplikacja)</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.users.title")}</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.users.subtitle")}</p>
         </div>
         <button onClick={() => { setEditingId(null); setEmail('');  setName(''); setRole(USER_ROLES.ADMIN); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-          <i className="ph ph-plus text-lg"></i> Dodaj Użytkownika
+          <i className="ph ph-plus text-lg"></i> {t("admin.users.add_user")}
         </button>
       </div>
 
@@ -141,7 +143,7 @@ export default function Users() {
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
                 <i className="ph ph-shield-check text-blue-600"></i>
-                {editingId ? 'Edytuj Użytkownika' : 'Zarejestruj nowego użytkownika'}
+                {editingId ? t("admin.users.edit_user") : t("admin.users.register_new")}
               </h2>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
                 <i className="ph ph-x text-2xl"></i>
@@ -151,14 +153,14 @@ export default function Users() {
               <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-start gap-3">
                 <i className="ph ph-info text-blue-600 text-xl mt-0.5"></i>
                 <div>
-                  <h4 className="font-bold text-blue-800 text-sm">System Bezpieczeństwa (Firebase Auth)</h4>
-                  <p className="text-blue-700 text-xs mt-1">Hasła są szyfrowane. Tworząc pracownika, nadajesz mu dostęp do platformy.</p>
+                  <h4 className="font-bold text-blue-800 text-sm">{t("admin.users.security_title")}</h4>
+                  <p className="text-blue-700 text-xs mt-1">{t("admin.users.security_desc")}</p>
                 </div>
               </div>
               <form onSubmit={handleAddUser} className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Imię i Nazwisko</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.name_label")}</label>
             <input 
               type="text" 
               value={name} 
@@ -169,7 +171,7 @@ export default function Users() {
             />
           </div>
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Adres e-mail</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.email_label")}</label>
             <input 
               type="email" 
               value={email} 
@@ -180,7 +182,7 @@ export default function Users() {
             />
           </div>
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Numer telefonu</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.phone_label")}</label>
             <input 
               type="text" 
               value={phone} 
@@ -200,13 +202,13 @@ export default function Users() {
           </div>
           
           <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Uprawnienia</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.permissions_label")}</label>
             <select
               value={role}
               onChange={e => setRole(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
             >
-              <option value="admin">Pełny Administrator (Systemowa)</option>
+              <option value="admin">{t("admin.users.role_admin")}</option>
               {rolesList.map(r => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
@@ -230,7 +232,7 @@ export default function Users() {
                     Anuluj
                   </button>
                   <button disabled={loading} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">
-                    {loading ? 'Zapisywanie...' : (editingId ? 'Zapisz zmiany' : 'Dodaj')}
+                    {loading ? t('admin.users.saving') : (editingId ? t('admin.users.save_changes') : t('admin.users.add'))}
                   </button>
                 </div>
               </form>
@@ -241,15 +243,15 @@ export default function Users() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="font-bold text-gray-700">Autoryzowani użytkownicy</h3>
+          <h3 className="font-bold text-gray-700">{t("admin.users.authorized_users")}</h3>
           <span className="text-xs bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded">
-            Łącznie: {usersList.length}
+            {t("admin.users.total")}{usersList.length}
           </span>
         </div>
         <div className="overflow-x-auto">
 <div className="lg:hidden flex flex-col gap-1.5 p-2">
     {usersList.length === 0 ? (
-      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak danych.</div>
+      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.users.no_data")}</div>
     ) : (
       usersList.map(item => (
         
@@ -265,10 +267,10 @@ export default function Users() {
   </div>
   <div className="text-sm space-y-1 mb-1">
     <div className="flex items-center gap-1.5"><i className="ph ph-phone text-gray-400"></i> {item.phone || '-'}</div>
-    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> Rola: <span className="font-bold">{(item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN) ? 'Administrator' : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
+    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> {t("admin.users.role_label")}<span className="font-bold">{(item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN) ? t("admin.users.administrator") : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
   </div>
   <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
-    <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> Edytuj</button>
+    <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}</button>
     <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs w-10"><i className="ph ph-trash"></i></button>
   </div>
 </div>
@@ -279,19 +281,19 @@ export default function Users() {
   <table className="w-full text-left hidden lg:table border-collapse hidden lg:table">
             <thead className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">
               <tr>
-                <th className="px-6 py-4">Imię i Nazwisko</th>
-                <th className="px-6 py-4">E-mail (Login)</th>
+                <th className="px-6 py-4">{t("admin.users.name_label")}</th>
+                <th className="px-6 py-4">{t("admin.users.email_login")}</th>
                 
-                <th className="px-6 py-4">Telefon</th>
-                <th className="px-6 py-4">Rola</th>
-                <th className="px-6 py-4 text-right">Akcje</th>
+                <th className="px-6 py-4">{t("admin.users.phone")}</th>
+                <th className="px-6 py-4">{t("admin.users.role")}</th>
+                <th className="px-6 py-4 text-right">{t("admin.users.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {usersList.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="p-8 text-center text-gray-500">
-                    Brak użytkowników. Dodaj pierwszego powyżej.
+                    {t("admin.users.empty_list")}
                   </td>
                 </tr>
               ) : (
@@ -305,7 +307,7 @@ export default function Users() {
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
                         (u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                       }`}>
-                        {(u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? 'Administrator' : 
+                        {(u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? t("admin.users.administrator") : 
                          rolesList.find(r => r.id === u.role)?.name || u.role}
                       </span>
                     </td>
@@ -316,7 +318,7 @@ export default function Users() {
                         className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
                       >
                         <i className="ph ph-pencil-simple"></i>
-                        Edytuj
+                        {t("admin.users.edit")}
                       </button>
                       <button 
                         onClick={() => handleDelete(u.id)}
@@ -324,7 +326,7 @@ export default function Users() {
                         title="Usuń"
                       >
                         <i className="ph ph-trash"></i>
-                        Usuń
+                        {t("admin.users.delete")}
                       </button>
                     </div>
                   </td>

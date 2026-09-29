@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import Machines from './Machines';
 import Regions from './Regions';
@@ -11,21 +12,22 @@ import Reporters from './Reporters';
 import { USER_ROLES } from '../../utils/constants';
 
 export default function MasterData({ machines, regions, services, roles }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState('machines');
 
   const tabs = [
     { id: 'machines', label: 'Baza Urz\u0105dze\u0144', icon: 'ph-engine' },
-    { id: 'regions', label: 'Rejony na stoczni', icon: 'ph-map-pin' },
-    { id: 'services', label: 'Podwykonawcy / Serwis', icon: 'ph-wrench' },
-    { id: 'topics', label: 'Tematy Zgłoszeń', icon: 'ph-text-aa' },
-    { id: 'reporters', label: 'Zgłaszający', icon: 'ph-user-list' }
+    { id: 'regions', label: t('admin.master_data.regions'), icon: 'ph-map-pin' },
+    { id: 'services', label: t('admin.master_data.services'), icon: 'ph-wrench' },
+    { id: 'topics', label: t('admin.master_data.topics'), icon: 'ph-text-aa' },
+    { id: 'reporters', label: t('admin.master_data.reporters'), icon: 'ph-user-list' }
   ];
 
   if ((user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPERADMIN)) {
-    tabs.push({ id: 'users', label: 'Użytkownicy', icon: 'ph-users' });
-    tabs.push({ id: 'roles', label: 'Role i Uprawnienia', icon: 'ph-shield-check' });
-    tabs.push({ id: 'settings', label: 'Ustawienia', icon: 'ph-gear' });
+    tabs.push({ id: 'users', label: t('admin.master_data.users'), icon: 'ph-users' });
+    tabs.push({ id: 'roles', label: t('admin.master_data.roles'), icon: 'ph-shield-check' });
+    tabs.push({ id: 'settings', label: t('admin.master_data.settings'), icon: 'ph-gear' });
   }
 
   // Odfiltruj zakładki jeśli użytkownik nie ma uprawnień (podobnie jak w ManagerView)
@@ -42,7 +44,7 @@ export default function MasterData({ machines, regions, services, roles }) {
       <div className="w-full md:w-64 shrink-0">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 bg-gray-50 border-b border-gray-200">
-            <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider">Konfiguracja</h3>
+            <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider">{t('admin.master_data.config')}</h3>
           </div>
           <ul className="divide-y divide-gray-100">
             {visibleTabs.map(tab => (

@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import React, { useMemo, useState } from 'react';

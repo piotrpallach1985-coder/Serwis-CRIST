@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
@@ -240,7 +239,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'archive' ? 'bg-red-500/20 text-red-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-archive text-xl shrink-0"></i>
-                  <span className="text-sm">Archiwum Awarii</span>
+                  <span className="text-sm">{t("sidebar.archive_tickets_menu")}</span>
                 </button>
 
                 
@@ -294,7 +293,7 @@ export default function Sidebar({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <i className="ph ph-clipboard-text text-xl shrink-0"></i>
-                    <span className="text-sm truncate">Tematy do realizacji</span>
+                    <span className="text-sm truncate">{t("sidebar.action_items_menu")}</span>
                   </div>
                   {openActionItemsCount > 0 && (
                     <span className="bg-amber-600/40 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
@@ -308,7 +307,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'archive_planned' ? 'bg-amber-500/20 text-amber-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-archive text-xl shrink-0"></i>
-                  <span className="text-sm">Archiwum serwisów</span>
+                  <span className="text-sm">{t("sidebar.archive_services_menu")}</span>
                 </button>
                 
               </div>
@@ -317,7 +316,7 @@ export default function Sidebar({
               {branding?.modules?.inventory !== false && (
                 <div className="space-y-1 pt-2 border-t border-gray-800/80">
                   <div className="px-3 py-1.5 flex items-center justify-between text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-                    <span>Magazyn Części Zapasowych</span>
+                    <span>{t("sidebar.warehouse_parts_menu")}</span>
                   </div>
                   
                   <button
@@ -325,7 +324,7 @@ export default function Sidebar({
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'parts_kpi' ? 'bg-emerald-600/30 text-emerald-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                   >
                     <i className="ph ph-chart-pie-slice text-xl shrink-0"></i>
-                    <span className="text-sm">KPI / Status</span>
+                    <span className="text-sm">{t("sidebar.kpi_status_menu")}</span>
                   </button>
                   
                   <button
@@ -334,7 +333,7 @@ export default function Sidebar({
                   >
                     <div className="flex items-center gap-3 truncate">
                       <i className="ph ph-archive-box text-xl shrink-0"></i>
-                      <span className="text-sm truncate">Baza Magazynowa</span>
+                      <span className="text-sm truncate">{t("sidebar.warehouse_base_menu")}</span>
                     </div>
                     {hasLowStockAlarm && (
                       <span className="bg-red-500 w-2.5 h-2.5 rounded-full animate-pulse shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
@@ -346,7 +345,7 @@ export default function Sidebar({
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'parts_transactions' ? 'bg-emerald-600/30 text-emerald-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                   >
                     <i className="ph ph-arrows-left-right text-xl shrink-0"></i>
-                    <span className="text-sm">Operacje magazynowe</span>
+                    <span className="text-sm">{t("sidebar.warehouse_operations_menu")}</span>
                   </button>
                   
                   <button
@@ -354,7 +353,7 @@ export default function Sidebar({
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'parts_qr' ? 'bg-emerald-600/30 text-emerald-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                   >
                     <i className="ph ph-qr-code text-xl shrink-0"></i>
-                    <span className="text-sm">Zestawienie QR</span>
+                    <span className="text-sm">{t("sidebar.qr_summary_menu")}</span>
                   </button>
                 </div>
               )}
@@ -371,7 +370,7 @@ export default function Sidebar({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <i className="ph ph-database text-xl shrink-0"></i>
-                    <span className="text-sm truncate">Baza Urządzeń</span>
+                    <span className="text-sm truncate">{t("sidebar.equipment_base_menu")}</span>
                   </div>
                   {unverifiedMachinesCount > 0 && (
                     <span className="bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shrink-0 shadow-xs">
@@ -385,7 +384,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'regions' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-map-pin-line text-xl shrink-0"></i>
-                  <span className="text-sm">Rejony</span>
+                  <span className="text-sm">{t("sidebar.regions_menu")}</span>
                 </button>
 
                 <button
@@ -393,7 +392,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'services' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-wrench text-xl shrink-0"></i>
-                  <span className="text-sm">Podwykonawcy / Serwisy</span>
+                  <span className="text-sm">{t("sidebar.subcontractors_menu")}</span>
                 </button>
 
                 <button
@@ -401,7 +400,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'topics' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-text-aa text-xl shrink-0"></i>
-                  <span className="text-sm">Tematy Zgłoszeń</span>
+                  <span className="text-sm">{t("sidebar.ticket_topics_menu")}</span>
                 </button>
 
                 <button
@@ -410,7 +409,7 @@ export default function Sidebar({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <i className="ph ph-users text-xl shrink-0"></i>
-                    <span className="text-sm truncate">Zgłaszający</span>
+                    <span className="text-sm truncate">{t("sidebar.reporters_menu")}</span>
                   </div>
                   {unverifiedReportersCount > 0 && (
                     <span className="bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shrink-0 shadow-xs">
@@ -457,7 +456,7 @@ export default function Sidebar({
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'users' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
               >
                 <i className="ph ph-users-three text-xl shrink-0"></i>
-                <span className="text-sm">Użytkownicy</span>
+                <span className="text-sm">{t("sidebar.users_menu")}</span>
               </button>
 
               <button
@@ -465,7 +464,7 @@ export default function Sidebar({
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'roles' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
               >
                 <i className="ph ph-shield-check text-xl shrink-0"></i>
-                <span className="text-sm">Role i Uprawnienia</span>
+                <span className="text-sm">{t("sidebar.roles_permissions_menu")}</span>
               </button>
 
               <button
@@ -473,7 +472,7 @@ export default function Sidebar({
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'reports' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
               >
                 <i className="ph ph-chart-bar text-xl shrink-0"></i>
-                <span className="text-sm">Raportowanie</span>
+                <span className="text-sm">{t("sidebar.reporting_menu")}</span>
               </button>
 
               <button
@@ -481,7 +480,7 @@ export default function Sidebar({
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'audit' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
               >
                 <i className="ph ph-scroll text-xl shrink-0"></i>
-                <span className="text-sm">Dziennik Zdarzeń</span>
+                <span className="text-sm">{t("sidebar.audit_logs_menu")}</span>
               </button>
 
 
@@ -490,7 +489,7 @@ export default function Sidebar({
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'ai_stats' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
               >
                 <i className="ph ph-brain text-xl shrink-0"></i>
-                <span className="text-sm">Zużycie AI</span>
+                <span className="text-sm">{t("sidebar.ai_usage_menu")}</span>
               </button>
             </div>
           )}
@@ -517,7 +516,7 @@ export default function Sidebar({
               title="Zarządzanie systemem SaaS"
             >
               <i className="ph ph-crown text-lg"></i>
-              <span>Zarządzanie SaaS</span>
+              <span>{t("sidebar.saas_management_menu")}</span>
             </button>
           )}
 
@@ -528,7 +527,7 @@ export default function Sidebar({
               title="Wróć do ekranu głównego"
             >
               <i className="ph ph-house text-lg text-blue-400"></i>
-              <span>Główny</span>
+              <span>{t("sidebar.main_menu")}</span>
             </button>
           </div>
           
@@ -538,7 +537,7 @@ export default function Sidebar({
             title="Wyloguj się z konta"
           >
             <i className="ph ph-sign-out text-lg"></i>
-            <span>Wyloguj</span>
+            <span>{t("sidebar.logout_menu")}</span>
           </button>
         </div>
       
