@@ -111,6 +111,12 @@ service cloud.firestore {
         allow write: if isTenantUser(tenantId) && isStaff();
       }
 
+      match /audit_logs/{document=**} {
+        allow create: if isSignedIn();
+        allow read: if isTenantUser(tenantId) && isStaff();
+        allow update, delete: if isSuperAdmin();
+      }
+
       match /crash_reports/{document=**} {
         allow create: if true;
         allow read, update, delete: if isTenantUser(tenantId) && isAdmin();
