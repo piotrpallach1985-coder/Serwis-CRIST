@@ -13,7 +13,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 
-export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
+export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService, onViewRelatedMachine }) {
   const { user } = useAuth();
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';

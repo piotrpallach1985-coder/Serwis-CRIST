@@ -51,6 +51,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [qrModalMachine, setQrModalMachine] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [machineHistoryStack, setMachineHistoryStack] = useState([]);
   const [isFromQRScan, setIsFromQRScan] = useState(false);
   const [machineHistory, setMachineHistory] = useState({ tickets: [], services: [] });
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -226,7 +227,12 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
       }
     };
 
-    const handleViewMachine = async (m, fromQR = false) => {
+    const handleViewMachine = async (m, fromQR = false, pushToHistory = false) => {
+    if (pushToHistory && selectedMachine) {
+      setMachineHistoryStack(prev => [...prev, selectedMachine]);
+    } else if (!pushToHistory) {
+      setMachineHistoryStack([]);
+    }
     setSelectedMachine(m);
     setIsFromQRScan(fromQR);
     setLoadingHistory(true);
@@ -298,6 +304,40 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     }
   };
 
+  const handleBackMachine = () => {
+    if (machineHistoryStack.length > 0) {
+      const prevMachine = machineHistoryStack[machineHistoryStack.length - 1];
+      setMachineHistoryStack(prev => prev.slice(0, -1));
+      
+      setSelectedMachine(prevMachine);
+      setIsFromQRScan(false);
+      setLoadingHistory(true);
+      
+      const fetchPrevHistory = async () => {
+        try {
+          const { fetchMachineTickets, fetchMachineServices } = await import('../../services/machines.service');
+          let machineTickets = await fetchMachineTickets(prevMachine.id, prevMachine.name);
+          let machineServices = await fetchMachineServices(prevMachine.id, prevMachine.name);
+          setMachineHistory({ tickets: machineTickets, services: machineServices });
+        } catch (error) {
+          const tickets = useManagerStore.getState().tickets || [];
+          const plannedServices = useManagerStore.getState().plannedServices || [];
+          setMachineHistory({
+            tickets: tickets.filter(t => t.machineId === prevMachine.id),
+            services: plannedServices.filter(s => s.machineId === prevMachine.id)
+          });
+        } finally {
+          setLoadingHistory(false);
+        }
+      };
+      fetchPrevHistory();
+    } else {
+      setSelectedMachine(null);
+      setIsFromQRScan(false);
+      setMachineHistoryStack([]);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <QRScannerModal
@@ -325,7 +365,8 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           isFromQR={isFromQRScan}
           onScanNext={() => setIsScanning(true)}
           onNfcNext={() => setIsNfcScanning(true)}
-          onBack={() => { setSelectedMachine(null); setIsFromQRScan(false); }}
+          onBack={handleBackMachine}
+            onViewRelatedMachine={(m) => handleViewMachine(m, false, true)}
           onPrint={handlePrint}
           onGeneratePDF={() => generateMachineHistoryPDF({...selectedMachine, regionName: regions.find(r => r.id === selectedMachine.regionId)?.name}, machineHistory.tickets, machineHistory.services)}
             onGenerateNewQR={() => handleGenerateNewQR(selectedMachine.id)}
