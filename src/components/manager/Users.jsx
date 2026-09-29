@@ -6,6 +6,7 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { addUser, updateUser, checkUserInUse } from '../../services/dictionary.service';
 
 
 // Inicjalizacja dodatkowej instancji Firebase Auth tylko do tworzenia kont,
@@ -57,7 +58,7 @@ export default function Users() {
     try {
       if (editingId) {
         // Zmiana nazwy/roli istniejącego usera
-        await updateDoc(doc(db, 'users', editingId), {
+        await updateUser(editingId, {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           role: role,
@@ -78,7 +79,7 @@ export default function Users() {
         const newUid = userCredential.user.uid;
 
         // Zapisanie roli i nazwy do bazy danych (BEZ HASŁA!)
-        await setDoc(doc(db, 'users', newUid), {
+        await addUser(newUid, {
             email: email.trim().toLowerCase(),
             name: name.trim(),
             role: role,
@@ -107,7 +108,7 @@ export default function Users() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć uprawnienia tego użytkownika? Uwaga: Usunie to jego dostęp, ale samo konto logowania (Firebase Auth) musi zostać usunięte w panelu Firebase.')) {
-      await updateDoc(doc(db, 'users', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+      await updateUser(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
     }
   };
 

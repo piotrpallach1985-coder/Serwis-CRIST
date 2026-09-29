@@ -1,8 +1,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import { useAuth } from '../../hooks/useAuth';
 
-export default function ProtectedRoute({ user, allowedRoles, children }) {
+export default function ProtectedRoute({ allowedRoles, children }) {
+  const { user } = useAuth();
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -14,7 +17,7 @@ export default function ProtectedRoute({ user, allowedRoles, children }) {
 
   // Sprawdź czy użytkownik ma wymaganą rolę
   if (!allowedRoles.includes(user.role)) {
-    // Brak dostępu – przekieruj na stronę domyślną zależnie od jego roli
+    // Brak dostępu — przekieruj na stronę domyślną zależnie od jego roli
     if (user.role === 'operator') {
       return <Navigate to="/operator" replace />;
     } else if (user.role === 'superadmin') {
@@ -28,7 +31,6 @@ export default function ProtectedRoute({ user, allowedRoles, children }) {
 }
 
 ProtectedRoute.propTypes = {
-  user: PropTypes.object,
   allowedRoles: PropTypes.arrayOf(PropTypes.string),
   children: PropTypes.node.isRequired,
 };

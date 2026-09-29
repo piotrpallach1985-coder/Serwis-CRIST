@@ -90,7 +90,8 @@ service cloud.firestore {
         allow write: if isTenantUser(tenantId) && isAdmin();
       }
 
-      match /planned_services/{document=**} {
+      match /stats/{document=**} { allow read, write: if isTenantUser(tenantId); }
+        match /planned_services/{document=**} {
         allow read: if isSignedIn();
         allow write: if isTenantUser(tenantId) && isStaff();
       }

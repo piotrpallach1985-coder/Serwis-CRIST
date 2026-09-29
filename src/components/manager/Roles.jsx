@@ -3,6 +3,7 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimest
 import { db } from '../../firebase';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { addRole, updateRole, checkRoleInUse } from '../../services/dictionary.service';
 
 
 export default function Roles() {
@@ -96,9 +97,9 @@ export default function Roles() {
     setLoading(true);
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'roles', editingId), { name, permissions });
+        await updateRole(editingId, { name, permissions });
       } else {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'roles'), {
+        await addRole({
           name,
           permissions,
           createdAt: serverTimestamp()
@@ -123,7 +124,7 @@ export default function Roles() {
 
   const handleDelete = async (id) => {
     if (confirm("Czy na pewno chcesz usunąć tę rolę? UWAGA: Użytkownicy z tą rolą stracą wszystkie dostępy!")) {
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'roles', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
+      await updateRole(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
     }
   };
 

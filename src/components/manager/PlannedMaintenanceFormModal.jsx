@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect } from 'react';
 import { useManagerStore } from '../../store/managerStore';
 import ChecklistBuilder from '../checklists/ChecklistBuilder';
@@ -5,8 +6,8 @@ import { addPlannedService, updatePlannedService } from '../../services/plannedS
 import { arrayUnion } from 'firebase/firestore';
 
 export default function PlannedMaintenanceFormModal({
-  isOpen, onClose, editingService, machines, user
-}) {
+  isOpen, onClose, editingService, machines }) {
+  const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
   
   const [name, setName] = useState('');
@@ -83,8 +84,9 @@ export default function PlannedMaintenanceFormModal({
     if ((triggerType === 'calendar' || triggerType === 'mixed') && !nextDate) return alert('Błąd: Podaj datę planowaną.');
     if ((triggerType === 'hours' || triggerType === 'mixed') && !targetWorkHours) return alert('Błąd: Podaj próg RBG.');
     
+    const selectedMachine = machines.find(m => m.id === machineId);
     const serviceData = { 
-      name, machineId, priority, triggerType, 
+      name, machineId, machineName: selectedMachine ? selectedMachine.name : "", priority, triggerType, 
       estimatedDowntimeHours: Number(estimatedDowntimeHours), 
       estimatedManHours: Number(estimatedManHours), 
       requiredPersonnel, machineStatus, notified: false, 

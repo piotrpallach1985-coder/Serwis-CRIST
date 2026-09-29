@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { useToast } from '../hooks/useToast';
-import { useTicketSubmit } from '../hooks/useTicketSubmit';
+import { useOperatorForm } from '../hooks/useOperatorForm';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import DictationButton from './shared/DictationButton';
 import Toast from './manager/Toast';
 import { collection, doc, setDoc, serverTimestamp, getDoc, getDocs, query, where, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { savePhotoToIndexedDB } from '../utils/offlineStorage';
 import { db, storage } from '../firebase';
-import { compressImage } from '../utils/imageCompressor';
 
 export default function OperatorForm({
   machines = [],
@@ -30,108 +27,22 @@ export default function OperatorForm({
   const user = useManagerStore(state => state.user);
   // Ignore default branding if tenant is different (for unlogged users who don't fetch branding)
   const companyName = branding?.companyName ? branding.companyName : tenantId.toUpperCase();
-  const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
-  const [topic, setTopic] = useState('');
-  const [description, setDescription] = useState('');
-  const [reporterName, setReporterName] = useState('');
-  const [reporterPhone, setReporterPhone] = useState('');
-  const [reporterDeviceId] = useState(() => {
-    let id = localStorage.getItem('device_id_token');
-    if (!id) {
-      id = Math.random().toString(36).substring(2, 8).toUpperCase();
-      localStorage.setItem('device_id_token', id);
-    }
-    return id;
-  });
-  const [isCritical, setIsCritical] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [pendingPhotos, setPendingPhotos] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const [acceptedRodo, setAcceptedRodo] = useState(false);
-  const { toastConfig, showToast, hideToast } = useToast();
-
-  const timeoutRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const { submitTicket, loading: submitLoading, uploadProgress: submitProgress } = useTicketSubmit({
-    regions,
-    onStepChange: handleStepChange,
-    showToast
-  });
-
-  
-  
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    let machineToSubmit = { ...selectedMachine };
-    
-    if (machineToSubmit.id === 'manual' && machineToSubmit.name) {
-      const typedName = machineToSubmit.name.trim().toLowerCase();
-      const existingMachine = machines.find(m => m.name.toLowerCase() === typedName);
-      if (existingMachine) {
-        machineToSubmit = { ...existingMachine };
-        setSelectedMachine(machineToSubmit); // update state for the success screen
-      }
-    }
-    
-    await submitTicket({
-      selectedMachine: machineToSubmit,
-      topic,
-      description,
-      reporterName,
-      reporterPhone,
-      isCritical,
-      pendingPhotos,
-      acceptedRodo,
-      reporterDeviceId,
-      isOnline,
-      timeoutRef,
-      setTopicMode
-    });
-  };
-
-  const handleFilesSelected = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setUploadProgress('Przetwarzanie zdjt...');
-    setLoading(true);
-    try {
-      let newPhotos = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const compressedFile = await compressImage(file, 2);
-        const base64 = await fileToBase64(compressedFile);
-        const preview = URL.createObjectURL(compressedFile);
-        newPhotos.push({ file: compressedFile, base64, preview, name: compressedFile.name });
-      }
-      setPendingPhotos(prev => [...prev, ...newPhotos]);
-    } catch (err) {
-      console.error(err);
-      showToast('Błąd przetwarzania: ' + err.message, 'error');
-    }
-    setUploadProgress('');
-    setLoading(false);
-  };
+  const {
+    topicMode, setTopicMode,
+    topic, setTopic,
+    description, setDescription,
+    reporterName, setReporterName,
+    reporterPhone, setReporterPhone,
+    isCritical, setIsCritical,
+    loading,
+    errorMsg,
+    pendingPhotos,
+    uploadProgress,
+    acceptedRodo, setAcceptedRodo,
+    toastConfig, hideToast,
+    submitLoading, submitProgress,
+    handleSubmit, handleFilesSelected
+  } = useOperatorForm({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline });
 
   return (
     <div className="flex flex-col gap-4">

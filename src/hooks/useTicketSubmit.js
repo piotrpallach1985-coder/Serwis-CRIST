@@ -62,6 +62,9 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       showToast('Jesteś offline. Zgłoszenie zostanie zapisane lokalnie i wysłane automatycznie po odzyskaniu połączenia z siecią.', 'warning');
     }
 
+    setLoading(true);
+    setUploadProgress('Sprawdzanie poprzednich zgłoszeń...');
+
     // 1. Zabezpieczenie przed duplikowaniem (2 godziny)
     if (selectedMachine.id !== 'manual') {
       try {
@@ -78,14 +81,18 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         
         if (foundDuplicate) {
           const proceed = window.confirm(`UWAGA: Awaria dla tej maszyny została już zgłoszona dzisiaj o godzinie ${foundDuplicate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.\n\nCzy na pewno chcesz wysłać KOLEJNE zgłoszenie dla tego samego urządzenia?`);
-          if (!proceed) return false;
+          if (!proceed) {
+            setLoading(false);
+            setUploadProgress('');
+            return false;
+          }
         }
       } catch (err) {
         console.error('Błąd weryfikacji duplikatów:', err);
       }
     }
 
-    setLoading(true);
+    setUploadProgress('Weryfikacja bazy danych...');
 
     try {
       // 2. Dodawanie Zgłaszającego do bazy
@@ -106,6 +113,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         }
       }
 
+      setUploadProgress('Przygotowywanie danych...');
       let finalMachineId = selectedMachine.id;
       
       if (finalMachineId === 'manual') {
@@ -132,13 +140,14 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       if (pendingPhotos.length > 0) {
         if (navigator.onLine) {
           try {
-            setUploadProgress('Wysyłanie zdjęć...');
+            setUploadProgress(`Wysyłanie zdjęć (0/${pendingPhotos.length})...`);
             for (const p of pendingPhotos) {
               const fileName = Date.now() + '_' + p.name.replace(/[^a-zA-Z0-9.-]/g, '_');
               const fileRef = ref(storage, `tickets/${ticketRef.id}/${fileName}`);
               await uploadString(fileRef, p.base64, 'data_url');
               const url = await getDownloadURL(fileRef);
               uploadedUrls.push(url);
+              setUploadProgress(`Wysyłanie zdjęć (${uploadedUrls.length}/${pendingPhotos.length})...`);
             }
           } catch (uploadErr) {
             console.error("Błąd wgrywania zdjęć online, przechodzę w tryb offline:", uploadErr);
@@ -149,7 +158,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         }
       }
 
-      setUploadProgress('');
+      setUploadProgress('Zapisywanie zgłoszenia w chmurze (to może zająć chwilę)...');
 
       // 4. Tworzymy zgłoszenie ATOMOWO
       const ticketPayload = {

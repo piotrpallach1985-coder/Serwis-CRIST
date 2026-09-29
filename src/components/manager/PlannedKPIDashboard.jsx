@@ -1,12 +1,9 @@
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useMemo, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { getCurrentTenant } from '../../utils/tenantHelper';
 import { savePdfWithPrompt } from '../../utils/pdfHelper';
-import html2canvas from 'html2canvas';
+import { fetchHistoricServices } from '../../services/kpi.service';
 
 export default function PlannedKPIDashboard() {
   const machines = useManagerStore(state => state.machines);
@@ -21,10 +18,8 @@ export default function PlannedKPIDashboard() {
     const fetchHistoric = async () => {
       setLoading(true);
       try {
-        const tenantId = getCurrentTenant();
-        const qArchive = query(collection(db, 'tenants', tenantId, 'planned_services'), where('status', '==', 'completed'));
-        const snap = await getDocs(qArchive);
-        setHistoricServices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const docs = await fetchHistoricServices();
+        setHistoricServices(docs);
       } catch (err) {
         console.error(err);
       } finally {
@@ -132,6 +127,8 @@ export default function PlannedKPIDashboard() {
     if (!reportElement) return;
 
     try {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
       const canvas = await html2canvas(reportElement, { scale: 2, useCORS: true, logging: false });
       const imgData = canvas.toDataURL('image/png');
       

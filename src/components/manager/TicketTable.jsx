@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useMemo } from 'react';
 import TicketMobileCard from './TicketMobileCard';
-import TicketTableRow from './TicketTableRow';
+import DataTable from '../shared/DataTable';
+import { safeParseDate } from '../../utils/dateHelpers';
+import { safe } from '../../utils/safeRender';
 
 export default function TicketTable({
   filteredTickets,
@@ -18,92 +20,160 @@ export default function TicketTable({
   fetchArchive,
   loadingArchive
 }) {
-  return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
-        {filteredTickets.length === 0 ? (
-          <div className="col-span-full p-6 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-200">
-            Brak zgłoszeń spełniających kryteria.
+  const columns = useMemo(() => [
+    {
+      header: isArchive ? 'Zakończono' : 'Data zgłoszenia',
+      accessor: 'date',
+      hidden: !visibleCols.date,
+      render: (ticket) => (
+        <div className="whitespace-nowrap">
+          <div className="font-bold text-slate-800">
+            {isArchive 
+              ? (safeParseDate(ticket.closedAt)?.toLocaleDateString('pl-PL') || '-')
+              : (safeParseDate(ticket.createdAt)?.toLocaleDateString('pl-PL') || '-')}
           </div>
-        ) : (
-          currentItems.map(ticket => (
-            <TicketMobileCard 
-              key={ticket.id} 
-              ticket={ticket} 
-              machines={machines} 
-              STATUSES={STATUSES} 
-              onOpenDetails={openDetails} 
-              isArchive={isArchive} 
-            />
-          ))
-        )}
-      </div>
-
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-bold text-gray-500">
-              <tr>
-                {visibleCols.date && <th className="px-6 py-4">{isArchive ? 'Zakończono' : 'Data zgłoszenia'}</th>}
-                {visibleCols.region && <th className="px-6 py-4">Miejsce (Rejon)</th>}
-                {visibleCols.machine && <th className="px-6 py-4">Maszynę</th>}
-                {visibleCols.bay && <th className="px-6 py-4">Przelot/Inf.</th>}
-                {visibleCols.topic && <th className="px-6 py-4">Temat</th>}
-                {visibleCols.reporter && <th className="px-6 py-4">Zgłaszający</th>}
-                {visibleCols.status && <th className="px-6 py-4">Status</th>}
-                {visibleCols.service && <th className="px-6 py-4">Przypisany Serwis</th>}
-                {visibleCols.duration && <th className="px-6 py-4">Czas trwania</th>}
-                <th className="px-6 py-4 w-12 text-center">Akcje</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredTickets.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="px-6 py-12 text-center text-gray-500 border-dashed border-2 border-gray-100 m-4">
-                    Brak zgłoszeń spełniających kryteria.
-                  </td>
-                </tr>
-              ) : (
-                currentItems.map(ticket => (
-                  <TicketTableRow 
-                    key={ticket.id} 
-                    ticket={ticket} 
-                    visibleCols={visibleCols} 
-                    STATUSES={STATUSES} 
-                    machines={machines} 
-                    calculateDuration={calculateDuration} 
-                    onOpenDetails={openDetails} 
-                    isArchive={isArchive} 
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+          <div className="text-xs text-slate-500">
+            {isArchive
+              ? (safeParseDate(ticket.closedAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || '-')
+              : (safeParseDate(ticket.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || '-')}
+          </div>
         </div>
-        
-        {hasMoreLocalItems && (
-          <div className="p-4 flex justify-center">
-            <button 
-              onClick={() => setCurrentPage(p => p + 1)} 
-              className="px-6 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-all shadow-sm"
-            >
-              Załaduj kolejne 30 (pozostało {filteredTickets.length - currentItems.length})
-            </button>
-          </div>
+      )
+    },
+    {
+      header: 'Miejsce (Rejon)',
+      accessor: 'regionName',
+      hidden: !visibleCols.region,
+      render: (t) => <span className="text-slate-800 font-medium">{safe(t.regionName, '-')}</span>
+    },
+    {
+      header: 'Maszyna',
+      accessor: 'machineName',
+      hidden: !visibleCols.machine,
+      render: (ticket) => (
+        <span className="font-bold text-[#111827]">
+          {safe(ticket.machineName)}{!machines?.some(m => m.id === ticket.machineId) && <span className="text-red-500 font-bold ml-1">(usunięta)</span>}
+        </span>
+      )
+    },
+    {
+      header: 'Przelot/Inf.',
+      accessor: 'bay',
+      hidden: !visibleCols.bay,
+      render: (t) => <span className="text-xs text-slate-500">{safe(t.bay, '-')}</span>
+    },
+    {
+      header: 'Temat',
+      accessor: 'topic',
+      hidden: !visibleCols.topic,
+      render: (ticket) => (
+        <>
+          <div className="font-medium text-slate-800 max-w-[150px] truncate" title={safe(ticket.topic)}>{safe(ticket.topic)}</div>
+          {ticket.isCritical && (
+            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded uppercase">
+              <i className="ph ph-siren"></i> KRYTYCZNE
+            </div>
+          )}
+        </>
+      )
+    },
+    {
+      header: 'Zgłaszający',
+      accessor: 'reportedBy',
+      hidden: !visibleCols.reporter,
+      render: (ticket) => (
+        <div className="text-xs">
+          <div className="font-bold text-slate-800">{safe(ticket.reportedBy, 'Nieznany')}</div>
+          {ticket.reporterType && <div className="text-slate-500 mt-0.5">{ticket.reporterType}</div>}
+        </div>
+      )
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      hidden: !visibleCols.status,
+      render: (ticket) => (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${STATUSES[ticket.status]?.color || 'bg-slate-100 text-slate-800'}`}>
+          {STATUSES[ticket.status]?.label || 'Nieznany'}
+        </span>
+      )
+    },
+    {
+      header: 'Przypisany Serwis',
+      accessor: 'assignedTo',
+      hidden: !visibleCols.service,
+      render: (ticket) => (
+        <div className="text-sm font-medium text-slate-600 max-w-[120px] truncate" title={safe(ticket.assignedTo, 'Brak')}>
+          {ticket.assignedTo ? safe(ticket.assignedTo) : <span className="text-slate-400 italic">Brak przypisania</span>}
+        </div>
+      )
+    },
+    {
+      header: 'Czas trwania',
+      accessor: 'duration',
+      hidden: !visibleCols.duration,
+      render: (ticket) => {
+        const { label, colorClass } = calculateDuration(ticket);
+        return <span className={`text-xs font-bold ${colorClass}`}>{label}</span>;
+      }
+    },
+    {
+      header: 'Akcje',
+      accessor: 'actions',
+      align: 'right',
+      render: (ticket) => (
+        <button 
+          onClick={(e) => { e.stopPropagation(); openDetails(ticket); }} 
+          className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm"
+        >
+          Szczegóły <i className="ph ph-caret-right font-bold"></i>
+        </button>
+      )
+    }
+  ], [visibleCols, isArchive, STATUSES, machines, calculateDuration, openDetails]);
+
+  return (
+    <div className="w-full">
+      <DataTable 
+        data={currentItems}
+        columns={columns}
+        emptyMessage="Brak zgłoszeń spełniających kryteria."
+        onRowClick={(ticket) => openDetails(ticket)}
+        renderMobileCard={(ticket) => (
+          <TicketMobileCard 
+            key={ticket.id} 
+            ticket={ticket} 
+            machines={machines} 
+            STATUSES={STATUSES} 
+            onOpenDetails={openDetails} 
+            isArchive={isArchive} 
+          />
         )}
-        {isArchive && hasMoreArchive && !hasMoreLocalItems && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-center">
-            <button 
-              onClick={() => fetchArchive(true)} 
-              disabled={loadingArchive} 
-              className="px-6 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded transition-colors disabled:opacity-50"
-            >
-              {loadingArchive ? 'Ładowanie...' : 'Załaduj więcej'}
-            </button>
-          </div>
-        )}
-      </div>
-    </>
+      />
+      
+      {/* Pagination Controls */}
+      {hasMoreLocalItems && (
+        <div className="p-4 flex justify-center mt-4">
+          <button 
+            onClick={() => setCurrentPage(p => p + 1)} 
+            className="px-6 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-all shadow-sm"
+          >
+            Załaduj kolejne 30 (pozostało {filteredTickets.length - currentItems.length})
+          </button>
+        </div>
+      )}
+      {isArchive && hasMoreArchive && !hasMoreLocalItems && (
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-center mt-4 rounded-b-xl">
+          <button 
+            onClick={() => fetchArchive(true)} 
+            disabled={loadingArchive} 
+            className="px-6 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold rounded transition-colors disabled:opacity-50"
+          >
+            {loadingArchive ? 'Ładowanie...' : 'Załaduj więcej'}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

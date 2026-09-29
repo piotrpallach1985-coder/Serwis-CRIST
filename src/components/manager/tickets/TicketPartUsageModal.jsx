@@ -1,3 +1,4 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React, { useState } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import QRScannerModal from '../../shared/QRScannerModal';
@@ -5,7 +6,8 @@ import { doc, runTransaction, serverTimestamp, collection } from 'firebase/fires
 import { db } from '../../../firebase';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 
-export default function TicketPartUsageModal({ isOpen, onClose, user, ticketId, onPartUsed }) {
+export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPartUsed }) {
+  const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);

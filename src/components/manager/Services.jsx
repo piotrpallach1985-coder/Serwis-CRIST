@@ -1,4 +1,5 @@
 import { useManagerStore } from '../../store/managerStore';
+import { addService, updateService, checkServiceInUse } from '../../services/dictionary.service';
 
 import { useState } from 'react';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -30,14 +31,14 @@ export default function Services() {
     if (!newService.trim()) return;
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'services', editingId), {
+        await updateService(editingId, {
           name: newService.trim(),
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
           contactPhone: contactPhone.trim()
         });
       } else {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'services'), { 
+        await addService({ 
           name: newService.trim(),
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
@@ -68,7 +69,7 @@ export default function Services() {
   const handleDelete = async (id, name) => {
     if (window.confirm(`Czy na pewno chcesz usunąć dział "${name}" z bazy danych?\n(Historia powiązanych z nim napraw pozostanie nienaruszona)`)) {
       try {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'services', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateService(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       } catch (error) {
         console.error('Błąd usuwania serwisu:', error);
         alert('Nie udało się usunąć serwisu.');

@@ -1,12 +1,15 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { useToast } from '../../hooks/useToast';
 import { useManagerStore } from '../../store/managerStore';
 import { Plus, Trash, Crown, Sliders, CheckCircle, Pencil, Upload } from 'lucide-react';
+import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
 
-export default function SuperAdminPanel({ user, onNavigate }) {
+export default function SuperAdminPanel({ onNavigate }) {
+  const { user } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,12 +38,33 @@ export default function SuperAdminPanel({ user, onNavigate }) {
     modules: { tickets: true, planned_services: true, map: true, kpi: true, inventory: false }
   };
 
+  
   const [formData, setFormData] = useState(initialFormState);
+
+  const [aiUsageMap, setAiUsageMap] = useState({});
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      const usages = await fetchAllTenantsStats(tenants);
+      setAiUsageMap(usages);
+    };
+    if (tenants.length > 0) fetchUsage();
+  }, [tenants]);
+
+  const tenantsWithTokens = tenants.map(t => ({
+    ...t,
+    aiTokensGemini: aiUsageMap[t.id]?.geminiTokens || 0,
+    aiTokensGroq: aiUsageMap[t.id]?.groqTokens || 0
+  }));
+
+  const totalGeminiTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGemini || 0), 0);
+  const totalGroqTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGroq || 0), 0);
+
 
   useEffect(() => {
     if (user?.role !== 'superadmin') return;
 
-    const unsub = onSnapshot(collection(db, 'tenant_registry'), (snapshot) => {
+    const unsub = subscribeToTenants((snapshot) => {
       setTenants(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (err) => {
@@ -49,8 +73,7 @@ export default function SuperAdminPanel({ user, onNavigate }) {
       setLoading(false);
     });
 
-    // Fetch Global App Logo from a global config document
-    const unsubGlobal = onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), (docSnap) => {
+    const unsubGlobal = subscribeToGlobalSettings((docSnap) => {
       if (docSnap.exists()) {
         setGlobalAppLogoUrl(docSnap.data().appLogoUrl || '');
         setGlobalGroqApiKey(docSnap.data().groqApiKey || '');
@@ -64,7 +87,7 @@ export default function SuperAdminPanel({ user, onNavigate }) {
     if(e) e.preventDefault();
     console.log("Saving global key...", globalGroqApiKey);
     try {
-      await setDoc(doc(db, 'tenant_registry', '_global_settings_'), { groqApiKey: (globalGroqApiKey || '').trim() }, { merge: true });
+      await saveGlobalKey(globalGroqApiKey);
       showToast('Globalny klucz AI został zapisany.', 'success');
     } catch (err) {
       showToast('Błąd zapisywania klucza: ' + err.message, 'error');
@@ -151,20 +174,8 @@ export default function SuperAdminPanel({ user, onNavigate }) {
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         
-        // Save to global settings
-        await setDoc(doc(db, 'tenant_registry', '_global_settings_'), {
-          appLogoUrl: downloadURL,
-          appLogoBase64: base64Data
-        }, { merge: true });
-
-        // Broadcast to ALL existing tenants
-        const promises = tenants.map(t => 
-          setDoc(doc(db, 'tenants', t.id, 'settings', 'branding'), {
-            appLogoUrl: downloadURL,
-            appLogoBase64: base64Data
-          }, { merge: true })
-        );
-        await Promise.all(promises);
+        const { saveGlobalAppLogo } = await import('../../services/admin.service');
+        await saveGlobalAppLogo(downloadURL, base64Data, tenants);
 
         setUploadingLogo(false);
         setUploadProgress(0);
@@ -212,58 +223,14 @@ export default function SuperAdminPanel({ user, onNavigate }) {
     }
 
     try {
-      const tenantRef = doc(db, 'tenant_registry', formData.id);
-
+      const { saveTenant } = await import('../../services/admin.service');
+      await saveTenant(formData, isEditing);
+      
       if (isEditing) {
-        await updateDoc(tenantRef, {
-          name: formData.name.trim(),
-          contactEmail: formData.contactEmail.trim(),
-          limits: {
-            maxUsers: parseInt(formData.maxUsers) || 10,
-            maxMachines: parseInt(formData.maxMachines) || 50
-          },
-          companyLogoUrl: formData.companyLogoUrl,
-            groqApiKey: formData.groqApiKey,
-          companyLogoBase64: formData.companyLogoBase64,
-          modules: formData.modules
-        });
         showToast('Dane firmy zostały zaktualizowane.', 'success');
       } else {
-        await setDoc(tenantRef, {
-          name: formData.name.trim(),
-          contactEmail: formData.contactEmail.trim(),
-          limits: {
-            maxUsers: parseInt(formData.maxUsers) || 10,
-            maxMachines: parseInt(formData.maxMachines) || 50
-          },
-          companyLogoUrl: formData.companyLogoUrl,
-            groqApiKey: formData.groqApiKey,
-          companyLogoBase64: formData.companyLogoBase64,
-          modules: formData.modules,
-          createdAt: serverTimestamp(),
-          status: 'active'
-        });
         showToast('Firma została pomyślnie dodana!', 'success');
       }
-
-      // Sync settings to the tenant's own database subcollection
-      
-      await setDoc(doc(db, 'tenants', formData.id, 'settings', 'general'), {
-        limits: {
-          maxUsers: parseInt(formData.maxUsers) || 10,
-          maxMachines: parseInt(formData.maxMachines) || 50
-        }
-      }, { merge: true });
-
-      await setDoc(doc(db, 'tenants', formData.id, 'settings', 'branding'), {
-        companyName: formData.name.trim(),
-        systemSubtitle: 'DYSPOZYTORNIA UR',
-        companyLogoUrl: formData.companyLogoUrl,
-            groqApiKey: formData.groqApiKey,
-        companyLogoBase64: formData.companyLogoBase64,
-        modules: formData.modules
-      }, { merge: true });
-      
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -274,7 +241,8 @@ export default function SuperAdminPanel({ user, onNavigate }) {
   const handleDelete = async (id) => {
     if (window.confirm(`UWAGA! Chcesz usunąć firmę ${id} z rejestru? To nie usunie jej fizycznych danych, ale natychmiast odetnie dostęp jej pracownikom.`)) {
       try {
-        await deleteDoc(doc(db, 'tenant_registry', id));
+        const { deleteTenant } = await import('../../services/admin.service');
+        await deleteTenant(id);
         showToast('Firma usunięta z rejestru.', 'success');
       } catch (err) {
         showToast('Błąd usuwania: ' + err.message, 'error');
@@ -296,6 +264,34 @@ export default function SuperAdminPanel({ user, onNavigate }) {
     <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6 h-full overflow-y-auto overflow-x-hidden">
       
       
+        
+        {/* Global AI Usage Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center gap-2">
+            <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-2">
+              <i className="ph ph-google-logo"></i>
+            </div>
+            <h3 className="text-lg font-bold text-slate-700">Zużycie Google Gemini</h3>
+            <p className="text-xs text-slate-400">Sumaryczne zużycie wszystkich firm (SaaS)</p>
+            <div className="text-4xl font-black text-blue-600 mt-2">
+              {totalGeminiTokens.toLocaleString('pl-PL')}
+            </div>
+            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tokenów łącznie</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center gap-2">
+            <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center text-3xl mb-2">
+              <i className="ph ph-microphone-stage"></i>
+            </div>
+            <h3 className="text-lg font-bold text-slate-700">Zużycie Groq (Llama 3)</h3>
+            <p className="text-xs text-slate-400">Sumaryczne zużycie wszystkich firm (SaaS)</p>
+            <div className="text-4xl font-black text-orange-600 mt-2">
+              {totalGroqTokens.toLocaleString('pl-PL')}
+            </div>
+            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tokenów łącznie</p>
+          </div>
+        </div>
+
         {/* Global AI Settings Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 flex-1">
@@ -389,11 +385,12 @@ export default function SuperAdminPanel({ user, onNavigate }) {
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-32">ID (Silos)</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-64">Nazwa Klienta</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Aktywne Moduły</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right w-48">Zarządzaj</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-32">AI (Tokeny)</th>
+                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right w-48">Zarządzaj</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                {tenants.filter(t => t.id !== '_global_settings_').map(tenant => (
+                {tenantsWithTokens.filter(t => t.id !== '_global_settings_').map(tenant => (
                     <tr key={tenant.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="p-4 w-16">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
@@ -419,6 +416,18 @@ export default function SuperAdminPanel({ user, onNavigate }) {
                                <CheckCircle size={10} /> {m.charAt(0).toUpperCase() + m.slice(1)}
                              </span>
                            ))}
+                        </div>
+                      </td>
+                      <td className="p-4 w-32">
+                        <div className="flex flex-col gap-1 text-xs">
+                          <div className="flex items-center gap-1 text-slate-600">
+                            <i className="ph ph-google-logo text-blue-500"></i>
+                            <span className="font-mono">{tenant.aiTokensGemini?.toLocaleString('pl-PL') || 0}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-slate-600">
+                            <i className="ph ph-microphone-stage text-orange-500"></i>
+                            <span className="font-mono">{tenant.aiTokensGroq?.toLocaleString('pl-PL') || 0}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="p-4 text-right">

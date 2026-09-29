@@ -1,10 +1,12 @@
+import { useAuth } from '../../hooks/useAuth';
 import React from 'react';
 import KPIDashboard from './KPIDashboard';
 import MapComponent from './Map';
 import Tickets from './Tickets';
 import { useManagerStore } from '../../store/managerStore';
 
-export default function TicketsLayout({ user, currentTab, setActiveTab }) {
+export default function TicketsLayout({ currentTab, setActiveTab }) {
+  const { user } = useAuth();
   const ticketsStore = useManagerStore(state => state.tickets) || [];
 
   const tabs = [
@@ -36,10 +38,10 @@ export default function TicketsLayout({ user, currentTab, setActiveTab }) {
         </div>
       </div>
 
-      {currentTab === 'kpi' && <KPIDashboard user={user} />}
-      {currentTab === 'dashboard_tickets' && <MapComponent user={user} tickets={ticketsStore} />}
-      {currentTab === 'tickets' && <Tickets user={user} />}
-      {currentTab === 'archive' && <Tickets isArchive user={user} />}
+      {currentTab === 'kpi' && <KPIDashboard />}
+      {currentTab === 'dashboard_tickets' && <MapComponent tickets={ticketsStore} />}
+      {currentTab === 'tickets' && <Tickets />}
+      {currentTab === 'archive' && <Tickets isArchive />}
     </div>
   );
 }

@@ -1,9 +1,10 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React, { useState } from 'react';
-import { db } from '../../../firebase';
-import { doc, collection, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
+import { issueOrReceivePart } from '../../../services/parts.service';
 
-export default function PartTransactionModal({ part, mode, onClose, user }) {
+export default function PartTransactionModal({ part, mode, onClose }) {
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState(part.unitPrice || 0);
   const [expirationDate, setExpirationDate] = useState('');
@@ -20,83 +21,15 @@ export default function PartTransactionModal({ part, mode, onClose, user }) {
     setLoading(true);
     try {
       const tenantId = getCurrentTenant();
-      const partRef = doc(db, 'tenants', tenantId, 'parts', part.id);
-      const txRef = doc(collection(db, 'tenants', tenantId, 'part_transactions'));
-
-      await runTransaction(db, async (transaction) => {
-        const partDoc = await transaction.get(partRef);
-        if (!partDoc.exists()) throw new Error("Część nie istnieje.");
-        
-        const currentStock = Number(partDoc.data().stock || 0);
-        let newStock = currentStock;
-        let updatePayload = {};
-        let currentBatches = partDoc.data().batches || [];
-        
-        if (currentBatches.length === 0 && currentStock > 0) {
-           currentBatches = [{ qty: currentStock, price: Number(partDoc.data().unitPrice || 0), date: new Date().toISOString(), expirationDate: partDoc.data().expirationDate || null }];
-        }
-
-        if (mode === 'receive') {
-          newStock = currentStock + qtyNum;
-          const finalPrice = Number(unitPrice);
-          currentBatches.push({ qty: qtyNum, price: finalPrice, date: new Date().toISOString(), expirationDate: expirationDate || null });
-          
-          updatePayload = { stock: newStock, unitPrice: finalPrice, batches: currentBatches };
-          transaction.update(partRef, updatePayload);
-          
-          transaction.set(txRef, {
-            partId: part.id,
-            type: 'receive',
-            quantity: qtyNum,
-            price: finalPrice,
-            expirationDate: expirationDate || null,
-            date: new Date().toISOString(),
-            user: user?.name || 'Nieznany (App)',
-            createdAt: serverTimestamp()
-          });
-
-        } else if (mode === 'issue') {
-          if (qtyNum > currentStock) {
-            throw new Error(`Brak wystarczającej ilości w magazynie (Dostępne: ${currentStock})`);
-          }
-          newStock = currentStock - qtyNum;
-          
-          let remainingToIssue = qtyNum;
-          let totalCost = 0;
-          let issueDetails = [];
-          let newBatches = [...currentBatches];
-          
-          while (remainingToIssue > 0 && newBatches.length > 0) {
-            let oldestBatch = newBatches[0];
-            if (oldestBatch.qty <= remainingToIssue) {
-              totalCost += oldestBatch.qty * oldestBatch.price;
-              issueDetails.push({ qty: oldestBatch.qty, price: oldestBatch.price });
-              remainingToIssue -= oldestBatch.qty;
-              newBatches.shift();
-            } else {
-              totalCost += remainingToIssue * oldestBatch.price;
-              issueDetails.push({ qty: remainingToIssue, price: oldestBatch.price });
-              oldestBatch.qty -= remainingToIssue;
-              remainingToIssue = 0;
-            }
-          }
-          
-          const avgPrice = qtyNum > 0 ? (totalCost / qtyNum) : 0;
-          updatePayload = { stock: newStock, batches: newBatches };
-          transaction.update(partRef, updatePayload);
-          
-          transaction.set(txRef, {
-            partId: part.id,
-            type: 'issue_adhoc',
-            quantity: -qtyNum,
-            price: avgPrice,
-            totalCost: totalCost,
-            issueDetails: issueDetails,
-            date: new Date().toISOString(),
-            user: user?.name || 'Nieznany (App)',
-            createdAt: serverTimestamp()
-          });
-        }
+      await issueOrReceivePart({
+        tenantId,
+        partId: part.id,
+        mode,
+        quantity: qtyNum,
+        unitPrice,
+        expirationDate,
+        user,
+        selectedMachine: null
       });
       onClose();
     } catch (err) {

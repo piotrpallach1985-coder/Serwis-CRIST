@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useManagerStore } from '../../store/managerStore';
 import DictationButton from '../shared/DictationButton';
@@ -5,14 +6,15 @@ import DTRChatModal from './DTRChatModal';
 import { useState, useRef, useEffect } from 'react';
 import ErrorBoundary from '../ErrorBoundary';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { doc, updateDoc } from 'firebase/firestore';
+import { updateMachine } from "../../services/machines.service";
 import { db, storage } from '../../firebase';
 
 import { safe } from '../../utils/safeRender';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
-export default function MachineDTR({ machine, user, canManage, canDeleteNotes }) {
+export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
+  const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatDocument, setChatDocument] = useState(null);
@@ -44,7 +46,7 @@ export default function MachineDTR({ machine, user, canManage, canDeleteNotes })
     try {
       const updatedNotes = localNotes.filter(n => n.id !== noteId);
       setLocalNotes(updatedNotes);
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machine.id), {
+      await updateMachine(machine.id, {
         techNotes: updatedNotes
       });
     } catch (err) {
@@ -65,7 +67,7 @@ export default function MachineDTR({ machine, user, canManage, canDeleteNotes })
       const updatedNotes = [...localNotes, noteObj];
       setLocalNotes(updatedNotes);
       setNewNote('');
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machine.id), {
+      await updateMachine(machine.id, {
         techNotes: updatedNotes
       });
     } catch (err) {
@@ -131,7 +133,7 @@ export default function MachineDTR({ machine, user, canManage, canDeleteNotes })
           };
           const updatedFiles = [...localDtrFiles, newFileObj];
           setLocalDtrFiles(updatedFiles);
-          await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machine.id), {
+          await updateMachine(machine.id, {
             dtrFiles: updatedFiles
           });
         } catch (err) {
@@ -152,7 +154,7 @@ export default function MachineDTR({ machine, user, canManage, canDeleteNotes })
       await deleteObject(storageRef);
       const updatedFiles = localDtrFiles.filter(f => f.id !== fileObj.id);
       setLocalDtrFiles(updatedFiles);
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machine.id), {
+      await updateMachine(machine.id, {
         dtrFiles: updatedFiles
       });
     } catch (err) {
@@ -366,7 +368,6 @@ export default function MachineDTR({ machine, user, canManage, canDeleteNotes })
 
 MachineDTR.propTypes = {
   machine: PropTypes.object.isRequired,
-  user: PropTypes.object,
   canManage: PropTypes.bool,
   canDeleteNotes: PropTypes.bool,
 };

@@ -1,9 +1,11 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import React, { useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useManagerStore } from '../../store/managerStore';
 // from 'qrcode.react';
 import { safeParseDate } from '../../utils/dateHelpers';
+import EmptyState from '../shared/EmptyState';
 import MachineDTR from './MachineDTR';
 import MachineWorkHoursModal from './MachineWorkHoursModal';
 import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
@@ -11,7 +13,8 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 
-export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, user, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
+export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService }) {
+  const { user } = useAuth();
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';
   const baseUrl = window.location.origin;
@@ -177,7 +180,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                     <div id={"qr-svg-" + machine.id}><QRCodeSVG value={qrValue} size={150} /></div>
                   </div>
                   <div className="flex flex-col items-center gap-1 mt-1">
-                    <div className="text-[10px] text-gray-400 font-medium">Data kodu (ost. edycja): {(machine.updatedAt || machine.qrCreatedAt) ? safeParseDate(machine.updatedAt || machine.qrCreatedAt)?.toLocaleDateString('pl-PL') : (machine.createdAt ? safeParseDate(machine.createdAt)?.toLocaleDateString('pl-PL') : 'Brak danych')}</div>
+                    <div className="text-[10px] text-gray-400 font-medium">Data kodu (ost. edycja): {(safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date()).toLocaleDateString('pl-PL')}</div>
                     
                   </div>
                   <div className="text-xs text-gray-400 text-center px-4 mt-1">
@@ -213,7 +216,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
               <div className="p-0 overflow-y-auto max-h-[400px]">
                 {history.tickets.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-sm italic">Brak zgłoszeń awarii dla tej maszyny.</div>
+                  <EmptyState title="Brak awarii" message="Nie odnotowano żadnych zgłoszeń awarii dla tej maszyny." icon="ph-wrench" />
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.tickets.map(t => (
@@ -247,7 +250,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
               <div className="p-0 overflow-y-auto max-h-[400px]">
                 {history.services.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-sm italic">Brak zrealizowanych lub zaplanowanych serwisów.</div>
+                  <EmptyState title="Brak serwisów" message="Nie zaplanowano jeszcze żadnych przeglądów dla tej maszyny." icon="ph-calendar" />
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.services.map(s => (
@@ -280,7 +283,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                 </div>
                 <div className="p-0 overflow-y-auto max-h-[400px]">
                   {machinePartsTx.length === 0 ? (
-                    <div className="p-6 text-center text-gray-400 text-sm italic">Brak zarejestrowanych kosztów części.</div>
+                    <EmptyState title="Brak części" message="Nie wydano jeszcze żadnych części dla tej maszyny." icon="ph-nut" />
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {machinePartsTx.map(tx => {
@@ -315,7 +318,6 @@ MachineDetails.propTypes = {
   onScanNext: PropTypes.func,
   onNfcNext: PropTypes.func,
   machine: PropTypes.object.isRequired,
-  user: PropTypes.object,
   history: PropTypes.object,
   loading: PropTypes.bool,
   onBack: PropTypes.func,

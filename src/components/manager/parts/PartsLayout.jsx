@@ -1,3 +1,4 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React from 'react';
 import PartsKPI from './PartsKPI';
 import PartsList from './PartsList';
@@ -5,7 +6,8 @@ import PartsList from './PartsList';
 import PartsQRCodes from './PartsQRCodes';
 import PartsTransactionsList from './PartsTransactionsList';
 
-export default function PartsLayout({ user, currentTab, setActiveTab }) {
+export default function PartsLayout({ currentTab, setActiveTab }) {
+  const { user } = useAuth();
   const tabs = [
     { id: 'parts_kpi', label: 'KPI', icon: 'ph-chart-pie-slice' },
     { id: 'parts_inventory', label: 'Baza Części', icon: 'ph-archive-box' },
@@ -37,11 +39,11 @@ export default function PartsLayout({ user, currentTab, setActiveTab }) {
         </div>
       </div>
 
-      {currentTab === 'parts_kpi' && <PartsKPI user={user} />}
-      {currentTab === 'parts_inventory' && <PartsList user={user} />}
-      {currentTab === 'parts_transactions' && <PartsTransactionsList user={user}  />}
+      {currentTab === 'parts_kpi' && <PartsKPI />}
+      {currentTab === 'parts_inventory' && <PartsList />}
+      {currentTab === 'parts_transactions' && <PartsTransactionsList />}
       
-      {currentTab === 'parts_qr' && <PartsQRCodes user={user} />}
+      {currentTab === 'parts_qr' && <PartsQRCodes />}
     </div>
   );
 }

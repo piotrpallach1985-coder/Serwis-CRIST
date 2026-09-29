@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -15,11 +16,11 @@ export default function Sidebar({
   onSidebarClose,
   onGoHome,
   // Użytkownik i uprawnienia
-  user,
   // Akcje
   onLogout,
   onNavigate
 }) {
+  const { user } = useAuth();
   const [saasTenants, setSaasTenants] = useState([]);
 
   useEffect(() => {
@@ -44,15 +45,32 @@ export default function Sidebar({
   const branding = useManagerStore(state => state.branding) || {};
   const parts = useManagerStore(state => state.parts) || [];
 
-  const hasLowStockAlarm = parts.some(p => {
-     const reserved = plannedServices
-        .filter(s => s.status !== 'completed' && s.requiredParts)
-        .flatMap(s => s.requiredParts)
-        .filter(req => req.partId === p.id)
-        .reduce((sum, req) => sum + Number(req.quantity || 0), 0);
-     const available = p.quantity - reserved;
-     return available <= (p.minQuantity || 0);
-  });
+  const hasLowStockAlarm = React.useMemo(() => {
+    if (!parts || parts.length === 0) return false;
+    
+    // O(S) - pre-calculate total reserved for each part
+    const reservedMap = new Map();
+    if (plannedServices && plannedServices.length > 0) {
+      for (const service of plannedServices) {
+        if (service.status !== 'completed' && service.requiredParts) {
+          for (const req of service.requiredParts) {
+            if (req.partId) {
+              const qty = Number(req.quantity) || 0;
+              reservedMap.set(req.partId, (reservedMap.get(req.partId) || 0) + qty);
+            }
+          }
+        }
+      }
+    }
+    
+    // O(P) - check against stock
+    return parts.some(p => {
+      const reserved = reservedMap.get(p.id) || 0;
+      const currentStock = Number(p.stock) || 0;
+      const minStock = Number(p.minStock) || 0;
+      return (currentStock - reserved) <= minStock;
+    });
+  }, [parts, plannedServices]);
 
   const unverifiedMachinesCount = machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).length;
   const unverifiedReportersCount = reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).length;
@@ -453,6 +471,23 @@ export default function Sidebar({
               >
                 <i className="ph ph-chart-bar text-xl shrink-0"></i>
                 <span className="text-sm">Raportowanie</span>
+              </button>
+
+              <button
+                onClick={() => handleItemClick('audit')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'audit' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+              >
+                <i className="ph ph-scroll text-xl shrink-0"></i>
+                <span className="text-sm">Dziennik Zdarzeń</span>
+              </button>
+
+
+              <button
+                onClick={() => handleItemClick('ai_stats')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'ai_stats' ? 'bg-purple-600/30 text-purple-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+              >
+                <i className="ph ph-brain text-xl shrink-0"></i>
+                <span className="text-sm">Zużycie AI</span>
               </button>
             </div>
           )}

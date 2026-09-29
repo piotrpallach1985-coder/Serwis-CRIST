@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,7 +8,8 @@ import QRScannerModal from '../shared/QRScannerModal';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../utils/constants';
 
-export default function HomeDashboard({ user, onLogout }) {
+export default function HomeDashboard({ onLogout }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tickets = useManagerStore(state => state.tickets) || [];

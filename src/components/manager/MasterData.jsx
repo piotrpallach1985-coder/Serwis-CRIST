@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useState } from 'react';
 import Machines from './Machines';
 import Regions from './Regions';
@@ -9,7 +10,8 @@ import Topics from './Topics';
 import Reporters from './Reporters';
 import { USER_ROLES } from '../../utils/constants';
 
-export default function MasterData({ user, machines, regions, services, roles }) {
+export default function MasterData({ machines, regions, services, roles }) {
+  const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState('machines');
 
   const tabs = [

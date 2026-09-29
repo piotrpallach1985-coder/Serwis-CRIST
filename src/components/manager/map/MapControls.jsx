@@ -1,3 +1,4 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React from 'react';
 import { USER_ROLES } from '../../../utils/constants';
 
@@ -6,7 +7,6 @@ export default function MapControls({
   setMode,
   currentSubmapId,
   setCurrentSubmapId,
-  user,
   isFullscreen,
   toggleFullscreen,
   zoomScale,
@@ -23,6 +23,7 @@ export default function MapControls({
   isSettingsMinimized,
   setIsSettingsMinimized
 }) {
+  const { user } = useAuth();
   return (
     <>
       {/* Ustawienia mapy (upload i widok domyślny) */}

@@ -1,3 +1,4 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React, { useState, useMemo } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -5,7 +6,8 @@ import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { safeParseDate } from '../../../utils/dateHelpers';
 import PartTransactionModal from './PartTransactionModal';
 
-export default function PartDetails({ part, onBack, user, onEdit }) {
+export default function PartDetails({ part, onBack, onEdit }) {
+  const { user } = useAuth();
   const [txMode, setTxMode] = useState(null);
   const transactions = useManagerStore(state => state.partTransactions || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
@@ -125,7 +127,7 @@ export default function PartDetails({ part, onBack, user, onEdit }) {
                     {sortedBatches.map((b, i) => (
                       <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
                         <div>
-                          <span className="font-black text-slate-700">{b.qty} szt.</span>
+                          <span className="font-black text-slate-700">{b.qty} {part.unit || 'szt.'}</span>
                           <span className="text-slate-400 ml-2">po {Number(b.price || 0).toFixed(2)} PLN</span>
                         </div>
                         <div className={`font-bold ${b.expirationDate ? (new Date(b.expirationDate) < new Date() ? 'text-red-500' : 'text-orange-500') : 'text-slate-400'}`}>
@@ -179,7 +181,7 @@ export default function PartDetails({ part, onBack, user, onEdit }) {
                           </div>
                         </div>
                         <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg font-black text-sm">
-                        {reqQty} szt.
+                        {reqQty} {part.unit || 'szt.'}
                       </div>
                     </div>
                   );
@@ -243,7 +245,7 @@ export default function PartDetails({ part, onBack, user, onEdit }) {
                     <div key={tx.id} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                       <div>
                         <div className="font-bold text-slate-700">
-                          {tx.type === 'receive' ? 'Przyjęcie' : tx.type === 'return' ? 'Zwrot' : tx.type === 'issue_planned' ? 'Wydanie (Serwis)' : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? (tx.referenceId ? 'Wydanie (Serwis)' : (tx.machineId || tx.machineName ? 'Wydanie Ręczne' : 'Remanent')) : tx.type}
+                          {tx.type === 'receive' ? 'Przyjęcie' : tx.type === 'return' ? 'Zwrot' : tx.type === 'issue_planned' ? 'Wydanie Serwis' : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? 'Wydanie Awaria' : tx.type}
                         </div>
                         <div className="text-slate-400 text-[10px] mt-0.5">
                           {safeParseDate(tx.date)?.toLocaleDateString('pl-PL')} • {tx.user}

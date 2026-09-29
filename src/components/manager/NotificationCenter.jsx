@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useMemo } from 'react';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -26,10 +27,9 @@ export default function NotificationCenter({
   actionItems = [],
   notifications = [],
   currentModule,
-  user,
   onNavigate,
-  align = 'left',
-}) {
+  align = 'left' }) {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const parts = useManagerStore(state => state.parts || []);
 

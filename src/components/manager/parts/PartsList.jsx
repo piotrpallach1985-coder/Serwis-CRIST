@@ -1,3 +1,5 @@
+import { useAuth } from '../../../hooks/useAuth';
+import DataTable from '../../shared/DataTable';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useManagerStore } from '../../../store/managerStore';
@@ -5,7 +7,8 @@ import PartForm from './PartForm';
 import PartDetails from './PartDetails';
 import QRScannerModal from '../../shared/QRScannerModal';
 
-export default function PartsList({ user }) {
+export default function PartsList({ }) {
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const parts = useManagerStore(state => state.parts || []);
@@ -85,8 +88,8 @@ export default function PartsList({ user }) {
   if (selectedPartId && currentPart) {
     return (
       <div className="w-full">
-        <PartDetails part={currentPart} onBack={() => setSelectedPartId(null)} user={user} onEdit={() => setIsFormOpen(true)} />
-        {isFormOpen && <PartForm part={currentPart} onClose={() => setIsFormOpen(false)} user={user} />}
+        <PartDetails part={currentPart} onBack={() => setSelectedPartId(null)} onEdit={() => setIsFormOpen(true)} />
+        {isFormOpen && <PartForm part={currentPart} onClose={() => setIsFormOpen(false)} />}
       </div>
     );
   }
@@ -158,111 +161,103 @@ export default function PartsList({ user }) {
             <p className="text-slate-500">Nie znaleziono części spełniających kryteria.</p>
           </div>
         ) : (
-          <div className="w-full">
-            {/* WIDOK PWA / MOBILE */}
-            <div className="md:hidden flex flex-col gap-3">
-              {filteredParts.map(part => {
-                const isOut = part.stock.available <= 0;
-                const isLow = part.stock.available <= (part.minStock || 0) && !isOut;
-                return (
-                  <div key={part.id} onClick={() => setSelectedPartId(part.id)} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:bg-slate-50 transition-colors">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${isOut ? 'bg-red-50 text-red-500 border border-red-100' : isLow ? 'bg-orange-50 text-orange-500 border border-orange-100' : 'bg-emerald-50 text-emerald-500 border border-emerald-100'}`}>
-                          <i className="ph ph-nut text-xl"></i>
+                      <div className="w-full">
+              {/* WIDOK Z DATATABLE */}
+              <DataTable 
+                data={filteredParts}
+                columns={[
+                  {
+                    header: 'Nazwa Części / Kod',
+                    accessor: 'name',
+                    render: (part) => {
+                      const isOut = part.available <= 0;
+                      const isLow = part.available <= (part.minStock || 0) && !isOut;
+                      return (
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 shadow-sm ${isOut ? 'bg-red-50 text-red-500' : isLow ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                            <i className="ph ph-nut text-lg"></i>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-slate-800">{part.name}</div>
+                            <div className="text-[10px] font-bold text-slate-400 mt-0.5">{part.code || '-'}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    header: 'Lokalizacja',
+                    accessor: 'location',
+                    render: (part) => <span className="text-xs font-medium text-slate-600">{part.location || '-'}</span>
+                  },
+                  {
+                    header: 'Dostępne',
+                    accessor: 'available',
+                    align: 'center',
+                    render: (part) => {
+                      const isOut = part.available <= 0;
+                      const isLow = part.available <= (part.minStock || 0) && !isOut;
+                      return (
+                        <div className={`inline-flex items-baseline gap-1 px-2.5 py-1 rounded-lg ${isOut ? 'bg-red-50 text-red-700' : isLow ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                          <span className="text-sm font-black">{part.available}</span>
+                          <span className="text-[9px] font-bold uppercase opacity-70">{part.unit || 'szt.'}</span>
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    header: 'Akcje',
+                    accessor: 'actions',
+                    align: 'right',
+                    render: (part) => (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setSelectedPartId(part.id); }} 
+                        className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm ml-auto"
+                      >
+                        Szczegóły <i className="ph ph-caret-right font-bold"></i>
+                      </button>
+                    )
+                  }
+                ]}
+                rowClassName={() => 'group'}
+                onRowClick={(part) => setSelectedPartId(part.id)}
+                renderMobileCard={(part) => {
+                  const isOut = part.available <= 0;
+                  const isLow = part.available <= (part.minStock || 0) && !isOut;
+                  return (
+                    <div 
+                      key={part.id} 
+                      onClick={() => setSelectedPartId(part.id)}
+                      className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${isOut ? 'bg-red-50 text-red-500 border border-red-100' : isLow ? 'bg-orange-50 text-orange-500 border border-orange-100' : 'bg-emerald-50 text-emerald-500 border border-emerald-100'}`}>
+                            <i className="ph ph-nut text-xl"></i>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-slate-800 leading-tight">{part.name}</div>
+                            <div className="text-[10px] font-bold text-slate-400 mt-1">{part.code || '-'}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-lg p-3">
+                        <div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Dostępne</div>
+                          <div className={`text-lg font-black ${isOut ? 'text-red-600' : isLow ? 'text-orange-500' : 'text-emerald-600'}`}>
+                            {part.available} <span className="text-xs font-semibold text-slate-400 ml-0.5">{part.unit || 'szt.'}</span>
+                          </div>
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-slate-800 leading-tight">{part.name}</div>
-                          <div className="text-[10px] font-bold text-slate-400 mt-1">{part.code || '-'}</div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Lokalizacja</div>
+                          <div className="text-sm font-semibold text-slate-700 mt-1">{part.location || '-'}</div>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-lg p-3">
-                      <div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Dostępne</div>
-                        <div className={`text-lg font-black ${isOut ? 'text-red-600' : isLow ? 'text-orange-500' : 'text-emerald-600'}`}>
-                          {part.stock.available} <span className="text-xs font-semibold text-slate-400 ml-0.5">{part.unit || 'szt.'}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Lokalizacja</div>
-                        <div className="text-sm font-semibold text-slate-700 mt-1">{part.location || '-'}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* WIDOK DESKTOP */}
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Nazwa Części / Kod</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Lokalizacja</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider">Zgodne Maszyny</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider text-center">Dostępne</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider text-center">Rezerwa</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider text-center">Fizycznie (Min)</th>
-                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider text-right">Akcje</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredParts.map(part => {
-                    const isOut = part.stock.available <= 0;
-                    const isLow = part.stock.available <= (part.minStock || 0) && !isOut;
-                    
-                    return (
-                      <tr key={part.id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => setSelectedPartId(part.id)}>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 shadow-sm ${isOut ? 'bg-red-50 text-red-500' : isLow ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                              <i className="ph ph-nut text-lg"></i>
-                            </div>
-                            <div>
-                              <div className="text-sm font-bold text-slate-800">{part.name}</div>
-                              <div className="text-[10px] font-bold text-slate-400 mt-0.5">{part.code || '-'}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-xs font-medium text-slate-600">
-                          {part.location || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          <div className="flex gap-1 flex-wrap max-w-[200px]">
-                            {(part.compatibleMachines || []).slice(0, 2).map(mid => {
-                              const mName = machines.find(m => m.id === mid)?.name || 'Nieznana maszyna';
-                              return <span key={mid} className="bg-slate-100 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-600">{mName}</span>
-                            })}
-                            {(part.compatibleMachines || []).length > 2 && (
-                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500">+{part.compatibleMachines.length - 2}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`inline-flex px-2 py-1 rounded text-xs font-black ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {part.stock.available} {part.unit || 'szt.'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center text-xs font-bold text-slate-500">
-                          {part.stock.reserved} {part.unit || 'szt.'}
-                        </td>
-                        <td className="py-3 px-4 text-center text-xs font-bold text-slate-600">
-                          {part.stock.physical} <span className="text-[9px] text-slate-400 ml-1">({part.minStock || 0})</span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedPartId(part.id); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50">
-                            <i className="ph ph-caret-right text-lg"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  );
+                }}
+              />
             </div>
         )}
       </div>
@@ -271,8 +266,7 @@ export default function PartsList({ user }) {
         <PartForm 
           part={currentPart || null} 
           onClose={() => setIsFormOpen(false)} 
-          user={user} 
-        />
+          />
       )}
       
       {isScannerOpen && (

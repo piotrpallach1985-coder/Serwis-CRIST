@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types';
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
@@ -48,7 +47,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
         if (n.includes('(DO WERYFIKACJI)')) {
           n = n.replace('(DO WERYFIKACJI)', '').trim();
         }
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', editingMachine.id), {
+        await updateMachine(editingMachine.id, {
           name: n,
           bay: bay.trim(),
           regionId,
@@ -58,7 +57,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
         });
         onSaved('Zaktualizowano maszynę');
       } else {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), {
+        await addMachine({
           name: name.trim(),
           bay: bay.trim(),
           regionId,

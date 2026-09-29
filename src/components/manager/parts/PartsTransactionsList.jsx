@@ -1,12 +1,15 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
+import { useNavigate } from 'react-router-dom';
 import { safeParseDate } from '../../../utils/dateHelpers';
-import { db } from '../../../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import PartsIssueReceive from './PartsIssueReceive';
+import { fixLegacyTransactions } from '../../../services/parts.service';
 
-export default function PartsTransactionsList({ user, onManualIssue }) {
+export default function PartsTransactionsList({ onManualIssue }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const parts = useManagerStore((state) => state.parts || []);
   const machines = useManagerStore((state) => state.machines || []);
   const tickets = useManagerStore(state => state.tickets || []);
@@ -19,42 +22,7 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
       const tenantId = getCurrentTenant();
       if (!tenantId) return;
       
-      const toFix = partTransactions.filter(tx => tx.referenceId && !tx.machineId && (tx.type === 'issue_adhoc' || tx.type === 'issue' || tx.type === 'issue_planned'));
-      if (toFix.length === 0) return;
-
-      console.log('Znaleziono transakcje do naprawy (brak machineId):', toFix.length);
-
-      for (const tx of toFix) {
-        try {
-          let mId = null;
-          let mName = null;
-
-          // 1. Sprawdźmy czy jest to ticket (Awaria)
-          const tDoc = await getDoc(doc(db, 'tenants', tenantId, 'tickets', tx.referenceId));
-          if (tDoc.exists()) {
-            mId = tDoc.data().machineId;
-            mName = tDoc.data().machineName;
-          } else {
-            // 2. Jeśli nie Awaria, sprawdźmy Serwisy Planowane
-            const sDoc = await getDoc(doc(db, 'tenants', tenantId, 'planned_services', tx.referenceId));
-            if (sDoc.exists()) {
-              mId = sDoc.data().machineId;
-              mName = sDoc.data().machineName;
-            }
-          }
-
-          if (mId) {
-            // Aktualizuj w bazie
-            await updateDoc(doc(db, 'tenants', tenantId, 'part_transactions', tx.id), {
-              machineId: mId,
-              machineName: mName || null
-            });
-            console.log('Naprawiono:', tx.id, '->', mId);
-          }
-        } catch (err) {
-          console.error('Błąd podczas naprawy transakcji:', tx.id, err);
-        }
-      }
+      await fixLegacyTransactions(tenantId, partTransactions);
     };
     fixLegacy();
   }, [partTransactions]);
@@ -150,12 +118,8 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
   const getTypeName = (tx) => {
     if (tx.type === 'receive') return 'Przyjęcie';
     if (tx.type === 'return') return 'Zwrot';
-    if (tx.type === 'issue_planned') return 'Wydanie (Serwis)';
-    if (tx.type === 'issue_adhoc' || tx.type === 'issue') {
-      if (tx.referenceId) return 'Wydanie (Serwis)';
-      if (tx.machineId || tx.machineName) return 'Wydanie Ręczne';
-      return 'Remanent';
-    }
+    if (tx.type === 'issue_planned') return 'Wydanie Serwis';
+    if (tx.type === 'issue_adhoc' || tx.type === 'issue') return 'Wydanie Awaria';
     return tx.type;
   };
 
@@ -202,9 +166,9 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
           >
             <option value="all">Wszystkie</option>
             <option value="receive">Przyjęcie</option>
-            <option value="issue_planned">Wydanie (Serwis)</option>
-            <option value="issue_adhoc">Wydanie Ręczne</option>
-              <option value="remanent">Remanent</option>
+            <option value="issue_planned">Wydanie Serwis</option>
+            <option value="issue_adhoc">Wydanie Awaria</option>
+            <option value="remanent">Remanent</option>
             <option value="return">Zwrot</option>
           </select>
         </div>
@@ -264,7 +228,7 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
               } else if (tx.type.startsWith('issue')) {
                 icon = 'ph-arrow-up-right text-red-600';
                 bg = 'bg-red-100';
-                textType = tx.type === 'issue_planned' ? 'Wydanie (Serwis)' : 'Wydanie (Awaria/Ręczne)';
+                textType = tx.type === 'issue_planned' ? 'Wydanie Serwis' : 'Wydanie Awaria';
                 qtyColor = 'text-red-600';
                 sign = '-';
               } else if (tx.type === 'return') {
@@ -291,11 +255,17 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
                       {sign}{Math.abs(tx.quantity)} <span className="text-xs font-medium">{part?.unit || 'szt.'}</span>
                     </div>
                   </div>
-                  <div className="mt-3 text-sm font-bold text-slate-800">
-                    {part?.name || 'Nieznana część'}
-                  </div>
+                  <div 
+                      className={"mt-3 text-sm font-bold " + (part ? 'text-blue-600 hover:text-blue-800 cursor-pointer underline decoration-blue-300 decoration-dashed underline-offset-4' : 'text-slate-800')}
+                      onClick={() => part && navigate('/manager/ur/parts_inventory?openPart=' + tx.partId)}
+                    >
+                      {part?.name || 'Nieznana część'}
+                    </div>
                   {(tx.machineId || tx.machineName) && (
-                    <div className="mt-1 text-xs text-blue-600 font-semibold flex items-center gap-1">
+                    <div 
+                      className={"mt-1 text-xs text-blue-600 font-semibold flex items-center gap-1 " + (tx.machineId ? 'cursor-pointer hover:text-blue-800 underline decoration-blue-300 decoration-dashed underline-offset-2' : '')}
+                      onClick={() => tx.machineId && navigate('/manager/ur/machines?openMachine=' + tx.machineId)}
+                    >
                       <i className="ph ph-gear"></i> {machines.find(m => m.id === tx.machineId)?.name || tx.machineName}
                     </div>
                   )}
@@ -345,7 +315,7 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
                   } else if (tx.type.startsWith('issue')) {
                     icon = 'ph-arrow-up-right text-red-600';
                     bg = 'bg-red-100';
-                    textType = tx.type === 'issue_planned' ? 'Wydanie (Serwis)' : 'Wydanie (Awaria/Ręczne)';
+                    textType = tx.type === 'issue_planned' ? 'Wydanie Serwis' : 'Wydanie Awaria';
                     qtyColor = 'text-red-600';
                     sign = '-';
                   } else if (tx.type === 'return') {
@@ -370,8 +340,13 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
                         </div>
                       </td>
                       <td className="p-3 text-sm font-semibold text-gray-800">
-                        {part?.name || <span className="text-gray-400 italic">Nieznana część</span>}
-                      </td>
+                          <div 
+                            className={part ? 'text-blue-600 hover:text-blue-800 cursor-pointer underline decoration-blue-300 decoration-dashed underline-offset-4' : ''}
+                            onClick={() => part && navigate('/manager/ur/parts_inventory?openPart=' + tx.partId)}
+                          >
+                            {part?.name || <span className="text-gray-400 italic">Nieznana część</span>}
+                          </div>
+                        </td>
                       <td className={`p-3 text-right font-black ${qtyColor}`}>
                         {sign}{Math.abs(tx.quantity)} <span className="text-xs font-medium text-gray-500">{part?.unit || 'szt.'}</span>
                       </td>
@@ -380,10 +355,13 @@ export default function PartsTransactionsList({ user, onManualIssue }) {
                       </td>
                       <td className="p-3 text-sm text-gray-600">
                         {(tx.machineId || tx.machineName) ? (
-                          <div className="flex items-center gap-1.5 text-blue-600 font-medium">
-                            <i className="ph ph-gear"></i>
-                            {machines.find(m => m.id === tx.machineId)?.name || tx.machineName}
-                          </div>
+                          <div 
+                              className={"flex items-center gap-1.5 text-blue-600 font-medium " + (tx.machineId ? 'cursor-pointer hover:text-blue-800 underline decoration-blue-300 decoration-dashed underline-offset-4' : '')}
+                              onClick={() => tx.machineId && navigate('/manager/ur/machines?openMachine=' + tx.machineId)}
+                            >
+                              <i className="ph ph-gear"></i>
+                              {machines.find(m => m.id === tx.machineId)?.name || tx.machineName}
+                            </div>
                         ) : '-'}
                       </td>
                       <td className="p-3 text-sm text-gray-500">

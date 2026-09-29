@@ -1,7 +1,8 @@
-import {  collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, serverTimestamp , increment } from 'firebase/firestore';
+import {  collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, serverTimestamp , increment, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
+import { logAudit } from './audit.service';
 
 
 /**
@@ -37,13 +38,34 @@ export const updateMachineWorkHours = async (machineId, newHours, isDelta = fals
  * @returns {Promise<import('firebase/firestore').DocumentReference>} Referencja do utworzonego dokumentu
  */
 export const addMachine = async (machineData) => {
-  return await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), machineData);
+  const res = await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), machineData);
+  logAudit('CREATE', 'MACHINE', res.id, `Dodano maszynę: ${machineData.name}`);
+  return res;
 };
 
 export const updateMachine = async (machineId, machineData) => {
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), machineData);
+  const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), machineData);
+  logAudit('UPDATE', 'MACHINE', machineId, 'Edycja maszyny');
+  return res;
 };
 
 export const deleteMachine = async (machineId) => {
+  logAudit('DELETE', 'MACHINE', machineId, 'Usunięto maszynę');
   return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
+};
+
+export const updateMapSettings = async (updateData) => {
+  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), updateData);
+};
+
+export const subscribeToMapSettings = (callback) => {
+  return onSnapshot(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), callback);
+};
+
+export const updateRegion = async (regionId, updateData) => {
+  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', regionId), updateData);
+};
+
+export const updateMachineRegion = async (machineId, updateData) => {
+  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), updateData);
 };

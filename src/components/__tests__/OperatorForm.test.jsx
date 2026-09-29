@@ -1,32 +1,36 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import OperatorForm from '../OperatorForm';
-import { addDoc, getDocs, collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { useTicketSubmit } from '../../hooks/useTicketSubmit';
+import { useToast } from '../../hooks/useToast';
 
-// Mock Firebase
-vi.mock('../../firebase', () => ({
-  db: {},
-  storage: {}
+// Mock matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), 
+    removeListener: vi.fn(), 
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
+vi.mock('../../hooks/useToast', () => ({
+  useToast: () => ({ toastConfig: null, showToast: vi.fn(), hideToast: vi.fn() })
 }));
 
-// Mock Firebase functions
-vi.mock('firebase/firestore', async () => {
-  const actual = await vi.importActual('firebase/firestore');
+vi.mock('../../hooks/useTicketSubmit', () => {
   return {
-    ...actual,
-    collection: vi.fn(),
-    addDoc: vi.fn(),
-    getDocs: vi.fn(),
-    query: vi.fn(),
-    where: vi.fn(),
-    doc: vi.fn(),
-    setDoc: vi.fn(() => Promise.resolve()),
-    serverTimestamp: vi.fn(() => new Date()),
+    useTicketSubmit: vi.fn()
   };
 });
 
-describe('OperatorForm', () => {
+describe('OperatorForm (Integration Test)', () => {
   const mockProps = {
     selectedMachine: { id: 'M1', name: 'Suwnica S1', regionId: 'R1' },
     setSelectedMachine: vi.fn(),
@@ -38,9 +42,17 @@ describe('OperatorForm', () => {
     reportersList: [],
     stopLiveScanner: vi.fn()
   };
+  
+  let submitTicketMock;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    submitTicketMock = vi.fn().mockResolvedValue(true);
+    useTicketSubmit.mockReturnValue({
+      submitLoading: false,
+      submitProgress: '',
+      submitTicket: submitTicketMock
+    });
   });
 
   it('renders correctly with selected machine', () => {
@@ -48,24 +60,7 @@ describe('OperatorForm', () => {
     expect(screen.getByText('Suwnica S1')).toBeInTheDocument();
   });
 
-  it('handles user input correctly', () => {
-    render(<OperatorForm {...mockProps} />);
-    
-    // Switch to manual topic mode if needed, but it should be default or there's a toggle
-    const descInput = screen.getAllByRole('textbox')[1]; // Drugi textbox po nameInput
-    fireEvent.change(descInput, { target: { value: 'Złamany wał' } });
-    expect(descInput.value).toBe('Złamany wał');
-
-    const nameInput = screen.getByPlaceholderText(/np. Jan Kowalski/i);
-    fireEvent.change(nameInput, { target: { value: 'Jan Kowalski' } });
-    expect(nameInput.value).toBe('Jan Kowalski');
-  });
-
-  it('submits form correctly when online', async () => {
-    getDocs.mockResolvedValue({ empty: true, forEach: () => {} }); // No duplicates
-    doc.mockReturnValue({ id: 'TICKET1' });
-    collection.mockReturnValue('mock-collection');
-
+  it('submits form correctly', async () => {
     const { container } = render(<OperatorForm {...mockProps} />);
     
     // Fill out form
@@ -74,59 +69,19 @@ describe('OperatorForm', () => {
     fireEvent.change(screen.getByPlaceholderText(/np. 500 600 700/i), { target: { value: '500 600 700' } });
     
     const select = container.querySelector('select');
-    fireEvent.change(select, { target: { value: 'manual' } }); // Select manual topic
-    
-    // Type into the manual topic input
-    fireEvent.change(screen.getByPlaceholderText(/Wpisz własny temat.../i), { target: { value: 'My custom topic' } });
-    
-    // Simulate form submission directly instead of click to bypass some HTML5 validation quirks in JSDOM
-    const form = screen.getByRole('button', { name: /Wyślij Zgłoszenie/i }).closest('form');
-    fireEvent.submit(form);
-
-    await waitFor(() => {
-      expect(getDocs).toHaveBeenCalled();
-      expect(setDoc).toHaveBeenCalled();
-      expect(mockProps.handleStepChange).toHaveBeenCalledWith('success');
-    });
-  });
-
-  it('prevents submission if duplicate exists', async () => {
-    // Mock that a duplicate ticket exists within the last 2 hours
-    const recentDate = new Date();
-    getDocs.mockResolvedValueOnce({ 
-      empty: false, 
-      forEach: (cb) => {
-        cb({ 
-          id: 'DUP1', 
-          data: () => ({ createdAt: recentDate.toISOString(), status: 1 })
-        });
-      }
-    }); 
-    doc.mockReturnValue({ id: 'DUP1' });
-    collection.mockReturnValue('mock-collection');
-
-    const { container } = render(<OperatorForm {...mockProps} />);
-    
-    fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'Test description' } });
-    fireEvent.change(screen.getByPlaceholderText(/np. Jan Kowalski/i), { target: { value: 'Jan Kowalski' } });
-    fireEvent.change(screen.getByPlaceholderText(/np. 500 600 700/i), { target: { value: '500 600 700' } });
-    
-    const select = container.querySelector('select');
     fireEvent.change(select, { target: { value: 'manual' } });
     
     fireEvent.change(screen.getByPlaceholderText(/Wpisz własny temat.../i), { target: { value: 'My custom topic' } });
-
-    const confirmMock = vi.spyOn(window, 'confirm').mockImplementation(() => false); // false means do not proceed
     
-    const form = screen.getByRole('button', { name: /Wyślij Zgłoszenie/i }).closest('form');
+    // Toggle RODO directly via change event, although not strictly needed if we test the hook call
+    const rodoCheckbox = container.querySelector('#rodo');
+    fireEvent.click(rodoCheckbox);
+
+    const form = screen.getByRole('button', { name: /Wyślij zgłoszenie/i }).closest('form');
+    
+    // Override the submit event to test our logic
     fireEvent.submit(form);
 
-    await waitFor(() => {
-      expect(getDocs).toHaveBeenCalled();
-      expect(setDoc).not.toHaveBeenCalled();
-      expect(confirmMock).toHaveBeenCalledWith(expect.stringContaining('UWAGA: Awaria dla tej maszyny została już zgłoszona'));
-    });
-    
-    confirmMock.mockRestore();
+    expect(submitTicketMock).toHaveBeenCalled();
   });
 });

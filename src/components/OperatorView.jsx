@@ -10,9 +10,11 @@ import { Html5Qrcode } from 'html5-qrcode';
 import OperatorForm from './OperatorForm';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
+import { useAuth } from '../hooks/useAuth';
 
 
-export default function OperatorView({ user, onLogout, initialMachineId, onSwitchView }) {
+export default function OperatorView({ initialMachineId, onSwitchView }) {
+  const { user, logout: onLogout } = useAuth();
   // Odczytaj tenant z prawdziwego URL (przed hashem) – HashRouter tego nie widzi
   useEffect(() => {
     const realParams = new URLSearchParams(window.location.search);
@@ -22,6 +24,14 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
     }
   }, []);
 
+  useEffect(() => {
+    const unsubGlobal = onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().groqApiKey) {
+        useManagerStore.getState().setGroqApiKey(docSnap.data().groqApiKey);
+      }
+    });
+    return () => unsubGlobal();
+  }, []);
   const tenantId = getCurrentTenant();
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
@@ -53,13 +63,22 @@ export default function OperatorView({ user, onLogout, initialMachineId, onSwitc
   const handleScanSuccess = (decodedText) => {
     let mId = decodedText;
     let tenantFromQr = null;
+    
+    let queryPart = decodedText;
     if (decodedText.includes('?')) {
-      try {
-        const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-        mId = urlParams.get('machine') || mId;
-        tenantFromQr = urlParams.get('tenant');
-      } catch (e) {}
+      queryPart = decodedText.split('?')[1];
     }
+    
+    try {
+      const urlParams = new URLSearchParams(queryPart);
+      if (urlParams.has('machine')) {
+        mId = urlParams.get('machine');
+      }
+      if (urlParams.has('tenant')) {
+        tenantFromQr = urlParams.get('tenant');
+      }
+    } catch (e) {}
+    
     const targetMachine = machines.find(m => m.id === mId || (m.qrCode && m.qrCode === mId) || (m.internalId && m.internalId.toLowerCase() === mId.toLowerCase()));
     
     if (targetMachine) {

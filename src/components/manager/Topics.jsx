@@ -4,6 +4,7 @@ import { db } from '../../firebase';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import DictationButton from '../shared/DictationButton';
+import { addTopic, updateTopic, checkTopicInUse } from '../../services/dictionary.service';
 
 export default function Topics() {
   const [topics, setTopics] = useState([]);

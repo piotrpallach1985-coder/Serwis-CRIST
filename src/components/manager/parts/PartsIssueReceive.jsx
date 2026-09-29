@@ -1,11 +1,12 @@
+import { useAuth } from '../../../hooks/useAuth';
 import React, { useState } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import QRScannerModal from '../../shared/QRScannerModal';
-import { doc, runTransaction, serverTimestamp, collection } from 'firebase/firestore';
-import { db } from '../../../firebase';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
+import { issueOrReceivePart } from '../../../services/parts.service';
 
-export default function PartsIssueReceive({ user, onComplete }) {
+export default function PartsIssueReceive({ onComplete }) {
+  const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
   
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -62,98 +63,15 @@ export default function PartsIssueReceive({ user, onComplete }) {
     setLoading(true);
     try {
       const tenantId = getCurrentTenant();
-      const partRef = doc(db, 'tenants', tenantId, 'parts', selectedPart.id);
-      const txRef = doc(collection(db, 'tenants', tenantId, 'part_transactions')); // new doc ref
-
-      await runTransaction(db, async (transaction) => {
-        const partDoc = await transaction.get(partRef);
-        if (!partDoc.exists()) {
-          throw new Error("Część nie istnieje.");
-        }
-        const currentStock = Number(partDoc.data().stock || 0);
-        
-        let newStock = currentStock;
-        let finalPrice = Number(unitPrice);
-        let txQuantity = qtyNum;
-        let updatePayload = {};
-        
-        let currentBatches = partDoc.data().batches || [];
-        
-        // Jeśli stary dokument nie miał batches, a ma stock > 0, to tworzymy mu pierwszą partię z jego unitPrice
-        if (currentBatches.length === 0 && currentStock > 0) {
-           currentBatches = [{ qty: currentStock, price: Number(partDoc.data().unitPrice || 0), date: new Date().toISOString(), expirationDate: partDoc.data().expirationDate || null }];
-        }
-
-        if (mode === 'receive') {
-          newStock = currentStock + qtyNum;
-          finalPrice = Number(unitPrice);
-          // Dodajemy nową partię do magazynu
-          currentBatches.push({ qty: qtyNum, price: finalPrice, date: new Date().toISOString(), expirationDate: expirationDate || null });
-          
-          updatePayload = { stock: newStock, unitPrice: finalPrice, batches: currentBatches };
-          transaction.update(partRef, updatePayload);
-          
-          transaction.set(txRef, {
-            partId: selectedPart.id,
-            type: 'receive',
-            quantity: qtyNum,
-            price: finalPrice,
-            expirationDate: expirationDate || null,
-            date: new Date().toISOString(),
-            user: user?.name || 'Nieznany (App)',
-            createdAt: serverTimestamp()
-          });
-
-        } else if (mode === 'issue') {
-          if (qtyNum > currentStock) {
-            throw new Error(`Brak wystarczającej ilości w magazynie (Dostępne: ${currentStock})`);
-          }
-          newStock = currentStock - qtyNum;
-          txQuantity = -qtyNum; 
-          
-          // FIFO: zdejmujemy z najstarszych partii
-          let remainingToIssue = qtyNum;
-          let totalCost = 0;
-          let issueDetails = [];
-          
-          let newBatches = [...currentBatches];
-          while (remainingToIssue > 0 && newBatches.length > 0) {
-            let oldestBatch = newBatches[0];
-            if (oldestBatch.qty <= remainingToIssue) {
-              // zjadamy całą partię
-              totalCost += oldestBatch.qty * oldestBatch.price;
-              issueDetails.push({ qty: oldestBatch.qty, price: oldestBatch.price });
-              remainingToIssue -= oldestBatch.qty;
-              newBatches.shift();
-            } else {
-              // zjadamy część partii
-              totalCost += remainingToIssue * oldestBatch.price;
-              issueDetails.push({ qty: remainingToIssue, price: oldestBatch.price });
-              oldestBatch.qty -= remainingToIssue;
-              remainingToIssue = 0;
-            }
-          }
-          
-          const avgPrice = qtyNum > 0 ? (totalCost / qtyNum) : 0;
-          
-          updatePayload = { stock: newStock, batches: newBatches };
-          // Jeśli nowa ilość to 0, można wyczyścić unitPrice lub zostawić. Zostawiamy ostatnią cenę
-          transaction.update(partRef, updatePayload);
-          
-          transaction.set(txRef, {
-            partId: selectedPart.id,
-            type: 'issue_adhoc',
-            quantity: txQuantity,
-            price: avgPrice, // zapisujemy uśrednioną cenę jako poglądową
-            totalCost: totalCost,
-            issueDetails: issueDetails, // tablica z dokładnym rozbiciem na ceny
-            machineId: selectedMachine?.id || null,
-            machineName: selectedMachine?.name || null,
-            date: new Date().toISOString(),
-            user: user?.name || 'Nieznany (App)',
-            createdAt: serverTimestamp()
-          });
-        }
+      await issueOrReceivePart({
+        tenantId,
+        partId: selectedPart.id,
+        mode,
+        quantity: qtyNum,
+        unitPrice,
+        expirationDate,
+        user,
+        selectedMachine
       });
 
       alert(mode === 'receive' ? 'Przyjęto na magazyn.' : 'Wydano z magazynu.');

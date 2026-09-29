@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
-import { app } from '../../firebase';
+import { app, db } from '../../firebase';
+import { doc, setDoc, increment } from 'firebase/firestore';
+import { getCurrentTenant } from '../../utils/tenantHelper';
 import DictationButton from '../shared/DictationButton';
 
 export default function DTRChatModal({ isOpen, onClose, document, allDocuments, machineName }) {
@@ -66,6 +68,17 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
       const responseText = response.response.text();
       setMessages(prev => [...prev, { role: 'model', text: responseText }]);
 
+      // Log AI Usage
+      const geminiTokens = response.response.usageMetadata?.totalTokenCount || 0;
+      if (geminiTokens > 0) {
+        const tenantId = getCurrentTenant();
+        if (tenantId) {
+          setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
+            geminiTokens: increment(geminiTokens)
+          }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+        }
+      }
+
     } catch (error) {
       console.error('Błąd Gemini:', error);
       let errorMsg = 'Wystąpił błąd podczas analizy. Upewnij się, że usługa Vertex AI jest włączona w konsoli Firebase.';
@@ -107,15 +120,32 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                msg.role === 'user' 
-                  ? 'bg-blue-600 text-white rounded-tr-sm' 
-                  : msg.isError
-                    ? 'bg-red-50 text-red-700 border border-red-200 rounded-tl-sm'
-                    : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
-              }`}>
-                <div className="whitespace-pre-wrap">{msg.text}</div>
-              </div>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm relative group ${
+                  msg.role === 'user' 
+                    ? 'bg-blue-600 text-white rounded-tr-sm' 
+                    : msg.isError
+                      ? 'bg-red-50 text-red-700 border border-red-200 rounded-tl-sm'
+                      : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm'
+                }`}>
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
+                  {msg.role !== 'user' && !msg.isError && (
+                    <button
+                      onClick={(e) => {
+                        navigator.clipboard.writeText(msg.text);
+                        const btn = e.currentTarget;
+                        const icon = btn.querySelector('i');
+                        icon.className = 'ph ph-check text-sm text-green-500';
+                        setTimeout(() => {
+                          icon.className = 'ph ph-copy text-sm';
+                        }, 2000);
+                      }}
+                      className="absolute -bottom-2 -right-2 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all z-10"
+                      title="Kopiuj odpowiedź"
+                    >
+                      <i className="ph ph-copy text-sm"></i>
+                    </button>
+                  )}
+                </div>
             </div>
           ))}
           {isLoading && (

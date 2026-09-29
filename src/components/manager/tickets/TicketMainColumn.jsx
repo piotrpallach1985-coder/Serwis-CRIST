@@ -1,3 +1,4 @@
+import { useAuth } from '../../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import React, { useState, useMemo } from 'react';
 import { safe } from '../../../utils/safeRender';
@@ -17,7 +18,6 @@ export default function TicketMainColumn({
   
   duration,
   STATUSES,
-  user,
   loading,
   isArchive,
   
@@ -34,6 +34,7 @@ export default function TicketMainColumn({
   setLightboxImg,
   showConfirm
 }) {
+  const { user } = useAuth();
   const { machines, regions, services, branding, parts = [], partTransactions = [] } = useManagerStore();
 
   const actualPartsUsed = React.useMemo(() => {
@@ -374,7 +375,6 @@ TicketMainColumn.propTypes = {
   machineRegion: PropTypes.string,
   duration: PropTypes.string,
   STATUSES: PropTypes.array.isRequired,
-  user: PropTypes.object,
   loading: PropTypes.bool,
   isArchive: PropTypes.bool,
   selectedService: PropTypes.string,

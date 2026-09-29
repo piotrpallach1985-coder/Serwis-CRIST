@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import React from 'react';
 import PlannedKPIDashboard from './PlannedKPIDashboard';
 import MapComponent from './Map';
@@ -5,7 +6,8 @@ import PlannedMaintenance from './PlannedMaintenance';
 import ActionItems from './ActionItems';
 import { useManagerStore } from '../../store/managerStore';
 
-export default function PlannedMaintenanceLayout({ user, currentTab, setActiveTab }) {
+export default function PlannedMaintenanceLayout({ currentTab, setActiveTab }) {
+  const { user } = useAuth();
   const ticketsStore = useManagerStore(state => state.tickets) || [];
 
   const tabs = [
@@ -38,11 +40,11 @@ export default function PlannedMaintenanceLayout({ user, currentTab, setActiveTa
         </div>
       </div>
 
-      {currentTab === 'planned_kpi' && <PlannedKPIDashboard user={user} />}
-      {currentTab === 'dashboard_planned' && <MapComponent user={user} tickets={ticketsStore} mode="services" />}
-      {currentTab === 'planned_maintenance' && <PlannedMaintenance user={user} />}
-      {currentTab === 'action_items' && <ActionItems user={user} />}
-      {currentTab === 'planned_maintenance_archive' && <PlannedMaintenance isArchive user={user} />}
+      {currentTab === 'planned_kpi' && <PlannedKPIDashboard />}
+      {currentTab === 'dashboard_planned' && <MapComponent tickets={ticketsStore} mode="services" />}
+      {currentTab === 'planned_maintenance' && <PlannedMaintenance />}
+      {currentTab === 'action_items' && <ActionItems />}
+      {currentTab === 'planned_maintenance_archive' && <PlannedMaintenance isArchive />}
     </div>
   );
 }

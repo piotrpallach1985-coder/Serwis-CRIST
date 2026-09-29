@@ -1,8 +1,10 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import {  useManagerStore } from '../../store/managerStore';
 import { useState, useEffect, useCallback , useMemo } from 'react';
 import { exportToExcel } from '../../utils/reports/excelExport';
-import { doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { updateTicket, deleteTicket } from '../../services/tickets.service';
+import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
@@ -11,7 +13,7 @@ import TicketDetails from './TicketDetails';
 import TicketFilters from './TicketFilters';
 import ErrorBoundary from '../ErrorBoundary';
 import TicketTable from './TicketTable';
-import TicketTableRow from './TicketTableRow';
+
 import TicketMobileCard from './TicketMobileCard';
 import { useTickets } from '../../hooks/useTickets';
 import { usePagination } from '../../hooks/usePagination';
@@ -48,7 +50,8 @@ const calculateDuration = (createdAt, closedAt) => {
   return res.join(' ');
 };
 
-export default function Tickets({ user, isArchive, initialTicketId, onClearTicketId, initialSearchQuery, onClearSearchQuery }) {
+export default function Tickets({ isArchive, initialTicketId, onClearTicketId, initialSearchQuery, onClearSearchQuery }) {
+  const { user } = useAuth();
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
   const ticketState = useTickets({ tickets, machines, regions, isArchive, initialSearchQuery });
@@ -75,7 +78,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         closeConfirmModal();
         setLoading(true);
         try {
-          await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'tickets', ticketId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (user?.name || 'System') });
+          await deleteTicket(ticketId, user?.name);
           setSelectedTicketId(null);
           showToast('Zgłoszenie zostało trwale usunięte.');
         } catch (err) {
@@ -97,7 +100,7 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         setLoading(true);
         try {
           const currentData = activeTickets.find(t => t.id === ticketId);
-          await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'tickets', ticketId), {
+          await updateTicket(ticketId, {
             isManuallyArchived: true, status: 5,
             closedAt: currentData?.closedAt || new Date().toISOString(),
             completedBy: currentData?.completedBy || user.name,
@@ -207,7 +210,6 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
         machines={machines}
         currentTicket={currentTicket}
         setSelectedTicketId={setSelectedTicketId}
-        user={user}
         handleUpdate={handleUpdate}
         handleDeleteTicket={handleDeleteTicket}
         handleArchiveTicket={handleArchiveTicket}
@@ -333,7 +335,6 @@ export default function Tickets({ user, isArchive, initialTicketId, onClearTicke
 
 
 Tickets.propTypes = {
-  user: PropTypes.object,
   isArchive: PropTypes.bool,
   initialTicketId: PropTypes.string,
   onClearTicketId: PropTypes.func,

@@ -45,7 +45,7 @@ export default function PlannedMaintenanceList({
               <tbody className="divide-y divide-slate-100">
                 {filteredServices.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="px-4 py-8 text-center text-gray-400">Brak serwisów pasujących do kryteriów.</td>
+                    <td colSpan="10" className="p-0"><EmptyState title="Brak wyników" message="Brak serwisów pasujących do kryteriów." icon="ph-calendar-x" /></td>
                   </tr>
                 ) : currentItems.map(srv => {
                   const machine = getMachine(srv.machineId);
@@ -120,9 +120,9 @@ export default function PlannedMaintenanceList({
                       )}
                       {columns.actions && (
                           <td className="px-6 py-4">
-                            <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-bold py-2 px-3 rounded text-sm transition-colors shadow-sm inline-flex items-center gap-1 group-hover:border-blue-300 group-hover:text-blue-600">
-                              <i className="ph ph-caret-right"></i> Szczegóły
-                            </button>
+                            <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm ml-auto">
+                                Szczegóły <i className="ph ph-caret-right font-bold"></i>
+                              </button>
                           </td>
                         )}
 </tr>
@@ -144,7 +144,7 @@ export default function PlannedMaintenanceList({
           {/* Mobile Cards View */}
           <div className="md:hidden flex flex-col gap-4 mt-2 p-2">
             {filteredServices.length === 0 ? (
-              <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak serwisów pasujących do kryteriów.</div>
+              <EmptyState title="Brak wyników" message="Brak serwisów pasujących do kryteriów." icon="ph-calendar-x" />
             ) : currentItems.map(srv => {
               const machine = getMachine(srv.machineId);
               const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;

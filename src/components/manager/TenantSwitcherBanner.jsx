@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -5,7 +6,8 @@ import { useManagerStore } from '../../store/managerStore';
 import { Crown, RefreshCw } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
-export default function TenantSwitcherBanner({ user }) {
+export default function TenantSwitcherBanner({ }) {
+  const { user } = useAuth();
   const [tenants, setTenants] = useState([]);
   const tenantId = useManagerStore(state => state.tenantId);
   const setTenantId = useManagerStore(state => state.setTenantId);

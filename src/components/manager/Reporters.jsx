@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { addDoc, doc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { addReporter, updateReporter, checkReporterInUse } from '../../services/dictionary.service';
 
 
 
@@ -28,9 +29,9 @@ export default function Reporters() {
         position: position.trim()
       };
       if (editingId) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'reporters', editingId), payload);
+        await updateReporter(editingId, payload);
       } else {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'reporters'), payload);
+        await addReporter(payload);
       }
       setName('');
       setPhone('');
@@ -47,7 +48,7 @@ export default function Reporters() {
   const handleDelete = async (id, reporterName) => {
     if (window.confirm(`Czy na pewno chcesz usunąć pracownika: ${reporterName}?`)) {
       try {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'reporters', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateReporter(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       } catch (err) {
         alert("Błąd podczas usuwania: " + err.message);
       }

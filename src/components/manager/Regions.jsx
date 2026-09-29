@@ -4,6 +4,7 @@ import { db, storage } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { addRegion, updateRegion, checkRegionInUse } from '../../services/dictionary.service';
 
 
 export default function Regions() {
@@ -61,13 +62,13 @@ export default function Regions() {
       }
 
       if (editingId) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', editingId), { 
+        await updateRegion(editingId, { 
           name: name.trim(), 
           description: description.trim(),
           mapImageUrl: finalImageUrl
         });
       } else {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'regions'), {
+        await addRegion({
           name: name.trim(),
           description: description.trim(),
           mapImageUrl: finalImageUrl,
@@ -101,7 +102,7 @@ export default function Regions() {
   const handleRestore = async (id) => {
     if (window.confirm('Czy na pewno chcesz przywrócić ten rejon?')) {
       try {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', id), { isDeleted: false });
+        await updateRegion(id, { isDeleted: false });
         alert('Rejon przywrócony pomyślnie.');
       } catch (err) {
         alert("Błąd: " + err.message);
@@ -111,16 +112,14 @@ export default function Regions() {
 
   const handleDelete = async (id) => {
     try {
-      const machinesQuery = query(collection(db, 'tenants', getCurrentTenant(), 'machines'), where('regionId', '==', id));
-      const machinesSnapshot = await getDocs(machinesQuery);
-      
-      if (!machinesSnapshot.empty) {
-        alert(`Nie można usunąć tego rejonu, ponieważ jest on przypisany do ${machinesSnapshot.size} maszyn. Zmień rejon w przypisanych maszynach przed usunięciem.`);
+      const { inUse, count } = await checkRegionInUse(id);
+      if (inUse) {
+        alert(`Nie można usunąć, ponieważ rekord jest przypisany do ${count} elementów. Zmień powiązania przed usunięciem.`);
         return;
       }
       
       if (confirm("Czy na pewno chcesz usunąć ten rejon?")) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+        await updateRegion(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
       }
     } catch (err) {
       console.error(err);

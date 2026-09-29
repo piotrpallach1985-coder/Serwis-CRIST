@@ -1,10 +1,12 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from 'react';
 import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { safeParseDate } from '../../utils/dateHelpers';
 
-export default function MachineWorkHoursModal({ isOpen, onClose, machine, user }) {
+export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
+  const { user } = useAuth();
   const [newHours, setNewHours] = useState(machine.currentWorkHours || 0);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');

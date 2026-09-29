@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { addPart, updatePart } from '../../../services/parts.service';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { useManagerStore } from '../../../store/managerStore';
 
@@ -38,7 +37,7 @@ export default function PartForm({ part, onClose, user }) {
         location: location.trim(),
         building: building.trim(),
         compatibleMachines,
-        updatedAt: serverTimestamp(),
+        unit: unit,
       };
 
       if (!isEditing) {
@@ -56,12 +55,9 @@ export default function PartForm({ part, onClose, user }) {
       }
 
       if (isEditing) {
-        const ref = doc(db, 'tenants', tenantId, 'parts', part.id);
-        await updateDoc(ref, payload);
+        await updatePart(tenantId, part.id, payload);
       } else {
-        payload.createdAt = serverTimestamp();
-        payload.qrCreatedAt = serverTimestamp();
-        await addDoc(collection(db, 'tenants', tenantId, 'parts'), payload);
+        await addPart(tenantId, payload);
       }
       onClose();
     } catch (err) {

@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useManagerStore } from '../../store/managerStore';
+import { doc, setDoc, increment } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { getCurrentTenant } from '../../utils/tenantHelper';
 
 export default function DictationButton({ onResult, onStart, className = '' }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -116,6 +119,17 @@ export default function DictationButton({ onResult, onStart, className = '' }) {
 
       const translateData = await resTranslate.json();
       const translatedText = translateData.choices[0].message.content.trim();
+
+      // Log AI Usage
+      const groqTokens = translateData.usage?.total_tokens || 0;
+      if (groqTokens > 0) {
+        const tenantId = getCurrentTenant();
+        if (tenantId) {
+          setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
+            groqTokens: increment(groqTokens)
+          }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+        }
+      }
 
       if (onResult) {
         onResult(translatedText);

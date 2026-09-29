@@ -1,7 +1,8 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { subscribeToActionItems, updateActionItem } from '../../services/tickets.service';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
@@ -10,7 +11,8 @@ import PlannedMaintenanceFilters from './PlannedMaintenanceFilters';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
-export default function ActionItems({ user }) {
+export default function ActionItems({ }) {
+  const { user } = useAuth();
   const machines = useManagerStore(state => state.machines);
   const regions = useManagerStore(state => state.regions);
 
@@ -44,9 +46,8 @@ export default function ActionItems({ user }) {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'tenants', getCurrentTenant(), 'action_items'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted));
+    const unsub = subscribeToActionItems((snapshotDocs) => {
+      setItems(snapshotDocs.filter(item => !item.isDeleted));
       setLoading(false);
     }, (err) => {
       alert('Błąd ładowania Tematów do Realizacji: ' + err.message);
@@ -66,7 +67,7 @@ export default function ActionItems({ user }) {
       if (filterStatus === ACTION_ITEM_STATUS.PENDING && item.status === ACTION_ITEM_STATUS.COMPLETED) return false;
       if (filterStatus === ACTION_ITEM_STATUS.COMPLETED && item.status !== ACTION_ITEM_STATUS.COMPLETED) return false;
 
-      const machine = machines.find(m => m.id === item.machineId);
+      const machine = machines.find(m => m.id === item.machineId) || {};
 
       // 2. Region Filter
       if (filterRegion && machine?.regionId !== filterRegion) return false;
@@ -130,7 +131,7 @@ export default function ActionItems({ user }) {
         updateData.completedAt = new Date().toISOString();
         updateData.completedBy = user?.name || 'Nieznany';
       }
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'action_items', id), updateData);
+      await updateActionItem(id, updateData);
     } catch (err) {
       console.error(err);
       alert('Błąd aktualizacji statusu');
@@ -190,7 +191,7 @@ export default function ActionItems({ user }) {
           
   <div className="lg:hidden flex flex-col gap-1.5 p-2">
     {filteredItems.length === 0 ? (
-      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">Brak tematów do realizacji.</div>
+      <div className="col-span-full"><EmptyState title="Brak tematów" message="Nie znaleziono tematów do realizacji dla wybranych filtrów." icon="ph-clipboard-text" /></div>
     ) : (
       filteredItems.map(item => {
         const dueDate = item.dueDate ? (typeof item.dueDate.toDate === 'function' ? item.dueDate.toDate() : new Date(item.dueDate)) : null;
@@ -259,8 +260,8 @@ export default function ActionItems({ user }) {
             <tbody className="divide-y divide-slate-100 bg-white">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-slate-500 font-medium">
-                    Brak tematów do wyświetlenia.
+                  <td colSpan="7" className="p-0">
+                    <EmptyState title="Brak tematów" message="Nie znaleziono tematów do realizacji dla wybranych filtrów." icon="ph-clipboard-text" />
                   </td>
                 </tr>
               ) : (
@@ -270,7 +271,7 @@ export default function ActionItems({ user }) {
                       {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-800">
-                      {getMachineName(item.machineId)}
+                      {item.machineName || getMachineName(item.machineId)}
                     </td>
                     <td className="px-6 py-4 text-slate-700 max-w-md break-words">
                       {item.problem}

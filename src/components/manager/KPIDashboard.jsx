@@ -1,16 +1,10 @@
 import { useManagerStore } from '../../store/managerStore';
-
 import { useState, useMemo, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../utils/constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { getCurrentTenant } from '../../utils/tenantHelper';
 import { savePdfWithPrompt } from '../../utils/pdfHelper';
-
-
-
+import { fetchHistoricalTickets } from '../../services/kpi.service';
 
 export default function KPIDashboard() {
   const tickets = useManagerStore(state => state.tickets);
@@ -34,9 +28,7 @@ export default function KPIDashboard() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const q = query(collection(db, 'tenants', getCurrentTenant(), 'tickets'));
-        const snap = await getDocs(q);
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !x.isDeleted && Number(x.status) === TICKET_STATUS.CLOSED);
+        const docs = await fetchHistoricalTickets();
         setHistoricalTickets(docs);
       } catch (err) {
         console.error("Błąd pobierania historii KPI:", err);

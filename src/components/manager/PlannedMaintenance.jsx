@@ -1,10 +1,10 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useManagerStore } from '../../store/managerStore';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { getDocs, startAfter, where, limit, collection, query, orderBy, arrayUnion, doc, updateDoc, addDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { addPlannedService, updatePlannedService, deletePlannedService, markServiceCompleted } from '../../services/plannedServices.service';
+import { arrayUnion } from 'firebase/firestore';
+import { fetchArchiveServices, addPlannedService, updatePlannedService, deletePlannedService, markServiceCompleted } from '../../services/plannedServices.service';
 import { updateMachineWorkHours } from '../../services/machines.service';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
@@ -37,15 +37,14 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
  * @returns {JSX.Element} Widok listy serwisów lub szczegółów konkretnego serwisu
  */
 export default function PlannedMaintenance({
-  user,
   isArchive = false,
   canEditPlanned = true,
   canDeletePlanned = true,
   initialServiceId,
   onClearServiceId,
   initialSearchQuery = '',
-  onClearSearchQuery,
-}) {
+  onClearSearchQuery }) {
+  const { user } = useAuth();
   const plannedServices = useManagerStore(state => state.plannedServices);
   const machines = useManagerStore(state => state.machines);
   const regions = useManagerStore(state => state.regions);
@@ -93,11 +92,7 @@ export default function PlannedMaintenance({
     if (loadingArchive || (!hasMoreArchive && loadMore)) return;
     setLoadingArchive(true);
     try {
-      let q = query(collection(db, 'tenants', getCurrentTenant(), 'planned_services'), orderBy('completedAt', 'desc'), limit(100));
-      if (loadMore && lastArchiveDocRef.current) {
-        q = query(collection(db, 'tenants', getCurrentTenant(), 'planned_services'), orderBy('completedAt', 'desc'), startAfter(lastArchiveDocRef.current), limit(100));
-      }
-      const snapshot = await getDocs(q);
+      const snapshot = await fetchArchiveServices(loadMore ? lastArchiveDocRef.current : null, 100);
       const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted && item.status === 'completed');
       if (snapshot.docs.length > 0) lastArchiveDocRef.current = snapshot.docs[snapshot.docs.length - 1];
       if (snapshot.docs.length < 50) setHasMoreArchive(false);
@@ -319,7 +314,7 @@ export default function PlannedMaintenance({
          photos: photos || [] 
       };
       
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'planned_services', serviceId), { 
+      await updatePlannedService(serviceId, { 
          history: arrayUnion(historyEntry) 
       });
       if (onDone) onDone();
@@ -350,8 +345,7 @@ export default function PlannedMaintenance({
     return (
       <>
         <PlannedMaintenanceDetails
-        srv={srv} machine={machine} user={user}
-        isArchive={isArchive} allowTicketDeletion={allowTicketDeletion}
+        srv={srv} machine={machine} isArchive={isArchive} allowTicketDeletion={allowTicketDeletion}
         canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
         getMachineRegionName={getMachineRegionName} machines={machines} regions={regions}
         onBack={() => window.history.back()}
@@ -368,7 +362,6 @@ export default function PlannedMaintenance({
         <TicketPartUsageModal
           isOpen={!!partUsageModalSrv}
           onClose={() => setPartUsageModalSrv(null)}
-          user={user}
           ticketId={partUsageModalSrv?.id}
           onPartUsed={(msg) => handleAddFutureNote(partUsageModalSrv?.id, msg, [], () => {})}
         />
@@ -448,7 +441,6 @@ export default function PlannedMaintenance({
       <TicketPartUsageModal
         isOpen={!!partUsageModalSrv}
         onClose={() => setPartUsageModalSrv(null)}
-        user={user}
         ticketId={partUsageModalSrv?.id}
         onPartUsed={(msg) => handleAddFutureNote(partUsageModalSrv?.id, msg, [], () => {})}
       />
@@ -456,21 +448,18 @@ export default function PlannedMaintenance({
         isOpen={!!serviceToComplete}
         onClose={() => setServiceToComplete(null)}
         serviceToComplete={serviceToComplete}
-        user={user}
-      />
+        />
       <PlannedMaintenanceFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         editingService={editingService}
         machines={machines}
-        user={user}
-      />
+        />
     </div>
   );
 }
 
 PlannedMaintenance.propTypes = {
-  user: PropTypes.object,
   isArchive: PropTypes.bool,
   canEditPlanned: PropTypes.bool,
   canDeletePlanned: PropTypes.bool,

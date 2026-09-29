@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import {  useManagerStore } from '../../store/managerStore';
 import { useState, useEffect , useMemo } from 'react';
@@ -25,7 +26,8 @@ import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
-export default function Machines({ user, onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
+export default function Machines({ onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tickets = useManagerStore(state => state.tickets);
@@ -149,7 +151,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
   const handleVerifyMachine = async (id, name) => {
     try {
       const cleanName = name.replace('(DO WERYFIKACJI)', '').trim();
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', id), { name: cleanName });
+      await updateMachine(id, { name: cleanName });
       showToast('Maszyna zweryfikowana.');
     } catch (err) {
       showToast('Błąd: ' + err.message, 'error');
@@ -180,7 +182,7 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
               <h2>${name}</h2>
               <p>Data: ${(() => {
                 try {
-                  const d = (machine.updatedAt || machine.qrCreatedAt) ? safeParseDate(machine.updatedAt || machine.qrCreatedAt) : (machine.createdAt ? safeParseDate(machine.createdAt) : new Date());
+                  const d = safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date();
                   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 } catch(e) { return 'Brak danych'; }
               })()}</p>
@@ -217,44 +219,18 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
     setIsFromQRScan(fromQR);
     setLoadingHistory(true);
     try {
-      // 1. Pobierz wszystkie zgłoszenia powiązane z tą maszyną (włącznie ze statusem 5 / archiwalnymi)
-      const qTicketsById = query(collection(db, 'tenants', getCurrentTenant(), 'tickets'), where('machineId', '==', m.id));
-      const snapTickets = await getDocs(qTicketsById);
-      let machineTickets = snapTickets.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
-
-      // Sprawdź powiązania po nazwie maszyny (obsługa wariantów z dopiskiem i bez dopisku np. "(DO WERYFIKACJI)")
-      const cleanName = m.name ? m.name.replace(/\s*\(DO WERYFIKACJI\)/gi, '').trim() : '';
-      if (cleanName) {
-        const qTicketsByName = query(collection(db, 'tenants', getCurrentTenant(), 'tickets'), where('machineName', '==', m.name));
-        const snapByName = await getDocs(qTicketsByName);
-        const byNameDocs = snapByName.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
-
-        let byCleanDocs = [];
-        if (cleanName !== m.name) {
-          const qTicketsByClean = query(collection(db, 'tenants', getCurrentTenant(), 'tickets'), where('machineName', '==', cleanName));
-          const snapByClean = await getDocs(qTicketsByClean);
-          byCleanDocs = snapByClean.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
-        }
-
-        const ticketMap = new Map();
-        machineTickets.forEach(t => ticketMap.set(t.id, t));
-        byNameDocs.forEach(t => ticketMap.set(t.id, t));
-        byCleanDocs.forEach(t => ticketMap.set(t.id, t));
-        machineTickets = Array.from(ticketMap.values());
-      }
-
-      // Sortuj zgłoszenia od najnowszych
+      let machineTickets = await fetchMachineTickets(m.id, m.name);
+      
+      // Sortuj zgloszenia od najnowszych
       machineTickets.sort((a, b) => {
         const dA = safeParseDate(a.createdAt)?.getTime() || 0;
         const dB = safeParseDate(b.createdAt)?.getTime() || 0;
         return dB - dA;
       });
 
-      // 2. Pobierz wszystkie serwisy powiązane z tą maszyną (włącznie ze statusem 'completed')
-      const qServices = query(collection(db, 'tenants', getCurrentTenant(), 'planned_services'), where('machineId', '==', m.id));
-      const snapServices = await getDocs(qServices);
-      let machineServices = snapServices.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
-
+      // 2. Pobierz wszystkie serwisy
+      let machineServices = await fetchMachineServices(m.id);
+      
       // Sortuj serwisy od najnowszych
       machineServices.sort((a, b) => {
         const dA = safeParseDate(a.completedAt || a.nextDate || a.createdAt)?.getTime() || 0;
@@ -342,7 +318,6 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
           onGeneratePDF={() => generateMachineHistoryPDF({...selectedMachine, regionName: regions.find(r => r.id === selectedMachine.regionId)?.name}, machineHistory.tickets, machineHistory.services)}
             onGenerateNewQR={() => handleGenerateNewQR(selectedMachine.id)}
           regions={regions}
-          user={user}
           onOpenTicket={onOpenTicket}
           onOpenService={onOpenService}
           onEdit={() => { setEditingId(selectedMachine.id); setIsFormOpen(true); }}
@@ -410,7 +385,6 @@ export default function Machines({ user, onOpenTicket, onOpenService, initialMac
 }
 
 Machines.propTypes = {
-  user: PropTypes.object,
   onOpenTicket: PropTypes.func,
   onOpenService: PropTypes.func,
   initialMachineId: PropTypes.string,

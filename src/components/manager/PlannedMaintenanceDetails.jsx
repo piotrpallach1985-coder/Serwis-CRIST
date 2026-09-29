@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useState, useEffect, useMemo } from 'react';
 import { storage } from '../../firebase';
@@ -22,7 +23,6 @@ export default function PlannedMaintenanceDetails({
 
   srv,
   machine,
-  user,
   isArchive,
   allowTicketDeletion,
   canEditPlanned,
@@ -45,8 +45,8 @@ export default function PlannedMaintenanceDetails({
   newRbgValue, setNewRbgValue,
   serviceToComplete, setServiceToComplete,
   isModalOpen, setIsModalOpen,
-  editingService,
-}) {
+  editingService }) {
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const branding = useManagerStore(state => state.branding);
@@ -611,7 +611,6 @@ export default function PlannedMaintenanceDetails({
 PlannedMaintenanceDetails.propTypes = {
   srv: PropTypes.object.isRequired,
   machine: PropTypes.object,
-  user: PropTypes.object,
   isArchive: PropTypes.bool,
   allowTicketDeletion: PropTypes.bool,
   canEditPlanned: PropTypes.bool,

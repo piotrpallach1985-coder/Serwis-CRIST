@@ -1,14 +1,13 @@
+import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from 'react';
-import { addDoc, collection, doc, updateDoc, runTransaction } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { getCurrentTenant } from '../../utils/tenantHelper';
-import { markServiceCompleted } from '../../services/plannedServices.service';
+import { markServiceCompleted, processServicePartsTransaction } from '../../services/plannedServices.service';
+import { addActionItem } from '../../services/tickets.service';
 import DictationButton from '../shared/DictationButton';
 import { useManagerStore } from '../../store/managerStore';
 
 export default function PlannedMaintenanceCompletionModal({
-  isOpen, onClose, serviceToComplete, user
-}) {
+  isOpen, onClose, serviceToComplete }) {
+  const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
   
   const [completionNotes, setCompletionNotes] = useState('');
@@ -30,6 +29,7 @@ export default function PlannedMaintenanceCompletionModal({
         nextPlanData = { 
           name: serviceToComplete.name, 
           machineId: serviceToComplete.machineId || '', 
+            machineName: serviceToComplete.machineName || (getMachine(serviceToComplete.machineId)?.name) || '', 
           priority: serviceToComplete.priority, 
           triggerType: serviceToComplete.triggerType, 
           estimatedDowntimeHours: serviceToComplete.estimatedDowntimeHours, 
@@ -54,12 +54,11 @@ export default function PlannedMaintenanceCompletionModal({
         }
       }
 
-      const checklistResponses = serviceToComplete.responses || {};
+      const checklistResponses = serviceToComplete.checklistResponses || {};
       let checklistSummary = [];
-      if (serviceToComplete.checklist?.length > 0) {
-        checklistSummary = serviceToComplete.checklist.map(step => ({ 
-          taskName: step.taskName, 
-          type: step.type, 
+      if (serviceToComplete.checklist) {
+        checklistSummary = serviceToComplete.checklist.map(step => ({
+          step: step.text,
           answer: checklistResponses.values?.[step.id] === undefined ? (checklistResponses[step.id] === undefined ? null : checklistResponses[step.id]) : checklistResponses.values[step.id],
           note: checklistResponses.notes?.[step.id] || '',
           photos: checklistResponses.photos?.[step.id] || []
@@ -77,49 +76,18 @@ export default function PlannedMaintenanceCompletionModal({
       
       let finalCost = 0;
       if (partsUsed && serviceToComplete.requiredParts && serviceToComplete.requiredParts.length > 0) {
-        const tenantId = getCurrentTenant();
-        await runTransaction(db, async (transaction) => {
-          const partsToUpdate = [];
-          for (const req of serviceToComplete.requiredParts) {
-             if (!req.partId || req.partId === 'custom') continue;
-             const pRef = doc(db, 'tenants', tenantId, 'parts', req.partId);
-             const pSnap = await transaction.get(pRef);
-             if (pSnap.exists()) {
-               partsToUpdate.push({ ref: pRef, id: req.partId, currentStock: Number(pSnap.data().stock || 0), unitPrice: Number(pSnap.data().unitPrice || req.unitCost || 0), quantity: Number(req.quantity || 1) });
-             }
-          }
-          
-          for (const p of partsToUpdate) {
-             const newStock = Math.max(0, p.currentStock - p.quantity);
-             transaction.update(p.ref, { stock: newStock });
-             
-             const txRef = doc(collection(db, 'tenants', tenantId, 'part_transactions'));
-             transaction.set(txRef, {
-               partId: p.id,
-               type: 'issue_planned',
-               quantity: -p.quantity,
-               price: p.unitPrice,
-               date: new Date().toISOString(),
-               user: user?.name || 'System',
-               referenceId: serviceToComplete.id,
-               machineId: serviceToComplete.machineId || null,
-                                                              createdAt: new Date().toISOString()
-             });
-             
-             finalCost += p.quantity * p.unitPrice;
-          }
-        });
+        finalCost = await processServicePartsTransaction(serviceToComplete);
       }
         
       if (finalCost > 0) {
          historyEntry.cost = finalCost;
-         historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + 'Zużyto części z magazynu o wartości: ' + finalCost.toLocaleString('pl-PL') + ' PLN.';
+         historyEntry.note = (historyEntry.note ? historyEntry.note + '\\n' : '') + 'Zużyto części z magazynu o wartości: ' + finalCost.toLocaleString('pl-PL') + ' PLN.';
       }
 
       await markServiceCompleted(serviceToComplete.id, { completedBy: user?.name || 'System', notes: completionNotes, checklistResponses, historyEntry, partsUsed }, nextPlanData);
 
       if (createActionItem && actionItemProblem.trim()) {
-        await addDoc(collection(db, 'tenants', getCurrentTenant(), 'action_items'), { 
+        await addActionItem({ 
           machineId: serviceToComplete.machineId || '', 
           plannedServiceId: serviceToComplete.id || '', 
           problem: actionItemProblem.trim(), 
@@ -140,7 +108,7 @@ export default function PlannedMaintenanceCompletionModal({
       onClose();
     } catch (err) { 
       console.error(err); 
-      alert('Błąd: ' + err.message); 
+      alert("Błąd: " + err.message); 
     }
   };
 
@@ -152,27 +120,26 @@ export default function PlannedMaintenanceCompletionModal({
 
         <div className="mb-4 flex items-center gap-2">
           <input
-            type="checkbox"
             id="partsUsed"
+            type="checkbox"
             checked={partsUsed}
             onChange={e => setPartsUsed(e.target.checked)}
-            className="w-4 h-4 text-orange-600 rounded border-gray-300"
+            className="w-4 h-4 text-orange-600 rounded border-slate-300"
           />
-          <label htmlFor="partsUsed" className="text-sm font-bold text-gray-700 cursor-pointer">
+          <label htmlFor="partsUsed" className="text-sm font-bold text-slate-700 cursor-pointer">
             Potwierdzam zużycie wymaganych części
           </label>
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-bold text-slate-700 mb-1">Notatki z wykonania</label>
+          <label className="block text-sm font-bold text-slate-700 mb-2">Notatki z wykonania</label>
           <div className="relative">
             <textarea
+              className="w-full p-3 pr-10 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 min-h-[100px]"
               value={completionNotes}
               onChange={e => setCompletionNotes(e.target.value)}
-              className="w-full p-2.5 border border-slate-300 rounded focus:ring-2 focus:ring-green-500 outline-none pr-10"
-              rows="3"
-              placeholder="np. Wymieniono filtr, zalano 5L oleju..."
-            />
+              placeholder="Opcjonalne notatki..."
+            ></textarea>
             <div className="absolute right-2 top-2">
               <DictationButton onResult={(text) => setCompletionNotes(prev => prev ? prev + ' ' + text : text)} />
             </div>
@@ -185,69 +152,67 @@ export default function PlannedMaintenanceCompletionModal({
             id="createNewPlan"
             checked={createNewPlan}
             onChange={e => setCreateNewPlan(e.target.checked)}
-            className="w-4 h-4 text-green-600 rounded border-gray-300"
+            className="w-4 h-4 text-green-600 rounded border-slate-300"
           />
-          <label htmlFor="createNewPlan" className="text-sm font-bold text-gray-700 cursor-pointer">
+          <label htmlFor="createNewPlan" className="text-sm font-bold text-slate-700 cursor-pointer">
             Wygeneruj automatycznie kolejny termin przeglądu
           </label>
         </div>
 
-        <div className="mb-6 border-t border-gray-200 pt-4">
+        <div className="mb-6 border-t border-slate-200 pt-4">
           <div className="flex items-center gap-2 mb-3">
             <input
               type="checkbox"
               id="createActionItem"
               checked={createActionItem}
               onChange={e => setCreateActionItem(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded border-gray-300"
+              className="w-4 h-4 text-blue-600 rounded border-slate-300"
             />
-            <label htmlFor="createActionItem" className="text-sm font-bold text-gray-700 cursor-pointer">
+            <label htmlFor="createActionItem" className="text-sm font-bold text-slate-700 cursor-pointer">
               Dodaj do Tematy do Realizacji
             </label>
           </div>
           {createActionItem && (
             <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
-              <div className="relative">
-                <label className="block text-xs font-bold text-gray-700 mb-1">Problem / Akcja do wykonania</label>
+              <div>
+                <label className="block text-xs font-bold text-blue-800 mb-1">Opis problemu *</label>
                 <div className="relative">
-                  <textarea
+                  <input
+                    type="text"
+                    required
                     value={actionItemProblem}
                     onChange={e => setActionItemProblem(e.target.value)}
-                    required={createActionItem}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm pr-10"
-                    rows="2"
-                    placeholder="Wpisz problem..."
+                    className="w-full p-2 pr-10 rounded border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500"
                   />
-                  <div className="absolute right-2 top-2">
+                  <div className="absolute right-1 top-1">
                     <DictationButton onResult={(text) => setActionItemProblem(prev => prev ? prev + ' ' + text : text)} />
                   </div>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Data wymaganej realizacji</label>
+                <label className="block text-xs font-bold text-blue-800 mb-1">Oczekiwany termin</label>
                 <input
                   type="date"
                   value={actionItemDueDate}
                   onChange={e => setActionItemDueDate(e.target.value)}
-                  required={createActionItem}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  className="w-full p-2 rounded border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex gap-2 justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded font-bold"
+            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded font-bold transition-colors"
           >
             Anuluj
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 shadow-sm"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm"
           >
             Zatwierdź Wykonanie
           </button>

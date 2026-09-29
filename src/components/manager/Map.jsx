@@ -1,9 +1,11 @@
+import { useAuth } from '../../hooks/useAuth';
 import MapLegend from './map/MapLegend';
 import MapPin from './map/MapPin';
 import { useManagerStore } from '../../store/managerStore';
 import MapControls from './map/MapControls';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { updateMapSettings, updateRegion, updateMachineRegion, subscribeToMapSettings } from '../../services/machines.service';
+import { doc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
@@ -19,9 +21,9 @@ const mapImageCache = {};
 
 export default function ShipyardMap({
   modeType = 'tickets',
-  user,
   onNavigateToTickets
 }) {
+  const { user } = useAuth();
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
   // --- Tryb widoku ---
@@ -44,7 +46,7 @@ export default function ShipyardMap({
   useEffect(() => {
     // dynamicznie importujemy żeby uniknąć duplikacji z ManagerView
     
-      const unsub = onSnapshot(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), (docSnap) => {
+      const unsub = subscribeToMapSettings((docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setMapConfig({ url: data.mapUrl || '', defaultZoom: data.defaultZoom || 1, defaultPan: { x: data.defaultPanX || 0, y: data.defaultPanY || 0 } });
@@ -81,9 +83,9 @@ export default function ShipyardMap({
       async () => {
         const url = await getDownloadURL(uploadTask.snapshot.ref);
         if (currentSubmapId !== null) {
-          await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', currentSubmapId), { mapImageUrl: url });
+          await updateRegion(currentSubmapId, { mapImageUrl: url });
         } else {
-          setDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), { mapUrl: url }, { merge: true });
+          updateMapSettings({ mapUrl: url });
         }
         setUploadingMap(false);
         setUploadProgress(0);
@@ -94,9 +96,9 @@ export default function ShipyardMap({
   const saveDefaultView = async () => {
     try {
       if (currentSubmapId !== null) {
-        await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', currentSubmapId), { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
+        await updateRegion(currentSubmapId, { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
       } else {
-        await setDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y }, { merge: true });
+        await updateMapSettings({ defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
       }
       alert('Domyślny kadr został zapisany poprawnie.');
     } catch (error) { 
@@ -243,7 +245,7 @@ export default function ShipyardMap({
     try {
       const updateData = { xPercent, yPercent };
       if (type === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), type === 'region' ? 'regions' : 'machines', id), updateData);
+      if (type === 'region') await updateRegion(id, updateData); else await updateMachineRegion(id, updateData);
     } catch (error) { console.error('Błąd zapisywania pinezki:', error); }
   };
 
@@ -268,7 +270,7 @@ export default function ShipyardMap({
     try {
       const updateData = { xPercent: tempPos.xPercent, yPercent: tempPos.yPercent };
       if (editingType === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), editingType === 'region' ? 'regions' : 'machines', editingId), updateData);
+      if (editingType === 'region') await updateRegion(editingId, updateData); else await updateMachineRegion(editingId, updateData);
       setIsModalOpen(false); setTempPos(null);
     } catch (error) { console.error('Błąd podczas zapisywania pinezki:', error); alert('Wystąpił błąd zapisu.'); }
   };

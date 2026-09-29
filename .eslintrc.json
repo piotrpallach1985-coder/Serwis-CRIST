@@ -16,7 +16,8 @@
     "sourceType": "module"
   },
   "plugins": [
-    "react"
+    "react",
+    "check-file"
   ],
   "rules": {
     "react/prop-types": "off",
@@ -24,11 +25,47 @@
     "no-unused-vars": "warn",
     "no-undef": "error",
     "react/jsx-key": "error",
-    "react/no-unescaped-entities": "off"
+    "react/no-unescaped-entities": "off",
+    "check-file/filename-naming-convention": [
+      "error",
+      {
+        "src/components/**/*.{jsx,tsx}": "PASCAL_CASE",
+        "src/components/**/!(index).{js,ts}": "CAMEL_CASE",
+        "src/hooks/**/*.{js,jsx,ts,tsx}": "CAMEL_CASE",
+        "src/services/**/*.{js,ts}": "CAMEL_CASE",
+        "src/utils/**/*.{js,ts}": "CAMEL_CASE",
+        "src/store/**/*.{js,ts}": "CAMEL_CASE",
+        "src/context/**/*.{js,jsx,ts,tsx}": "PASCAL_CASE"
+      },
+      {
+        "ignoreMiddleExtensions": true
+      }
+    ],
+    "check-file/folder-naming-convention": [
+      "error",
+      {
+        "src/**/!(__tests__)": "KEBAB_CASE"
+      }
+    ]
   },
   "settings": {
     "react": {
       "version": "detect"
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.ts",
+        "**/*.tsx"
+      ],
+      "parser": "@typescript-eslint/parser",
+      "plugins": [
+        "@typescript-eslint"
+      ],
+      "extends": [
+        "plugin:@typescript-eslint/recommended"
+      ]
+    }
+  ]
 }

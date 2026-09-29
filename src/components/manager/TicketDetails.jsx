@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import TicketMainColumn from './tickets/TicketMainColumn';
 import TicketLightbox from './tickets/TicketLightbox';
@@ -19,8 +20,6 @@ import { useManagerStore } from '../../store/managerStore';
 export default function TicketDetails({
   currentTicket,
   setSelectedTicketId,
-  user,
-  
   handleUpdate,
   handleDeleteTicket,
   handleArchiveTicket,
@@ -37,6 +36,7 @@ export default function TicketDetails({
   STATUSES,
   isArchive
 }) {
+  const { user } = useAuth();
   const { machines, regions, services } = useManagerStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -169,7 +169,6 @@ export default function TicketDetails({
 TicketDetails.propTypes = {
   currentTicket: PropTypes.object.isRequired,
   setSelectedTicketId: PropTypes.func.isRequired,
-  user: PropTypes.object,
   handleUpdate: PropTypes.func.isRequired,
   handleDeleteTicket: PropTypes.func.isRequired,
   handleArchiveTicket: PropTypes.func.isRequired,

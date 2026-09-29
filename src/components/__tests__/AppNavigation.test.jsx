@@ -2,8 +2,15 @@ import React from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../../App';
+import { BrowserRouter } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { USER_ROLES } from '../../utils/constants';
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({ user: null, isAuthLoading: false, login: vi.fn() })),
+  AuthProvider: ({children}) => <div>{children}</div>
+}));
 
 vi.mock('../../firebase', () => ({
   auth: {},
@@ -45,43 +52,34 @@ describe('App Navigation', () => {
   });
 
   it('shows loading initially', () => {
-    onAuthStateChanged.mockImplementation(() => () => {});
-    render(<App />);
+        useAuth.mockReturnValue({ isAuthLoading: true, user: null });
+    render(<BrowserRouter><App /></BrowserRouter>);
     expect(screen.getByText(/Ładowanie sesji użytkownika/i)).toBeInTheDocument();
   });
 
   it('shows Login view when not authenticated', () => {
     // Simulate no user
-    onAuthStateChanged.mockImplementation((auth, callback) => {
-      callback(null);
-      return () => {};
-    });
+        useAuth.mockReturnValue({ isAuthLoading: false, user: null });
     
-    render(<App />);
+    render(<BrowserRouter><App /></BrowserRouter>);
     expect(screen.getByTestId('login-view')).toBeInTheDocument();
   });
 
-  it('shows OperatorView if role is operator', () => {
-    onAuthStateChanged.mockImplementation((auth, callback) => {
-      callback({ isAnonymous: true, uid: 'anon' }); // Triggers anonymous flow setting role to 'operator'
-      return () => {};
-    });
+  it('shows OperatorView if role is operator', async () => {
+        useAuth.mockReturnValue({ isAuthLoading: false, user: { role: 'operator', uid: 'anon' } });
 
     window.history.replaceState({}, '', '?module=operator');
 
-    render(<App />);
-    expect(screen.getByTestId('operator-view')).toBeInTheDocument();
+    render(<BrowserRouter><App /></BrowserRouter>);
+    expect(await screen.findByTestId('operator-view')).toBeInTheDocument();
   });
 
   it('handles URL parameter navigation on load', () => {
-    onAuthStateChanged.mockImplementation((auth, callback) => {
-      callback(null);
-      return () => {};
-    });
+        useAuth.mockReturnValue({ isAuthLoading: false, user: null });
     
     window.history.replaceState({}, '', '?module=planned_maintenance');
     
-    render(<App />);
+    render(<BrowserRouter><App /></BrowserRouter>);
     // Should still show login because not authenticated
     expect(screen.getByTestId('login-view')).toBeInTheDocument();
   });
