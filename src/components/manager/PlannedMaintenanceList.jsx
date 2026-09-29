@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../shared/EmptyState';
 import React, { useMemo } from 'react';
 import { usePagination } from '../../hooks/usePagination';
@@ -18,6 +19,7 @@ export default function PlannedMaintenanceList({
   setRbgUpdateModal,
   setNewRbgValue
 }) {
+  const { t } = useTranslation();
   const { currentItems, hasMore, loadMore } = usePagination(filteredServices, 30, [filteredServices]);
 
   return (
@@ -46,7 +48,7 @@ export default function PlannedMaintenanceList({
               <tbody className="divide-y divide-slate-100">
                 {filteredServices.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="p-0"><EmptyState title="Brak wyników" message="Brak serwisów pasujących do kryteriów." icon="ph-calendar-x" /></td>
+                    <td colSpan="10" className="p-0"><EmptyState title={t('planned.empty_title')} message={t('planned.empty_message')} icon="ph-calendar-x" /></td>
                   </tr>
                 ) : currentItems.map(srv => {
                   const machine = getMachine(srv.machineId);
@@ -75,7 +77,7 @@ export default function PlannedMaintenanceList({
                         </td>
                       )}
                       {columns.machine && (
-                        <td className="px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || <>{srv.machineName || 'Nieznana'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>}</td>
+                        <td className="px-6 py-4 font-bold text-slate-800 text-sm">{machine?.name || <>{srv.machineName || 'Nieznana'} <span className="text-red-500 font-bold ml-1">{t('planned.machine_deleted')}</span></>}</td>
                       )}
                       {columns.region && (
                         <td className="px-6 py-4 font-bold text-slate-600 text-sm">{getMachineRegionName(machine?.regionId)}</td>
@@ -109,20 +111,20 @@ export default function PlannedMaintenanceList({
                       )}
                       {columns.priority && (
                         <td className="px-6 py-4">
-                          {isCritical ? <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border flex inline-flex items-center gap-1 w-max ${showRedCritical ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><i className="ph ph-warning"></i> KRYTYCZNE</span> : <span className="text-slate-400 text-xs font-bold uppercase">Standard</span>}
+                          {isCritical ? <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider border flex inline-flex items-center gap-1 w-max ${showRedCritical ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><i className="ph ph-warning"></i> {t('planned.critical').toUpperCase()}</span> : <span className="text-slate-400 text-xs font-bold uppercase">{t('planned.standard')}</span>}
                         </td>
                       )}
                       {columns.status && (
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${rowColor}`}>
-                            {isCompleted ? 'Zako\u0144czone' : srv.status === SERVICE_STATUS.IN_PROGRESS ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
+                            {isCompleted ? 'Zako\u0144czone' : srv.status === SERVICE_STATUS.IN_PROGRESS ? t('planned.status_in_progress') : (isOverdue ? t('planned.status_overdue') : t('planned.status_pending'))}
                           </span>
                         </td>
                       )}
                       {columns.actions && (
                           <td className="px-6 py-4">
                             <button onClick={() => setSelectedServiceId(srv.id)} className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm ml-auto">
-                                Szczegóły <i className="ph ph-caret-right font-bold"></i>
+                                {t('planned.details_btn')} <i className="ph ph-caret-right font-bold"></i>
                               </button>
                           </td>
                         )}
@@ -136,7 +138,7 @@ export default function PlannedMaintenanceList({
           onClick={loadMore} 
           className="px-6 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-bold rounded-lg transition-all"
         >
-          Załaduj kolejne 30 (pozostało {filteredServices.length - currentItems.length})
+          {t('planned.load_more')}  {filteredServices.length - currentItems.length})
         </button>
       </div>
     )}
@@ -145,7 +147,7 @@ export default function PlannedMaintenanceList({
           {/* Mobile Cards View */}
           <div className="md:hidden flex flex-col gap-4 mt-2 p-2">
             {filteredServices.length === 0 ? (
-              <EmptyState title="Brak wyników" message="Brak serwisów pasujących do kryteriów." icon="ph-calendar-x" />
+              <EmptyState title={t('planned.empty_title')} message={t('planned.empty_message')} icon="ph-calendar-x" />
             ) : currentItems.map(srv => {
               const machine = getMachine(srv.machineId);
               const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;
@@ -168,7 +170,7 @@ return (
 <div key={srv.id} onClick={() => setSelectedServiceId(srv.id)} className={`cursor-pointer bg-white p-4 pt-6 rounded-xl shadow-sm border flex flex-col relative hover:bg-slate-50 transition-colors ${showRedCritical ? 'border-red-500 border-l-4' : 'border-slate-200'}`}>
 {isCritical && (
 <div className={`absolute top-0 right-0 text-white px-2.5 py-1 ${showRedCritical ? "bg-red-500" : "bg-gray-400"} rounded-tr-xl rounded-bl-xl text-[10px] font-bold uppercase tracking-wider z-10 shadow-sm`}>
-Wysoki
+{t('planned.high')}
 </div>
 )}
                   <div className="flex justify-between items-start mb-1">
@@ -182,7 +184,7 @@ Wysoki
                   <div className="text-sm text-slate-600 mb-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <div className="font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                       <i className="ph ph-engine text-slate-400 text-base"></i>
-                      {machine?.name || <>{srv.machineName || 'Nieznana maszyna'} <span className="text-red-500 font-bold ml-1">(maszyna usunięta)</span></>}
+                      {machine?.name || <>{srv.machineName || t('planned.unknown_machine')} <span className="text-red-500 font-bold ml-1">{t('planned.machine_deleted')}</span></>}
                     </div>
                     
                   </div>
@@ -191,7 +193,7 @@ Wysoki
                       <div className="flex flex-col gap-1">
                         {isArchive ? (
                           <span className="text-[11px] text-slate-500 flex items-center gap-1 font-bold">
-                            Zakończono: {srv.completedAt ? safeParseDate(srv.completedAt)?.toLocaleDateString('pl-PL') || '-' : '-'}
+                            {t('planned.completed_date')} {srv.completedAt ? safeParseDate(srv.completedAt)?.toLocaleDateString('pl-PL') || '-' : '-'}
                           </span>
                         ) : (srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
                           <span className="text-[11px] text-slate-500 flex items-center gap-1">
@@ -208,11 +210,11 @@ Wysoki
                       
                       {isCompleted ? (
                         <div className="border border-green-500 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm bg-green-50">
-                          Zakończone
+                          {t('planned.status_completed')}
                         </div>
                       ) : (
                         <div className={`border px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${rowColor}`}>
-                          {srv.status === SERVICE_STATUS.IN_PROGRESS ? 'W trakcie' : (isOverdue ? 'Przekroczony' : 'Oczekuje')}
+                          {srv.status === SERVICE_STATUS.IN_PROGRESS ? t('planned.status_in_progress') : (isOverdue ? t('planned.status_overdue') : t('planned.status_pending'))}
                         </div>
                       )}
                     </div>

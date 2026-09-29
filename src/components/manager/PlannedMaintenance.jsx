@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useManagerStore } from '../../store/managerStore';
@@ -44,6 +45,7 @@ export default function PlannedMaintenance({
   onClearServiceId,
   initialSearchQuery = '',
   onClearSearchQuery }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const plannedServices = useManagerStore(state => state.plannedServices);
   const machines = useManagerStore(state => state.machines);
@@ -215,7 +217,7 @@ export default function PlannedMaintenance({
         const dateB = b.nextDate ? new Date(b.nextDate).getTime() : Infinity;
         if (dateA !== dateB) return dateA - dateB;
       }
-      const isCritA = a.priority === 'Krytyczny' ? 1 : 0, isCritB = b.priority === 'Krytyczny' ? 1 : 0;
+      const isCritA = a.priority === t('planned.critical') ? 1 : 0, isCritB = b.priority === t('planned.critical') ? 1 : 0;
       return isCritB - isCritA;
     });
   }, [services, machines, regions, filterTime, filterRegion, filterMachine, searchQuery, isArchive, plannedWarningDays]);
@@ -318,20 +320,20 @@ export default function PlannedMaintenance({
          history: arrayUnion(historyEntry) 
       });
       if (onDone) onDone();
-    } catch (err) { console.error(err); alert('Błąd dodawania notatki: ' + err.message); }
+    } catch (err) { console.error(err); alert(t('planned.note_add_error') + ' ' + err.message); }
   };
 
   const handleExportExcel = () => {
     const dataToExport = filteredServices.map(s => {
       const targetDate = safeParseDate(s.nextDate);
       return {
-        'ID Serwisu': s.id, 'Nazwa Serwisu': s.name || '-', 'Maszynę': getMachine(s.machineId)?.name || ((s.machineName || '-') + ' (maszyna usunięta)'),
-        'Priorytet': s.priority === 'Krytyczny' ? 'Krytyczny' : 'Standard',
-        'Typ Wyzwalacza': s.triggerType === 'hours' ? 'RBG' : (s.triggerType === 'calendar' ? 'Kalendarz' : 'Mieszany'),
-        'Data Wykonania/Oczekiwana': targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
-        'Cel RBG': s.targetWorkHours || '-',
-        'Status': s.status === 'completed' ? 'Zakończony' : (s.status === 'in_progress' ? 'W trakcie' : 'Oczekujący'),
-        'Historia': (s.history || []).map(h => `[${new Date(h.date).toLocaleDateString()}] ${h.user}: ${h.action}`).join(' | ')
+        [t('planned.excel_id')]: s.id, [t('planned.excel_name')]: s.name || '-', 'Maszynę': getMachine(s.machineId)?.name || ((s.machineName || '-') + ' (maszyna usunięta)'),
+        [t('planned.excel_priority')]: s.priority === t('planned.critical') ? t('planned.critical') : t('planned.standard'),
+        [t('planned.excel_trigger')]: s.triggerType === 'hours' ? t('planned.trigger_rbg') : (s.triggerType === 'calendar' ? t('planned.trigger_calendar') : t('planned.trigger_mixed')),
+        [t('planned.excel_date')]: targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
+        [t('planned.excel_rbg')]: s.targetWorkHours || '-',
+        [t('planned.excel_status')]: s.status === 'completed' ? t('planned.status_completed') : (s.status === 'in_progress' ? t('planned.status_in_progress') : t('planned.status_pending')),
+        [t('planned.excel_history')]: (s.history || []).map(h => `[${new Date(h.date).toLocaleDateString()}] ${h.user}: ${h.action}`).join(' | ')
       };
     });
     exportToExcel(dataToExport, isArchive ? 'Archiwum_Serwisow' : 'Planowane_Serwisy');
@@ -377,29 +379,29 @@ export default function PlannedMaintenance({
             <div>
               <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                 <i className={`ph ${isArchive ? 'ph-archive text-slate-600' : 'ph-calendar-check text-blue-600'}`}></i>
-                {isArchive ? 'Archiwum Serwisów' : 'Serwis Planowany'}
+                {isArchive ? t('planned.archive_title') : t('planned.main_title')}
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                {isArchive ? 'Historia zakończonych prac prewencyjnych' : 'Konserwacja prewencyjna, harmonogramy i liczniki roboczogodzin'}
+                {isArchive ? t('planned.archive_subtitle') : t('planned.main_subtitle')}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
               <button onClick={handleExportExcel} className="w-full sm:w-auto bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2.5 rounded-lg font-bold border border-green-200 transition-colors flex items-center justify-center gap-2 text-sm shadow-sm">
-                <i className="ph ph-file-xls text-lg"></i> Eksport Excel
+                <i className="ph ph-file-xls text-lg"></i> {t('planned.export_excel')}
               </button>
               {!isArchive && (
             <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
               <button onClick={() => setViewMode('list')} className={`flex-1 sm:flex-none px-4 py-2 font-bold text-sm rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>
-                <i className="ph ph-list-dashes mr-1"></i> Lista
+                <i className="ph ph-list-dashes mr-1"></i> {t('planned.view_list')}
               </button>
               <button onClick={() => setViewMode('calendar')} className={`flex-1 sm:flex-none px-4 py-2 font-bold text-sm rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>
-                <i className="ph ph-calendar-blank mr-1"></i> Kalendarz
+                <i className="ph ph-calendar-blank mr-1"></i> {t('planned.view_calendar')}
               </button>
             </div>
           )}
           {!isArchive && (
             <button onClick={openModalForNew} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 shrink-0">
-              <i className="ph ph-plus-circle text-lg"></i> Dodaj Plan
+              <i className="ph ph-plus-circle text-lg"></i> {t('planned.add_plan')}
             </button>
           )}
         </div>
@@ -427,7 +429,7 @@ export default function PlannedMaintenance({
         {isArchive && hasMoreArchive && (
           <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-center">
             <button onClick={() => fetchArchive(true)} disabled={loadingArchive} className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
-              {loadingArchive ? 'Wczytywanie...' : 'Wczytaj starsze serwisy'}
+              {loadingArchive ? t('planned.loading') : t('planned.load_older')}
             </button>
           </div>
         )}

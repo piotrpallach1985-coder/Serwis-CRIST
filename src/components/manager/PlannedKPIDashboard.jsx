@@ -1,11 +1,13 @@
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { savePdfWithPrompt } from '../../utils/pdfHelper';
 import { fetchHistoricServices } from '../../services/kpi.service';
 
 export default function PlannedKPIDashboard() {
+  const { t } = useTranslation();
   const machines = useManagerStore(state => state.machines);
   const plannedServices = useManagerStore(state => state.plannedServices);
   const regions = useManagerStore(state => state.regions);
@@ -167,9 +169,9 @@ export default function PlannedKPIDashboard() {
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <i className="ph ph-chart-line-up text-blue-600"></i>
-            KPI / Status Serwisów
+            {t('planned.kpi_title')}
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Analiza prac prewencyjnych</p>
+          <p className="text-sm text-slate-500 mt-1">{t('planned.kpi_subtitle')}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <select 
@@ -177,17 +179,17 @@ export default function PlannedKPIDashboard() {
             onChange={(e) => setPeriod(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           >
-            <option value="7">Ostatnie 7 dni</option>
-            <option value="30">Ostatnie 30 dni</option>
-            <option value="90">Ostatnie 90 dni</option>
-            <option value="365">Ostatni rok</option>
+            <option value="7">{t('planned.last_7_days')}</option>
+            <option value="30">{t('planned.last_30_days')}</option>
+            <option value="90">{t('planned.last_90_days')}</option>
+            <option value="365">{t('planned.last_year')}</option>
           </select>
           <button 
             onClick={generatePDF}
             className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all flex items-center gap-2 justify-center"
           >
             <i className="ph ph-file-pdf text-lg"></i>
-            Generuj PDF
+            {t('planned.generate_pdf')}
           </button>
         </div>
       </div>
@@ -199,7 +201,7 @@ export default function PlannedKPIDashboard() {
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
             <div className="relative z-10 flex justify-between items-start mb-2">
-              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Serwisy łącznie</span>
+              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">{t('planned.total_services')}</span>
               <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><i className="ph ph-list-dashes text-lg"></i></div>
             </div>
             <div className="relative z-10 text-3xl font-black text-slate-800">{kpiData.total}</div>
@@ -208,7 +210,7 @@ export default function PlannedKPIDashboard() {
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
             <div className="relative z-10 flex justify-between items-start mb-2">
-              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Zrealizowane</span>
+              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">{t('planned.completed')}</span>
               <div className="bg-green-100 p-2 rounded-lg text-green-600"><i className="ph ph-check-circle text-lg"></i></div>
             </div>
             <div className="relative z-10 text-3xl font-black text-slate-800">{kpiData.completed}</div>
@@ -217,7 +219,7 @@ export default function PlannedKPIDashboard() {
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
             <div className="relative z-10 flex justify-between items-start mb-2">
-              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Opóźnione</span>
+              <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">{t('planned.overdue')}</span>
               <div className="bg-red-100 p-2 rounded-lg text-red-600"><i className="ph ph-warning-circle text-lg"></i></div>
             </div>
             <div className="relative z-10 text-3xl font-black text-slate-800">{kpiData.overdue}</div>
@@ -229,14 +231,14 @@ export default function PlannedKPIDashboard() {
               <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Średni czas zewłoki</span>
               <div className="bg-purple-100 p-2 rounded-lg text-purple-600"><i className="ph ph-clock text-lg"></i></div>
             </div>
-            <div className="relative z-10 text-3xl font-black text-slate-800">{kpiData.avgTime} <span className="text-sm text-slate-500 font-medium">godz.</span></div>
+            <div className="relative z-10 text-3xl font-black text-slate-800">{kpiData.avgTime} <span className="text-sm text-slate-500 font-medium">{t('planned.hours')}</span></div>
           </div>
         </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><i className="ph ph-calendar-blank text-blue-500"></i> Zrealizowane vs Zaplanowane w czasie</h3>
+            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><i className="ph ph-calendar-blank text-blue-500"></i> {t('planned.completed_vs_planned')}</h3>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={kpiData.timelineChart} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
@@ -247,15 +249,15 @@ export default function PlannedKPIDashboard() {
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                     cursor={{ stroke: '#e2e8f0', strokeWidth: 2, strokeDasharray: '3 3' }}
                   />
-                  <Line type="monotone" dataKey="Zrealizowane" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
-                  <Line type="monotone" dataKey="Zaplanowane" stroke="#f59e0b" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                  <Line type="monotone" dataKey={t('planned.completed')} stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                  <Line type="monotone" dataKey={t('planned.planned')} stroke="#f59e0b" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><i className="ph ph-map-pin text-blue-500"></i> Serwisy wg Rejonów</h3>
+            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><i className="ph ph-map-pin text-blue-500"></i> {t('planned.services_by_region')}</h3>
             <div className="h-[300px] w-full flex items-center justify-center">
               {kpiData.regionChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -280,7 +282,7 @@ export default function PlannedKPIDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-slate-400 font-medium">Brak danych w wybranym okresie</div>
+                <div className="text-slate-400 font-medium">{t('planned.no_data')}</div>
               )}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { markServiceCompleted, processServicePartsTransaction } from '../../services/plannedServices.service';
 import { addActionItem } from '../../services/tickets.service';
 import DictationButton from '../shared/DictationButton';
@@ -7,6 +8,7 @@ import { useManagerStore } from '../../store/managerStore';
 
 export default function PlannedMaintenanceCompletionModal({
   isOpen, onClose, serviceToComplete }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
   
@@ -115,7 +117,7 @@ export default function PlannedMaintenanceCompletionModal({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-scale-in">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">Zakończ Serwis</h3>
+        <h3 className="text-lg font-bold text-slate-800 mb-4">{t('planned.complete_service')}</h3>
         <p className="text-sm text-slate-600 mb-4 font-bold">{serviceToComplete.name}</p>
 
         <div className="mb-4 flex items-center gap-2">
@@ -127,12 +129,12 @@ export default function PlannedMaintenanceCompletionModal({
             className="w-4 h-4 text-orange-600 rounded border-slate-300"
           />
           <label htmlFor="partsUsed" className="text-sm font-bold text-slate-700 cursor-pointer">
-            Potwierdzam zużycie wymaganych części
+            {t('planned.confirm_parts')}
           </label>
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-bold text-slate-700 mb-2">Notatki z wykonania</label>
+          <label className="block text-sm font-bold text-slate-700 mb-2">{t('planned.exec_notes')}</label>
           <div className="relative">
             <textarea
               className="w-full p-3 pr-10 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 min-h-[100px]"
@@ -155,7 +157,7 @@ export default function PlannedMaintenanceCompletionModal({
             className="w-4 h-4 text-green-600 rounded border-slate-300"
           />
           <label htmlFor="createNewPlan" className="text-sm font-bold text-slate-700 cursor-pointer">
-            Wygeneruj automatycznie kolejny termin przeglądu
+            {t('planned.auto_next_plan')}
           </label>
         </div>
 
@@ -169,13 +171,13 @@ export default function PlannedMaintenanceCompletionModal({
               className="w-4 h-4 text-blue-600 rounded border-slate-300"
             />
             <label htmlFor="createActionItem" className="text-sm font-bold text-slate-700 cursor-pointer">
-              Dodaj do Tematy do Realizacji
+              {t('planned.add_to_tasks')}
             </label>
           </div>
           {createActionItem && (
             <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
               <div>
-                <label className="block text-xs font-bold text-blue-800 mb-1">Opis problemu *</label>
+                <label className="block text-xs font-bold text-blue-800 mb-1">{t('planned.problem_desc')}</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -190,7 +192,7 @@ export default function PlannedMaintenanceCompletionModal({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-blue-800 mb-1">Oczekiwany termin</label>
+                <label className="block text-xs font-bold text-blue-800 mb-1">{t('planned.expected_date')}</label>
                 <input
                   type="date"
                   value={actionItemDueDate}
@@ -214,7 +216,7 @@ export default function PlannedMaintenanceCompletionModal({
             type="submit"
             className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm"
           >
-            Zatwierdź Wykonanie
+            {t('planned.confirm_exec')}
           </button>
         </div>
       </form>

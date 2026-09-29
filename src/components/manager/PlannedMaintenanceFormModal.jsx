@@ -1,5 +1,6 @@
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../store/managerStore';
 import ChecklistBuilder from '../checklists/ChecklistBuilder';
 import { addPlannedService, updatePlannedService } from '../../services/plannedServices.service';
@@ -7,6 +8,7 @@ import { arrayUnion } from 'firebase/firestore';
 
 export default function PlannedMaintenanceFormModal({
   isOpen, onClose, editingService, machines }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
   
@@ -213,11 +215,11 @@ export default function PlannedMaintenanceFormModal({
             <input type="number" value={estimatedManHours} onChange={e => setEstimatedManHours(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" min={0} step="0.5" />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Wymagany personel / kwalifikacje</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">{t('planned.required_personnel')}</label>
             <input type="text" value={requiredPersonnel} onChange={e => setRequiredPersonnel(e.target.value)} placeholder="np. Elektryk SEP, 2x Mechanik" className="w-full p-2 border border-gray-300 rounded outline-none" />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Wymagany status maszyny podczas serwisu</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">{t('planned.machine_status')}</label>
             <select value={machineStatus} onChange={e => setMachineStatus(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
               <option value="LOTO">LOTO (Całkowicie odłączona, Lockout/Tagout)</option>
               <option value="Wyłączona">Wyłączona, ale zasilanie doprowadzone</option>
@@ -229,10 +231,10 @@ export default function PlannedMaintenanceFormModal({
         
         {/* Narzędzia i części */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Wymagane narzędzia */}
+          {/* {t('planned.required_tools')} */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <i className="ph ph-wrench text-lg text-slate-500"></i> Wymagane narzędzia
+              <i className="ph ph-wrench text-lg text-slate-500"></i> {t('planned.required_tools')}
             </h4>
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -266,7 +268,7 @@ export default function PlannedMaintenanceFormModal({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <i className="ph ph-nut text-lg text-slate-500"></i> Wymagane części (Rezerwacje)
+                  <i className="ph ph-nut text-lg text-slate-500"></i> {t('planned.required_parts')}
                 </h4>
                 <button type="button" onClick={addPart} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold hover:bg-blue-200 transition-colors">
                   + Dodaj część

@@ -228,7 +228,7 @@ export default function PlannedMaintenanceDetails({
                               <li key={idx} className="flex justify-between items-center text-sm bg-blue-50/50 p-2 border border-blue-100 rounded">
                                 <span className="font-bold text-slate-800">{pName}</span>
                                 <div className="flex gap-4 text-xs text-slate-600 font-medium">
-                                  <span>Pobrano: {Math.abs(tx.quantity)} ({tx.user || 'System'})</span>
+                                  <span>Pobrano: {Math.abs(tx.quantity)} ({tx.user || t('planned.system')})</span>
                                   <span>Koszt: {tx.totalCost ? tx.totalCost.toFixed(2) + ' PLN' : (Math.abs(tx.quantity) * tx.price).toFixed(2) + ' PLN'}</span>
                                 </div>
                               </li>
@@ -486,7 +486,7 @@ export default function PlannedMaintenanceDetails({
                   )}
                   {canDeletePlanned && (!isArchive || allowTicketDeletion) && (
                     <button onClick={() => { onDelete(srv.id); onBack(); }} className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 px-6 py-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 border border-red-200">
-                      <i className="ph ph-trash text-xl"></i> Usuń
+                      <i className="ph ph-trash text-xl"></i> {t('planned.delete_btn')}
                     </button>
                   )}
                                 </div>
@@ -497,14 +497,14 @@ export default function PlannedMaintenanceDetails({
         <div className="w-full lg:w-1/4">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
             <h4 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2">
-              <i className="ph ph-clock-counter-clockwise text-lg"></i> HISTORIA ZDARZEŃ
+              <i className="ph ph-clock-counter-clockwise text-lg"></i> {t('planned.history_title')}
             </h4>
             <div className="relative border-l-2 border-slate-100 ml-3 space-y-8 pb-4">
               {srv.history && [...srv.history].reverse().map((entry, index) => (
                 <div key={index} className="relative pl-8">
                   <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-[3px] border-slate-800"></div>
                   <div className="flex justify-between items-start mb-1">
-                    <div className="font-bold text-slate-800 text-sm">{entry.user || 'System'}</div>
+                    <div className="font-bold text-slate-800 text-sm">{entry.user || t('planned.system')}</div>
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                       {new Date(entry.date).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -530,19 +530,19 @@ export default function PlannedMaintenanceDetails({
                     )}
                   {entry.checklistSummary && entry.checklistSummary.length > 0 && (
                     <div className="mt-3 space-y-2">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Lista Kontrolna:</div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{t('planned.checklist_title')}</div>
                       {entry.checklistSummary.map((item, i) => (
                         <div key={i} className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
                           <div className="font-semibold mb-1">{item.taskName}:</div>
                           <div className="mb-1">
                           {item.type === 'CHECKBOX' ? (
-                            item.answer ? '✅ Wykonano' : '❌ Pominięto'
+                            item.answer ? `✅ ${t('planned.done')}` : `❌ ${t('planned.skipped')}`
                           ) : item.type === 'PHOTO' ? (
                             item.answer && item.answer.length > 0 ? (
                               <img src={item.answer} alt="załącznik" className="w-12 h-12 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity shadow-sm inline-block" onClick={() => setLightboxImg(item.answer)} />
-                            ) : 'Brak zdjęcia głównego'
+                            ) : t('planned.no_main_photo')
                           ) : (
-                            <span className="font-mono text-blue-600">{item.answer || 'Brak danych'}</span>
+                            <span className="font-mono text-blue-600">{item.answer || t('planned.no_data_short')}</span>
                           )}
                           </div>
                           {item.note && (
@@ -564,7 +564,7 @@ export default function PlannedMaintenanceDetails({
                 </div>
               ))}
               {(!srv.history || srv.history.length === 0) && (
-                <div className="text-sm text-slate-400 italic pl-6">Brak historii zdarzeń.</div>
+                <div className="text-sm text-slate-400 italic pl-6">{t('planned.no_history')}</div>
               )}
                                         </div>
             </div>
