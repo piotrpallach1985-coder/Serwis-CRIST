@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { addPart, updatePart } from '../../../services/parts.service';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { useManagerStore } from '../../../store/managerStore';
+import { useTranslation } from 'react-i18next';
 
 export default function PartForm({ part, onClose, user }) {
+  const { t } = useTranslation();
   const isEditing = !!part;
   const machines = useManagerStore(state => state.machines || []);
   
@@ -115,7 +117,7 @@ export default function PartForm({ part, onClose, user }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-fade-in my-8 flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl shrink-0">
           <h2 className="text-xl font-extrabold text-gray-800">
-            {isEditing ? 'Edytuj Część Zapasową' : 'Dodaj Nową Część'}
+            {isEditing ? t('parts.form.edit_title') : t('parts.form.add_title')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
             <i className="ph ph-x text-2xl"></i>
@@ -127,11 +129,11 @@ export default function PartForm({ part, onClose, user }) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nazwa części *</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.name')}</label>
                 <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Kod magazynowy *</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.code')}</label>
                 <input type="text" required value={code} onChange={e => setCode(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" />
               </div>
             </div>
@@ -139,35 +141,35 @@ export default function PartForm({ part, onClose, user }) {
                           {isEditing && (
                 <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-xl border border-blue-100 flex items-center gap-2">
                   <i className="ph ph-info text-lg"></i>
-                  Stan fizyczny, cena oraz data ważności są zarządzane przez Dostawy i Wydania (FIFO).
+                  {t('parts.form.info_fifo')}
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {!isEditing && (
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Fizyczny Stan *</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.stock')}</label>
                     <input type="number" min="0" step="1" required value={stock} onChange={e => setStock(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold" />
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Jednostka (J.M.)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.unit')}</label>
                   <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold bg-white">
-                    <option value="szt.">sztuk (szt.)</option>
-                    <option value="kg">kilogramów (kg)</option>
-                    <option value="L">litrów (L)</option>
-                    <option value="m">metrów bieżących (m)</option>
-                    <option value="m2">metrów kwadratowych (m2)</option>
-                    <option value="opak.">opakowań (opak.)</option>
-                    <option value="kpl.">kompletów (kpl.)</option>
+                    <option value="szt.">{t('parts.form.units.pcs')}</option>
+                    <option value="kg">{t('parts.form.units.kg')}</option>
+                    <option value="L">{t('parts.form.units.l')}</option>
+                    <option value="m">{t('parts.form.units.m')}</option>
+                    <option value="m2">{t('parts.form.units.m2')}</option>
+                    <option value="opak.">{t('parts.form.units.pack')}</option>
+                    <option value="kpl.">{t('parts.form.units.set')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Stan Minimalny *</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.min_stock')}</label>
                   <input type="number" min="0" step="1" required value={minStock} onChange={e => setMinStock(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold" />
                 </div>
                 {!isEditing && (
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Cena jedn. (PLN) {Number(stock) > 0 ? '*' : '(Opcjonalnie)'}</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.price')} {Number(stock) > 0 ? '*' : t('parts.form.price_opt')}</label>
                     <input type="number" min="0" step="0.01" required={Number(stock) > 0} value={unitPrice} onChange={e => setUnitPrice(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold" />
                   </div>
                 )}
@@ -175,11 +177,11 @@ export default function PartForm({ part, onClose, user }) {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Budynek Magazynowy</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.building')}</label>
                   <input 
                     type="text" 
                     list="regions-list" 
-                    placeholder="Wybierz lub wpisz..." 
+                    placeholder={t('parts.form.building_placeholder')} 
                     value={building} 
                     onChange={e => setBuilding(e.target.value)} 
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" 
@@ -189,19 +191,19 @@ export default function PartForm({ part, onClose, user }) {
                   </datalist>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Lokalizacja (Piętro/Regał/Półka)</label>
-                  <input type="text" placeholder="np. P315/R12" value={location} onChange={e => setLocation(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.location')}</label>
+                  <input type="text" placeholder={t('parts.form.location_placeholder')} value={location} onChange={e => setLocation(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" />
                 </div>
                 {!isEditing && (
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Data ważności</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{t('parts.form.expiration')}</label>
                     <input type="date" value={expirationDate} onChange={e => setExpirationDate(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" />
                   </div>
                 )}
               </div>
 
               <div className="pt-2">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Kompatybilne Maszyny</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{t('parts.form.compatible_machines')}</label>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {compatibleMachines.map(mid => {
                     const m = machines.find(mac => mac.id === mid);
@@ -221,7 +223,7 @@ export default function PartForm({ part, onClose, user }) {
                   <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                   <input
                     type="text"
-                    placeholder="Wyszukaj i dodaj maszynę..."
+                    placeholder={t('parts.form.search_machine')}
                     value={machineSearch}
                     onChange={(e) => setMachineSearch(e.target.value)}
                     onFocus={() => setShowDropdown(true)}
@@ -230,7 +232,7 @@ export default function PartForm({ part, onClose, user }) {
                   {showDropdown && (
                       <div className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto pb-4">
                         {dropdownMachines.length === 0 ? (
-                          <div className="p-4 text-center text-gray-500 text-sm">Brak wyników</div>
+                          <div className="p-4 text-center text-gray-500 text-sm">{t('parts.list.no_results_title')}</div>
                         ) : (
                           dropdownMachines.map(m => (
                               <button
@@ -261,7 +263,7 @@ export default function PartForm({ part, onClose, user }) {
               Anuluj
             </button>
             <button form="part-form" type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl font-bold shadow-md transition-all disabled:opacity-50 flex items-center gap-2">
-              {loading ? 'Zapisywanie...' : (isEditing ? 'Zapisz Część' : 'Dodaj Część')}
+              {loading ? t('parts.buttons.saving') : (isEditing ? t('parts.buttons.save_part') : t('parts.buttons.add_part'))}
             </button>
           </div>
         </div>

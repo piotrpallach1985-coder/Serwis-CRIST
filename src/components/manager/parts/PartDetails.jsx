@@ -1,4 +1,5 @@
 import { useAuth } from '../../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import React, { useState, useMemo } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -7,6 +8,7 @@ import { safeParseDate } from '../../../utils/dateHelpers';
 import PartTransactionModal from './PartTransactionModal';
 
 export default function PartDetails({ part, onBack, onEdit }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [txMode, setTxMode] = useState(null);
   const transactions = useManagerStore(state => state.partTransactions || []);
@@ -62,27 +64,27 @@ export default function PartDetails({ part, onBack, onEdit }) {
             <button 
               onClick={onBack}
               className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm shrink-0"
-              title="Powrót"
+              title={t('parts.buttons.back')}
             >
-              <i className="ph ph-arrow-left text-lg"></i> <span className="hidden sm:inline">Powrót</span>
+              <i className="ph ph-arrow-left text-lg"></i> <span className="hidden sm:inline">{t('parts.buttons.back')}</span>
             </button>
             <div className="min-w-0">
               <h2 className="text-base md:text-xl font-bold text-gray-800 shrink-0 truncate max-w-[200px] sm:max-w-md">{part.name}</h2>
-              <div className="text-[10px] sm:text-xs font-bold text-slate-400 mt-0 sm:mt-0.5 uppercase tracking-widest leading-none">KOD: {part.code || '-'}</div>
+              <div className="text-[10px] sm:text-xs font-bold text-slate-400 mt-0 sm:mt-0.5 uppercase tracking-widest leading-none">{t('parts.details.code')} {part.code || '-'}</div>
             </div>
           </div>
 
           {/* Prawa strona (Desktop) / Dolny wiersz (Mobile) */}
           <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full md:w-auto">
-            <button onClick={() => setTxMode('receive')} className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0" title="Dostawa">
-              <i className="ph ph-plus-circle text-xl md:text-base"></i><span className="hidden md:inline">Dostawa</span>
+            <button onClick={() => setTxMode('receive')} className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0" title={t('parts.buttons.receive')}>
+              <i className="ph ph-plus-circle text-xl md:text-base"></i><span className="hidden md:inline">{t('parts.buttons.receive')}</span>
             </button>
-            <button onClick={() => setTxMode('issue')} className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0" title="Remanent">
-              <i className="ph ph-minus-circle text-xl md:text-base"></i><span className="hidden md:inline">Remanent</span>
+            <button onClick={() => setTxMode('issue')} className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0" title={t('parts.buttons.issue')}>
+              <i className="ph ph-minus-circle text-xl md:text-base"></i><span className="hidden md:inline">{t('parts.buttons.issue')}</span>
             </button>
             <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
-            <button onClick={onEdit} className="flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-sm transition-colors shrink-0" title="Edytuj">
-              <i className="ph ph-pencil-simple text-xl md:text-base"></i><span className="hidden md:inline">Edytuj</span>
+            <button onClick={onEdit} className="flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-sm transition-colors shrink-0" title={t('parts.buttons.edit')}>
+              <i className="ph ph-pencil-simple text-xl md:text-base"></i><span className="hidden md:inline">{t('parts.buttons.edit')}</span>
             </button>
           </div>
         </div>
@@ -91,37 +93,35 @@ export default function PartDetails({ part, onBack, onEdit }) {
         {/* INFO */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Informacje Ogólne</h3>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{t('parts.details.general_info')}</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Lokalizacja</div>
-                <div className="font-semibold text-slate-800 text-sm">{part.building ? part.building + ' / ' : ''}{part.location || 'Brak danych'}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">{t('parts.details.location')}</div>
+                <div className="font-semibold text-slate-800 text-sm">{part.building ? part.building + ' / ' : ''}{part.location || t('parts.details.no_data')}</div>
               </div>
                               <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Cena Jedn. (Średnia)</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{t('parts.details.avg_price')}</div>
                   <div className="font-semibold text-slate-800 text-sm">{avgPrice.toFixed(2)} PLN</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase text-blue-500">Wartość Zapasu</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase text-blue-500">{t('parts.details.stock_value')}</div>
                   <div className="font-black text-blue-600 text-sm">{totalValue.toFixed(2)} PLN</div>
                 </div>
                                 <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Data wprow.</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{t('parts.details.created_at')}</div>
                   <div className="font-semibold text-slate-800 text-sm">{part.createdAt ? safeParseDate(part.createdAt.toDate ? part.createdAt.toDate() : part.createdAt).toLocaleDateString('pl-PL') : '-'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Ost. edycja</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{t('parts.details.updated_at')}</div>
                   <div className="font-semibold text-slate-800 text-sm">{part.updatedAt ? safeParseDate(part.updatedAt.toDate ? part.updatedAt.toDate() : part.updatedAt).toLocaleDateString('pl-PL') : '-'}</div>
                 </div>
             
                           </div>
               <div className="mt-6 pt-4 border-t border-slate-50">
                 <div className="text-[10px] font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
-                  <i className="ph ph-stack text-lg"></i>
-                  Dostępne Partie na Magazynie (FIFO)
-                </div>
+                  <i className="ph ph-stack text-lg"></i> {t('parts.details.batches')} </div>
                 {sortedBatches.length === 0 ? (
-                  <div className="text-xs text-slate-400 italic">Brak partii na stanie.</div>
+                  <div className="text-xs text-slate-400 italic">{t('parts.details.no_batches')}</div>
                 ) : (
                   <div className="space-y-2">
                     {sortedBatches.map((b, i) => (
@@ -131,7 +131,7 @@ export default function PartDetails({ part, onBack, onEdit }) {
                           <span className="text-slate-400 ml-2">po {Number(b.price || 0).toFixed(2)} PLN</span>
                         </div>
                         <div className={`font-bold ${b.expirationDate ? (new Date(b.expirationDate) < new Date() ? 'text-red-500' : 'text-orange-500') : 'text-slate-400'}`}>
-                          {b.expirationDate ? `Ważne: ${new Date(b.expirationDate).toLocaleDateString('pl-PL')}` : 'Brak daty ważności'}
+                          {b.expirationDate ? `{t('parts.details.valid_until')} ${new Date(b.expirationDate).toLocaleDateString('pl-PL')}` : t('parts.details.no_expiration')}
                         </div>
                       </div>
                     ))}
@@ -140,15 +140,15 @@ export default function PartDetails({ part, onBack, onEdit }) {
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-50">
-                <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">Kompatybilność Maszynowa</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">{t('parts.details.machine_compatibility')}</div>
               <div className="flex flex-wrap gap-2">
                 {part.compatibleMachines && part.compatibleMachines.length > 0 ? (
                   part.compatibleMachines.map(mid => {
                     const m = machines.find(mac => mac.id === mid);
-                    return <span key={mid} className="bg-slate-50 border border-slate-100 px-3 py-1 rounded-lg text-xs font-bold text-slate-600">{m ? m.name : 'Nieznana maszyna'}</span>;
+                    return <span key={mid} className="bg-slate-50 border border-slate-100 px-3 py-1 rounded-lg text-xs font-bold text-slate-600">{m ? m.name : t('parts.details.unknown_machine')}</span>;
                   })
                 ) : (
-                  <span className="text-xs text-slate-400 italic">Brak przypisanych maszyn</span>
+                  <span className="text-xs text-slate-400 italic">{t('parts.details.no_machines')}</span>
                 )}
               </div>
             </div>
@@ -157,13 +157,11 @@ export default function PartDetails({ part, onBack, onEdit }) {
           {/* ZAPLANOWANE ZUŻYCIE */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="ph ph-calendar-check text-lg"></i>
-              Zaplanowane Zużycie (Rezerwacje)
-            </h3>
+              <i className="ph ph-calendar-check text-lg"></i> {t('parts.details.planned_usage')} </h3>
             {plannedUsage.length === 0 ? (
               <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                 <i className="ph ph-check-circle text-2xl text-emerald-400 mb-2"></i>
-                <p className="text-sm text-slate-500 font-medium">Brak nadchodzących serwisów wymagających tej części.</p>
+                <p className="text-sm text-slate-500 font-medium">{t('parts.details.no_planned')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -175,9 +173,9 @@ export default function PartDetails({ part, onBack, onEdit }) {
                         <div>
                           <div className="font-bold text-slate-800 text-sm">{s.name}</div>
                           <div className="text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-1.5">
-                            <span className="flex items-center gap-1 text-blue-500"><i className="ph ph-gear"></i> {machine ? machine.name : 'Nieznane urządzenie'}</span>
+                            <span className="flex items-center gap-1 text-blue-500"><i className="ph ph-gear"></i> {machine ? machine.name : t('parts.details.unknown_device')}</span>
                             <span>•</span>
-                            <span>Planowane: {safeParseDate(s.nextDate)?.toLocaleDateString('pl-PL')}</span>
+                            <span>{t('parts.details.planned_date')} {safeParseDate(s.nextDate)?.toLocaleDateString('pl-PL')}</span>
                           </div>
                         </div>
                         <div className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg font-black text-sm">
@@ -196,31 +194,31 @@ export default function PartDetails({ part, onBack, onEdit }) {
           
           {/* STAN */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Stan Magazynowy</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">{t('parts.details.stock_status')}</h3>
             
             <div className={`w-32 h-32 rounded-full border-[6px] flex flex-col items-center justify-center mb-4 ${isOut ? 'border-red-500 text-red-500' : isLow ? 'border-orange-500 text-orange-500' : 'border-emerald-500 text-emerald-500'}`}>
               <div className="text-4xl font-black leading-none">{available}</div>
-              <div className="text-[10px] font-bold uppercase mt-1">Dostępne</div>
+              <div className="text-[10px] font-bold uppercase mt-1">{t('parts.details.available')}</div>
             </div>
             
             <div className="grid grid-cols-2 w-full gap-4 pt-4 border-t border-slate-50">
               <div>
-                <div className="text-xs text-slate-400 font-bold uppercase">Fizycznie</div>
+                <div className="text-xs text-slate-400 font-bold uppercase">{t('parts.details.physical')}</div>
                 <div className="text-lg font-black text-slate-700">{part.stock}</div>
               </div>
               <div>
-                <div className="text-xs text-slate-400 font-bold uppercase">Zarezerw.</div>
+                <div className="text-xs text-slate-400 font-bold uppercase">{t('parts.details.reserved')}</div>
                 <div className="text-lg font-black text-orange-500">{reservedQty}</div>
               </div>
             </div>
             <div className="mt-3 w-full bg-slate-50 py-1.5 rounded-lg text-xs font-bold text-slate-500">
-              Stan Minimalny: {part.minStock}
+              {t('parts.details.min_stock')} {part.minStock}
             </div>
           </div>
 
           {/* QR */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Kod QR Części</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">{t('parts.details.qr_title')}</h3>
             <div className="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm">
               <QRCodeCanvas value={qrValue} size={140} level="H" />
             </div>
@@ -232,11 +230,9 @@ export default function PartDetails({ part, onBack, onEdit }) {
           {/* AUDYT */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="ph ph-clock-counter-clockwise text-lg"></i>
-              Operacje magazynowe
-            </h3>
+              <i className="ph ph-clock-counter-clockwise text-lg"></i> {t('parts.details.audit')} </h3>
             {partTxs.length === 0 ? (
-              <div className="text-xs text-slate-400 italic text-center py-2">Brak operacji.</div>
+              <div className="text-xs text-slate-400 italic text-center py-2">{t('parts.details.no_audit')}</div>
             ) : (
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                 {partTxs.map(tx => {
@@ -245,7 +241,7 @@ export default function PartDetails({ part, onBack, onEdit }) {
                     <div key={tx.id} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                       <div>
                         <div className="font-bold text-slate-700">
-                          {tx.type === 'receive' ? 'Przyjęcie' : tx.type === 'return' ? 'Zwrot' : tx.type === 'issue_planned' ? 'Wydanie Serwis' : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? 'Wydanie Awaria' : tx.type}
+                          {tx.type === 'receive' ? t('parts.transactions.types.receive') : tx.type === 'return' ? t('parts.transactions.types.return') : tx.type === 'issue_planned' ? t('parts.transactions.types.issue_planned') : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? t('parts.transactions.types.issue_adhoc') : tx.type}
                         </div>
                         <div className="text-slate-400 text-[10px] mt-0.5">
                           {safeParseDate(tx.date)?.toLocaleDateString('pl-PL')} • {tx.user}
@@ -281,7 +277,7 @@ export default function PartDetails({ part, onBack, onEdit }) {
                         })()}
                         {["issue_planned", "issue_adhoc", "issue"].includes(tx.type) && tx.totalCost > 0 && (
                           <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                            Koszt: {tx.totalCost.toFixed(2)} PLN
+                            {t('parts.details.cost')} {tx.totalCost.toFixed(2)} PLN
                           </div>
                         )}
                       </div>

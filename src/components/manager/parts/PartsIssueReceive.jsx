@@ -1,4 +1,5 @@
 import { useAuth } from '../../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import QRScannerModal from '../../shared/QRScannerModal';
@@ -6,6 +7,7 @@ import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { issueOrReceivePart } from '../../../services/parts.service';
 
 export default function PartsIssueReceive({ onComplete }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
   
@@ -33,10 +35,10 @@ export default function PartsIssueReceive({ onComplete }) {
         setUnitPrice(found.unitPrice || 0);
         setQuantity('');
       } else {
-        alert("Nie znaleziono części o kodzie: " + partId);
+        alert(t('parts.alerts.not_found') + partId);
       }
     } catch (err) {
-      alert("Błąd skanowania kodu QR.");
+      alert(t('parts.alerts.scan_error'));
     }
   };
 
@@ -51,12 +53,12 @@ export default function PartsIssueReceive({ onComplete }) {
     if (!selectedPart) return;
     const qtyNum = Number(quantity);
     if (qtyNum <= 0) {
-      alert("Ilość musi być większa od zera.");
+      alert(t('parts.alerts.qty_zero'));
       return;
     }
     
     if (mode === 'issue' && !selectedMachine) {
-      alert("Wybierz urządzenie.");
+      alert(t('parts.alerts.select_device'));
       return;
     }
 
@@ -74,7 +76,7 @@ export default function PartsIssueReceive({ onComplete }) {
         selectedMachine
       });
 
-      alert(mode === 'receive' ? 'Przyjęto na magazyn.' : 'Wydano z magazynu.');
+      alert(mode === 'receive' ? t('parts.alerts.received') : t('parts.alerts.issued'));
       if (onComplete) onComplete();
       setSelectedPart(null);
       setQuantity('');
@@ -82,7 +84,7 @@ export default function PartsIssueReceive({ onComplete }) {
       setSelectedMachine(null);
     } catch (err) {
       console.error(err);
-      alert("Błąd operacji: " + err.message);
+      alert(t('parts.alerts.op_error') + err.message);
     } finally {
       setLoading(false);
     }
@@ -98,23 +100,21 @@ export default function PartsIssueReceive({ onComplete }) {
     <div className="w-full space-y-4 pb-20">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight">Szybkie Wydania i Przyjęcia</h2>
-          <p className="text-sm text-slate-500 mt-1">Skanuj kody z kuwet, by natychmiast uaktualnić stan fizyczny.</p>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('parts.issue_receive.title')}</h2>
+          <p className="text-sm text-slate-500 mt-1">{t('parts.issue_receive.subtitle')}</p>
         </div>
         <button onClick={() => setIsScannerOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-xl font-bold shadow-md transition-all flex items-center gap-2">
-          <i className="ph ph-qr-code text-xl"></i>
-          Skanuj QR
-        </button>
+          <i className="ph ph-qr-code text-xl"></i> {t('parts.buttons.scan_qr')} </button>
       </div>
 
       {!selectedPart && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lub wyszukaj ręcznie</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.manual_search')}</label>
           <div className="relative">
             <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
             <input
               type="text"
-              placeholder="Wpisz nazwę lub kod części..."
+              placeholder={t('parts.issue_receive.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-slate-700"
@@ -123,16 +123,16 @@ export default function PartsIssueReceive({ onComplete }) {
           
             <div className="mt-4 flex flex-col gap-2 max-h-60 overflow-y-auto pr-2 rounded-xl border border-slate-100 bg-white p-2 shadow-inner">
               {filteredParts.length === 0 ? (
-                <div className="text-sm text-slate-500 p-2">Brak wyników.</div>
+                <div className="text-sm text-slate-500 p-2">{t('parts.list.no_results_title')}</div>
               ) : (
                 filteredParts.slice(0, 20).map(p => (
                   <div key={p.id} onClick={() => handleManualSelect(p)} className="p-3 bg-slate-50 border border-slate-100 hover:border-blue-500 rounded-xl cursor-pointer transition-colors flex justify-between items-center group">
                     <div>
                       <div className="font-bold text-slate-800 group-hover:text-blue-600">{p.name}</div>
-                      <div className="text-xs text-slate-400">KOD: {p.code || '-'}</div>
+                      <div className="text-xs text-slate-400">{t('parts.details.code')} {p.code || '-'}</div>
                     </div>
                     <div className="text-xs font-black text-slate-400 bg-white px-2 py-1 rounded shadow-sm border border-slate-100">
-                      Na stanie: {p.stock}
+                      {t('parts.issue_receive.in_stock')} {p.stock}
                     </div>
                   </div>
                 ))
@@ -153,23 +153,21 @@ export default function PartsIssueReceive({ onComplete }) {
             </div>
             <div>
               <h3 className="text-2xl font-black text-slate-800 leading-tight">{selectedPart.name}</h3>
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Aktualny stan: <span className="text-blue-600">{selectedPart.stock} szt.</span></p>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{t('parts.issue_receive.current_stock')} <span className="text-blue-600">{selectedPart.stock} szt.</span></p>
             </div>
           </div>
 
           <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
             <button onClick={() => { setMode('issue'); setQuantity(''); setExpirationDate(''); setSelectedMachine(null); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${mode === 'issue' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-              <i className="ph ph-minus-circle mr-2 text-red-500"></i> Wydaj
-            </button>
+              <i className="ph ph-minus-circle mr-2 text-red-500"></i> {t('parts.issue_receive.btn_issue')} </button>
             <button onClick={() => { setMode('receive'); setQuantity(''); setExpirationDate(''); setSelectedMachine(null); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${mode === 'receive' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-              <i className="ph ph-plus-circle mr-2 text-emerald-500"></i> Przyjmij (Dostawa)
-            </button>
+              <i className="ph ph-plus-circle mr-2 text-emerald-500"></i> {t('parts.issue_receive.btn_receive')} </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ilość sztuk *</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.qty')}</label>
                 <input 
                   type="number" min="1" step="1" required 
                   value={quantity} onChange={e => setQuantity(e.target.value)} 
@@ -178,12 +176,12 @@ export default function PartsIssueReceive({ onComplete }) {
               </div>
               {mode === 'issue' && (
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Urządzenie / Projekt *</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.device_project')}</label>
                   <div className="relative">
                     <i className="ph ph-gear absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
                     <input
                       type="text"
-                      placeholder="Wyszukaj urządzenie..."
+                      placeholder={t('parts.issue_receive.search_device')}
                       value={selectedMachine ? selectedMachine.name : machineSearch}
                       onChange={(e) => { setMachineSearch(e.target.value); setSelectedMachine(null); }}
                       className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
@@ -213,29 +211,29 @@ export default function PartsIssueReceive({ onComplete }) {
               {mode === 'receive' && (
                 <>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cena nowej dostawy (PLN)</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.new_price')}</label>
                   <input 
                     type="number" min="0" step="0.01" required 
                     value={unitPrice} onChange={e => setUnitPrice(e.target.value)} 
                     className="w-full p-4 text-xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center" 
                   />
-                  <p className="text-[10px] text-slate-400 text-center mt-2">Zaktualizuje globalną cenę na najnowszą ({selectedPart.unitPrice || 0} PLN).</p>
+                  <p className="text-[10px] text-slate-400 text-center mt-2">{t('parts.issue_receive.new_price_desc')} ({selectedPart.unitPrice || 0} PLN).</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data ważności dostawy</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.expiration')}</label>
                   <input 
                     type="date" 
                     value={expirationDate} onChange={e => setExpirationDate(e.target.value)} 
                     className="w-full p-4 text-xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center" 
                   />
-                  <p className="text-[10px] text-slate-400 text-center mt-2">Opcjonalnie (dotyczy tylko tej partii).</p>
+                  <p className="text-[10px] text-slate-400 text-center mt-2">{t('parts.issue_receive.expiration_desc')}</p>
                 </div>
                 </>
               )}
             </div>
 
             <button type="submit" disabled={loading} className={`w-full py-4 rounded-xl font-black text-lg text-white shadow-md transition-all ${loading ? 'opacity-50' : ''} ${mode === 'receive' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'}`}>
-              {loading ? 'Przetwarzanie...' : mode === 'receive' ? `POTWIERDŹ PRZYJĘCIE (+${quantity || 0})` : `POTWIERDŹ WYDANIE (-${quantity || 0})`}
+              {loading ? t('parts.issue_receive.processing') : mode === 'receive' ? `${t('parts.issue_receive.confirm_receive')} (+${quantity || 0})` : `${t('parts.issue_receive.confirm_issue')} (-${quantity || 0})`}
             </button>
           </form>
         </div>
@@ -246,7 +244,7 @@ export default function PartsIssueReceive({ onComplete }) {
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
           onScanSuccess={handleScan}
-          title="Skanuj Część"
+          title={t('parts.buttons.scan_qr')}
         />
       )}
     </div>

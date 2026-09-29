@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { safeParseDate } from '../../../utils/dateHelpers';
 
 export default function PartsQRCodes() {
+  const { t } = useTranslation();
   const parts = useManagerStore(state => state.parts || []);
   const tenantId = getCurrentTenant();
 
@@ -58,7 +60,7 @@ export default function PartsQRCodes() {
 
   const handlePrint = () => {
     if (selectedIds.length === 0) {
-      alert('Wybierz przynajmniej jedną część do druku.');
+      alert(t('parts.qr.print_alert'));
       return;
     }
     window.print();
@@ -71,27 +73,25 @@ export default function PartsQRCodes() {
         {/* Nagłówek i Drukuj */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Zestawienie Kodów QR</h2>
-            <p className="text-sm text-slate-500 mt-1">Wybierz części i wydrukuj ich kody QR.</p>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('parts.qr.title')}</h2>
+            <p className="text-sm text-slate-500 mt-1">{t('parts.qr.subtitle')}</p>
           </div>
           <button 
             onClick={handlePrint} 
             className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2"
           >
-            <i className="ph ph-printer text-lg"></i>
-            Drukuj wybrane
-          </button>
+            <i className="ph ph-printer text-lg"></i> {t('parts.buttons.print_selected')} </button>
         </div>
 
         {/* Filtry */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Wyszukaj</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('parts.qr.search_label')}</label>
             <div className="relative">
               <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
               <input 
                 type="text" 
-                placeholder="Nazwa lub kod..." 
+                placeholder={t('parts.qr.search_placeholder')} 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -99,7 +99,7 @@ export default function PartsQRCodes() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data od</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('parts.qr.date_from')}</label>
             <input 
               type="date" 
               value={dateFrom}
@@ -108,7 +108,7 @@ export default function PartsQRCodes() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data do</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('parts.qr.date_to')}</label>
             <input 
               type="date" 
               value={dateTo}
@@ -124,18 +124,13 @@ export default function PartsQRCodes() {
             <button 
               onClick={handleSelectAll}
               className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-sm font-bold text-slate-700 transition-colors"
-            >
-              Zaznacz wszystkie
-            </button>
+            > {t('parts.buttons.select_all')} </button>
             <button 
               onClick={handleDeselectAll}
               className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-sm font-bold text-slate-700 transition-colors"
-            >
-              Odznacz wszystkie
-            </button>
+            > {t('parts.buttons.deselect_all')} </button>
           </div>
-          <div className="text-sm font-bold text-slate-600">
-            Zaznaczono: <span className="text-blue-600">{selectedIds.length}</span> z {filteredParts.length} widocznych
+          <div className="text-sm font-bold text-slate-600"> {t('parts.qr.selected')} <span className="text-blue-600">{selectedIds.length}</span> {t('parts.qr.of_visible').replace('{total}', filteredParts.length)}
           </div>
         </div>
       </div>
@@ -145,8 +140,8 @@ export default function PartsQRCodes() {
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="ph ph-qr-code text-3xl text-slate-300"></i>
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1">Brak części</h3>
-          <p className="text-slate-500">Nie znaleziono części spełniających kryteria.</p>
+          <h3 className="text-lg font-bold text-slate-800 mb-1">{t('parts.qr.no_parts')}</h3>
+          <p className="text-slate-500">{t('parts.list.no_results_desc')}</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 print:shadow-none print:border-none print:p-0 print:bg-transparent">
@@ -177,7 +172,7 @@ export default function PartsQRCodes() {
                   {part.location && (
                     <div className="text-[10px] bg-slate-100 px-2 py-0.5 rounded mt-2 font-bold print:bg-white print:border print:border-slate-200">{part.location}</div>
                   )}
-                  <div className="text-[9px] text-slate-400 font-semibold mt-2 print:text-slate-500">Edycja: {safeParseDate(part.updatedAt || part.createdAt)?.toLocaleDateString('pl-PL') || '-'}</div>
+                  <div className="text-[9px] text-slate-400 font-semibold mt-2 print:text-slate-500">{t('parts.qr.edited')} {safeParseDate(part.updatedAt || part.createdAt)?.toLocaleDateString('pl-PL') || '-'}</div>
                 </div>
               );
             })}

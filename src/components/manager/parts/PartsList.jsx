@@ -1,4 +1,5 @@
 import { useAuth } from '../../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import DataTable from '../../shared/DataTable';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import PartDetails from './PartDetails';
 import QRScannerModal from '../../shared/QRScannerModal';
 
 export default function PartsList({ }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -100,8 +102,8 @@ export default function PartsList({ }) {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 mb-4">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="hidden md:block">
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">Baza Magazynowa</h2>
-            <p className="text-sm text-slate-500 mt-1">Zarządzaj częściami zapasowymi, przypisuj je do maszyn i śledź stany</p>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('parts.layout.title')}</h2>
+            <p className="text-sm text-slate-500 mt-1">{t('parts.layout.subtitle')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -109,14 +111,14 @@ export default function PartsList({ }) {
               className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2"
             >
               <i className="ph ph-qr-code text-lg"></i>
-              Skanuj QR
+              {t('parts.buttons.scan_qr')}
             </button>
             <button
               onClick={() => { setIsFormOpen(true); setSelectedPartId(null); }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2"
             >
               <i className="ph ph-plus text-lg"></i>
-              Dodaj Część
+              {t('parts.buttons.add_part')}
             </button>
           </div>
         </div>
@@ -126,7 +128,7 @@ export default function PartsList({ }) {
             <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
             <input
               type="text"
-              placeholder="Szukaj po nazwie, kodzie, lokalizacji..."
+              placeholder={t('parts.list.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-slate-700"
@@ -143,7 +145,7 @@ export default function PartsList({ }) {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {f === 'all' ? 'Wszystkie' : f === 'available' ? 'Dostępne' : 'Na wyczerpaniu'}
+                {f === 'all' ? t('parts.list.filter_all') : f === 'available' ? t('parts.list.filter_available') : t('parts.list.filter_low')}
               </button>
             ))}
           </div>
@@ -157,8 +159,8 @@ export default function PartsList({ }) {
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="ph ph-archive-box text-3xl text-slate-300"></i>
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">Brak wyników</h3>
-            <p className="text-slate-500">Nie znaleziono części spełniających kryteria.</p>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">{t('parts.list.no_results_title')}</h3>
+            <p className="text-slate-500">{t('parts.list.no_results_desc')}</p>
           </div>
         ) : (
                       <div className="w-full">
@@ -167,7 +169,7 @@ export default function PartsList({ }) {
                 data={filteredParts}
                 columns={[
                   {
-                    header: 'Nazwa Części / Kod',
+                    header: t('parts.table.name_code'),
                     accessor: 'name',
                     render: (part) => {
                       const isOut = part.available <= 0;
@@ -186,12 +188,12 @@ export default function PartsList({ }) {
                     }
                   },
                   {
-                    header: 'Lokalizacja',
+                    header: t('parts.table.location'),
                     accessor: 'location',
                     render: (part) => <span className="text-xs font-medium text-slate-600">{part.location || '-'}</span>
                   },
                   {
-                    header: 'Dostępne',
+                    header: t('parts.table.available'),
                     accessor: 'available',
                     align: 'center',
                     render: (part) => {
@@ -206,7 +208,7 @@ export default function PartsList({ }) {
                     }
                   },
                   {
-                    header: 'Akcje',
+                    header: t('parts.table.actions'),
                     accessor: 'actions',
                     align: 'right',
                     render: (part) => (
@@ -214,7 +216,7 @@ export default function PartsList({ }) {
                         onClick={(e) => { e.stopPropagation(); setSelectedPartId(part.id); }} 
                         className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm ml-auto"
                       >
-                        Szczegóły <i className="ph ph-caret-right font-bold"></i>
+                        {t('parts.buttons.details')} <i className="ph ph-caret-right font-bold"></i>
                       </button>
                     )
                   }
@@ -244,13 +246,13 @@ export default function PartsList({ }) {
                       
                       <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-lg p-3">
                         <div>
-                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Dostępne</div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('parts.table.available')}</div>
                           <div className={`text-lg font-black ${isOut ? 'text-red-600' : isLow ? 'text-orange-500' : 'text-emerald-600'}`}>
                             {part.available} <span className="text-xs font-semibold text-slate-400 ml-0.5">{part.unit || 'szt.'}</span>
                           </div>
                         </div>
                         <div>
-                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Lokalizacja</div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('parts.table.location')}</div>
                           <div className="text-sm font-semibold text-slate-700 mt-1">{part.location || '-'}</div>
                         </div>
                       </div>
@@ -274,7 +276,7 @@ export default function PartsList({ }) {
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
           onScanSuccess={handleScan}
-          title="Skanuj Kod QR Części"
+          title={t('parts.details.qr_title')}
         />
       )}
     </div>

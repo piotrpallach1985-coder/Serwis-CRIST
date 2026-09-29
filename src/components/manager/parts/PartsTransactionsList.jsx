@@ -1,4 +1,5 @@
 import { useAuth } from '../../../hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import PartsIssueReceive from './PartsIssueReceive';
 import { fixLegacyTransactions } from '../../../services/parts.service';
 
 export default function PartsTransactionsList({ onManualIssue }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const parts = useManagerStore((state) => state.parts || []);
@@ -116,10 +118,10 @@ export default function PartsTransactionsList({ onManualIssue }) {
   );
 
   const getTypeName = (tx) => {
-    if (tx.type === 'receive') return 'Przyjęcie';
-    if (tx.type === 'return') return 'Zwrot';
-    if (tx.type === 'issue_planned') return 'Wydanie Serwis';
-    if (tx.type === 'issue_adhoc' || tx.type === 'issue') return 'Wydanie Awaria';
+    if (tx.type === 'receive') return t('parts.transactions.types.receive');
+    if (tx.type === 'return') return t('parts.transactions.types.return');
+    if (tx.type === 'issue_planned') return t('parts.transactions.types.issue_planned');
+    if (tx.type === 'issue_adhoc' || tx.type === 'issue') return t('parts.transactions.types.issue_adhoc');
     return tx.type;
   };
 
@@ -143,42 +145,38 @@ export default function PartsTransactionsList({ onManualIssue }) {
       <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="hidden md:block">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <i className="ph ph-list-numbers text-blue-500"></i>
-            Operacje magazynowe
-          </h2>
+            <i className="ph ph-list-numbers text-blue-500"></i> {t('parts.tx_list.title')} </h2>
         </div>
         <button
           onClick={() => setIsIssueModalOpen(true)}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors font-medium text-sm"
         >
-          <i className="ph ph-hand-coins"></i>
-          Dodaj operację
-        </button>
+          <i className="ph ph-hand-coins"></i> {t('parts.tx_list.add_tx')} </button>
       </div>
 
       <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 border-b border-gray-100">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Typ operacji</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('parts.tx_list.type_label')}</label>
           <select 
             value={typeFilter} 
             onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
             className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">Wszystkie</option>
-            <option value="receive">Przyjęcie</option>
-            <option value="issue_planned">Wydanie Serwis</option>
-            <option value="issue_adhoc">Wydanie Awaria</option>
-            <option value="remanent">Remanent</option>
-            <option value="return">Zwrot</option>
+            <option value="all">{t('parts.tx_list.all')}</option>
+            <option value="receive">{t('parts.transactions.types.receive')}</option>
+            <option value="issue_planned">{t('parts.transactions.types.issue_planned')}</option>
+            <option value="issue_adhoc">{t('parts.transactions.types.issue_adhoc')}</option>
+            <option value="remanent">{t('parts.tx_list.remanent')}</option>
+            <option value="return">{t('parts.transactions.types.return')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Wyszukaj</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('parts.tx_list.search_label')}</label>
           <div className="relative">
             <i className="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-400"></i>
             <input 
               type="text" 
-              placeholder="Część, maszyna, użytkownik..." 
+              placeholder={t('parts.tx_list.search_placeholder')} 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
               className="w-full rounded-lg border-gray-300 border p-2 pl-9 text-sm focus:ring-2 focus:ring-blue-500"
@@ -186,7 +184,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Od daty</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('parts.tx_list.date_from')}</label>
           <input 
             type="date" 
             value={dateFrom}
@@ -195,7 +193,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Do daty</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('parts.tx_list.date_to')}</label>
           <input 
             type="date" 
             value={dateTo}
@@ -209,7 +207,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
         {/* MOBILE VIEW */}
         <div className="md:hidden flex flex-col gap-3">
           {currentData.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 italic">Brak operacji spełniających kryteria.</div>
+            <div className="p-8 text-center text-gray-500 italic">{t('parts.tx_list.no_tx')}</div>
           ) : (
             currentData.map(tx => {
               const part = parts.find(p => p.id === tx.partId);
@@ -222,19 +220,19 @@ export default function PartsTransactionsList({ onManualIssue }) {
               if (tx.type === 'receive') {
                 icon = 'ph-arrow-down-left text-green-600';
                 bg = 'bg-green-100';
-                textType = 'Przyjęcie';
+                textType = t('parts.transactions.types.receive');
                 qtyColor = 'text-green-600';
                 sign = '+';
               } else if (tx.type.startsWith('issue')) {
                 icon = 'ph-arrow-up-right text-red-600';
                 bg = 'bg-red-100';
-                textType = tx.type === 'issue_planned' ? 'Wydanie Serwis' : 'Wydanie Awaria';
+                textType = tx.type === 'issue_planned' ? t('parts.transactions.types.issue_planned') : t('parts.transactions.types.issue_adhoc');
                 qtyColor = 'text-red-600';
                 sign = '-';
               } else if (tx.type === 'return') {
                 icon = 'ph-arrow-u-down-left text-blue-600';
                 bg = 'bg-blue-100';
-                textType = 'Zwrot';
+                textType = t('parts.transactions.types.return');
                 qtyColor = 'text-blue-600';
                 sign = '+';
               }
@@ -259,7 +257,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
                       className={"mt-3 text-sm font-bold " + (part ? 'text-blue-600 hover:text-blue-800 cursor-pointer underline decoration-blue-300 decoration-dashed underline-offset-4' : 'text-slate-800')}
                       onClick={() => part && navigate('/manager/ur/parts_inventory?openPart=' + tx.partId)}
                     >
-                      {part?.name || 'Nieznana część'}
+                      {part?.name || t('parts.tx_list.unknown_part')}
                     </div>
                   {(tx.machineId || tx.machineName) && (
                     <div 
@@ -284,18 +282,18 @@ export default function PartsTransactionsList({ onManualIssue }) {
           <table className="w-full text-left border-collapse min-w-[800px] bg-white">
             <thead>
               <tr className="bg-slate-50 border-y border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                <th className="p-3 font-medium">Data</th>
-                <th className="p-3 font-medium">Typ</th>
-                <th className="p-3 font-medium">Część</th>
-                <th className="p-3 font-medium text-right">Ilość</th>
-                <th className="p-3 font-medium text-right">Koszt (PLN)</th>
-                <th className="p-3 font-medium">Maszyna</th>
-                <th className="p-3 font-medium">Użytkownik</th>
+                <th className="p-3 font-medium">{t('parts.tx_list.date')}</th>
+                <th className="p-3 font-medium">{t('parts.tx_list.type')}</th>
+                <th className="p-3 font-medium">{t('parts.tx_list.part')}</th>
+                <th className="p-3 font-medium text-right">{t('parts.tx_list.qty')}</th>
+                <th className="p-3 font-medium text-right">{t('parts.tx_list.cost')}</th>
+                <th className="p-3 font-medium">{t('parts.tx_list.machine')}</th>
+                <th className="p-3 font-medium">{t('parts.tx_list.user')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {currentData.length === 0 ? (
-                <tr><td colSpan="7" className="p-8 text-center text-gray-500 italic">Brak operacji spełniających kryteria.</td></tr>
+                <tr><td colSpan="7" className="p-8 text-center text-gray-500 italic">{t('parts.tx_list.no_tx')}</td></tr>
               ) : (
                 currentData.map(tx => {
                   const part = parts.find(p => p.id === tx.partId);
@@ -309,19 +307,19 @@ export default function PartsTransactionsList({ onManualIssue }) {
                   if (tx.type === 'receive') {
                     icon = 'ph-arrow-down-left text-green-600';
                     bg = 'bg-green-100';
-                    textType = 'Przyjęcie';
+                    textType = t('parts.transactions.types.receive');
                     qtyColor = 'text-green-600';
                     sign = '+';
                   } else if (tx.type.startsWith('issue')) {
                     icon = 'ph-arrow-up-right text-red-600';
                     bg = 'bg-red-100';
-                    textType = tx.type === 'issue_planned' ? 'Wydanie Serwis' : 'Wydanie Awaria';
+                    textType = tx.type === 'issue_planned' ? t('parts.transactions.types.issue_planned') : t('parts.transactions.types.issue_adhoc');
                     qtyColor = 'text-red-600';
                     sign = '-';
                   } else if (tx.type === 'return') {
                     icon = 'ph-arrow-u-down-left text-blue-600';
                     bg = 'bg-blue-100';
-                    textType = 'Zwrot';
+                    textType = t('parts.transactions.types.return');
                     qtyColor = 'text-blue-600';
                     sign = '+';
                   }
@@ -380,8 +378,8 @@ export default function PartsTransactionsList({ onManualIssue }) {
       {totalPages > 1 && (
         <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-xl">
           <p className="text-sm text-gray-500">
-            Strona <span className="font-medium text-gray-900">{currentPage}</span> z <span className="font-medium text-gray-900">{totalPages}</span>
-            <span className="ml-2 text-gray-400">({filteredTransactions.length} wpisów)</span>
+            {t('parts.tx_list.page')} <span className="font-medium text-gray-900">{currentPage}</span> {t('parts.tx_list.of')} <span className="font-medium text-gray-900">{totalPages}</span>
+            <span className="ml-2 text-gray-400">({t('parts.tx_list.entries').replace('{total}', filteredTransactions.length)})</span>
           </p>
           <div className="flex gap-2">
             <button
