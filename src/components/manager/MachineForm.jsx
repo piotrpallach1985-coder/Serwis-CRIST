@@ -120,28 +120,28 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
         </div>
         <div className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa maszyny *</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-blue-500" placeholder="np. Suwnica S-01" required />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Rejon / Numer Hali</label>
-                <select value={regionId} onChange={e => setRegionId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white" required>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Rejon / Numer Hali *</label>
+                <select value={regionId} onChange={e => setRegionId(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-blue-500" required>
                   <option value="">-- Wybierz Rejon --</option>
                   {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Przelot / Inf. dodatkowa (Opcjonalnie)</label>
-                <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Przelot 2 / Magazyn" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Przelot / Info</label>
+                <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="np. Przelot 2 / Magazyn" />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Numer wew. UR (Opcjonalnie)</label>
-                <input type="text" value={internalId} onChange={(e) => setInternalId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. UR-123" />
-              </div>
-              <div className="sm:col-span-2 lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa maszyny</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Suwnica S-01" required />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Numer wew. UR</label>
+                <input type="text" value={internalId} onChange={(e) => setInternalId(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="np. UR-123" />
               </div>
             </div>
-            <div>
+              <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna nadrzędna (Opcjonalnie)</label>
               <select value={parentId} onChange={handleParentChange} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
                 <option value="">Brak (Główna maszyna)</option>

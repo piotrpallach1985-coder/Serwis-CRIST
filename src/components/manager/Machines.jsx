@@ -441,6 +441,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)} 
         editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
+        initialParentId={formInitialParentId}
         regions={regions}
         onSaved={(msg, newMachineId) => {
     showToast(msg, 'success');
