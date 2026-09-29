@@ -125,10 +125,13 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
               <div>
                 {parentMachine && (
-                  <div className="text-xs font-semibold text-blue-600 flex items-center gap-1 mb-0.5">
-                    <i className="ph ph-arrow-u-up-left"></i> Podzespół urządzenia: {parentMachine.name}
-                  </div>
-                )}
+                    <div 
+                      onClick={() => onViewRelatedMachine && onViewRelatedMachine(parentMachine)}
+                      className="text-xs font-semibold text-blue-600 flex items-center gap-1 mb-0.5 cursor-pointer hover:text-blue-800 hover:underline w-fit"
+                    >
+                      <i className="ph ph-arrow-u-up-left"></i> Podzespół urządzenia: {parentMachine.name}
+                    </div>
+                  )}
                 <h1 className="text-2xl font-black text-gray-900">{machine.name}</h1>
                 <div className="text-gray-400 font-mono text-sm">ID: {machine.id}</div>
               </div>
@@ -170,19 +173,55 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
             </div>
             
-            {childMachines.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Podzespoły (Drzewo aktywów)</div>
-                <ul className="flex flex-col gap-2">
-                  {childMachines.map(child => (
-                    <li key={child.id} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-50 p-2 rounded border border-gray-100">
-                      <i className="ph ph-gear text-blue-500 text-lg"></i>
-                      {child.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            
+              {childMachines.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Podzespoły (Drzewo aktywów)</div>
+                  <ul className="flex flex-col gap-2">
+                    {childMachines.map(child => (
+                      <li 
+                        key={child.id} 
+                        onClick={() => onViewRelatedMachine && onViewRelatedMachine(child)}
+                        className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 p-2 rounded border border-gray-100 cursor-pointer transition-colors"
+                      >
+                        <i className="ph ph-gear text-blue-500 text-lg"></i>
+                        {child.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* KOMPATYBILNE CZĘŚCI (BOM) */}
+              {(() => {
+                const compatibleParts = parts.filter(p => p.compatibleMachines && p.compatibleMachines.includes(machine.id));
+                if (compatibleParts.length === 0) return null;
+                return (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Części zamienne (BOM)</div>
+                    <ul className="flex flex-col gap-2">
+                      {compatibleParts.map(part => (
+                        <li 
+                          key={part.id} 
+                          className="flex items-center justify-between text-sm font-semibold text-gray-700 bg-emerald-50/50 p-2 rounded border border-emerald-100"
+                        >
+                          <div className="flex items-center gap-2">
+                            <i className="ph ph-nut text-emerald-600 text-lg"></i>
+                            <div>
+                              <div className="text-gray-800">{part.name}</div>
+                              {part.code && <div className="text-xs text-gray-500 font-mono">{part.code}</div>}
+                            </div>
+                          </div>
+                          <div className="text-xs px-2 py-1 bg-white rounded-md border border-gray-200 text-gray-600">
+                            Stan: <span className={part.stock > 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{part.stock} {part.unit || 'szt.'}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
+  
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4">
