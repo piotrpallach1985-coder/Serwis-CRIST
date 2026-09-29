@@ -26,13 +26,26 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
       setAdditionalDescription(editingMachine.additionalDescription || '');
     } else {
       setName('');
-      setBay('');
-      setRegionId('');
       setInternalId('');
-      setParentId('');
       setAdditionalDescription('');
+      
+      if (initialParentId) {
+        setParentId(initialParentId);
+        const pm = machines.find(m => m.id === initialParentId);
+        if (pm) {
+          setRegionId(pm.regionId || '');
+          setBay(pm.bay || '');
+        } else {
+          setRegionId('');
+          setBay('');
+        }
+      } else {
+        setParentId('');
+        setRegionId('');
+        setBay('');
+      }
     }
-  }, [editingMachine, isOpen]);
+  }, [editingMachine, isOpen, initialParentId, machines]);
 
   if (!isOpen) return null;
 
@@ -95,7 +108,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-start justify-center p-4 overflow-y-auto" >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10">
           <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">

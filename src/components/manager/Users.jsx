@@ -136,7 +136,7 @@ export default function Users() {
       </div>
 
       {isFormOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[10000] pb-24 md:pb-4 flex items-center justify-center p-4 overflow-y-auto" onClick={(e) => { if(e.target === e.currentTarget) setIsFormOpen(false); }}>
+        <div className="fixed inset-0 bg-black/60 z-[10000] pb-24 md:pb-4 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl animate-fade-in flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
