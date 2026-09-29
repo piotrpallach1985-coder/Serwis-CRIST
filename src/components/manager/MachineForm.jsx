@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -6,6 +7,8 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addMachine, updateMachine } from '../../services/machines.service';
 
 export default function MachineForm({ isOpen, onClose, editingMachine, initialParentId, regions, onSaved, onError }) {
+  const { t } = useTranslation();
+
   const [name, setName] = useState('');
   const [bay, setBay] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -66,7 +69,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
     e.preventDefault();
     const machines = useManagerStore.getState().machines || [];
     if (!editingMachine && limits && machines.length >= (limits.maxMachines || 50)) {
-       alert('Osiągnięto limit maszyn (' + (limits.maxMachines || 50) + ').');
+       alert(t('machines.form.limitReached') + (limits.maxMachines || 50) + ').');
        return;
     }
     if (!name.trim() || !regionId) return;
@@ -86,7 +89,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
           additionalDescription: additionalDescription.trim(),
           qrCreatedAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
-        onSaved('Zaktualizowano maszynę');
+        onSaved(t('machines.toasts.machineUpdated'));
       } else {
         const res = await addMachine({
             name: name.trim(),
@@ -98,11 +101,11 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
             isDeleted: false,
             currentWorkHours: 0
           });
-          onSaved('Maszyna została dodana pomyślnie.', res.id);
+          onSaved(t('machines.toasts.machineAdded'), res.id);
       }
       onClose();
     } catch (err) {
-      onError('Wystąpił błąd: ' + err.message);
+      onError(t('machines.toasts.error') + err.message);
     }
     setLoading(false);
   };
@@ -112,7 +115,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10">
           <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
-            {editingMachine ? 'Edytuj maszynę' : 'Dodaj nową maszynę i wygeneruj kod QR'}
+            {editingMachine ? t('machines.form.editMachine') : t('machines.form.addMachine')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
             <i className="ph ph-x text-2xl"></i>
@@ -121,44 +124,44 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
         <div className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa maszyny *</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-blue-500" placeholder="np. Suwnica S-01" required />
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('machines.form.machineName')}</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-blue-500" placeholder={t('machines.form.machineNamePlaceholder')} required />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Rejon / Numer Hali *</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">{t('machines.form.region')}</label>
                 <select value={regionId} onChange={e => setRegionId(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-blue-500" required>
-                  <option value="">-- Wybierz Rejon --</option>
+                  <option value="">{t('machines.form.selectRegion')}</option>
                   {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Przelot / Info</label>
-                <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="np. Przelot 2 / Magazyn" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('machines.form.bay')}</label>
+                <input type="text" value={bay} onChange={(e) => setBay(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('machines.form.bayPlaceholder')} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Numer wew. UR</label>
-                <input type="text" value={internalId} onChange={(e) => setInternalId(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="np. UR-123" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('machines.form.internalIdLabel')}</label>
+                <input type="text" value={internalId} onChange={(e) => setInternalId(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('machines.form.internalIdPlaceholder')} />
               </div>
             </div>
               <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna nadrzędna (Opcjonalnie)</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('machines.form.parentMachine')}</label>
               <select value={parentId} onChange={handleParentChange} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
-                <option value="">Brak (Główna maszyna)</option>
+                <option value="">{t('machines.form.noParent')}</option>
                 {machines.filter(m => m.id !== (editingMachine ? editingMachine.id : null)).map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Dodatkowy opis awaryjny (Opcjonalnie)</label>
-              <textarea value={additionalDescription} onChange={(e) => setAdditionalDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none resize-y min-h-[80px]" placeholder="Opis pomocniczy widoczny dla pracowników..."></textarea>
-              <p className="text-xs text-gray-400 mt-1">Ten opis będzie widoczny pod nazwą maszyny, może pomóc w dokładniejszej identyfikacji.</p>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('machines.form.additionalDescription')}</label>
+              <textarea value={additionalDescription} onChange={(e) => setAdditionalDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none resize-y min-h-[80px]" placeholder={t('machines.form.additionalDescriptionPlaceholder')}></textarea>
+              <p className="text-xs text-gray-400 mt-1">{t('machines.form.additionalDescriptionHint')}</p>
             </div>
             {editingMachine && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mt-4 text-yellow-800 text-sm">
-                <p className="font-bold"><i className="ph ph-warning-circle mr-1"></i> Uwaga dotycząca kodów QR</p>
-                <p>Jeśli zmieniasz nazwę maszyny, stary, wydrukowany kod QR (naklejka) będzie miał nieaktualny napis. Pamiętaj, aby po zapisaniu zmian wygenerować i wydrukować <strong>nowy kod QR</strong>!</p>
+                <p className="font-bold"><i className="ph ph-warning-circle mr-1"></i> {t('machines.form.qrWarningTitle')}</p>
+                <p>{t('machines.form.qrWarningText')}<strong>{t('machines.form.newQr')}</strong>!</p>
               </div>
             )}
             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
@@ -167,11 +170,11 @@ export default function MachineForm({ isOpen, onClose, editingMachine, initialPa
                 onClick={onClose}
                 className="bg-gray-100 text-gray-700 font-semibold py-2.5 px-6 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                Anuluj
+                {t('machines.buttons.cancel')}
               </button>
               <button disabled={loading} type="submit" className="bg-blue-600 text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 min-w-[150px] shadow-sm">
                 {loading ? <i className="ph ph-spinner animate-spin"></i> : <i className="ph ph-check font-bold"></i>}
-                {editingMachine ? 'Zapisz zmiany' : 'Dodaj maszynę'}
+                {editingMachine ? t('machines.buttons.saveChanges') : t('machines.buttons.addMachineBtn')}
               </button>
             </div>
           </form>

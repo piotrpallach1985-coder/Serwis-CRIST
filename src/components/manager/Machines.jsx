@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import {  useManagerStore } from '../../store/managerStore';
@@ -29,6 +30,8 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 export default function Machines({ onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
+  const { t } = useTranslation();
+
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -86,7 +89,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         if (targetMachine) {
           handleViewMachine(targetMachine, true);
         } else {
-          alert('Nie znaleziono zeskanowanej maszyny w bazie tej firmy.');
+          alert(t('machines.alerts.notFoundScanned'));
         }
         
         setSearchParams(prev => {
@@ -105,9 +108,9 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   const handleDeleteMachine = (id, name) => {
     setConfirmModalConfig({
       isOpen: true,
-      title: 'Potwierdź usunięcie maszyny',
-      message: `Czy na pewno chcesz usunąć maszynę "${name}"? Tej operacji nie można cofnąć (maszyna zostanie oznaczona jako usunięta).`,
-      confirmText: 'Usuń maszynę',
+      title: t('machines.alerts.confirmDeleteTitle'),
+      message: t('machines.alerts.confirmDeleteMessage', { name: name }),
+      confirmText: t('machines.alerts.deleteMachine'),
       onConfirm: async () => {
         try {
           const tenantId = getCurrentTenant();
@@ -133,7 +136,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             batch.update(docSnap.ref, { 
               status: 5, // Zamknięte/Zarchiwizowane
               closedAt: new Date().toISOString(),
-              history: arrayUnion({ action: 'Automatyczne zamknięcie', date: new Date().toISOString(), user: 'System', note: 'Maszyna została usunięta' })
+              history: arrayUnion({ action: t('machines.history.autoClose'), date: new Date().toISOString(), user: t('machines.history.system'), note: t('machines.history.machineDeleted') })
             });
           });
 
@@ -145,16 +148,16 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             batch.update(docSnap.ref, { 
               status: 'completed',
               completedAt: new Date().toISOString(),
-              history: arrayUnion({ action: 'Automatyczne zamknięcie', date: new Date().toISOString(), user: 'System', note: 'Maszyna została usunięta' })
+              history: arrayUnion({ action: t('machines.history.autoClose'), date: new Date().toISOString(), user: t('machines.history.system'), note: t('machines.history.machineDeleted') })
             });
           });
 
           await batch.commit();
 
-          showToast('Maszyna i powiązane zadania zostały zarchiwizowane');
+          showToast(t('machines.toasts.machineArchived'));
           if (selectedMachine?.id === id) setSelectedMachine(null);
         } catch (err) {
-          showToast('Błąd: ' + err.message, 'error');
+          showToast(t('machines.toasts.error') + err.message, 'error');
         } finally {
           closeConfirmModal();
         }
@@ -166,9 +169,9 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     try {
       const cleanName = name.replace('(DO WERYFIKACJI)', '').trim();
       await updateMachine(id, { name: cleanName });
-      showToast('Maszyna zweryfikowana.');
+      showToast(t('machines.toasts.machineVerified'));
     } catch (err) {
-      showToast('Błąd: ' + err.message, 'error');
+      showToast(t('machines.toasts.error') + err.message, 'error');
     }
   };
 
@@ -182,7 +185,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     printWindow.document.write(`
       <html>
         <head>
-          <title>Drukuj QR - ${name}</title>
+          <title>${t('machines.print.printQr')}${name}</title>
           <style>
               body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
               .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
@@ -194,11 +197,11 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             <div class="qr-container">
               ${svgData}
               <h2>${name}</h2>
-              <p>Data: ${(() => {
+              <p>${t('machines.print.date')}${(() => {
                 try {
                   const d = safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date();
                   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                } catch(e) { return 'Brak danych'; }
+                } catch(e) { return t('machines.print.noData'); }
               })()}</p>
             </div>
             <script>window.onload = function() { window.print(); window.close(); }</script>
@@ -214,17 +217,17 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
       const currentTenantId = getCurrentTenant();
       const qrValue = `tenant=${currentTenantId}&machine=${machine.id}`;
       navigator.clipboard.writeText(qrValue)
-        .then(() => showToast('Skopiowano ID maszyny do schowka (NFC)', 'success'))
-        .catch(() => showToast('Błąd kopiowania do schowka', 'error'));
+        .then(() => showToast(t('machines.toasts.copiedNfc'), 'success'))
+        .catch(() => showToast(t('machines.toasts.copyNfcError'), 'error'));
     };
 
     const handleGenerateNewQR = async (machineId) => {
       try {
         const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
         await updateDoc(machineRef, { qrCreatedAt: serverTimestamp() });
-        showToast('Wygenerowano nowy kod QR', 'success');
+        showToast(t('machines.toasts.newQrGenerated'), 'success');
       } catch (error) {
-        showToast('Błąd generowania kodu QR', 'error');
+        showToast(t('machines.toasts.newQrError'), 'error');
       }
     };
 
@@ -271,7 +274,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   const handleScanSuccess = (decoded, rawQr) => {
     setIsScanning(false);
     if (!decoded) {
-      showToast('Błąd odczytu QR: brak danych.', 'error');
+      showToast(t('machines.toasts.qrReadError'), 'error');
       return;
     }
 
@@ -299,9 +302,9 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
 
     if (found) {
       handleViewMachine(found, true);
-      showToast('Wczytano maszyne: ' + found.name, 'success');
+      showToast(t('machines.toasts.machineLoaded') + found.name, 'success');
     } else {
-      showToast('Nie znaleziono maszyny: ' + machineId, 'error');
+      showToast(t('machines.toasts.machineNotFound') + machineId, 'error');
     }
   };
 
@@ -345,8 +348,8 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         isOpen={isScanning}
         onClose={() => setIsScanning(false)}
         onScanSuccess={handleScanSuccess}
-        title="Skanuj kod QR (Baza Urzadzen)"
-        subtitle="Skieruj aparat na kod QR maszyny, aby otworzyć jej detale."
+        title={t('machines.scanner.qrTitle')}
+        subtitle={t('machines.scanner.qrSubtitle')}
       />
         <NFCScannerModal
           isOpen={isNfcScanning}
@@ -355,7 +358,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             setIsNfcScanning(false);
             handleScanSuccess(decoded);
           }}
-          title="Odczyt NFC (Baza Urządzeń)"
+          title={t('machines.scanner.nfcTitle')}
         />
 
       {selectedMachine ? (
@@ -413,14 +416,14 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
               <div className="flex gap-2 w-full md:w-auto">
                 <button onClick={() => setIsScanning(true)} className="flex-1 md:flex-none bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                  <i className="ph ph-qr-code text-lg"></i> Skanuj
+                  <i className="ph ph-qr-code text-lg"></i> {t('machines.buttons.scan')}
                 </button>
                   <button onClick={() => setIsNfcScanning(true)} className="flex-1 md:flex-none bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                    <i className="ph ph-waves text-lg"></i> NFC
+                    <i className="ph ph-waves text-lg"></i> {t('machines.buttons.nfc')}
                   </button>
 
                 <button onClick={handleExportExcel} className="flex-1 md:flex-none bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                  <i className="ph ph-file-xls text-lg"></i> Excel
+                  <i className="ph ph-file-xls text-lg"></i> {t('machines.buttons.excel')}
                 </button>
               </div>
             </div>

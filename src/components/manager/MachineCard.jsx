@@ -1,7 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
 ﻿import React from 'react';
 
 export default function MachineCard({ machine, regions, onClick, onPrintQR, onShowQR, handleCopyNfc }) {
+  const { t } = useTranslation();
+
   return (
     <div 
       onClick={() => onClick(machine)}
@@ -9,7 +12,7 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
     >
       {machine.name?.includes('(DO WERYFIKACJI)') && (
         <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-[9px] font-black px-2 py-0.5 rounded-bl-lg rounded-tr-xl tracking-wider">
-          WERYFIKACJA
+          {t('machines.card.verification')}
         </div>
       )}
       
@@ -32,23 +35,23 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
           )}
           <span className={machine.hasChildren ? 'cursor-pointer hover:text-blue-600' : ''}>{machine.name}</span>
         </h4>
-        <p className="text-xs font-mono text-gray-400 mb-1">ID: {machine.id}</p>
+        <p className="text-xs font-mono text-gray-400 mb-1">{t('machines.card.id')}{machine.id}</p>
         
         <div className="text-sm font-semibold text-slate-700 mb-2">
-          Nr wew: {machine.internalId || '-'}
+          {t('machines.card.internalId')}{machine.internalId || '-'}
         </div>
         
         <div className="text-xs text-slate-500 space-y-1">
-          <div className="flex items-center gap-1"><i className="ph ph-map-pin"></i> Rejon: {regions.find(r => r.id === machine.regionId)?.name || '-'}</div>
-          <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> Hala/Przelot: {machine.bay || '-'}</div>
-          <div className="flex items-center gap-1"><i className="ph ph-hourglass"></i> RBG: {machine.currentWorkHours || 0}</div>
+          <div className="flex items-center gap-1"><i className="ph ph-map-pin"></i> {t('machines.card.region')}{regions.find(r => r.id === machine.regionId)?.name || '-'}</div>
+          <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> {t('machines.card.bay')}{machine.bay || '-'}</div>
+          <div className="flex items-center gap-1"><i className="ph ph-hourglass"></i> {t('machines.card.rbg')}{machine.currentWorkHours || 0}</div>
         </div>
         {handleCopyNfc && (
           <button 
             onClick={(e) => { e.stopPropagation(); handleCopyNfc(machine); }} 
             className="mt-3 w-full bg-slate-50 border border-slate-200 text-slate-600 hover:text-purple-600 font-bold text-xs py-1.5 rounded flex justify-center items-center gap-1.5 transition-colors"
           >
-            <i className="ph ph-link"></i> Kopiuj ID NFC
+            <i className="ph ph-link"></i> {t('machines.card.copyNfc')}
           </button>
         )}
       </div>

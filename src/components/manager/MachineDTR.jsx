@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useManagerStore } from '../../store/managerStore';
@@ -14,6 +15,8 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
+  const { t } = useTranslation();
+
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -42,7 +45,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
   }, [machine.dtrFiles, machine.techNotes]);
 
   const handleDeleteNote = async (noteId) => {
-    if (!window.confirm("Czy na pewno chcesz usunąć tę notatkę?")) return;
+    if (!window.confirm(t('machines.dtr.confirmDeleteNote'))) return;
     try {
       const updatedNotes = localNotes.filter(n => n.id !== noteId);
       setLocalNotes(updatedNotes);
@@ -51,7 +54,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
       });
     } catch (err) {
       console.error(err);
-      alert('Błąd podczas usuwania notatki');
+      alert(t('machines.dtr.deleteNoteError'));
     }
   };
 
@@ -62,7 +65,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
         id: Date.now().toString(),
         text: newNote.trim(),
         createdAt: new Date().toISOString(),
-        createdBy: user?.name || 'Nieznany'
+        createdBy: user?.name || t('machines.dtr.unknownUser')
       };
       const updatedNotes = [...localNotes, noteObj];
       setLocalNotes(updatedNotes);
@@ -72,7 +75,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
       });
     } catch (err) {
       console.error(err);
-      setErrorMsg('Błąd podczas dodawania notatki.');
+      setErrorMsg(t('machines.dtr.addNoteError'));
     }
   };
 
@@ -91,15 +94,15 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
 
   const uploadFile = (file) => {
     if (file.type !== 'application/pdf') {
-      setErrorMsg('Tylko pliki PDF są obsługiwane.');
+      setErrorMsg(t('machines.dtr.onlyPdfError'));
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
-      setErrorMsg('Plik jest za duży. Maksymalny rozmiar to 50MB.');
+      setErrorMsg(t('machines.dtr.fileTooLargeError'));
       return;
     }
     if (localDtrFiles.length >= 10) {
-      setErrorMsg('Możesz dodać maksymalnie 10 plików DTR do maszyny.');
+      setErrorMsg(t('machines.dtr.maxFilesError'));
       return;
     }
 
@@ -117,7 +120,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
       }, 
       (error) => {
         console.error('Błąd uploadu:', error);
-        setErrorMsg('Błąd podczas wgrywania pliku.');
+        setErrorMsg(t('machines.dtr.uploadError'));
         setUploading(false);
       }, 
       async () => {
@@ -138,7 +141,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
           });
         } catch (err) {
           console.error(err);
-          setErrorMsg('Błąd zapisu w bazie danych.');
+          setErrorMsg(t('machines.dtr.dbSaveError'));
         } finally {
           setUploading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -148,7 +151,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
   };
 
   const handleDelete = async (fileObj) => {
-    if (!window.confirm(`Czy na pewno chcesz usunąć plik ${fileObj.name}?`)) return;
+    if (!window.confirm(t('machines.dtr.confirmDeleteFile', { name: fileObj.name }))) return;
     try {
       const storageRef = ref(storage, fileObj.path);
       await deleteObject(storageRef);
@@ -159,7 +162,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
       });
     } catch (err) {
       console.error(err);
-      alert('Nie udało się usunąć pliku.');
+      alert(t('machines.dtr.deleteFileError'));
     }
   };
 
@@ -174,9 +177,9 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full">
           <div className="flex flex-col">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <i className="ph ph-files text-xl text-blue-500"></i> Dokumentacja DTR
+              <i className="ph ph-files text-xl text-blue-500"></i> {t('machines.dtr.title')}
             </h3>
-            <span className="text-[10px] md:text-xs text-slate-500 mt-0.5">Tylko PDF. Max 50MB. Limit: 10 plików. Powyżej 30MB może działać wolniej. Przeciągnij i puść.</span>
+            <span className="text-[10px] md:text-xs text-slate-500 mt-0.5">{t('machines.dtr.subtitle')}</span>
           </div>
           {localDtrFiles.length > 0 && (
             <button
@@ -187,7 +190,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
               className="mt-3 sm:mt-0 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm border border-blue-100 shrink-0"
             >
               <i className="ph ph-sparkle text-lg"></i>
-              <span>Czatuj z całą DTR</span>
+              <span>{t('machines.dtr.chatWithDtr')}</span>
             </button>
           )}
         </div>
@@ -206,11 +209,11 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded shadow-sm transition-colors flex items-center gap-1 disabled:opacity-50 whitespace-nowrap"
             >
               <i className="ph ph-upload-simple"></i>
-              Wgraj DTR
+              {t('machines.buttons.uploadDtr')}
             </button>
           </div>
         ) : (
-          <span className="text-xs italic text-gray-400">Brak uprawnień do edycji DTR</span>
+          <span className="text-xs italic text-gray-400">{t('machines.dtr.noPermissions')}</span>
         )}
       </div>
       
@@ -224,7 +227,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
         {uploading && (
           <div className="mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
             <div className="flex justify-between text-xs text-blue-800 font-bold mb-1">
-              <span>Wgrywanie pliku...</span>
+              <span>{t('machines.dtr.uploadingFile')}</span>
               <span>{progress}%</span>
             </div>
             <div className="w-full bg-blue-200 rounded-full h-2">
@@ -235,8 +238,8 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
 
         {localDtrFiles.length === 0 ? (
           <div className="text-center py-6 text-slate-400 text-sm">
-            Brak wgranych plików DTR dla tej maszyny.
-            {canManage && <div className="text-xs mt-1">Przeciągnij plik PDF tutaj, aby go wgrać.</div>}
+            {t('machines.dtr.noDtrFiles')}
+            {canManage && <div className="text-xs mt-1">{t('machines.dtr.dragToUpload')}</div>}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -269,7 +272,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                         setChatDocument(f);
                         setIsChatOpen(true);
                       }}
-                      title="Zapytaj AI o ten plik"
+                      title={t('machines.dtr.askAi')}
                       className="ml-2 w-8 h-8 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
                     >
                       <i className="ph ph-sparkle text-lg"></i>
@@ -279,7 +282,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                     <button 
                       onClick={() => handleDelete(f)}
                       className="ml-2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                      title="Usuń plik"
+                      title={t('machines.buttons.deleteFile')}
                     >
                       <i className="ph ph-trash"></i>
                     </button>
@@ -294,7 +297,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
         <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <i className="ph ph-notebook text-xl text-blue-600"></i> 
-            Notatki Działu Technicznego
+            {t('machines.dtr.techNotesTitle')}
           </h3>
         </div>
         <div className="p-4">
@@ -306,7 +309,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                 value={newNote} 
                 onChange={(e) => setNewNote(e.target.value)} 
                 onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
-                placeholder="Dodaj nową notatkę..." 
+                placeholder={t('machines.dtr.addNotePlaceholder')} 
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 <div className="absolute right-2">
@@ -318,13 +321,13 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                 disabled={!newNote.trim()}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm"
               >
-                Dodaj
+                {t('machines.buttons.add')}
               </button>
             </div>
           )}
 
           {localNotes.length === 0 ? (
-            <div className="text-center py-4 text-slate-400 text-sm italic">Brak notatek technicznych.</div>
+            <div className="text-center py-4 text-slate-400 text-sm italic">{t('machines.dtr.noTechNotes')}</div>
           ) : (
             <div className="space-y-3">
               {localNotes.map(n => (
@@ -339,7 +342,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                       <button 
                         onClick={() => handleDeleteNote(n.id)}
                         className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shrink-0"
-                        title="Usuń notatkę"
+                        title={t('machines.buttons.deleteNote')}
                       >
                         <i className="ph ph-trash"></i>
                       </button>

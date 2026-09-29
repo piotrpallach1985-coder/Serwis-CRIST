@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import MachineCard from './MachineCard';
 import DataTable from '../shared/DataTable';
@@ -11,9 +12,11 @@ export default function MachineTable({
   handleCopyNfc,
   toggleNode
 }) {
+  const { t } = useTranslation();
+
   const columns = [
     {
-      header: 'Nazwa Maszyny',
+      header: t('machines.table.machineName'),
       accessor: 'name',
       render: (m) => (
         <>
@@ -35,7 +38,7 @@ export default function MachineTable({
       )
     },
     {
-      header: 'Nr wew. / Opis',
+      header: t('machines.table.internalId'),
       accessor: 'internalId',
       render: (m) => (
         <>
@@ -45,7 +48,7 @@ export default function MachineTable({
       )
     },
     {
-      header: 'Rejon / Hala',
+      header: t('machines.table.region'),
       accessor: 'regionId',
       render: (m) => (
         <span className="text-gray-600">
@@ -55,7 +58,7 @@ export default function MachineTable({
       )
     },
     {
-      header: 'Akcje',
+      header: t('machines.table.actions'),
       accessor: 'actions',
       align: 'right',
       render: (m) => (
@@ -63,7 +66,7 @@ export default function MachineTable({
           <button 
             onClick={(e) => { e.stopPropagation(); handleCopyNfc(m); }} 
             className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-purple-600 font-semibold py-1.5 px-3 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1 text-sm" 
-            title="Kopiuj ID NFC"
+            title={t('machines.table.copyNfc')}
           >
             <i className="ph ph-link text-lg"></i>
           </button>
@@ -71,7 +74,7 @@ export default function MachineTable({
             onClick={(e) => { e.stopPropagation(); handleViewMachine(m); }} 
             className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600 font-semibold py-1.5 px-4 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 text-sm"
           >
-            Szczegóły <i className="ph ph-caret-right font-bold"></i>
+            {t('machines.table.details')} <i className="ph ph-caret-right font-bold"></i>
           </button>
         </div>
       )
@@ -83,7 +86,7 @@ export default function MachineTable({
       <DataTable
         data={currentItems}
         columns={columns}
-        emptyMessage="Brak maszyn spełniających kryteria."
+        emptyMessage={t('machines.table.empty')}
         rowClassName={(m) => m.name?.includes('(DO WERYFIKACJI)') ? 'bg-orange-50 hover:bg-orange-100' : ''}
         renderMobileCard={(m) => (
           <MachineCard 
