@@ -116,9 +116,11 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           batch.update(machineRef, { isDeleted: true, deletedAt: serverTimestamp() });
           
           // 2. Aktywne zgłoszenia
-          const ticketsQ = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', id), where('status', 'in', ['0', '1', '2', '3', '4', 0, 1, 2, 3, 4]));
+          const ticketsQ = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', id));
           const ticketsSnapshot = await getDocs(ticketsQ);
           ticketsSnapshot.forEach(docSnap => {
+              const status = docSnap.data().status;
+              if (status == 5 || status == 'closed') return;
             batch.update(docSnap.ref, { 
               status: 5, // Zamknięte/Zarchiwizowane
               closedAt: new Date().toISOString(),
@@ -127,9 +129,10 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           });
 
           // 3. Aktywne serwisy
-          const servicesQ = query(collection(db, 'tenants', tenantId, 'planned_services'), where('machineId', '==', id), where('status', '==', 'pending'));
+          const servicesQ = query(collection(db, 'tenants', tenantId, 'planned_services'), where('machineId', '==', id));
           const servicesSnapshot = await getDocs(servicesQ);
           servicesSnapshot.forEach(docSnap => {
+              if (docSnap.data().status !== 'pending') return;
             batch.update(docSnap.ref, { 
               status: 'completed',
               completedAt: new Date().toISOString(),

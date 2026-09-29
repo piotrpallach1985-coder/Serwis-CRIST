@@ -208,7 +208,21 @@ export default function TicketMainColumn({
                               {step.label}
                             </h4>
                             
-                            {isActive && (
+                            
+                              {/* Bezpośrednie zamknięcie awarii */}
+                              {step.id === TICKET_STATUS.CLOSED && currentTicket.status !== TICKET_STATUS.CLOSED && currentTicket.status !== 'closed' && (
+                                <div className="mt-4 pt-3 mb-4">
+                                  <button 
+                                    disabled={loading || isArchive} 
+                                    onClick={() => handleUpdate(currentTicket.id, TICKET_STATUS.CLOSED, "Zamknięto awarię (fałszywy alarm)", null)}
+                                    className="w-full bg-emerald-50 border-2 border-emerald-500 hover:bg-emerald-100 text-emerald-700 px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                                  >
+                                    <i className="ph ph-check-circle text-lg md:text-xl"></i>
+                                    Zamknij awarię (fałszywy alarm / odrzuć)
+                                  </button>
+                                </div>
+                              )}
+                              {isActive && (
                               <div className="mt-5 space-y-5 animate-fade-in">
                                 
                                 {/* Specyficzna akcja dla kroku */}
