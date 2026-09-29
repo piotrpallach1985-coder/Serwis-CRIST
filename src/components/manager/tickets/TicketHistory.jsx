@@ -1,14 +1,16 @@
 import React from 'react';
 import { safe } from '../../../utils/safeRender';
 import { safeParseDate } from '../../../utils/dateHelpers';
+import { useTranslation } from 'react-i18next';
 
 export default function TicketHistory({ history, setLightboxImg }) {
+  const { t } = useTranslation();
   if (!history || !Array.isArray(history)) return null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
       <h4 className="font-bold text-xs text-gray-500 uppercase tracking-widest mb-5 flex items-center gap-2">
-        <i className="ph ph-clock-counter-clockwise text-lg"></i> HISTORIA ZDARZEŃ
+        <i className="ph ph-clock-counter-clockwise text-lg"></i> {t('tickets.history.title')}
       </h4>
       
       <div className="relative border-l-2 border-gray-100 ml-3 space-y-5 pb-4">
@@ -17,9 +19,9 @@ export default function TicketHistory({ history, setLightboxImg }) {
             <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-[3px] border-[#111827]"></div>
             
             <div className="flex justify-between items-start mb-1">
-              <div className="font-bold text-[#111827] text-sm">{safe(entry.user, "System")}</div>
+              <div className="font-bold text-[#111827] text-sm">{safe(entry.user, t('tickets.history.system'))}</div>
               <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                {safeParseDate(entry.date)?.toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || 'Brak daty'}
+                {safeParseDate(entry.date)?.toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || t('tickets.history.no_date')}
               </div>
             </div>
             <div className="text-sm text-gray-600">{safe(entry.action)}</div>

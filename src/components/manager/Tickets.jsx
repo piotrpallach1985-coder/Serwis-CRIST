@@ -23,21 +23,22 @@ import { useToast } from '../../hooks/useToast';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { TICKET_STATUS } from '../../utils/constants';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { useTranslation } from 'react-i18next';
 
 
-const STATUSES = {
-  1: { label: 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200' },
-  'new': { label: 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200' },
-  2: { label: 'Weryfikacja UT', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  3: { label: 'Oczek. na naprawę', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  4: { label: 'Naprawa w trakcie', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  5: { label: 'Zakończone', color: 'bg-green-100 text-green-800 border-green-200' }
-};
+const STATUSES = (t) => ({
+  1: { label: t('tickets.statuses.status_1'), color: 'bg-red-100 text-red-800 border-red-200' },
+  'new': { label: t('tickets.statuses.status_1'), color: 'bg-red-100 text-red-800 border-red-200' },
+  2: { label: t('tickets.statuses.status_2'), color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  3: { label: t('tickets.statuses.status_3'), color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  4: { label: t('tickets.statuses.status_4'), color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  5: { label: t('tickets.statuses.status_5'), color: 'bg-green-100 text-green-800 border-green-200' }
+});
 
-const calculateDuration = (createdAt, closedAt) => {
+const calculateDuration = (createdAt, closedAt, t) => {
   const start = safeParseDate(createdAt);
   const end = safeParseDate(closedAt) || new Date();
-  if (!start) return 'Brak danych';
+  if (!start) return t('tickets.duration.no_data');
   const diffMs = end - start;
   const diffMins = Math.floor(diffMs / 60000);
   const days = Math.floor(diffMins / 1440);
@@ -51,6 +52,7 @@ const calculateDuration = (createdAt, closedAt) => {
 };
 
 export default function Tickets({ isArchive, initialTicketId, onClearTicketId, initialSearchQuery, onClearSearchQuery }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
@@ -71,18 +73,18 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   const handleDeleteTicket = (ticketId) => {
     setConfirmModalConfig({
       isOpen: true,
-      title: 'Usunąć zgłoszenie?',
-      message: 'Czy na pewno chcesz BEZPOWROTNIE USUNĄĆ to zgłoszenie z bazy?',
-      confirmText: 'Tak, usuń',
+      title: t('tickets.messages.delete_title'),
+      message: t('tickets.messages.delete_desc'),
+      confirmText: t('tickets.messages.delete_confirm'),
       onConfirm: async () => {
         closeConfirmModal();
         setLoading(true);
         try {
           await deleteTicket(ticketId, user?.name);
           setSelectedTicketId(null);
-          showToast('Zgłoszenie zostało trwale usunięte.');
+          showToast(t('tickets.messages.deleted_success'));
         } catch (err) {
-          showToast("Nie udało się usunąć zgłoszenia: " + err.message, 'error');
+          showToast(t('tickets.messages.delete_error') + err.message, 'error');
         }
         setLoading(false);
       }
@@ -92,9 +94,9 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   const handleArchiveTicket = (ticketId) => {
     setConfirmModalConfig({
       isOpen: true,
-      title: 'Zarchiwizować zgłoszenie?',
-      message: 'Czy na pewno chcesz przenieść to zgłoszenie do Archiwum?',
-      confirmText: 'Tak, archiwizuj',
+      title: t('tickets.messages.archive_title'),
+      message: t('tickets.messages.archive_desc'),
+      confirmText: t('tickets.messages.archive_confirm'),
       onConfirm: async () => {
         closeConfirmModal();
         setLoading(true);
@@ -107,15 +109,15 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
             history: arrayUnion({
               date: new Date().toISOString(),
               user: user.name,
-              action: "Przeniesiono do Archiwum",
-              note: "Zamknięto i przeniesiono ręcznie",
+              action: t('tickets.history.moved_to_archive'),
+              note: t('tickets.history.closed_manually'),
               photos: []
             })
           });
           setSelectedTicketId(null);
-          showToast('Zgłoszenie pomyślnie zarchiwizowane.');
+          showToast(t('tickets.messages.archived_success'));
         } catch (err) {
-          showToast("Nie udało się zarchiwizować zgłoszenia: " + err.message, 'error');
+          showToast(t('tickets.messages.archive_error') + err.message, 'error');
         }
         setLoading(false);
       }
@@ -127,7 +129,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
     const ticketRef = doc(db, 'tenants', getCurrentTenant(), 'tickets', ticketId);
     try {
       const currentData = activeTickets.find(t => t.id === ticketId);
-      if (!currentData) throw new Error("Zgłoszenie nie istnieje w systemie!");
+      if (!currentData) throw new Error(t('tickets.messages.no_ticket'));
       
       const updateData = {
         history: arrayUnion({
@@ -157,13 +159,13 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       await updateDoc(ticketRef, updateData);
       setComment('');
       setEtr('');
-      showToast('Zgłoszenie zostało zaktualizowane.');
+      showToast(t('tickets.messages.update_success'));
       if (Number(newStatus) === TICKET_STATUS.CLOSED) {
         setSelectedTicketId(null);
         if (onClearTicketId) onClearTicketId();
       }
     } catch (err) {
-      showToast("Błąd aktualizacji: " + err.message, 'error');
+      showToast(t('tickets.messages.update_error') + err.message, 'error');
     }
     setLoading(false);
   };
@@ -198,7 +200,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
-        <span className="ml-3 text-gray-500 font-medium">Wczytywanie zgłoszenia...</span>
+        <span className="ml-3 text-gray-500 font-medium">{t('tickets.messages.loading')}</span>
       </div>
     );
   }
@@ -223,7 +225,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         allowTicketDeletion={allowTicketDeletion}
         showToast={showToast}
         showConfirm={showConfirm}
-        STATUSES={STATUSES}
+        STATUSES={STATUSES(t)}
         isArchive={isArchive}
       />
       </ErrorBoundary>
@@ -240,7 +242,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
             </div>
             <div>
               <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{safe(activeTickets.length)}</div>
-              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">Aktywne awarie</div>
+              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.active_tickets_count')}</div>
             </div>
           </div>
           <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
@@ -249,7 +251,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
             </div>
             <div>
               <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{criticalTicketsCount}</div>
-              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">Awarie krytyczne</div>
+              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.critical_tickets_count')}</div>
             </div>
           </div>
         </div>
@@ -271,23 +273,23 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         <div className="flex gap-2 w-full lg:w-auto">
           <div className="relative w-full lg:w-auto hidden lg:block">
               <button onClick={() => setShowColumnPicker(!showColumnPicker)} className="w-full lg:w-auto bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                <i className="ph ph-columns text-lg"></i> Widok
+                <i className="ph ph-columns text-lg"></i> {t('tickets.view')}
             </button>
             {showColumnPicker && (
               <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] p-4">
-                <div className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">Dostosuj kolumny</div>
+                <div className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">{t('tickets.customize_columns')}</div>
                 <div className="space-y-2">
                   {Object.keys(visibleCols).map(key => {
                     const COL_LABELS = {
-                      date: isArchive ? 'Zakończono / Zgłoszono' : 'Data zgłoszenia',
-                      region: 'Miejsce (Rejon)',
-                      machine: 'Maszyna',
-                      bay: 'Przelot/Inf.',
-                      topic: 'Temat',
-                      reporter: 'Zgłaszający',
-                      status: 'Status',
-                      service: 'Przypisany serwis',
-                      duration: 'Czas trwania'
+                      date: isArchive ? t('tickets.cols.date_archive') : t('tickets.cols.date_active'),
+                      region: t('tickets.cols.region'),
+                      machine: t('tickets.cols.machine'),
+                      bay: t('tickets.cols.bay'),
+                      topic: t('tickets.cols.topic'),
+                      reporter: t('tickets.cols.reporter'),
+                      status: t('tickets.cols.status'),
+                      service: t('tickets.cols.service'),
+                      duration: t('tickets.cols.duration')
                     };
                     return (
                       <label key={key} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
@@ -309,9 +311,9 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         currentItems={currentItems}
         visibleCols={visibleCols}
         isArchive={isArchive}
-        STATUSES={STATUSES}
+        STATUSES={STATUSES(t)}
         machines={machines}
-        calculateDuration={calculateDuration}
+        calculateDuration={(createdAt, closedAt, t_arg) => calculateDuration(createdAt, closedAt, t_arg || t)}
         openDetails={openDetails}
         hasMoreLocalItems={hasMoreLocalItems}
         setCurrentPage={setCurrentPage}

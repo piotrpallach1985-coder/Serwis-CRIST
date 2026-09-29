@@ -1,6 +1,7 @@
 import React from 'react';
 import DebouncedInput from './DebouncedInput';
 import { safe } from "../../utils/safeRender";
+import { useTranslation } from 'react-i18next';
 
 export default function TicketFilters({
   filterMachine, setFilterMachine,
@@ -13,13 +14,14 @@ export default function TicketFilters({
   machines,
   onClearSearchQuery
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3 w-full relative z-[50]">
       <div className="relative w-full sm:w-64 shrink-0">
         <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
         <DebouncedInput
           type="text"
-          placeholder="Szukaj (temat, opis)..."
+          placeholder={t('tickets.filters.search_placeholder')}
           value={filterMachine}
           onChange={setFilterMachine}
           className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 transition-all shadow-sm"
@@ -27,14 +29,14 @@ export default function TicketFilters({
       </div>
 
       <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500 shrink-0 w-full sm:w-auto">
-        <option value="">Wszystkie rejony</option>
+        <option value="">{t('tickets.filters.all_regions')}</option>
         {regions.map(r => (
           <option key={r.id || r.name} value={r.id || r.name}>{safe(r.name)}</option>
         ))}
       </select>
 
       <select value={filterMachineId} onChange={(e) => setFilterMachineId(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500 shrink-0 w-full sm:w-auto">
-        <option value="">Wszystkie maszyny</option>
+        <option value="">{t('tickets.filters.all_machines')}</option>
         {machines
           .filter(m => filterRegion ? m.regionId === filterRegion : true)
           .map(m => (
@@ -48,7 +50,7 @@ export default function TicketFilters({
           value={filterTime === 'all' ? '' : filterTime}
           onChange={(e) => setFilterTime(e.target.value || 'all')}
           className="w-full sm:w-48 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 shadow-sm shrink-0"
-          title="Filtruj po miesiącu wykonania"
+          title={t('tickets.filters.filter_month')}
         />
       )}
 
@@ -60,11 +62,11 @@ export default function TicketFilters({
             onChange={(e) => setFilterStatus(e.target.value)} 
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-900 appearance-none shadow-sm cursor-pointer"
           >
-            <option value="">Wszystkie statusy</option>
-            <option value="1">Otwarte (Zgłoszone)</option>
-            <option value="2">Weryfikacja UT</option>
-            <option value="3">Oczekujące na naprawę</option>
-            <option value="4">W trakcie naprawy</option>
+            <option value="">{t('tickets.filters.all_statuses')}</option>
+            <option value="1">{t('tickets.filters.status_1')}</option>
+            <option value="2">{t('tickets.filters.status_2')}</option>
+            <option value="3">{t('tickets.filters.status_3')}</option>
+            <option value="4">{t('tickets.filters.status_4')}</option>
           </select>
         </div>
       )}
@@ -80,9 +82,9 @@ export default function TicketFilters({
             if (onClearSearchQuery) onClearSearchQuery();
           }}
           className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-          title="Wyczyść wszystkie filtry"
+          title={t('tickets.filters.clear_filters_title')}
         >
-          <i className="ph ph-x text-base font-bold"></i> Usuń filtr
+          <i className="ph ph-x text-base font-bold"></i> {t('tickets.filters.clear_filters')}
         </button>
       )}
     </div>
