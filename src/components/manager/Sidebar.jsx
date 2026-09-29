@@ -545,7 +545,7 @@ export default function Sidebar({
       {/* Language Switcher */}
       <div className="p-4 mt-auto border-t border-white/5">
         <button 
-          onClick={() => i18n.changeLanguage(i18n.language.startsWith('pl') ? 'en' : 'pl')}
+          onClick={() => i18n.changeLanguage((i18n.language || 'pl').startsWith('pl') ? 'en' : 'pl')}
           className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm"
         >
           <div className="flex items-center gap-2">
@@ -553,7 +553,7 @@ export default function Sidebar({
             <span>{t('sidebar.language')}</span>
           </div>
           <span className="font-bold text-xs bg-black/30 px-2 py-1 rounded">
-            {i18n.language.startsWith('pl') ? 'PL' : 'EN'}
+            {(i18n.language || 'pl').startsWith('pl') ? 'PL' : 'EN'}
           </span>
         </button>
       </div>
