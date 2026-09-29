@@ -296,18 +296,18 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                   <EmptyState title={t('machines.details.noBreakdowns')} message="Nie odnotowano żadnych {t('machines.details.ticketsCount')} awarii dla tej maszyny." icon="ph-wrench" />
                 ) : (
                   <div className="divide-y divide-gray-100">
-                    {history.tickets.map(t => (
-                      <div key={t.id} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenTicket && onOpenTicket(t.id, Number(t.status) === TICKET_STATUS.CLOSED, machine.id); }} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
+                    {history.tickets.map(ticket => (
+                      <div key={ticket.id} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenTicket && onOpenTicket(ticket.id, Number(ticket.status) === TICKET_STATUS.CLOSED, machine.id); }} className="p-4 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100">
                         <div className="flex justify-between items-start mb-2">
-                          <div className="font-bold text-gray-800">{t.topic || t('machines.details.other')}</div>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${Number(t.status) === TICKET_STATUS.CLOSED ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-600'}`}>
-                            {Number(t.status) === TICKET_STATUS.CLOSED ? t('machines.details.closed') : t('machines.details.open')}
+                          <div className="font-bold text-gray-800">{ticket.topic || t('machines.details.other')}</div>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${Number(ticket.status) === TICKET_STATUS.CLOSED ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-600'}`}>
+                            {Number(ticket.status) === TICKET_STATUS.CLOSED ? t('machines.details.closed') : t('machines.details.open')}
                           </span>
                         </div>
-                        <div className="text-sm text-gray-600 mb-2">{t.description || '-'}</div>
+                        <div className="text-sm text-gray-600 mb-2">{ticket.description || '-'}</div>
                         <div className="flex justify-between items-center text-xs text-gray-400">
-                          <span>{t('machines.details.reportedBy')}<span className="font-semibold text-gray-600">{t.reportedBy}</span></span>
-                          <span>{t.createdAt ? safeParseDate(t.createdAt).toLocaleDateString('pl-PL') : '-'}</span>
+                          <span>{t('machines.details.reportedBy')}<span className="font-semibold text-gray-600">{ticket.reportedBy}</span></span>
+                          <span>{ticket.createdAt ? safeParseDate(ticket.createdAt).toLocaleDateString('pl-PL') : '-'}</span>
                         </div>
                       </div>
                     ))}

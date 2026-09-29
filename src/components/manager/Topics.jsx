@@ -148,14 +148,14 @@ export default function Topics() {
           {topics.length === 0 ? (
             <li className="p-8 text-center text-gray-500">{t("admin.topics.empty_list")}</li>
           ) : (
-            topics.map(t => (
-              <li key={t.id} className="p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 hover:bg-gray-50 border border-gray-200 md:border-0 rounded-xl md:rounded-none bg-white">
-                <span className="font-medium text-gray-800">{t.text}</span>
+            topics.map(topic => (
+              <li key={topic.id} className="p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 hover:bg-gray-50 border border-gray-200 md:border-0 rounded-xl md:rounded-none bg-white">
+                <span className="font-medium text-gray-800">{topic.text}</span>
                 <div className="flex justify-end gap-1.5 mt-2 md:mt-0 border-t md:border-t-0 border-gray-100 pt-2 md:pt-0 w-full md:w-auto">
-                    <button onClick={() => handleEdit(t)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
+                    <button onClick={() => handleEdit(topic)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
                       <i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}
                     </button>
-                    <button onClick={() => handleDelete(t.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
+                    <button onClick={() => handleDelete(topic.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded-lg md:rounded transition-colors flex-1 md:flex-none justify-center flex items-center gap-1 text-xs md:text-sm">
                       <i className="ph ph-trash"></i> {t("admin.users.delete")}
                     </button>
                   </div>
