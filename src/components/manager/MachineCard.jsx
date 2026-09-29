@@ -14,7 +14,10 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
       )}
       
       <div className="pt-1">
-        <h4 className="font-bold text-[#002b5e] text-base leading-tight mb-1">{machine.name}</h4>
+        <h4 className="font-bold text-[#002b5e] text-base leading-tight mb-1 flex items-start gap-1.5" style={{ marginLeft: `${(machine.depth || 0) * 1}rem` }}>
+          {(machine.depth > 0) && <i className="ph ph-arrow-elbow-down-right text-gray-400 mt-0.5"></i>}
+          {machine.name}
+        </h4>
         <p className="text-xs font-mono text-gray-400 mb-1">ID: {machine.id}</p>
         
         <div className="text-sm font-semibold text-slate-700 mb-2">

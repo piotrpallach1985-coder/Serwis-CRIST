@@ -16,7 +16,10 @@ export default function MachineTable({
       accessor: 'name',
       render: (m) => (
         <>
-          <div className="font-semibold text-gray-800 text-base">{m.name}</div>
+          <div className="font-semibold text-gray-800 text-base flex items-center gap-2">
+            {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400" style={{ marginLeft: `${m.depth * 1.5}rem` }}></i>}
+            {m.name}
+          </div>
           <div className="text-xs font-mono text-gray-400 mt-1">ID: {m.id}</div>
         </>
       )

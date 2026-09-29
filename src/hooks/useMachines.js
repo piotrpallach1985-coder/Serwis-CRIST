@@ -13,9 +13,40 @@ export function useMachines(machines = [], regions = []) {
   const [filterRegion, setFilterRegion] = useState('');
 
   const filteredMachines = useMemo(() => {
-    return machines
-      .filter(m => !m.isDeleted)
-      .filter(m => {
+    const activeMachines = machines.filter(m => !m.isDeleted);
+    
+    const sortFn = (a, b) => {
+      const aVerify = (a.name || '').includes('(DO WERYFIKACJI)');
+      const bVerify = (b.name || '').includes('(DO WERYFIKACJI)');
+      if (aVerify && !bVerify) return -1;
+      if (!aVerify && bVerify) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    };
+
+    const buildTree = (all, parentId = null, depth = 0) => {
+      const children = all
+        .filter(m => parentId ? m.parentId === parentId : (!m.parentId || m.parentId === ''))
+        .sort(sortFn);
+      
+      return children.map(m => {
+        return { ...m, depth, children: buildTree(all, m.id, depth + 1) };
+      });
+    };
+
+    const flattenTree = (nodes) => {
+      let flat = [];
+      nodes.forEach(n => {
+        flat.push(n);
+        if (n.children) {
+          flat = flat.concat(flattenTree(n.children));
+        }
+      });
+      return flat;
+    };
+
+    let flatMachines = flattenTree(buildTree(activeMachines));
+
+    return flatMachines.filter(m => {
         const queryLower = searchQuery.toLowerCase().trim();
         const isNoRegionQuery = queryLower === 'bez rejonu';
         
@@ -35,13 +66,6 @@ export function useMachines(machines = [], regions = []) {
         }
 
         return matchName && matchRegion;
-      })
-      .sort((a, b) => {
-        const aVerify = (a.name || '').includes('(DO WERYFIKACJI)');
-        const bVerify = (b.name || '').includes('(DO WERYFIKACJI)');
-        if (aVerify && !bVerify) return -1;
-        if (!aVerify && bVerify) return 1;
-        return (a.name || '').localeCompare(b.name || '');
       });
   }, [machines, searchQuery, filterRegion]);
 
