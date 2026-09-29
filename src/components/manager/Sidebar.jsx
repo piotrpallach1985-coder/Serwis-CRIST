@@ -75,6 +75,8 @@ export default function Sidebar({
   const unverifiedMachinesCount = machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).length;
   const unverifiedReportersCount = reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).length;
 
+  const { t, i18n } = useTranslation();
+
   const handleItemClick = (tabId) => {
     onTabChange(tabId);
     if (window.innerWidth < 1024 && onSidebarClose) {
@@ -193,7 +195,7 @@ export default function Sidebar({
               {/* SEKCJA 1: AWARIE */}
               <div className="space-y-1">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Awarie UR</span>
+                  <span>{t("sidebar.section_tickets")}</span>
                   {criticalTicketsCount > 0 && (
                     <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30">
                       {criticalTicketsCount} kryt.
@@ -206,7 +208,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'kpi' ? 'bg-red-500/20 text-red-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-chart-line-up text-xl shrink-0"></i>
-                  <span className="text-sm">Analiza Awarii (KPI)</span>
+                  <span className="text-sm">{t("sidebar.dashboard_kpi")}</span>
                 </button>
 
                 <button
@@ -214,7 +216,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'dashboard_tickets' ? 'bg-red-500/20 text-red-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-map-pin text-xl shrink-0"></i>
-                  <span className="text-sm">Mapa Awarii</span>
+                  <span className="text-sm">{t("sidebar.map")}</span>
                 </button>
 
                 <button
@@ -223,7 +225,7 @@ export default function Sidebar({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <i className="ph ph-list-dashes text-xl shrink-0"></i>
-                    <span className="text-sm truncate">Zgłoszone awarie</span>
+                    <span className="text-sm truncate">{t("sidebar.active_tickets")}</span>
                   </div>
                   {activeTicketsCount > 0 && (
                     <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-xs ${criticalTicketsCount > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-blue-600 text-white'}`}>
@@ -246,7 +248,7 @@ export default function Sidebar({
               {/* SEKCJA 2: SERWISY */}
               <div className="space-y-1 pt-2 border-t border-gray-800/80">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Serwisy UR</span>
+                  <span>{t("sidebar.section_services")}</span>
                   {overdueServicesCount > 0 && (
                     <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30 animate-pulse">
                       {overdueServicesCount} kryt.
@@ -259,7 +261,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'planned_kpi' ? 'bg-amber-500/20 text-amber-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-chart-line-up text-xl shrink-0"></i>
-                  <span className="text-sm">Analiza Serwisów (KPI)</span>
+                  <span className="text-sm">{t("sidebar.services_kpi")}</span>
                 </button>
 
                 <button
@@ -267,7 +269,7 @@ export default function Sidebar({
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'dashboard_planned' ? 'bg-amber-500/20 text-amber-300 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i className="ph ph-map-pin text-xl shrink-0"></i>
-                  <span className="text-sm">Mapa Serwisów</span>
+                  <span className="text-sm">{t("sidebar.services_map")}</span>
                 </button>
 
                 <button
@@ -276,7 +278,7 @@ export default function Sidebar({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <i className="ph ph-calendar-check text-xl shrink-0"></i>
-                    <span className="text-sm truncate">Lista serwisów</span>
+                    <span className="text-sm truncate">{t("sidebar.services_list")}</span>
                   </div>
                   {totalActionableServicesCount > 0 && (
                     <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-xs ${overdueServicesCount > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-amber-600 text-white'}`}>
@@ -538,7 +540,25 @@ export default function Sidebar({
             <span>Wyloguj</span>
           </button>
         </div>
-      </aside>
+      
+      {/* Language Switcher */}
+      <div className="p-4 mt-auto border-t border-white/5">
+        <button 
+          onClick={() => i18n.changeLanguage(i18n.language.startsWith('pl') ? 'en' : 'pl')}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm"
+        >
+          <div className="flex items-center gap-2">
+            <i className="ph ph-globe text-lg"></i>
+            <span>{t('sidebar.language')}</span>
+          </div>
+          <span className="font-bold text-xs bg-black/30 px-2 py-1 rounded">
+            {i18n.language.startsWith('pl') ? 'PL' : 'EN'}
+          </span>
+        </button>
+      </div>
+      
+    </aside>
+
     </>
   );
 }
