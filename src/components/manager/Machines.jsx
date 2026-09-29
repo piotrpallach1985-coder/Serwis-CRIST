@@ -19,6 +19,8 @@ import QRScannerModal from '../shared/QRScannerModal';
 import NFCScannerModal from '../shared/NFCScannerModal';
 import Toast from './Toast';
 import { useMachines } from '../../hooks/useMachines';
+import { fetchMachineTickets } from '../../services/tickets.service';
+import { fetchMachineServices } from '../../services/plannedServices.service';
 import { usePagination } from '../../hooks/usePagination';
 import DebouncedInput from './DebouncedInput';
 import { useToast } from '../../hooks/useToast';
