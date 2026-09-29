@@ -115,6 +115,13 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           const machineRef = doc(db, 'tenants', tenantId, 'machines', id);
           batch.update(machineRef, { isDeleted: true, deletedAt: serverTimestamp() });
           
+          // 1a. Dzieci maszyny (Drzewo aktywów)
+          const childMachines = machines.filter(m => m.parentId === id);
+          childMachines.forEach(child => {
+            const childRef = doc(db, 'tenants', tenantId, 'machines', child.id);
+            batch.update(childRef, { parentId: null });
+          });
+          
           // 2. Aktywne zgłoszenia
           const ticketsQ = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', id));
           const ticketsSnapshot = await getDocs(ticketsQ);

@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { addMachine, updateMachine } from '../../services/machines.service';
 
 export default function MachineForm({ isOpen, onClose, editingMachine, regions, onSaved, onError }) {
   const [name, setName] = useState('');
   const [bay, setBay] = useState('');
   const [regionId, setRegionId] = useState('');
   const [internalId, setInternalId] = useState('');
+  const [parentId, setParentId] = useState('');
   const [additionalDescription, setAdditionalDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
@@ -20,12 +22,14 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
       setBay(editingMachine.bay || '');
       setRegionId(editingMachine.regionId || '');
       setInternalId(editingMachine.internalId || '');
+      setParentId(editingMachine.parentId || '');
       setAdditionalDescription(editingMachine.additionalDescription || '');
     } else {
       setName('');
       setBay('');
       setRegionId('');
       setInternalId('');
+      setParentId('');
       setAdditionalDescription('');
     }
   }, [editingMachine, isOpen]);
@@ -52,6 +56,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
           bay: bay.trim(),
           regionId,
           internalId: internalId.trim(),
+          parentId: parentId || null,
           additionalDescription: additionalDescription.trim(),
           qrCreatedAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
@@ -62,6 +67,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
           bay: bay.trim(),
           regionId,
           internalId: internalId.trim(),
+          parentId: parentId || null,
           additionalDescription: additionalDescription.trim(),
           isDeleted: false,
           currentWorkHours: 0
@@ -108,6 +114,15 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa maszyny</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none" placeholder="np. Suwnica S-01" required />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna nadrzędna (Opcjonalnie)</label>
+              <select value={parentId} onChange={e => setParentId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
+                <option value="">Brak (Główna maszyna)</option>
+                {machines.filter(m => m.id !== (editingMachine ? editingMachine.id : null)).map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Dodatkowy opis awaryjny (Opcjonalnie)</label>

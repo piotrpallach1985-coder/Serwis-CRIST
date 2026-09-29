@@ -23,6 +23,10 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
   const parts = useManagerStore(state => state.parts || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
+  const machines = useManagerStore(state => state.machines || []);
+  
+  const parentMachine = machine.parentId ? machines.find(m => m.id === machine.parentId) : null;
+  const childMachines = machines.filter(m => m.parentId === machine.id);
   
   
   const machinePartsTx = useMemo(() => {
@@ -120,6 +124,11 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                 <i className="ph ph-engine"></i>
               </div>
               <div>
+                {parentMachine && (
+                  <div className="text-xs font-semibold text-blue-600 flex items-center gap-1 mb-0.5">
+                    <i className="ph ph-arrow-u-up-left"></i> Podzespół urządzenia: {parentMachine.name}
+                  </div>
+                )}
                 <h1 className="text-2xl font-black text-gray-900">{machine.name}</h1>
                 <div className="text-gray-400 font-mono text-sm">ID: {machine.id}</div>
               </div>
@@ -160,6 +169,20 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                 <div className="font-semibold text-red-600 text-base">{totalPartsCost.toFixed(2)} PLN</div>
               </div>
             </div>
+            
+            {childMachines.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Podzespoły (Drzewo aktywów)</div>
+                <ul className="flex flex-col gap-2">
+                  {childMachines.map(child => (
+                    <li key={child.id} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-50 p-2 rounded border border-gray-100">
+                      <i className="ph ph-gear text-blue-500 text-lg"></i>
+                      {child.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center gap-4">
