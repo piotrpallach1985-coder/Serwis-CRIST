@@ -1,6 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 
+import EmptyState from '../shared/EmptyState';
 import React, { useState, useEffect, useMemo } from 'react';
 import { subscribeToActionItems, updateActionItem } from '../../services/tickets.service';
 import { db } from '../../firebase';
