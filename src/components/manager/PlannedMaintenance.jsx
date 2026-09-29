@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useManagerStore } from '../../store/managerStore';

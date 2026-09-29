@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../shared/EmptyState';
 import React, { useMemo } from 'react';
 import { usePagination } from '../../hooks/usePagination';

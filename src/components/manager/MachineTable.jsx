@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import MachineCard from './MachineCard';
 import DataTable from '../shared/DataTable';

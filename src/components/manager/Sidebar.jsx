@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';

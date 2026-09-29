@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 /**
  * PlannedMaintenanceRbgModal — Modal aktualizacji licznika roboczogodzin maszyny.
  */
