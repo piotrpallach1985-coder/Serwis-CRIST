@@ -5,7 +5,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addMachine, updateMachine } from '../../services/machines.service';
 
-export default function MachineForm({ isOpen, onClose, editingMachine, regions, onSaved, onError }) {
+export default function MachineForm({ isOpen, onClose, editingMachine, initialParentId, regions, onSaved, onError }) {
   const [name, setName] = useState('');
   const [bay, setBay] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -35,6 +35,19 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
   }, [editingMachine, isOpen]);
 
   if (!isOpen) return null;
+
+
+  const handleParentChange = (e) => {
+    const val = e.target.value;
+    setParentId(val);
+    if (val && !editingMachine) {
+      const pm = machines.find(m => m.id === val);
+      if (pm) {
+        if (pm.regionId) setRegionId(pm.regionId);
+        if (pm.bay) setBay(pm.bay);
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,7 +130,7 @@ export default function MachineForm({ isOpen, onClose, editingMachine, regions, 
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna nadrzędna (Opcjonalnie)</label>
-              <select value={parentId} onChange={e => setParentId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
+              <select value={parentId} onChange={handleParentChange} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
                 <option value="">Brak (Główna maszyna)</option>
                 {machines.filter(m => m.id !== (editingMachine ? editingMachine.id : null)).map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
@@ -159,6 +172,7 @@ MachineForm.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
   editingMachine: PropTypes.object,
+  initialParentId: PropTypes.string,
   regions: PropTypes.array.isRequired,
   onSaved: PropTypes.func,
   onError: PropTypes.func,

@@ -13,7 +13,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 
-export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService, onViewRelatedMachine }) {
+export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machine, history, loading, onBack, onPrint, onGeneratePDF, onGenerateNewQR, regions, onEdit, onDelete, onOpenTicket, onOpenService, onViewRelatedMachine, onAddChildMachine }) {
   const { user } = useAuth();
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
   const regionName = regions.find(r => r.id === machine.regionId)?.name || 'Nieznany rejon';
@@ -174,9 +174,18 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
             </div>
             
             
-              {childMachines.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Podzespoły (Drzewo aktywów)</div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Podzespoły (Drzewo aktywów)</div>
+                  <button 
+                    onClick={() => onAddChildMachine && onAddChildMachine(machine.id)}
+                    className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
+                  >
+                    <i className="ph ph-plus-circle"></i> Dodaj
+                  </button>
+                </div>
+                {childMachines.length > 0 ? (
                   <ul className="flex flex-col gap-2">
                     {childMachines.map(child => (
                       <li 
@@ -189,8 +198,11 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-gray-400 italic">Brak przypisanych podzespołów.</div>
+                )}
+              </div>
+
 
               {/* KOMPATYBILNE CZĘŚCI (BOM) */}
               {(() => {

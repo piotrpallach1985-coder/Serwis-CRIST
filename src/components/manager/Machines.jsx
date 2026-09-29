@@ -49,6 +49,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   
   const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel } = useMachines(machines, regions);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formInitialParentId, setFormInitialParentId] = useState(null);
   const [qrModalMachine, setQrModalMachine] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [machineHistoryStack, setMachineHistoryStack] = useState([]);
@@ -367,6 +368,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           onNfcNext={() => setIsNfcScanning(true)}
           onBack={handleBackMachine}
             onViewRelatedMachine={(m) => handleViewMachine(m, false, true)}
+            onAddChildMachine={(pid) => { setEditingId(null); setFormInitialParentId(pid); setIsFormOpen(true); }}
           onPrint={handlePrint}
           onGeneratePDF={() => generateMachineHistoryPDF({...selectedMachine, regionName: regions.find(r => r.id === selectedMachine.regionId)?.name}, machineHistory.tickets, machineHistory.services)}
             onGenerateNewQR={() => handleGenerateNewQR(selectedMachine.id)}
@@ -393,6 +395,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             isOpen={isFormOpen} 
             onClose={() => setIsFormOpen(false)} 
             editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
+        initialParentId={formInitialParentId}
             regions={regions}
             onSaved={showToast}
             onError={(err) => showToast(err, 'error')}
