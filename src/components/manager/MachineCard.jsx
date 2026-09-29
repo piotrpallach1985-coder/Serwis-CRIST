@@ -26,7 +26,7 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
         >
           {(machine.depth > 0) && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
           {machine.hasChildren && (
-            <button className="text-gray-500 hover:text-blue-600 focus:outline-none flex items-center justify-center w-6 h-6 rounded hover:bg-blue-50 transition-colors">
+            <button className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 focus:outline-none flex items-center justify-center w-6 h-6 rounded transition-colors shadow-sm">
               <i className={`ph ${machine.isCollapsed ? 'ph-caret-right' : 'ph-caret-down'}`}></i>
             </button>
           )}

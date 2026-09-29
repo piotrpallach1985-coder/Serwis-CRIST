@@ -21,7 +21,7 @@ export default function MachineTable({
             <div style={{ marginLeft: `${m.depth * 1.5}rem` }} className="flex items-center gap-1.5">
               {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
               {m.hasChildren ? (
-                 <button className="text-gray-500 hover:text-blue-600 focus:outline-none p-1 rounded hover:bg-blue-50 transition-colors">
+                 <button className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 focus:outline-none p-1 rounded transition-colors shadow-sm">
                    <i className={`ph ${m.isCollapsed ? 'ph-caret-right' : 'ph-caret-down'}`}></i>
                  </button>
               ) : (

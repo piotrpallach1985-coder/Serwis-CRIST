@@ -18,10 +18,11 @@ export default function MapEditModal({
     if (editingType === 'region') {
       return regions.filter(r => r.xPercent == null || r.yPercent == null);
     } else {
+      const mainMachines = machines.filter(m => !m.parentId || m.parentId === '');
       if (currentSubmapId !== null) {
-        return machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
+        return mainMachines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
       }
-      return machines.filter(m => m.xPercent == null || m.yPercent == null);
+      return mainMachines.filter(m => m.xPercent == null || m.yPercent == null);
     }
   };
 

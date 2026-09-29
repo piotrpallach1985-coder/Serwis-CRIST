@@ -11,10 +11,10 @@ import { exportToExcel } from '../utils/reports/excelExport';
 export function useMachines(machines = [], regions = []) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
-  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+  const [expandedNodes, setExpandedNodes] = useState(new Set());
 
   const toggleNode = (id) => {
-    setCollapsedNodes(prev => {
+    setExpandedNodes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) newSet.delete(id);
       else newSet.add(id);
@@ -47,10 +47,16 @@ export function useMachines(machines = [], regions = []) {
       let flat = [];
       nodes.forEach(n => {
         const hasChildren = n.children && n.children.length > 0;
-        const isCollapsed = collapsedNodes.has(n.id);
-        flat.push({ ...n, hasChildren, isCollapsed });
         
-        if (hasChildren && !isCollapsed) {
+        // If there's an active search, we temporarily force expand everything
+        // so users can see the matched nested items. Otherwise, rely on expandedNodes.
+        const isSearching = searchQuery.trim() !== '' || filterRegion !== '';
+        const isExpanded = isSearching || expandedNodes.has(n.id);
+        
+        // We pass isCollapsed for the UI (so it knows which icon to show)
+        flat.push({ ...n, hasChildren, isCollapsed: !isExpanded });
+        
+        if (hasChildren && isExpanded) {
           flat = flat.concat(flattenTree(n.children));
         }
       });
@@ -80,7 +86,7 @@ export function useMachines(machines = [], regions = []) {
 
         return matchName && matchRegion;
       });
-  }, [machines, searchQuery, filterRegion, collapsedNodes]);
+  }, [machines, searchQuery, filterRegion, expandedNodes]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredMachines.map(m => ({
