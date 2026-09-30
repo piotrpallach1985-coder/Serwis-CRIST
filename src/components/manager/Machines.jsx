@@ -406,7 +406,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
       setTimeout(() => {
         const machinesList = useManagerStore.getState().machines;
         const newM = machinesList.find(m => m.id === newMachineId);
-        if (newM) handleViewMachine(newM, false, true);
+        if (newM && !formInitialParentId) handleViewMachine(newM, false, true);
       }, 600);
     }
   }}
@@ -452,7 +452,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
       setTimeout(() => {
         const machinesList = useManagerStore.getState().machines;
         const newM = machinesList.find(m => m.id === newMachineId);
-        if (newM) handleViewMachine(newM, false, true);
+        if (newM && !formInitialParentId) handleViewMachine(newM, false, true);
       }, 600);
     }
   }}

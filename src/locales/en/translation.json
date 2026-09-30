@@ -601,7 +601,54 @@
     "required_tools": "Required tools",
     "required_parts": "Required parts (Reservations)"
   },
-  "dashboards": {},
+  "dashboards": {
+    "reports_title": "Reporting and Settings",
+    "reports_desc": "Access to advanced operational reports, database dumps, and settings.",
+    "audit_report": "Full Audit Report (Database)",
+    "audit_desc": "Complete dump of breakdowns, services and machines (including deleted objects). Ideal for ISO auditors, internal audits, or Excel analysis.",
+    "generate": "Generating...",
+    "download_xlsx": "Download XLSX",
+    "planned_warnings": "Planned Service Warnings",
+    "planned_desc": "Pins on the map will be highlighted in yellow when the inspection date approaches. Set how far in advance the system should start warning.",
+    "days_before": "Days before",
+    "audit": {
+      "title": "Audit Trail",
+      "desc": "Tracking system operations (ISO 55000 requirement).",
+      "export": "Export to Excel",
+      "filter_from": "From:",
+      "filter_to": "To:",
+      "filter_btn": "Filter",
+      "loading": "Loading audit trail...",
+      "empty_title": "Audit trail empty",
+      "empty_msg": "No events registered in the selected period.",
+      "col_date": "Date & Time",
+      "col_user": "User",
+      "col_action": "Action",
+      "col_module": "Module",
+      "col_target": "Target Object",
+      "load_more": "Load more",
+      "loading_more": "Loading...",
+      "unknown_user": "System/Unknown"
+    },
+    "ai_stats": {
+      "title": "AI Usage (Tokens)",
+      "desc": "Monitor artificial intelligence usage in your company.",
+      "gemini_desc": "Searching in technical documentation",
+      "groq_desc": "Dictation and ticket correction",
+      "tokens_used": "Tokens used"
+    },
+    "superadmin": {
+      "title": "SuperAdmin Panel",
+      "desc": "Manage SaaS instances and global settings (visible only to root).",
+      "add_tenant": "Add Company (Tenant)",
+      "logo_title": "Global App Logo",
+      "logo_desc": "Select a logo that will overwrite all company logos. Use a square PNG/JPG.",
+      "upload_logo": "Upload new logo",
+      "remove_logo": "Remove global logo",
+      "global_settings": "Global API Settings",
+      "save": "Save"
+    }
+  },
   "superadmin": {},
   "admin": {
     "users": {

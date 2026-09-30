@@ -601,7 +601,54 @@
     "required_tools": "Wymagane narzędzia",
     "required_parts": "Wymagane części (Rezerwacje)"
   },
-  "dashboards": {},
+  "dashboards": {
+    "reports_title": "Raportowanie oraz Ustawienia",
+    "reports_desc": "Dostęp do zaawansowanych raportów operacyjnych, zrzutów bazy danych oraz ustawień.",
+    "audit_report": "Pełny Raport Audytorski (Baza Danych)",
+    "audit_desc": "Kompletny zrzut awarii, serwisów i maszyn (wraz z usuniętymi obiektami). Idealny dla audytorów ISO, na wypadek kontroli wewnętrznej lub do analizy w Excelu.",
+    "generate": "Generowanie...",
+    "download_xlsx": "Pobierz XLSX",
+    "planned_warnings": "Ostrzeżenia Serwisu Planowanego",
+    "planned_desc": "Pinezki na mapie będą podświetlone na żółto, gdy zbliża się termin przeglądu. Ustaw z jakim wyprzedzeniem system ma zacząć ostrzegać.",
+    "days_before": "Dni wcześniej",
+    "audit": {
+      "title": "Dziennik Zdarzeń (Audit Trail)",
+      "desc": "Śledzenie operacji w systemie (wymóg ISO 55000).",
+      "export": "Eksportuj do Excela",
+      "filter_from": "Od:",
+      "filter_to": "Do:",
+      "filter_btn": "Filtruj",
+      "loading": "Ładowanie dziennika zdarzeń...",
+      "empty_title": "Dziennik pusty",
+      "empty_msg": "Brak zarejestrowanych zdarzeń w wybranym okresie.",
+      "col_date": "Data i czas",
+      "col_user": "Użytkownik",
+      "col_action": "Akcja",
+      "col_module": "Moduł",
+      "col_target": "Obiekt docelowy",
+      "load_more": "Załaduj starsze",
+      "loading_more": "Ładowanie...",
+      "unknown_user": "System/Nieznany"
+    },
+    "ai_stats": {
+      "title": "Zużycie AI (Tokeny)",
+      "desc": "Monitoruj wykorzystanie sztucznej inteligencji w Twojej firmie.",
+      "gemini_desc": "Wyszukiwanie w dokumentacjach DTR",
+      "groq_desc": "Dyktowanie i korekta zgłoszeń",
+      "tokens_used": "Tokenów zużyto"
+    },
+    "superadmin": {
+      "title": "Panel SuperAdmin",
+      "desc": "Zarządzanie instancjami SaaS i globalnymi ustawieniami (widoczne tylko dla root).",
+      "add_tenant": "Dodaj firmę (Tenant)",
+      "logo_title": "Globalne Logo Aplikacji",
+      "logo_desc": "Wybierz logo, które nadpisze loga wszystkich firm. Użyj kwadratowego PNG/JPG.",
+      "upload_logo": "Wgraj nowe logo",
+      "remove_logo": "Usuń globalne logo",
+      "global_settings": "Ustawienia Globalne API",
+      "save": "Zapisz"
+    }
+  },
   "superadmin": {},
   "admin": {
     "users": {

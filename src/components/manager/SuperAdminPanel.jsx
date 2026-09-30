@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
@@ -331,7 +332,7 @@ export default function SuperAdminPanel({ onNavigate }) {
             )}
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Globalne Logo Aplikacji</h2>
+            <h2 className="text-lg font-bold text-slate-800">{t("dashboards.superadmin.logo_title")}</h2>
             <p className="text-sm text-slate-500 max-w-md">To logo będzie wyświetlane w lewym górnym rogu u wszystkich klientów (tenantów) niezależnie od ich własnego brandingu.</p>
           </div>
         </div>

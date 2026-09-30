@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../store/managerStore';
 ﻿
 import React, { useState, useEffect } from 'react';
@@ -9,6 +10,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
 export default function Reports() {
+  const { t } = useTranslation();
   const tickets = useManagerStore(state => state.tickets);
   const machines = useManagerStore(state => state.machines);
   const plannedServices = useManagerStore(state => state.plannedServices);
@@ -53,8 +55,8 @@ export default function Reports() {
     <div className="p-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-black text-gray-800 tracking-tight">Raportowanie oraz Ustawienia</h2>
-          <p className="text-gray-500 mt-2">Dostęp do zaawansowanych raportów operacyjnych, zrzutów bazy danych oraz ustawień.</p>
+          <h2 className="text-3xl font-black text-gray-800 tracking-tight">{t("dashboards.reports_title")}</h2>
+          <p className="text-gray-500 mt-2">{t("dashboards.reports_desc")}</p>
         </div>
       </div>
 
@@ -67,12 +69,8 @@ export default function Reports() {
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <i className="ph ph-file-xls text-blue-600 text-2xl"></i>
-              Pełny Raport Audytorski (Baza Danych)
-            </h2>
-            <p className="text-sm text-gray-500 max-w-2xl mt-1">
-              Kompletny zrzut awarii, serwisów i maszyn (wraz z usuniętymi obiektami). Idealny dla audytorów ISO, na wypadek kontroli wewnętrznej lub do analizy w Excelu.
-            </p>
+              <i className="ph ph-file-xls text-blue-600 text-2xl"></i> {t("dashboards.audit_report")}</h2>
+            <p className="text-sm text-gray-500 max-w-2xl mt-1"> {t("dashboards.audit_desc")} </p>
           </div>
           
           <div className="flex items-center gap-3">
@@ -83,11 +81,11 @@ export default function Reports() {
             >
               {loading ? (
                 <>
-                  <i className="ph ph-spinner animate-spin text-lg"></i> Generowanie...
+                  <i className="ph ph-spinner animate-spin text-lg"></i> {t("dashboards.generate")}
                 </>
               ) : (
                 <>
-                  <i className="ph ph-download-simple text-lg"></i> Pobierz XLSX
+                  <i className="ph ph-download-simple text-lg"></i> {t("dashboards.download_xlsx")}
                 </>
               )}
             </button>
@@ -98,9 +96,7 @@ export default function Reports() {
         <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
             <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
-              <i className="ph ph-warning-circle text-amber-600 text-2xl"></i>
-              Ostrzeżenia Serwisu Planowanego
-            </h2>
+              <i className="ph ph-warning-circle text-amber-600 text-2xl"></i> {t("dashboards.planned_warnings")}</h2>
             <p className="text-sm text-amber-800 max-w-2xl mt-1">
               Pinezki na mapie będą podświetlone na żółto, gdy zbliża się termin przeglądu. Ustaw z jakim wyprzedzeniem system ma zacząć ostrzegać.
             </p>
@@ -117,7 +113,7 @@ export default function Reports() {
               max="365"
               className="w-20 font-bold text-amber-900 border-b-2 border-amber-300 focus:outline-none focus:border-amber-600 bg-transparent text-center"
             />
-            <span className="text-amber-700 font-bold text-sm">Dni wcześniej</span>
+            <span className="text-amber-700 font-bold text-sm">{t("dashboards.days_before")}</span>
           </div>
         </div>
 

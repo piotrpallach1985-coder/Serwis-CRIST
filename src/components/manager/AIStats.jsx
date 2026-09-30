@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { fetchTenantUsageStats } from '../../services/admin.service';
 
 export default function AIStats() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState({ geminiTokens: 0, groqTokens: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -38,8 +40,8 @@ export default function AIStats() {
           <i className="ph ph-brain"></i>
         </div>
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Zużycie AI (Tokeny)</h1>
-          <p className="text-sm text-slate-500 font-medium">Monitoruj wykorzystanie sztucznej inteligencji w Twojej firmie.</p>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight"> {t("dashboards.ai_stats.title")} </h1>
+          <p className="text-sm text-slate-500 font-medium">{t("dashboards.ai_stats.desc")}</p>
         </div>
       </div>
 
@@ -49,11 +51,11 @@ export default function AIStats() {
             <i className="ph ph-google-logo"></i>
           </div>
           <h3 className="text-lg font-bold text-slate-700">Google Gemini</h3>
-          <p className="text-xs text-slate-400">Wyszukiwanie w dokumentacjach DTR</p>
+          <p className="text-xs text-slate-400">{t("dashboards.ai_stats.gemini_desc")}</p>
           <div className="text-4xl font-black text-blue-600 mt-2">
             {stats.geminiTokens.toLocaleString('pl-PL')}
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tokenów zużyto</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("dashboards.ai_stats.tokens_used")}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center gap-2">
@@ -61,11 +63,11 @@ export default function AIStats() {
             <i className="ph ph-microphone-stage"></i>
           </div>
           <h3 className="text-lg font-bold text-slate-700">Groq (Llama 3)</h3>
-          <p className="text-xs text-slate-400">Dyktowanie i korekta zgłoszeń</p>
+          <p className="text-xs text-slate-400">{t("dashboards.ai_stats.groq_desc")}</p>
           <div className="text-4xl font-black text-orange-600 mt-2">
             {stats.groqTokens.toLocaleString('pl-PL')}
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tokenów zużyto</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("dashboards.ai_stats.tokens_used")}</p>
         </div>
       </div>
     </div>

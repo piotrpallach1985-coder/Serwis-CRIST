@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, orderBy, limit, getDocs, startAfter, where } from 'firebase/firestore';
@@ -8,6 +9,7 @@ import EmptyState from '../shared/EmptyState';
 import { exportToExcel } from '../../utils/reports/excelExport';
 
 export default function AuditLogs() {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -122,9 +124,7 @@ export default function AuditLogs() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <i className="ph ph-scroll text-blue-600 text-3xl"></i>
-            Dziennik Zdarzeń (Audit Trail)
-          </h1>
+            <i className="ph ph-scroll text-blue-600 text-3xl"></i> {t("dashboards.audit.title")} </h1>
           <p className="text-slate-500 mt-1">Śledzenie operacji w systemie (wymóg ISO 55000).</p>
         </div>
         <div className="flex gap-2">
@@ -158,9 +158,7 @@ export default function AuditLogs() {
             />
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-bold text-sm">
-              Filtruj
-            </button>
+            <button type="submit" className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-bold text-sm"> {t("dashboards.audit.filter_btn")} </button>
             {(dateFrom || dateTo) && (
               <button type="button" onClick={executeClear} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm">
                 Wyczyść
@@ -172,9 +170,9 @@ export default function AuditLogs() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
-          <LoadingState message="Ładowanie dziennika zdarzeń..." />
+          <LoadingState message={t("dashboards.audit.loading")} />
         ) : logs.length === 0 ? (
-          <EmptyState title="Dziennik pusty" message="Brak zarejestrowanych zdarzeń w wybranym okresie." icon="ph-scroll" />
+          <EmptyState title={t("dashboards.audit.empty_title")} message={t("dashboards.audit.empty_msg")} icon="ph-scroll" />
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -183,7 +181,7 @@ export default function AuditLogs() {
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
                     <th className="p-4 font-bold">Data</th>
                     <th className="p-4 font-bold">Użytkownik</th>
-                    <th className="p-4 font-bold">Akcja</th>
+                    <th className="p-4 font-bold">{t("dashboards.audit.col_action")}</th>
                     <th className="p-4 font-bold">Moduł</th>
                     <th className="p-4 font-bold">Szczegóły</th>
                   </tr>

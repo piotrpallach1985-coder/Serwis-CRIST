@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import { useState, useEffect, useMemo } from 'react';
@@ -46,6 +47,7 @@ export default function PlannedMaintenanceDetails({
   serviceToComplete, setServiceToComplete,
   isModalOpen, setIsModalOpen,
   editingService }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
