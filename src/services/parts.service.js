@@ -1,6 +1,7 @@
 import { db } from '../firebase';
 import { logAudit } from './audit.service';
 import { collection, doc, addDoc, updateDoc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { calculateFifoIssue } from '../utils/inventoryHelpers';
 
 export const addPart = async (tenantId, payload) => {
   logAudit('CREATE', 'PART', '', `Utworzono część: ${payload.name}`);
@@ -110,26 +111,7 @@ export const issueOrReceivePart = async ({
       newStock = currentStock - quantity;
       txQuantity = -quantity; 
       
-      let remainingToIssue = quantity;
-      let totalCost = 0;
-      let issueDetails = [];
-      
-      let newBatches = [...currentBatches];
-      while (remainingToIssue > 0 && newBatches.length > 0) {
-        let oldestBatch = newBatches[0];
-        if (oldestBatch.qty <= remainingToIssue) {
-          totalCost += oldestBatch.qty * oldestBatch.price;
-          issueDetails.push({ qty: oldestBatch.qty, price: oldestBatch.price });
-          remainingToIssue -= oldestBatch.qty;
-          newBatches.shift();
-        } else {
-          totalCost += remainingToIssue * oldestBatch.price;
-          issueDetails.push({ qty: remainingToIssue, price: oldestBatch.price });
-          oldestBatch.qty -= remainingToIssue;
-          remainingToIssue = 0;
-        }
-      }
-      
+      const { newBatches, totalCost, issueDetails } = calculateFifoIssue(quantity, currentBatches);
       const avgPrice = quantity > 0 ? (totalCost / quantity) : 0;
       
       updatePayload = { stock: newStock, batches: newBatches };

@@ -34,11 +34,7 @@ export default function PlannedMaintenanceDetails({
   regions = [],
   // Akcje
   onBack,
-  onDelete,
-  onSetInProgress,
   onComplete,
-  onUpdateRbg,
-  onAddNote,
   onAddFutureNote,
   onEdit,
   onAddPart,
@@ -51,6 +47,10 @@ export default function PlannedMaintenanceDetails({
   const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
+  const deletePlannedServiceAction = useManagerStore(state => state.deletePlannedServiceAction);
+  const updateRbgAction = useManagerStore(state => state.updateRbgAction);
+  const setServiceInProgressAction = useManagerStore(state => state.setServiceInProgressAction);
+  const addServiceNoteAction = useManagerStore(state => state.addServiceNoteAction);
   const navigate = useNavigate();
   const branding = useManagerStore(state => state.branding);
   const [partTransactions, setPartTransactions] = useState([]);
@@ -82,7 +82,7 @@ export default function PlannedMaintenanceDetails({
     if (!newNote.trim()) return;
     setAddingNote(true);
     try {
-      await onAddNote(srv, newNote.trim());
+      await addServiceNoteAction(srv, newNote.trim(), user);
       setNewNote('');
     } finally {
       setAddingNote(false);
@@ -325,7 +325,7 @@ export default function PlannedMaintenanceDetails({
                               <div className="space-y-4">
                                 {step.id === 1 && !isCompleted && srv.status !== 'in_progress' && (
                                   <div className="flex flex-col sm:flex-row gap-3">
-                                    <button onClick={() => onSetInProgress(srv)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                                    <button onClick={() => setServiceInProgressAction(srv, user)} className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
                                       <i className="ph ph-play-circle text-xl"></i> Rozpocznij Serwis
                                     </button>
 
@@ -510,7 +510,13 @@ export default function PlannedMaintenanceDetails({
         rbgUpdateModal={rbgUpdateModal}
         newRbgValue={newRbgValue}
         setNewRbgValue={setNewRbgValue}
-        onSubmit={onUpdateRbg}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (rbgUpdateModal) {
+            try { await updateRbgAction(rbgUpdateModal.id, newRbgValue); setRbgUpdateModal(null); setNewRbgValue(''); }
+            catch(err) { alert('Błąd aktualizacji RBG'); }
+          }
+        }}
         onClose={() => setRbgUpdateModal(null)}
       />
 

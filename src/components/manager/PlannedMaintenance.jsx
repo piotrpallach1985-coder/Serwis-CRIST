@@ -351,9 +351,7 @@ export default function PlannedMaintenance({
         canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
         getMachineRegionName={getMachineRegionName} machines={machines} regions={regions}
         onBack={() => window.history.back()}
-        onDelete={handleDelete} onSetInProgress={handleSetInProgress}
-        onUpdateRbg={handleUpdateRbg}
-        onAddNote={handleAddNote} onAddFutureNote={handleAddFutureNote}
+         onAddFutureNote={handleAddFutureNote}
         onEdit={openModalForEdit}
         onAddPart={(srv) => setPartUsageModalSrv(srv)}
         rbgUpdateModal={rbgUpdateModal} setRbgUpdateModal={setRbgUpdateModal}
