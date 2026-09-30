@@ -37,7 +37,7 @@ async function getTokensForPermission(permissionId) {
 }
 
 exports.onTicketCreated = functions.firestore
-  .document('tickets/{ticketId}')
+  .document('tenants/{tenantId}/tickets/{ticketId}')
   .onCreate(async (snap, context) => {
     const ticket = snap.data();
     const isCritical = ticket.isCritical;
@@ -69,7 +69,7 @@ exports.onTicketCreated = functions.firestore
   });
 
 exports.onTicketStatusUpdated = functions.firestore
-  .document('tickets/{ticketId}')
+  .document('tenants/{tenantId}/tickets/{ticketId}')
   .onUpdate(async (change, context) => {
     const newValue = change.after.data();
     const previousValue = change.before.data();

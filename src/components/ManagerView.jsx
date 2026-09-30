@@ -198,9 +198,9 @@ function ManagerViewInner() {
                   { id: 'dashboard_tickets', label: 'Mapa', icon: 'ph-map-pin' },
                   { id: 'tickets', label: 'Lista', icon: 'ph-list-dashes' },
                   { id: 'archive', label: 'Archiwum', icon: 'ph-archive' }
-                ].map(t => (
+                ].map(tabItem => (
                   <button
-                    key={t.id}
+                    key={tabItem.id}
                     onClick={() => handleNavigate('ur', t.id)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
                       activeTab === t.id
@@ -226,9 +226,9 @@ function ManagerViewInner() {
                   { id: 'planned_maintenance', label: 'Lista', icon: 'ph-calendar-check' },
                   { id: 'action_items', label: 'Zadania', icon: 'ph-check-square' },
                   { id: 'archive_planned', label: 'Archiwum', icon: 'ph-archive' }
-                ].map(t => (
+                ].map(tabItem => (
                   <button
-                    key={t.id}
+                    key={tabItem.id}
                     onClick={() => handleNavigate('ur', t.id)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
                       activeTab === t.id

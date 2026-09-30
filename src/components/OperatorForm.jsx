@@ -238,7 +238,7 @@ export default function OperatorForm({
                     <option value="" disabled>Wybierz z podpowiedzi...</option>
                     
                       <option value="manual" className="font-bold text-blue-900">+ Wpisz własny temat...</option>
-                    {topicsList.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                    {topicsList.map((topicItem, i) => <option key={i} value={topicItem}>{topicItem}</option>)}
                   </select>
                 ) : (
                   <div className="flex gap-2">

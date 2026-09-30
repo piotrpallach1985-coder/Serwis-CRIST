@@ -2,51 +2,71 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // === FUNKCJE POMOCNICZE ===
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Maksymalny rozmiar pliku: 30 MB
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getTenant() {
+      return getUserData().tenantId;
+    }
+
     function isValidSize() {
       return request.resource.size < 30 * 1024 * 1024;
     }
 
-    // Tylko dozwolone typy plików (obrazy + PDF)
     function isValidType() {
       return request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/pdf';
     }
 
-    // === ZDJĘCIA AWARII ===
-    // Zalogowany użytkownik może wgrywać zdjęcia awarii (np. z TicketDetails)
-    // Niezalogowani NIE mogą (formularz operatora zapisuje zdjęcia tylko przez zalogowanych)
     match /tickets/{ticketId}/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && isValidType();
+      allow write: if isSignedIn() && isValidSize() && isValidType() && 
+                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/tickets/$(ticketId));
     }
 
-    // === ZDJĘCIA MASZYN / DTR ===
     match /machine_photos/{machineId}/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && isValidType();
+      allow write: if isSignedIn() && isValidSize() && isValidType() && 
+                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/machines/$(machineId));
     }
 
-    // === LOGO APLIKACJI (branding) ===
-    // Blokujemy anonimowych operatorów, pozwalając na wgranie logo tylko pracownikom z mailem
-    match /branding/{fileName} {
-      allow read: if true; // Logo musi być widoczne na stronie logowania
-      allow write: if isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous' && isValidSize() && isValidType();
-    }
-
-    // === DOKUMENTY DTR (instrukcje maszyn) ===
     match /dtr_documents/{machineId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidSize() && 
+                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/machines/$(machineId));
+    }
+    
+    match /planned_services/{srvId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidSize() && 
+                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/planned_services/$(srvId));
+    }
+    
+    match /checklists/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && isValidSize();
     }
+    
+    match /map_backgrounds/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    
+    match /regions_maps/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
 
-    // === DOMYŚLNA REGUŁA: DENY ALL ===
-    // Wszystko inne jest zablokowane
+    match /branding/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous' && isValidSize() && isValidType();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

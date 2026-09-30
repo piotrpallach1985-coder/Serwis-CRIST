@@ -52,10 +52,10 @@ export default function SuperAdminPanel({ onNavigate }) {
     if (tenants.length > 0) fetchUsage();
   }, [tenants]);
 
-  const tenantsWithTokens = tenants.map(t => ({
-    ...t,
-    aiTokensGemini: aiUsageMap[t.id]?.geminiTokens || 0,
-    aiTokensGroq: aiUsageMap[t.id]?.groqTokens || 0
+  const tenantsWithTokens = tenants.map(tenantItem => ({
+    ...tenantItem,
+    aiTokensGemini: aiUsageMap[tenantItem.id]?.geminiTokens || 0,
+    aiTokensGroq: aiUsageMap[tenantItem.id]?.groqTokens || 0
   }));
 
   const totalGeminiTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGemini || 0), 0);
@@ -391,7 +391,7 @@ export default function SuperAdminPanel({ onNavigate }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                {tenantsWithTokens.filter(t => t.id !== '_global_settings_').map(tenant => (
+                {tenantsWithTokens.filter(t => tenantItem.id !== '_global_settings_').map(tenant => (
                     <tr key={tenant.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="p-4 w-16">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">

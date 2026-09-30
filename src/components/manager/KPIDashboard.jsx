@@ -40,9 +40,9 @@ export default function KPIDashboard() {
 
   const allTicketsForKPI = useMemo(() => {
     // Połączenie otwartych i zamkniętych zgłoszeń
-    const activeMap = new Map(tickets.map(t => [t.id, t]));
-    historicalTickets.forEach(t => {
-      if (!activeMap.has(t.id)) activeMap.set(t.id, t);
+    const activeMap = new Map(tickets.map(tic => [tic.id, tic]));
+    historicalTickets.forEach(tic => {
+      if (!activeMap.has(tic.id)) activeMap.set(tic.id, tic);
     });
     return Array.from(activeMap.values());
   }, [tickets, historicalTickets]);

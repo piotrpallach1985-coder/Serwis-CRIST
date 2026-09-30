@@ -93,8 +93,8 @@ export default function ChecklistBuilder({ steps, onChange }) {
                     onChange={(e) => updateStep(step.id, 'type', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   >
-                    {STEP_TYPES.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
+                    {STEP_TYPES.map(stepType => (
+                      <option key={stepType.value} value={stepType.value}>{stepType.label}</option>
                     ))}
                   </select>
                 </div>

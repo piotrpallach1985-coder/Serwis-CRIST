@@ -47,16 +47,11 @@ service cloud.firestore {
       }
 
       match /machines/{document=**} {
-        allow read: if true;
-        allow create: if isSignedIn();
-        allow update, delete: if isTenantUser(tenantId);
+        allow read, create, update, delete: if isTenantUser(tenantId);
       }
 
       match /tickets/{ticketId} {
-        allow read: if isSignedIn();   
-        allow create: if isSignedIn();
-        allow update: if isSignedIn();
-        allow delete: if isTenantUser(tenantId);
+        allow read, create, update, delete: if isTenantUser(tenantId);
       }
 
       match /regions/{document=**} {

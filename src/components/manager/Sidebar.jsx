@@ -430,9 +430,9 @@ export default function Sidebar({
               <div className="px-3 py-1.5 text-[11px] font-bold text-yellow-500 uppercase tracking-wider mb-1">
                 Lista Firm (SaaS)
               </div>
-              {saasTenants.map(t => (
+              {saasTenants.map(tenantItem => (
                  <button
-                  key={t.id}
+                  key={tenantItem.id}
                   onClick={() => {
                      useManagerStore.getState().setTenantId(t.id);
                      onNavigate('home', 'home');
@@ -440,7 +440,7 @@ export default function Sidebar({
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left text-gray-300 hover:bg-white/5 hover:text-white"
                 >
                   <i className="ph ph-buildings text-xl shrink-0"></i>
-                  <span className="text-sm">{t.name || t.id}</span>
+                  <span className="text-sm">{tenantItem.name || t.id}</span>
                 </button>
               ))}
             </div>
