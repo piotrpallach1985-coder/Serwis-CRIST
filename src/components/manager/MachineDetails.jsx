@@ -298,7 +298,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
               <div className="p-0 overflow-y-auto max-h-[400px]">
                 {history.tickets.length === 0 ? (
-                  <EmptyState title={t('machines.details.noBreakdowns')} message="Nie odnotowano żadnych {t('machines.details.ticketsCount')} awarii dla tej maszyny." icon="ph-wrench" />
+                  <EmptyState title={t('machines.details.noBreakdowns')} message={t('machines.details.noBreakdownsMsg')} icon="ph-wrench" />
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.tickets.map(ticket => (
@@ -332,7 +332,7 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
               </div>
               <div className="p-0 overflow-y-auto max-h-[400px]">
                 {history.services.length === 0 ? (
-                  <EmptyState title="Brak {t('machines.details.servicesCount')}" message={t('machines.details.noServicesMsg')} icon="ph-calendar" />
+                  <EmptyState title={t('machines.details.noServices')} message={t('machines.details.noServicesMsg')} icon="ph-calendar" />
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {history.services.map(s => (

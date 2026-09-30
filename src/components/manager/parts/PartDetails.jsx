@@ -1,5 +1,6 @@
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import React, {  useState, useMemo , useEffect } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -9,6 +10,7 @@ import PartTransactionModal from './PartTransactionModal';
 
 export default function PartDetails({ part, onBack, onEdit }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [txMode, setTxMode] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -136,7 +138,7 @@ export default function PartDetails({ part, onBack, onEdit }) {
                           <span className="text-slate-400 ml-2">po {Number(b.price || 0).toFixed(2)} PLN</span>
                         </div>
                         <div className={`font-bold ${b.expirationDate ? (new Date(b.expirationDate) < new Date() ? 'text-red-500' : 'text-orange-500') : 'text-slate-400'}`}>
-                          {b.expirationDate ? `{t('parts.details.valid_until')} ${new Date(b.expirationDate).toLocaleDateString('pl-PL')}` : t('parts.details.no_expiration')}
+                          {b.expirationDate ? `${t('parts.details.valid_until')} ${new Date(b.expirationDate).toLocaleDateString('pl-PL')}` : t('parts.details.no_expiration')}
                         </div>
                       </div>
                     ))}
@@ -178,7 +180,9 @@ export default function PartDetails({ part, onBack, onEdit }) {
                         <div>
                           <div className="font-bold text-slate-800 text-sm">{s.name}</div>
                           <div className="text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-1.5">
-                            <span className="flex items-center gap-1 text-blue-500"><i className="ph ph-gear"></i> {machine ? machine.name : t('parts.details.unknown_device')}</span>
+                            <button onClick={(e) => { e.stopPropagation(); if (machine) navigate('/manager/ur/machines?openMachine=' + machine.id); }} className="flex items-center gap-1 text-blue-500 hover:text-blue-700 hover:underline cursor-pointer transition-colors text-left">
+      <i className="ph ph-gear"></i> {machine ? machine.name : t('parts.details.unknown_device')}
+    </button>
                             <span>•</span>
                             <span>{t('parts.details.planned_date')} {safeParseDate(s.nextDate)?.toLocaleDateString('pl-PL')}</span>
                           </div>
@@ -226,9 +230,12 @@ export default function PartDetails({ part, onBack, onEdit }) {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">{t('parts.details.qr_title')}</h3>
             <div className="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm">
               <QRCodeCanvas value={qrValue} size={140} level="H" />
+                <div className="mt-3 text-center">
+                  <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">DATA: {safeParseDate(part.createdAt)?.toLocaleDateString('pl-PL') || '-'}</span>
+                </div>
             </div>
             <p className="text-[10px] text-slate-400 text-center mt-3 font-medium px-4">
-              Naklej na pudełko/regał, aby szybko skanować wydania i przyjęcia.
+              {t('parts.details.qr_desc')}
             </p>
           </div>
 

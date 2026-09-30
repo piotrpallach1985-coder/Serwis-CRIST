@@ -615,7 +615,22 @@
     "col_date_calendar": "Termin (Kalendarz)",
     "col_date_rbg": "Termin (RBG)",
     "col_priority": "Priorytet",
-    "col_status": "Status"
+    "col_status": "Status",
+    "kpi_title": "Analiza Serwisów Planowanych",
+    "kpi_subtitle": "Śledzenie wydajności i terminowości",
+    "last_7_days": "Ostatnie 7 dni",
+    "last_30_days": "Ostatnie 30 dni",
+    "last_90_days": "Ostatnie 90 dni",
+    "last_year": "Ostatni rok",
+    "total_services": "ZAPLANOWANE SERWISY",
+    "completed": "ZAKOŃCZONE",
+    "overdue": "PRZEKROCZONE",
+    "hours": "godz.",
+    "completed_vs_planned": "Wykonane vs Zaplanowane",
+    "services_by_region": "Serwisy według Rejonu",
+    "planned": "Zaplanowane",
+    "no_data": "Brak danych do wyświetlenia",
+    "generate_pdf": "Generuj PDF"
   },
   "dashboards": {
     "reports_title": "Raportowanie oraz Ustawienia",

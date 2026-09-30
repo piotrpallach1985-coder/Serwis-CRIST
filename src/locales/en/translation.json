@@ -615,7 +615,22 @@
     "col_date_calendar": "Date (Calendar)",
     "col_date_rbg": "Date (Hours)",
     "col_priority": "Priority",
-    "col_status": "Status"
+    "col_status": "Status",
+    "kpi_title": "Planned Services KPI",
+    "kpi_subtitle": "Tracking performance and timeliness",
+    "last_7_days": "Last 7 days",
+    "last_30_days": "Last 30 days",
+    "last_90_days": "Last 90 days",
+    "last_year": "Last year",
+    "total_services": "PLANNED SERVICES",
+    "completed": "COMPLETED",
+    "overdue": "OVERDUE",
+    "hours": "hrs",
+    "completed_vs_planned": "Completed vs Planned",
+    "services_by_region": "Services by Region",
+    "planned": "Planned",
+    "no_data": "No data to display",
+    "generate_pdf": "Generate PDF"
   },
   "dashboards": {
     "reports_title": "Reporting and Settings",
