@@ -7,16 +7,18 @@ import { safeParseDate } from '../../../utils/dateHelpers';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import PartsIssueReceive from './PartsIssueReceive';
 import { fixLegacyTransactions } from '../../../services/parts.service';
+import { usePartTransactions } from '../../../hooks/usePartTransactions';
 
 export default function PartsTransactionsList({ onManualIssue }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const parts = useManagerStore((state) => state.parts || []);
+  const { transactions: partTransactions, loading, hasMore, fetchTransactions } = usePartTransactions();
   const machines = useManagerStore((state) => state.machines || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
-  const partTransactions = useManagerStore((state) => state.partTransactions || []);
+  
 
   useEffect(() => {
     // FIX LEGACY TRANSACTIONS - jednorazowe sprawdzenie i naprawa transakcji bez machineId

@@ -11,7 +11,12 @@ export default function PartDetails({ part, onBack, onEdit }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [txMode, setTxMode] = useState(null);
-  const transactions = useManagerStore(state => state.partTransactions || []);
+  const [transactions, setTransactions] = useState([]);
+  useEffect(() => {
+    import('../../../hooks/usePartTransactions').then(({ fetchTransactionsForPart }) => {
+      fetchTransactionsForPart(getCurrentTenant(), part.id).then(setTransactions);
+    });
+  }, [part.id]);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const machines = useManagerStore(state => state.machines || []);

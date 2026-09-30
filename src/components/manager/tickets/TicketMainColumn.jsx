@@ -37,7 +37,13 @@ export default function TicketMainColumn({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { machines, regions, services, branding, parts = [], partTransactions = [] } = useManagerStore();
+  const { machines, regions, services, branding, parts = [] } = useManagerStore();
+  const [partTransactions, setPartTransactions] = useState([]);
+  useEffect(() => {
+    import('../../../hooks/usePartTransactions').then(({ fetchTransactionsForReference }) => {
+      fetchTransactionsForReference(getCurrentTenant(), currentTicket.id).then(setPartTransactions);
+    });
+  }, [currentTicket.id]);
 
   const actualPartsUsed = React.useMemo(() => {
     return partTransactions.filter(tx => tx.referenceId === currentTicket.id && tx.type === 'issue_adhoc');

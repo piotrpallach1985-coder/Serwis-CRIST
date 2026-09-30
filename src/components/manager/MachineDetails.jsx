@@ -22,7 +22,12 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
   const regionName = regions.find(r => r.id === machine.regionId)?.name || t('machines.details.unknownRegion');
   const baseUrl = window.location.origin;
   const currentTenantId = getCurrentTenant();
-    const partTransactions = useManagerStore(state => state.partTransactions || []);
+    const [partTransactions, setPartTransactions] = useState([]);
+  useEffect(() => {
+    import('../../hooks/usePartTransactions').then(({ fetchTransactionsForMachine }) => {
+      fetchTransactionsForMachine(getCurrentTenant(), machine.id).then(setPartTransactions);
+    });
+  }, [machine.id]);
   const parts = useManagerStore(state => state.parts || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);

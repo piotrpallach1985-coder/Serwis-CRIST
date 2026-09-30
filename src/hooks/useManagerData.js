@@ -114,10 +114,8 @@ export function useManagerData() {
       setParts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !p.isDeleted));
     }, (err) => console.debug("onSnapshot err:", err.code));
     
-    const qTx = query(collection(db, 'tenants', tenantId, 'part_transactions'), limit(500));
-    const unsubTransactions = onSnapshot(qTx, (snapshot) => {
-      setPartTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.debug("onSnapshot err:", err.code));
+    
+    
 
     // --- Serwisy planowane ---
     const qPlanned = query(
@@ -156,7 +154,7 @@ export function useManagerData() {
     return () => {
       unsubTickets();
       unsubParts();
-      unsubTransactions();
+      
       unsubPlanned();
       unsubNotifications();
       unsubActionItems();

@@ -53,7 +53,12 @@ export default function PlannedMaintenanceDetails({
   const location = useLocation();
   const navigate = useNavigate();
   const branding = useManagerStore(state => state.branding);
-  const partTransactions = useManagerStore(state => state.partTransactions || []);
+  const [partTransactions, setPartTransactions] = useState([]);
+  useEffect(() => {
+    import('../../hooks/usePartTransactions').then(({ fetchTransactionsForReference }) => {
+      fetchTransactionsForReference(getCurrentTenant(), srv.id).then(setPartTransactions);
+    });
+  }, [srv.id]);
   const parts = useManagerStore(state => state.parts || []);
   
   const actualPartsUsed = useMemo(() => {
