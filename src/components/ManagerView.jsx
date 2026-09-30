@@ -203,15 +203,15 @@ function ManagerViewInner() {
                 ].map(tabItem => (
                   <button
                     key={tabItem.id}
-                    onClick={() => handleNavigate('ur', t.id)}
+                    onClick={() => handleNavigate('ur', tabItem.id)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
-                      activeTab === t.id
+                      activeTab === tabItem.id
                         ? 'bg-red-600 text-white'
                         : 'bg-white text-gray-500 hover:bg-gray-50'
                     }`}
                   >
-                    <i className={`ph ${t.icon} text-lg`}></i>
-                    {t.label}
+                    <i className={`ph ${tabItem.icon} text-lg`}></i>
+                    {tabItem.label}
                   </button>
                 ))}
               </div>
@@ -231,15 +231,15 @@ function ManagerViewInner() {
                 ].map(tabItem => (
                   <button
                     key={tabItem.id}
-                    onClick={() => handleNavigate('ur', t.id)}
+                    onClick={() => handleNavigate('ur', tabItem.id)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
-                      activeTab === t.id
+                      activeTab === tabItem.id
                         ? 'bg-amber-600 text-white'
                         : 'bg-white text-gray-500 hover:bg-gray-50'
                     }`}
                   >
-                    <i className={`ph ${t.icon} text-lg`}></i>
-                    {t.label}
+                    <i className={`ph ${tabItem.icon} text-lg`}></i>
+                    {tabItem.label}
                   </button>
                 ))}
               </div>
