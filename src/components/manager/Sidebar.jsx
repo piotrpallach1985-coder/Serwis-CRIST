@@ -95,7 +95,8 @@ export default function Sidebar({
           {isUrModule && (
             <SidebarNavUR 
               activeTab={activeTab} 
-              handleItemClick={handleItemClick} 
+              handleItemClick={handleItemClick}
+              branding={branding}
             />
           )}
 

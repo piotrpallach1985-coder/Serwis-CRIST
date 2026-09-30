@@ -4,7 +4,7 @@ import { useManagerStore } from '../../../store/managerStore';
 import { safeParseDate } from '../../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../../utils/constants';
 
-export default function SidebarNavUR({ activeTab, handleItemClick }) {
+export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const { t } = useTranslation();
   
   const tickets = useManagerStore(state => state.tickets) || [];
