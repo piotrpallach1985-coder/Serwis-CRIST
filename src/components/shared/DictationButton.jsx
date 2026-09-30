@@ -3,6 +3,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { useTranslation } from 'react-i18next';
 
 export default function DictationButton({ onResult, onStart, className = '', mode = 'text' }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -11,6 +12,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
 
+  const { i18n } = useTranslation();
   const apiKey = useManagerStore(state => state.groqApiKey);
 
   const startRecording = async (e) => {
@@ -127,6 +129,8 @@ export default function DictationButton({ onResult, onStart, className = '', mod
 
       } else {
         // Tłumaczenie i Korekta na Polski (Groq Llama 3)
+        
+        const lang = i18n.language === 'en' ? 'angielski' : 'polski';
         const resTranslate = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -138,7 +142,15 @@ export default function DictationButton({ onResult, onStart, className = '', mod
             messages: [
               {
                 role: 'system',
-                content: 'Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. Twoim jedynym zadaniem jest przetłumaczenie go na czysty, poprawny język polski, zachowując techniczny sens. Jeśli tekst jest już po polsku, po prostu sformatuj go poprawnie (dodaj kropki, przecinki, usuń zająknięcia). Zwróć TYLKO wynikowy polski tekst.'
+                content: `Jesteś asystentem technicznym. Interfejs systemu jest w języku: ${lang.toUpperCase()}. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
+1. Jeśli oryginalny podyktowany tekst jest w języku ${lang} (albo bardzo do niego zbliżonym), po prostu sformatuj go poprawnie (dodaj interpunkcję) i zwróć TYLKO sam sformatowany tekst (bez dopisków o tłumaczeniu).
+2. Jeśli oryginalny tekst jest w INNYM języku (np. ukraińskim, hiszpańskim, itp.), przetłumacz go na język ${lang}. 
+Wtedy (i tylko wtedy) zwróć wynik DOKŁADNIE w tym formacie (zachowując oryginalny tekst u góry):
+[Oryginalny podyktowany tekst]
+
+---
+Tłumaczenie (${lang}):
+[Przetłumaczony tekst]`
               },
               {
                 role: 'user',
