@@ -18,10 +18,30 @@ export default function PlannedMaintenanceCompletionModal({
   const [actionItemProblem, setActionItemProblem] = useState('');
   const [actionItemDueDate, setActionItemDueDate] = useState('');
   const [partsUsed, setPartsUsed] = useState(false);
+  const [actualManHours, setActualManHours] = useState('');
 
   if (!isOpen || !serviceToComplete) return null;
 
   const getMachine = (id) => machines.find(m => m.id === id);
+
+  const handleSmartAiResult = (result) => {
+    if (typeof result === 'object' && result !== null) {
+      if (result.note) setCompletionNotes(prev => prev ? prev + ' \n' + result.note : result.note);
+      if (result.timeSpentHours) setActualManHours(result.timeSpentHours);
+      if (result.actionItem) {
+        setCreateActionItem(true);
+        setActionItemProblem(result.actionItem);
+        if (result.actionItemDays) {
+          const d = new Date();
+          d.setDate(d.getDate() + result.actionItemDays);
+          setActionItemDueDate(d.toISOString().split('T')[0]);
+        }
+      }
+    } else {
+      setCompletionNotes(prev => prev ? prev + ' ' + result : result);
+    }
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,6 +88,7 @@ export default function PlannedMaintenanceCompletionModal({
       }
 
       const historyEntry = { 
+        manHours: actualManHours ? Number(actualManHours) : null, 
         date: new Date().toISOString(), 
         user: user?.name || 'System', 
         action: 'Zakończono serwis', 
@@ -117,10 +138,29 @@ export default function PlannedMaintenanceCompletionModal({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-scale-in">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">{t('planned.complete_service')}</h3>
-        <p className="text-sm text-slate-600 mb-4 font-bold">{serviceToComplete.name}</p>
+        
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">{t('planned.complete_service')}</h3>
+            <p className="text-sm text-slate-600 font-bold">{serviceToComplete.name}</p>
+          </div>
+          <DictationButton mode="smart" onResult={handleSmartAiResult} />
+        </div>
 
-        <div className="mb-4 flex items-center gap-2">
+
+        
+        <div className="mb-4">
+          <label className="block text-sm font-bold text-slate-700 mb-2">Czas pracy (RBG / Godziny)</label>
+          <input
+            type="number"
+            step="0.1"
+            className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            value={actualManHours}
+            onChange={e => setActualManHours(e.target.value)}
+            placeholder="np. 2.5"
+          />
+        </div>
+<div className="mb-4 flex items-center gap-2">
           <input
             id="partsUsed"
             type="checkbox"

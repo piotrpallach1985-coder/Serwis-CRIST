@@ -4,7 +4,7 @@ import { doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
-export default function DictationButton({ onResult, onStart, className = '' }) {
+export default function DictationButton({ onResult, onStart, className = '', mode = 'text' }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -89,50 +89,87 @@ export default function DictationButton({ onResult, onStart, className = '' }) {
         return;
       }
 
-      // 2. Tłumaczenie i Korekta na Polski (Groq Llama 3)
-      const resTranslate = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
-          messages: [
-            {
-              role: 'system',
-              content: 'Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni (może być w dowolnym języku, np. ukraińskim, hiszpańskim, angielskim lub polskim). Twoim jedynym zadaniem jest przetłumaczenie go na czysty, poprawny język polski, zachowując techniczny sens i oryginalne słownictwo branżowe. Jeśli tekst jest już po polsku, po prostu sformatuj go poprawnie (dodaj kropki, przecinki, usuń zająknięcia "yyy", "eee", popraw literówki). Zwróć TYLKO wynikowy polski tekst bez żadnych wstępów ani komentarzy.'
-            },
-            {
-              role: 'user',
-              content: originalText
-            }
-          ],
-          temperature: 0.1
-        })
-      });
+      // 2. Przetwarzanie (Groq LLM)
+      let translatedText = originalText;
+      let finalResult = originalText;
 
-      if (!resTranslate.ok) {
-        const errData = await resTranslate.json().catch(() => ({}));
-        throw new Error("Błąd API Groq (tłumaczenie): " + (errData.error?.message || "Status " + resTranslate.status));
-      }
+      if (mode === 'smart') {
+        const resAi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ 
+              role: 'system', 
+              content: 'Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania). Zwróć obiekt JSON: {"note": "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach", "timeSpentHours": liczba_godzin (lub null), "actionItem": "Zadanie na przyszłość" (lub null), "actionItemDays": liczba_dni_do_wykonania (lub null)}. Wymagany format JSON. Użyj polskiego języka.' 
+            }, { 
+              role: 'user', 
+              content: originalText 
+            }],
+            temperature: 0.1,
+            response_format: { type: 'json_object' }
+          })
+        });
 
-      const translateData = await resTranslate.json();
-      const translatedText = translateData.choices[0].message.content.trim();
+        if (!resAi.ok) throw new Error('Błąd API Smart Extraction');
+        const aiData = await resAi.json();
+        try {
+          finalResult = JSON.parse(aiData.choices[0].message.content);
+        } catch (e) {
+          throw new Error('Niepoprawny format danych od AI');
+        }
 
-      // Log AI Usage
-      const groqTokens = translateData.usage?.total_tokens || 0;
-      if (groqTokens > 0) {
-        const tenantId = getCurrentTenant();
-        if (tenantId) {
-          setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
-            groqTokens: increment(groqTokens)
-          }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+        const groqTokens = aiData.usage?.total_tokens || 0;
+        if (groqTokens > 0) {
+          const tenantId = getCurrentTenant();
+          if (tenantId) setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), { groqTokens: increment(groqTokens) }, { merge: true }).catch(err => console.error(err));
+        }
+
+      } else {
+        // Tłumaczenie i Korekta na Polski (Groq Llama 3)
+        const resTranslate = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              {
+                role: 'system',
+                content: 'Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. Twoim jedynym zadaniem jest przetłumaczenie go na czysty, poprawny język polski, zachowując techniczny sens. Jeśli tekst jest już po polsku, po prostu sformatuj go poprawnie (dodaj kropki, przecinki, usuń zająknięcia). Zwróć TYLKO wynikowy polski tekst.'
+              },
+              {
+                role: 'user',
+                content: originalText
+              }
+            ],
+            temperature: 0.1
+          })
+        });
+
+        if (!resTranslate.ok) {
+          const errData = await resTranslate.json().catch(() => ({}));
+          throw new Error("Błąd API Groq (tłumaczenie): " + (errData.error?.message || "Status " + resTranslate.status));
+        }
+
+        const translateData = await resTranslate.json();
+        finalResult = translateData.choices[0].message.content.trim();
+
+        const groqTokens = translateData.usage?.total_tokens || 0;
+        if (groqTokens > 0) {
+          const tenantId = getCurrentTenant();
+          if (tenantId) {
+            setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
+              groqTokens: increment(groqTokens)
+            }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+          }
         }
       }
 
       if (onResult) {
-        onResult(translatedText);
+        onResult(finalResult);
       }
     } catch (err) {
       console.error("AI processing error:", err);
@@ -152,14 +189,16 @@ export default function DictationButton({ onResult, onStart, className = '' }) {
           ? 'bg-red-500 hover:bg-red-600 text-white shadow-md shadow-red-500/50' 
           : isProcessing 
             ? 'bg-amber-400 text-white cursor-wait' 
-            : 'bg-slate-100 hover:bg-blue-100 text-slate-500 hover:text-blue-600'
+            : mode === 'smart' 
+              ? 'bg-purple-100 hover:bg-purple-200 text-purple-600 hover:text-purple-700 shadow-sm'
+              : 'bg-slate-100 hover:bg-blue-100 text-slate-500 hover:text-blue-600'
         } ${className}`}
-      title={isRecording ? "Zatrzymaj nagrywanie" : "Podyktuj tekst (AI Whisper + Tłumacz)"}
+      title={isRecording ? "Zatrzymaj nagrywanie" : mode === 'smart' ? "Inteligentne Dyktowanie (Wypełnij automatycznie formularz)" : "Podyktuj tekst (AI Whisper)"}
     >
       {isProcessing ? (
         <i className="ph ph-spinner animate-spin text-lg"></i>
       ) : (
-        <i className={`ph ${isRecording ? 'ph-stop' : 'ph-microphone'} text-lg`}></i>
+        <i className={`ph ${isRecording ? 'ph-stop' : mode === 'smart' ? 'ph-magic-wand' : 'ph-microphone'} text-lg`}></i>
       )}
       
       {isRecording && (

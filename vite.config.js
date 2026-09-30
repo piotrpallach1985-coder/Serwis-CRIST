@@ -4,8 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: './',
-  test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ["e2e/**", "node_modules/**"] },
-  build: { sourcemap: true }, 
+  test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ["e2e/**", "node_modules/**", "functions/**"] },
+  build: { sourcemap: true, emptyOutDir: false }, 
   esbuild: {
     drop: ['console', 'debugger'],
   },
