@@ -1,0 +1,2 @@
+const r=async(t,a)=>{if(window.showSaveFilePicker)try{const i=await(await window.showSaveFilePicker({suggestedName:a,id:"crist-cmms-pdf-dir",types:[{description:"Plik PDF",accept:{"application/pdf":[".pdf"]}}]})).createWritable(),s=t.output("blob");await i.write(s),await i.close()}catch(e){e.name!=="AbortError"&&t.save(a)}else t.save(a)};export{r as s};
+//# sourceMappingURL=pdfHelper-zU7mpu3v.js.map
