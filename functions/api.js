@@ -2,21 +2,27 @@ const functions = require('firebase-functions');
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
+const Joi = require('joi');
 
 const app = express();
 
-// Middleware konfigurujące CORS (zabezpieczenie lub otwarcie API)
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// Jeśli db nie jest przekazane z index.js, inicjujemy
 const db = admin.firestore();
 
-/**
- * MIDDLEWARE AUTORYZACJI
- * Oczekuje nagłówka x-api-key.
- * Sprawdza w Firestore w kolekcji '_api_keys_' (globalna lub per tenant) czy klucz istnieje.
- */
+// 1. RATE LIMITING
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Przekroczono limit zapytań (Rate Limit). Spróbuj ponownie za 15 minut.' }
+});
+
+app.use(apiLimiter);
+
+// 2. MIDDLEWARE AUTORYZACJI (SHA-256 Hash)
 const authenticateApiKey = async (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   if (!apiKey) {
@@ -24,9 +30,8 @@ const authenticateApiKey = async (req, res, next) => {
   }
 
   try {
-    // Sprawdzamy klucz w bazie danych (np. globalna kolekcja tenant_api_keys)
-    // Zakładamy strukturę: tenant_api_keys / {keyString} -> { tenantId, active: true, name: "BIM Integration" }
-    const keyDoc = await db.collection('tenant_api_keys').doc(apiKey).get();
+    const hash = crypto.createHash('sha256').update(apiKey).digest('hex');
+    const keyDoc = await db.collection('tenant_api_keys').doc(hash).get();
     
     if (!keyDoc.exists) {
       return res.status(403).json({ error: 'Nieprawidłowy klucz API' });
@@ -37,7 +42,6 @@ const authenticateApiKey = async (req, res, next) => {
       return res.status(403).json({ error: 'Klucz API jest nieaktywny' });
     }
 
-    // Przekazujemy tenantId z klucza do obiektu request
     req.tenantId = keyData.tenantId;
     next();
   } catch (error) {
@@ -48,9 +52,30 @@ const authenticateApiKey = async (req, res, next) => {
 
 app.use(authenticateApiKey);
 
+// 3. WALIDACJA PAYLOADU (Joi)
+const ticketSchema = Joi.object({
+  machineId: Joi.string().required(),
+  topic: Joi.string().required(),
+  description: Joi.string().allow('').optional(),
+  priority: Joi.string().valid('normal', 'high', 'critical').optional(),
+  reporterName: Joi.string().allow('').optional()
+});
+
+const stockSchema = Joi.object({
+  quantity: Joi.number().required(),
+  type: Joi.string().valid('add', 'subtract', 'set').required(),
+  userId: Joi.string().optional(),
+  userName: Joi.string().optional()
+});
+
+const telemetrySchema = Joi.object({
+  workHours: Joi.number().optional(),
+  status: Joi.string().optional(),
+  lastReading: Joi.string().optional()
+});
+
 /**
  * GET /api/v1/machines
- * Zwraca listę maszyn dla danego Tenanta.
  */
 app.get('/v1/machines', async (req, res) => {
   try {
@@ -65,29 +90,26 @@ app.get('/v1/machines', async (req, res) => {
     
     res.status(200).json({ success: true, count: machines.length, data: machines });
   } catch (err) {
-    console.error('Błąd pobierania maszyn:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * POST /api/v1/tickets
- * Tworzy nowe zgłoszenie awarii z systemu zewnętrznego (np. BIM)
  */
 app.post('/v1/tickets', async (req, res) => {
   try {
-    const { machineId, topic, description, priority, reporterName } = req.body;
+    const { error, value } = ticketSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     
-    if (!machineId || !topic) {
-      return res.status(400).json({ error: 'Brakuje wymaganych pól (machineId, topic)' });
-    }
-
+    const { machineId, topic, description, priority, reporterName } = value;
+    
     const newTicket = {
       machineId,
       topic,
       description: description || '',
-      priority: priority || 'normal', // normal / high / critical
-      status: 1, // 1 = Nowe
+      priority: priority || 'normal',
+      status: 1,
       isCritical: priority === 'critical',
       reportedBy: reporterName || 'API Integration',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -96,18 +118,14 @@ app.post('/v1/tickets', async (req, res) => {
     };
 
     const docRef = await db.collection('tenants').doc(req.tenantId).collection('tickets').add(newTicket);
-    
     res.status(201).json({ success: true, ticketId: docRef.id, message: 'Ticket utworzony pomyślnie' });
   } catch (err) {
-    console.error('Błąd tworzenia zgłoszenia API:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-
 /**
  * GET /api/v1/parts
- * (ERP) Zwraca listę części magazynowych wraz ze stanami.
  */
 app.get('/v1/parts', async (req, res) => {
   try {
@@ -120,24 +138,19 @@ app.get('/v1/parts', async (req, res) => {
     
     res.status(200).json({ success: true, count: parts.length, data: parts });
   } catch (err) {
-    console.error('Błąd pobierania części:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * PATCH /api/v1/parts/:id/stock
- * (ERP) Aktualizacja stanu magazynowego (np. z dostawy zewnętrznej).
  */
 app.patch('/v1/parts/:id/stock', async (req, res) => {
   try {
-    const { quantity, type, userId, userName } = req.body;
-    // type: 'add' (przyjęcie) / 'subtract' (wydanie) / 'set' (nadpisanie)
+    const { error, value } = stockSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
     
-    if (quantity === undefined || !type) {
-      return res.status(400).json({ error: 'Brakuje quantity lub type (add/subtract/set)' });
-    }
-
+    const { quantity, type, userId, userName } = value;
     const partRef = db.collection('tenants').doc(req.tenantId).collection('parts').doc(req.params.id);
     
     await db.runTransaction(async (t) => {
@@ -160,7 +173,6 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
 
       t.update(partRef, { stock: newStock, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 
-      // Log do part_transactions (widoczny w historii)
       const txRef = db.collection('tenants').doc(req.tenantId).collection('part_transactions').doc();
       t.set(txRef, {
         partId: req.params.id,
@@ -176,25 +188,24 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Stan magazynowy zaktualizowany' });
   } catch (err) {
-    console.error('Błąd aktualizacji stanu ERP:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * PATCH /api/v1/machines/:id/telemetry
- * (SCADA / IoT) Aktualizacja motogodzin (RBG) i parametrów urządzenia.
  */
 app.patch('/v1/machines/:id/telemetry', async (req, res) => {
   try {
-    const { workHours, status, lastReading } = req.body;
+    const { error, value } = telemetrySchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    
+    const { workHours, status, lastReading } = value;
     
     const machineRef = db.collection('tenants').doc(req.tenantId).collection('machines').doc(req.params.id);
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     
-    if (workHours !== undefined) {
-      updates.currentWorkHours = Number(workHours);
-    }
+    if (workHours !== undefined) updates.currentWorkHours = Number(workHours);
     if (status) updates.status = status;
     if (lastReading) updates.lastReading = lastReading;
 
@@ -202,11 +213,8 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
     
     res.status(200).json({ success: true, message: 'Dane telemetryczne zaktualizowane' });
   } catch (err) {
-    console.error('Błąd IoT/SCADA:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Eksportujemy aplikację express jako funkcję chmurową
 exports.api = functions.region('europe-west1').https.onRequest(app);
-

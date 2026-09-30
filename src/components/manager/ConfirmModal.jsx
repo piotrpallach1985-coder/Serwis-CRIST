@@ -1,6 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
-export default function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmText = "Tak, usuń", cancelText = "Anuluj" }) {
+export default function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmText, cancelText }) {
+  const { t } = useTranslation();
+  
   if (!isOpen) return null;
 
   return (
@@ -10,7 +13,7 @@ export default function ConfirmModal({ isOpen, title, message, onConfirm, onCanc
           <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
             <i className="ph ph-warning text-red-600 text-2xl"></i>
           </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">{title || 'Czy na pewno?'}</h3>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">{title || t('common.are_you_sure', 'Czy na pewno?')}</h3>
           <p className="text-slate-600 leading-relaxed">{message}</p>
         </div>
         <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
@@ -18,13 +21,13 @@ export default function ConfirmModal({ isOpen, title, message, onConfirm, onCanc
             onClick={onCancel}
             className="px-5 py-2.5 rounded-lg text-slate-600 font-semibold hover:bg-slate-200 transition-colors"
           >
-            {cancelText}
+            {cancelText || t('common.cancel', 'Anuluj')}
           </button>
           <button 
             onClick={onConfirm}
             className="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold shadow-md transition-colors flex items-center gap-2"
           >
-            {confirmText}
+            {confirmText || t('common.yes_delete', 'Tak, usuń')}
           </button>
         </div>
       </div>
