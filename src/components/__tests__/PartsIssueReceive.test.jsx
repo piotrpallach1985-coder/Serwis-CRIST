@@ -77,34 +77,34 @@ describe('PartsIssueReceive - Szybkie Wydania i Przyjęcia (Integration)', () =>
 
   it('renders correctly and shows search input', () => {
     render(<PartsIssueReceive user={mockUser} />);
-    expect(screen.getByText('Szybkie Wydania i Przyjęcia')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Wpisz nazwę lub kod/i)).toBeInTheDocument();
+    expect(screen.getByText('parts.issue_receive.title')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('parts.issue_receive.search_placeholder')).toBeInTheDocument();
   });
 
   it('searches and selects a part to show the form', async () => {
     render(<PartsIssueReceive user={mockUser} />);
     
-    const searchInput = screen.getByPlaceholderText(/Wpisz nazwę lub kod/i);
+    const searchInput = screen.getByPlaceholderText('parts.issue_receive.search_placeholder');
     fireEvent.change(searchInput, { target: { value: 'Łożysko' } });
     
     const resultItem = screen.getByText(/Łożysko SKF/i);
     fireEvent.click(resultItem);
     
-    expect(screen.getByText(/Wydaj/i)).toBeInTheDocument();
-    expect(screen.getByText(/Przyjmij/i)).toBeInTheDocument();
+    expect(screen.getByText('parts.issue_receive.btn_issue')).toBeInTheDocument();
+    expect(screen.getByText('parts.issue_receive.btn_receive')).toBeInTheDocument();
   });
 
   it('submits part issue transaction correctly', async () => {
     const { container } = render(<PartsIssueReceive user={mockUser} />);
     
-    const searchInput = screen.getByPlaceholderText(/Wpisz nazwę lub kod/i);
+    const searchInput = screen.getByPlaceholderText('parts.issue_receive.search_placeholder');
     fireEvent.change(searchInput, { target: { value: 'Łożysko' } });
     fireEvent.click(screen.getByText(/Łożysko SKF/i));
     
     const qtyInput = container.querySelector('input[type="number"]');
     fireEvent.change(qtyInput, { target: { value: '2' } });
 
-    const machineInput = screen.getByPlaceholderText(/Wyszukaj urządzenie.../i);
+    const machineInput = screen.getByPlaceholderText('parts.issue_receive.search_device');
     fireEvent.change(machineInput, { target: { value: 'Suwnica' } });
     fireEvent.click(screen.getByText('Suwnica S1'));
     
