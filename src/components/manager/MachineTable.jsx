@@ -83,7 +83,7 @@ export default function MachineTable({
 
   return (
     <div className="p-4 md:p-6 overflow-x-auto">
-      <DataTable
+      <DataTable virtualize={true}
         data={currentItems}
         columns={columns}
         emptyMessage={t('machines.table.empty')}

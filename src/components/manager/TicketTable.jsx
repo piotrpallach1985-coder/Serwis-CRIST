@@ -136,7 +136,7 @@ export default function TicketTable({
 
   return (
     <div className="w-full">
-      <DataTable 
+      <DataTable virtualize={true} 
         data={currentItems}
         columns={columns}
         emptyMessage={t('tickets.table.empty')}
