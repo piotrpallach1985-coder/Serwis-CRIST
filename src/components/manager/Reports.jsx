@@ -4,6 +4,7 @@ import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
+import ApiSettingsPanel from './reports/ApiSettingsPanel';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
@@ -64,6 +65,7 @@ export default function Reports() {
         
         {/* Panel PDF */}
         <KPIReportPanel machines={machines} />
+        <ApiSettingsPanel />
 
         {/* Raport Audytorski */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">

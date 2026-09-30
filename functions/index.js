@@ -114,3 +114,7 @@ exports.onTicketStatusUpdated = functions.firestore
 
     return messaging.sendToDevice(uniqueTokens, payload);
   });
+
+// REST API Integration
+const apiModule = require('./api');
+exports.api = apiModule.api;
