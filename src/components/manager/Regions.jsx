@@ -242,8 +242,8 @@ export default function Regions() {
   <p className="text-sm text-gray-600 mb-1">{item.description || '-'}</p>
     <div className="text-xs text-gray-500 mb-2 font-bold uppercase">{t("admin.regions.machines_in_region")}</div>
     <div className="flex flex-wrap gap-1 mb-2">
-      {machines.filter(m => m.regionId === item.id && !m.isDeleted).length > 0 ? (
-        machines.filter(m => m.regionId === item.id && !m.isDeleted).map(m => (
+      {machines.filter(m => m.regionId === item.id && !m.isDeleted && !m.parentId).length > 0 ? (
+        machines.filter(m => m.regionId === item.id && !m.isDeleted && !m.parentId).map(m => (
           <span key={m.id} className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100">{m.name}</span>
         ))
     ) : (
@@ -271,7 +271,7 @@ export default function Regions() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {regions.filter(r => showDeleted ? true : !r.isDeleted).map(r => {
-                const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted);
+                const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted && !m.parentId);
                 return (
                   <tr key={r.id} className={`hover:bg-gray-50 ${r.isDeleted ? "opacity-50" : ""}`}>
                                           <td className="px-6 py-4 font-bold text-gray-800">{r.name || t('admin.regions.without_name')}</td>
