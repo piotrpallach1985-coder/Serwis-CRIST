@@ -23,16 +23,16 @@ export default function TicketsLayout({ currentTab, setActiveTab }) {
         <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pt-2">
           {tabs.map(t => (
             <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              key={tabItem.id}
+              onClick={() => setActiveTab(tabItem.id)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
-                currentTab === t.id
+                currentTab === tabItem.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
             >
-              <i className={`ph ${t.icon} text-lg`}></i>
-              {t.label}
+              <i className={`ph ${tabItem.icon} text-lg`}></i>
+              {tabItem.label}
             </button>
           ))}
         </div>

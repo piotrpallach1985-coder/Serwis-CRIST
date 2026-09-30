@@ -36,13 +36,16 @@ export default function PlannedMaintenanceFilters({
             <button onClick={() => setFilterTime('90')} className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${filterTime === '90' ? 'bg-blue-600 shadow-md text-white' : 'text-slate-600 hover:bg-slate-200'}`}>{t('planned.next_90_days')}</button>
           </div>
         ) : (
-          <input 
+          <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-gray-300 shadow-sm shrink-0">
+            <span className="text-sm font-semibold text-gray-500 whitespace-nowrap">{t('planned.filter_month')}:</span>
+            <input 
             type="month" 
             value={filterTime === 'all' ? '' : filterTime} 
             onChange={(e) => setFilterTime(e.target.value || 'all')}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm bg-transparent outline-none cursor-pointer"
             title={t('planned.filter_month')}
           />
+          </div>
         )}
 
         <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500">

@@ -1,6 +1,6 @@
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import React, { useState, useMemo } from 'react';
+import React, {  useState, useMemo , useEffect } from 'react';
 import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getCurrentTenant } from '../../../utils/tenantHelper';

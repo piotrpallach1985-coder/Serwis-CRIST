@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
-import React, { useMemo, useState } from 'react';
+import React, {  useMemo, useState , useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useManagerStore } from '../../store/managerStore';
 // from 'qrcode.react';
