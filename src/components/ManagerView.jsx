@@ -11,26 +11,27 @@ import { usePermissions } from '../hooks/usePermissions';
 import Sidebar from './manager/Sidebar';
 
 // Zak'adki
-import HomeDashboard from './manager/HomeDashboard';
-import Tickets from './manager/Tickets';
-import KPIDashboard from './manager/KPIDashboard';
-import PlannedKPIDashboard from './manager/PlannedKPIDashboard';
-import PartsLayout from './manager/parts/PartsLayout';
-import MapComponent from './manager/Map';
-import Machines from './manager/Machines';
-import Regions from './manager/Regions';
-import Roles from './manager/Roles';
-import Users from './manager/Users';
-import Reports from './manager/Reports';
-import AIStats from './manager/AIStats';
-import Services from './manager/Services';
-import Topics from './manager/Topics';
-import Reporters from './manager/Reporters';
-import PlannedMaintenance from './manager/PlannedMaintenance';
-import ActionItems from './manager/ActionItems';
+import { lazy, Suspense } from 'react';
+const HomeDashboard = lazy(() => import('./manager/HomeDashboard'));
+const Tickets = lazy(() => import('./manager/Tickets'));
+const KPIDashboard = lazy(() => import('./manager/KPIDashboard'));
+const PlannedKPIDashboard = lazy(() => import('./manager/PlannedKPIDashboard'));
+const PartsLayout = lazy(() => import('./manager/parts/PartsLayout'));
+const MapComponent = lazy(() => import('./manager/Map'));
+const Machines = lazy(() => import('./manager/Machines'));
+const Regions = lazy(() => import('./manager/Regions'));
+const Roles = lazy(() => import('./manager/Roles'));
+const Users = lazy(() => import('./manager/Users'));
+const Reports = lazy(() => import('./manager/Reports'));
+const AIStats = lazy(() => import('./manager/AIStats'));
+const Services = lazy(() => import('./manager/Services'));
+const Topics = lazy(() => import('./manager/Topics'));
+const Reporters = lazy(() => import('./manager/Reporters'));
+const PlannedMaintenance = lazy(() => import('./manager/PlannedMaintenance'));
+const ActionItems = lazy(() => import('./manager/ActionItems'));
 import NotificationCenter from './manager/NotificationCenter';
-import SuperAdminPanel from './manager/SuperAdminPanel';
-import AuditLogs from './manager/AuditLogs';
+const SuperAdminPanel = lazy(() => import('./manager/SuperAdminPanel'));
+const AuditLogs = lazy(() => import('./manager/AuditLogs'));
 
 import { USER_ROLES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
@@ -141,6 +142,7 @@ function ManagerViewInner() {
 
       {/* === GŁÓWNA TREŚĆ === */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center p-10"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
         
         {/* MOBILNA GÓRNA BELKA (widoczna tylko na ekranach < lg) */}
         <div className="lg:hidden bg-[#1B253B] text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-gray-800 shrink-0 z-[200]">
@@ -355,6 +357,7 @@ function ManagerViewInner() {
           {activeTab.startsWith('parts_') && <PartsLayout currentTab={activeTab} setActiveTab={setActiveTab} />}
 
         </div>
+              </Suspense>
       </main>
 
     </div>

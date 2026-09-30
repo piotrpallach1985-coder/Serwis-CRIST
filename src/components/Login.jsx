@@ -2,10 +2,11 @@ import PropTypes from 'prop-types';
 import QRScannerModal from './shared/QRScannerModal';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, getDocs, limit, onSnapshot } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { loginWithEmail, loginAnon, subscribeToGeneralSettings, subscribeToBranding } from '../services/auth.service';
+
+
 import { generateAuditorReport } from '../utils/reports/auditorExport';
-import { db, auth } from '../firebase';
+
 import { USER_ROLES } from '../utils/constants';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -29,12 +30,12 @@ export default function Login({ onLogin, currentUser }) {
       }
       const autoBypass = async () => {
         try {
-          if (!auth.currentUser) await signInAnonymously(auth);
+          await loginAnon();
         } catch (e) {
           console.warn('Anonymous sign-in failed', e);
         }
         const finalTenant = tId || getCurrentTenant();
-        onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: auth.currentUser?.uid || 'anon', tenantId: finalTenant });
+        onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon', tenantId: finalTenant });
         navigate('/operator?machine=' + mId);
       };
       autoBypass();
@@ -56,12 +57,12 @@ export default function Login({ onLogin, currentUser }) {
       useManagerStore.getState().setTenantId(tenantFromQr);
     }
     try {
-      if (!auth.currentUser) await signInAnonymously(auth);
+      await loginAnon();
     } catch (e) {
       console.warn('Anonymous sign-in failed', e);
     }
     const finalTenant = tenantFromQr || getCurrentTenant();
-    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: auth.currentUser?.uid || 'anon', tenantId: finalTenant });
+    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon', tenantId: finalTenant });
     navigate('/operator?machine=' + mId);
   };
 
@@ -81,12 +82,7 @@ export default function Login({ onLogin, currentUser }) {
 
   useEffect(() => {
     const currentTenantId = getCurrentTenant();
-    const unsub = onSnapshot(doc(db, 'tenants', currentTenantId, 'settings', 'general'), (snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false });
-      }
-    }, (err) => { /* ignore */ });
+    const unsub = subscribeToGeneralSettings(currentTenantId, (d) => { setModSettings({ enableTickets: d.enableTickets !== false, enablePlanned: d.enablePlanned !== false }); });
     return () => unsub();
   }, [tenantId]);
 
@@ -94,32 +90,28 @@ export default function Login({ onLogin, currentUser }) {
     const currentTenantId = getCurrentTenant();
     
     // Subskrypcja GLOBALNYCH ustawień (Logo Aplikacji - VexoNT)
-    let globalAppLogo = '';
-    const unsubGlobal = onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), (globalSnap) => {
-      if (globalSnap.exists()) {
-        globalAppLogo = globalSnap.data().appLogoUrl || '';
-        setBranding(prev => ({ ...prev, appLogoUrl: globalAppLogo }));
-      }
-    }, (err) => { /* ignore */ });
-
-    const unsub = onSnapshot(doc(db, 'tenants', currentTenantId, 'settings', "branding"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setBranding(prev => ({ 
-          companyName: data.companyName || currentTenantId.toUpperCase(),
-          systemSubtitle: data.systemSubtitle || 'MAINT SYSTEM PORTAL',
-          companyLogoUrl: data.companyLogoUrl || '',
-          appLogoUrl: data.appLogoUrl || prev.appLogoUrl 
-        }));
+    const unsub = subscribeToBranding(currentTenantId, (payload) => {
+      if (payload.type === 'global') {
+        setBranding(prev => ({ ...prev, appLogoUrl: payload.globalAppLogo }));
       } else {
-        setBranding({ 
-          companyName: currentTenantId.toUpperCase(), 
-          systemSubtitle: 'MAINT SYSTEM PORTAL', 
-          companyLogoUrl: '',
-          appLogoUrl: globalAppLogo
-        });
+        const data = payload.data;
+        if (data) {
+          setBranding(prev => ({
+            companyName: data.companyName || currentTenantId.toUpperCase(),
+            systemSubtitle: data.systemSubtitle || 'MAINT SYSTEM PORTAL',
+            companyLogoUrl: data.companyLogoUrl || '',
+            appLogoUrl: data.appLogoUrl || prev.appLogoUrl
+          }));
+        } else {
+          setBranding(prev => ({
+            companyName: currentTenantId.toUpperCase(),
+            systemSubtitle: 'MAINT SYSTEM PORTAL',
+            companyLogoUrl: '',
+            appLogoUrl: prev.appLogoUrl
+          }));
+        }
       }
-    }, (err) => { /* ignore */ });
+    });
     return () => unsub();
   }, [tenantId]);
 
@@ -130,16 +122,7 @@ export default function Login({ onLogin, currentUser }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const user = userCredential.user;
-      
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (!userDoc.exists()) {
-        setErrorMsg('Zalogowano, ale brak przypisanej roli w bazie danych.');
-      } else {
-        const userData = userDoc.data();
+      const userData = await loginWithEmail(email.trim(), password);
         let targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
           let targetTab = targetModule === 'home' ? 'home' : undefined;
           
@@ -154,17 +137,16 @@ export default function Login({ onLogin, currentUser }) {
             `?module=${targetModule}${targetTab ? '&tab=' + targetTab : ''}`
           );
         onLogin({ 
-          uid: user.uid,
-          name: userData.name || user.email, 
+          uid: userData.uid,
+          name: userData.name || email, 
           role: userData.role || 'brak', 
           permissions: userData.permissions || [],
           tenantId: getCurrentTenant() 
         });
         setLoginModalTarget(null);
-      }
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      if (err.message === 'USER_NO_ROLE') { setErrorMsg('Zalogowano, ale brak przypisanej roli.'); } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         setErrorMsg('Nieprawidłowy e-mail lub hasło.');
       } else {
         setErrorMsg('Błąd: ' + err.message);
@@ -176,12 +158,12 @@ export default function Login({ onLogin, currentUser }) {
 
   const handleOperatorBypass = async () => {
     try {
-      if (!auth.currentUser) await signInAnonymously(auth);
+      await loginAnon();
     } catch (e) {
       console.warn('Anonymous sign-in failed', e);
     }
     navigate('/operator');
-    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: auth.currentUser?.uid || 'anon' });
+    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon' });
   };
 
   const handleTileClick = (target) => {
