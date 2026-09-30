@@ -16,17 +16,40 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
 
   useEffect(() => {
     if (isOpen) {
-      setMessages([
-        { 
-          role: 'model', 
-          text: isGlobal 
-            ? `Cześć! Przeanalizowałem całą dokumentację maszyny **${machineName}** (${docsToAnalyze.length} plików). W czym mogę pomóc?`
-            : `Cześć! Przeanalizowałem dokument **${document?.name}**. W czym mogę pomóc?` 
+      const storageKey = `dtr_chat_${machineName}_${document ? document.name : 'global'}`;
+      const savedMessages = localStorage.getItem(storageKey);
+      if (savedMessages) {
+        try {
+          setMessages(JSON.parse(savedMessages));
+        } catch (e) {
+          console.error('Błąd parsowania historii czatu DTR', e);
         }
-      ]);
+      } else {
+        setMessages([
+          { 
+            role: 'model', 
+            text: isGlobal 
+              ? `Cześć! Przeanalizowałem całą dokumentację maszyny **${machineName}** (${docsToAnalyze.length} plików). W czym mogę pomóc?`
+              : `Cześć! Przeanalizowałem dokument **${document?.name}**. W czym mogę pomóc?` 
+          }
+        ]);
+      }
       setInput('');
     }
-  }, [isOpen, document, allDocuments, machineName]);
+  }, [isOpen, document, allDocuments, machineName, isGlobal]);
+
+  // Zapis do localStorage przy każdej zmianie messages, zachowując max 10 elementów (5 ostatnich pytań/odpowiedzi)
+  useEffect(() => {
+    if (messages.length > 0 && isOpen) {
+      const storageKey = `dtr_chat_${machineName}_${document ? document.name : 'global'}`;
+      // Zawsze zostawiamy pierwszą wiadomość powitalną, a z reszty bierzemy max 10 ostatnich
+      const welcomeMessage = messages[0];
+      const otherMessages = messages.slice(1);
+      const messagesToSave = [welcomeMessage, ...otherMessages.slice(-10)];
+      
+      localStorage.setItem(storageKey, JSON.stringify(messagesToSave));
+    }
+  }, [messages, machineName, document, isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
