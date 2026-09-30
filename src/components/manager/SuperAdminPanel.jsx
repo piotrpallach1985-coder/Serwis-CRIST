@@ -10,6 +10,7 @@ import { Plus, Trash, Crown, Sliders, CheckCircle, Pencil, Upload } from 'lucide
 import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
 
 export default function SuperAdminPanel({ onNavigate }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
