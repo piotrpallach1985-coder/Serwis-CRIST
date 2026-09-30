@@ -392,7 +392,7 @@ export default function SuperAdminPanel({ onNavigate }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                {tenantsWithTokens.filter(t => tenantItem.id !== '_global_settings_').map(tenant => (
+                {tenantsWithTokens.filter(t => t.id !== '_global_settings_').map(tenant => (
                     <tr key={tenant.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="p-4 w-16">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
