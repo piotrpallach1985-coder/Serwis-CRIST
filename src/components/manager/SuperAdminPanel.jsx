@@ -8,7 +8,8 @@ import { useManagerStore } from '../../store/managerStore';
 import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
 
 import SuperAdminStats from './superadmin/SuperAdminStats';
-import SuperAdminGlobalSettings from './superadmin/SuperAdminGlobalSettings';
+import SuperAdminGlobalLogo from './superadmin/SuperAdminGlobalLogo';
+import SuperAdminGlobalGroqKey from './superadmin/SuperAdminGlobalGroqKey';
 import SuperAdminTenantTable from './superadmin/SuperAdminTenantTable';
 import SuperAdminTenantModal from './superadmin/SuperAdminTenantModal';
 
@@ -226,15 +227,7 @@ export default function SuperAdminPanel({ onNavigate }) {
     <div className="w-full h-full flex flex-col p-4 sm:p-6 bg-[#f8f9fa] overflow-y-auto animate-fade-in relative z-10">
       <div className="max-w-6xl mx-auto w-full space-y-6">
         
-        <SuperAdminStats 
-          totalGeminiTokens={totalGeminiTokens} 
-          totalGroqTokens={totalGroqTokens} 
-        />
-        
-        <SuperAdminGlobalSettings 
-          globalGroqApiKey={globalGroqApiKey}
-          setGlobalGroqApiKey={setGlobalGroqApiKey}
-          saveGlobalGroqApiKey={saveGlobalGroqApiKey}
+        <SuperAdminGlobalLogo 
           globalAppLogoUrl={globalAppLogoUrl}
           globalAppLogoRef={globalAppLogoRef}
           uploadingLogo={uploadingLogo}
@@ -247,6 +240,17 @@ export default function SuperAdminPanel({ onNavigate }) {
           openNewModal={openNewModal}
           openEditModal={openEditModal}
           handleDelete={handleDelete}
+        />
+
+        <SuperAdminStats 
+          totalGeminiTokens={totalGeminiTokens} 
+          totalGroqTokens={totalGroqTokens} 
+        />
+
+        <SuperAdminGlobalGroqKey
+          globalGroqApiKey={globalGroqApiKey}
+          setGlobalGroqApiKey={setGlobalGroqApiKey}
+          saveGlobalGroqApiKey={saveGlobalGroqApiKey}
         />
 
       </div>
