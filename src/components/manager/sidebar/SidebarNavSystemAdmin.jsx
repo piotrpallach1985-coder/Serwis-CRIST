@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../../store/managerStore';
 
@@ -17,10 +17,10 @@ export default function SidebarNavSystemAdmin({ saasTenants, onNavigate }) {
              useManagerStore.getState().setTenantId(tenantItem.id);
              onNavigate('home', 'home');
           }}
-          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-left text-gray-300 hover:bg-white/5 hover:text-white"
+          className="w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left text-gray-300 hover:bg-white/5 hover:text-white"
         >
-          <i className="ph ph-buildings text-xl shrink-0"></i>
-          <span className="text-sm">{tenantItem.name || tenantItem.id}</span>
+          <i className="ph ph-buildings text-lg shrink-0"></i>
+          <span className="text-[13px]">{tenantItem.name || tenantItem.id}</span>
         </button>
       ))}
     </div>

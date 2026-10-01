@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import NotificationCenter from '../NotificationCenter';
 
 export default function SidebarHeader({ 
@@ -18,9 +18,9 @@ export default function SidebarHeader({
   onNavigate
 }) {
   return (
-    <div className="flex-shrink-0 h-20 bg-[#161f30] px-5 flex items-center justify-between border-b border-gray-800">
+    <div className="flex-shrink-0 h-16 bg-[#161f30] px-5 flex items-center justify-between border-b border-gray-800">
       <div className="flex items-center gap-3 overflow-hidden">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-lg flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-inner flex-shrink-0">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-lg flex items-center justify-center font-bold text-blue-900 overflow-hidden shadow-inner flex-shrink-0">
           {isSystemAdmin ? (
             <i className="ph ph-crown text-2xl text-yellow-600"></i>
           ) : branding?.companyLogoUrl ? (

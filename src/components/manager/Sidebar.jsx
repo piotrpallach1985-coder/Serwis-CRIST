@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+﻿import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
@@ -65,13 +65,13 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Tło przyciemniające na mobile */}
+      {/* TĹ‚o przyciemniajÄ…ce na mobile */}
       <div 
         className={`fixed inset-0 bg-gray-900/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onSidebarClose}
       />
 
-      <aside className={`fixed lg:static inset-y-0 left-0 z-[200] w-72 h-full bg-[#1B253B] text-white flex flex-col transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-[200] w-64 h-full bg-[#1B253B] text-white flex flex-col transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         
         <SidebarHeader 
           currentModule={currentModule}
@@ -90,8 +90,8 @@ export default function Sidebar({
           onNavigate={onNavigate}
         />
 
-        {/* GŁÓWNA LISTA NAWIGACYJNA (SCROLLOWANA) */}
-        <div className="flex-1 overflow-y-auto hide-scrollbar px-3 py-4 space-y-5">
+        {/* GĹĂ“WNA LISTA NAWIGACYJNA (SCROLLOWANA) */}
+        <div className="flex-1 overflow-y-auto hide-scrollbar px-3 py-2 space-y-3">
           {isUrModule && (
             <SidebarNavUR 
               activeTab={activeTab} 
