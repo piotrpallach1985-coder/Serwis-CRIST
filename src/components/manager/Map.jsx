@@ -20,9 +20,11 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 const mapImageCache = {};
 
 export default function ShipyardMap({
+  
   modeType = 'tickets',
   onNavigateToTickets
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
 
