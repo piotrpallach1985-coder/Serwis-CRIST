@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,18 @@ export default function SuperAdminGlobalSettings({
   processGlobalAppLogo
 }) {
   const { t } = useTranslation();
+  
+  const [isEditingGroqKey, setIsEditingGroqKey] = useState(false);
+  
+  const isKeySaved = Boolean(globalGroqApiKey && globalGroqApiKey.length > 0);
+  const showEditButton = isKeySaved && !isEditingGroqKey;
+  const isReadOnly = showEditButton;
+
+  const handleSaveKey = async (e) => {
+    e.preventDefault();
+    await saveGlobalGroqApiKey(e);
+    setIsEditingGroqKey(false);
+  };
 
   return (
     <>
@@ -26,17 +38,32 @@ export default function SuperAdminGlobalSettings({
             <div className="flex gap-2">
               <input 
                 type="password" 
-                value={globalGroqApiKey} 
-                onChange={e => setGlobalGroqApiKey(e.target.value)} 
-                className="w-full p-2 border border-slate-300 rounded-lg shadow-sm font-mono text-sm"
+                value={globalGroqApiKey || ''} 
+                onChange={e => {
+                  if (!isEditingGroqKey) setIsEditingGroqKey(true);
+                  setGlobalGroqApiKey(e.target.value);
+                }} 
+                disabled={isReadOnly}
+                className={`w-full p-2 border border-slate-300 rounded-lg shadow-sm font-mono text-sm ${isReadOnly ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="gsk_..."
               />
-              <button 
-                type="button" onClick={saveGlobalGroqApiKey}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors whitespace-nowrap"
-              >
-                Zapisz Globalnie
-              </button>
+              {showEditButton ? (
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditingGroqKey(true)}
+                  className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors whitespace-nowrap"
+                >
+                  Edytuj
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={handleSaveKey}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors whitespace-nowrap"
+                >
+                  Zapisz Globalnie
+                </button>
+              )}
             </div>
           </div>
         </div>
