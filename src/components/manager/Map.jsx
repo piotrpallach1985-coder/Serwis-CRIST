@@ -3,6 +3,7 @@ import MapLegend from './map/MapLegend';
 import MapPin from './map/MapPin';
 import { useManagerStore } from '../../store/managerStore';
 import MapControls from './map/MapControls';
+import { useTranslation } from 'react-i18next';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { updateMapSettings, updateRegion, updateMachineRegion, subscribeToMapSettings } from '../../services/machines.service';
 import { doc, updateDoc } from 'firebase/firestore';
