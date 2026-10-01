@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+Ôªøimport React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function SuperAdminGlobalGroqKey({ 
@@ -28,7 +28,7 @@ export default function SuperAdminGlobalGroqKey({
         </div>
         <div className="flex-1 w-full max-w-lg">
           <h2 className="text-lg font-bold text-slate-800">Globalny Klucz API Groq (Sztuczna Inteligencja)</h2>
-          <p className="text-sm text-slate-500 mb-3">Klucz z tego pola bÍdzie uøywany domyúlnie przez wszystkie firmy (tenants) do obs≥ugi Voice-to-Text oraz t≥umaczeÒ.</p>
+          <p className="text-sm text-slate-500 mb-3">Klucz z tego pola bƒôdzie u≈ºywany domy≈õlnie przez wszystkie firmy (tenants) do obs≈Çugi Voice-to-Text oraz t≈Çumacze≈Ñ.</p>
           <div className="flex gap-2">
             <input 
               type="password" 
