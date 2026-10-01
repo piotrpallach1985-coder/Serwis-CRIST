@@ -3,6 +3,7 @@ import { collection, doc, setDoc, getDocs, query, where, addDoc, serverTimestamp
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { savePhotoToIndexedDB } from '../utils/offlineStorage';
+import { logAudit } from '../services/audit.service';
 import { TICKET_STATUS } from '../utils/constants';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -186,6 +187,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       };
 
       await setDoc(ticketRef, ticketPayload);
+      logAudit('CREATE', 'TICKET', ticketRef.id, 'Zgłoszono nową awarię: ' + selectedMachine.name);
       localStorage.setItem('last_ticket_time', Date.now().toString());
 
       // 5. Tryb offline dla zdjęć

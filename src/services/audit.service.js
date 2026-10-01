@@ -8,12 +8,11 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
     if (!tenantId) return;
 
     const user = auth.currentUser;
-    if (!user) return; // Skip if no logged-in user
 
     await addDoc(collection(db, 'tenants', tenantId, 'audit_logs'), {
       timestamp: serverTimestamp(),
-      userId: user.uid,
-      userName: user.displayName || user.email || 'Użytkownik',
+      userId: user ? user.uid : 'public',
+      userName: user ? (user.displayName || user.email || 'Użytkownik') : 'Zgłaszający ze skanera',
       action,
       entityType,
       entityId,

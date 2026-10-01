@@ -156,7 +156,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       }
       if (newEtr !== null) updateData.etr = newEtr;
 
-      await updateDoc(ticketRef, updateData);
+      await updateTicket(ticketId, updateData);
       setComment('');
       setEtr('');
       showToast(t('tickets.messages.update_success'));

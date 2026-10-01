@@ -1,6 +1,7 @@
 import { useManagerStore } from '../store/managerStore';
 import { runTransaction, collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, query, where, arrayUnion, writeBatch, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from '../firebase';
+import { logAudit } from './audit.service';
 import { createNotification } from './notifications.service';
 import { SERVICE_STATUS, TIME_THRESHOLDS } from '../utils/constants';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -20,7 +21,8 @@ import { getCurrentTenant } from '../utils/tenantHelper';
  */
 export const addPlannedService = async (serviceData) => {
   const tenantId = getCurrentTenant();
-  return await addDoc(collection(db, 'tenants', tenantId, 'planned_services'), {
+  const res = await addDoc(collection(db, 'tenants', tenantId, 'planned_services'), {
+
     ...serviceData,
     createdAt: serverTimestamp(),
     status: SERVICE_STATUS.PENDING,
