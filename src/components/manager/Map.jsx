@@ -1,4 +1,4 @@
-import { useAuth } from '../../hooks/useAuth';
+﻿import { useAuth } from '../../hooks/useAuth';
 import MapLegend from './map/MapLegend';
 import MapPin from './map/MapPin';
 import { useManagerStore } from '../../store/managerStore';
@@ -16,7 +16,7 @@ import { USER_ROLES, TICKET_STATUS, SERVICE_STATUS, PIN_STATUS } from '../../uti
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
 
-// Globalny cache dla obrazów mapy (działa do wylogowania/odświeżenia)
+// Globalny cache dla obrazĂłw mapy (dziaĹ‚a do wylogowania/odĹ›wieĹĽenia)
 const mapImageCache = {};
 
 export default function ShipyardMap({
@@ -42,9 +42,9 @@ export default function ShipyardMap({
   const [uploadingMap, setUploadingMap] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Pobierz konfigurację mapy z Firestore
+  // Pobierz konfiguracjÄ™ mapy z Firestore
   useEffect(() => {
-    // dynamicznie importujemy żeby uniknąć duplikacji z ManagerView
+    // dynamicznie importujemy ĹĽeby uniknÄ…Ä‡ duplikacji z ManagerView
     
       const unsub = subscribeToMapSettings((docSnap) => {
         if (docSnap.exists()) {
@@ -100,10 +100,10 @@ export default function ShipyardMap({
       } else {
         await updateMapSettings({ defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
       }
-      alert('Domyślny kadr został zapisany poprawnie.');
+      alert('DomyĹ›lny kadr zostaĹ‚ zapisany poprawnie.');
     } catch (error) { 
-      console.error('Błąd zapisywania widoku:', error); 
-      alert('Wystąpił błąd podczas zapisywania kadru: ' + error.message);
+      console.error('BĹ‚Ä…d zapisywania widoku:', error); 
+      alert('WystÄ…piĹ‚ bĹ‚Ä…d podczas zapisywania kadru: ' + error.message);
     }
   };
 
@@ -246,7 +246,7 @@ export default function ShipyardMap({
       const updateData = { xPercent, yPercent };
       if (type === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
       if (type === 'region') await updateRegion(id, updateData); else await updateMachineRegion(id, updateData);
-    } catch (error) { console.error('Błąd zapisywania pinezki:', error); }
+    } catch (error) { console.error('BĹ‚Ä…d zapisywania pinezki:', error); }
   };
 
   const handleMapClick = (e) => {
@@ -272,13 +272,13 @@ export default function ShipyardMap({
       if (editingType === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
       if (editingType === 'region') await updateRegion(editingId, updateData); else await updateMachineRegion(editingId, updateData);
       setIsModalOpen(false); setTempPos(null);
-    } catch (error) { console.error('Błąd podczas zapisywania pinezki:', error); alert('Wystąpił błąd zapisu.'); }
+    } catch (error) { console.error('BĹ‚Ä…d podczas zapisywania pinezki:', error); alert('WystÄ…piĹ‚ bĹ‚Ä…d zapisu.'); }
   };
 
   const handleDeletePin = async (id, type) => {
-    if (confirm('Czy na pewno chcesz usunąć tę pinezkę z mapy?')) {
+    if (confirm('Czy na pewno chcesz usunÄ…Ä‡ tÄ™ pinezkÄ™ z mapy?')) {
       try { await updateDoc(doc(db, 'tenants', getCurrentTenant(), type === 'region' ? 'regions' : 'machines', id), { xPercent: null, yPercent: null }); }
-      catch (error) { console.error('Błąd usuwania pinezki:', error); }
+      catch (error) { console.error('BĹ‚Ä…d usuwania pinezki:', error); }
     }
   };
 
@@ -290,7 +290,7 @@ export default function ShipyardMap({
       <div
         ref={isFullscreen ? mapContainerRef : null}
         className={`flex-1 bg-slate-900 rounded-xl overflow-hidden shadow-sm border border-slate-700 relative group flex items-center justify-center select-none touch-none ${isFullscreen ? 'w-full h-full' : ''}`}
-        style={{ minHeight: '600px' }}
+        style={{ minHeight: '350px' }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
@@ -322,11 +322,11 @@ export default function ShipyardMap({
               />
             ) : (
               <div 
-                className={`w-full h-full min-w-[800px] min-h-[600px] flex flex-col items-center justify-center bg-slate-800 text-slate-400 font-bold text-xl md:text-3xl text-center p-8 transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'}`}
+                className={`w-full h-full min-w-[400px] min-h-[350px] flex flex-col items-center justify-center bg-slate-800 text-slate-400 font-bold text-xl md:text-3xl text-center p-8 transition-opacity duration-300 ${mode === 'edit' ? 'opacity-80' : 'opacity-100'}`}
                 onClick={handleMapClick}
               >
                 <i className="ph ph-map-trifold text-6xl mb-4 opacity-50"></i>
-                BRAK MAPY.<br/>Wgraj nową mapę w trybie Edycji.
+                BRAK MAPY.<br/>Wgraj nowÄ… mapÄ™ w trybie Edycji.
               </div>
             )}
           </div>
@@ -335,7 +335,7 @@ export default function ShipyardMap({
           {(isImageLoading && !mapImageCache[currentMapUrl]) && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
               <i className="ph ph-spinner-gap animate-spin text-5xl mb-4 text-blue-500"></i>
-              <h3 className="text-base md:text-xl font-bold mb-2">Ładowanie mapy...</h3>
+              <h3 className="text-base md:text-xl font-bold mb-2">Ĺadowanie mapy...</h3>
               <div className="w-64 h-2 bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${imageProgress}%` }}></div></div>
               <p className="mt-2 text-[10px] md:text-sm text-slate-400 font-mono">{imageProgress}%</p>
             </div>
@@ -348,7 +348,7 @@ export default function ShipyardMap({
                 {mode === 'edit' && !draggingPin && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none flex items-center justify-center z-10">
                     <div className="bg-amber-500/90 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse text-[10px] md:text-sm whitespace-nowrap">
-                      Kliknij aby przypiąć, lub chwyć pinezkę aby przesunąć
+                      Kliknij aby przypiÄ…Ä‡, lub chwyÄ‡ pinezkÄ™ aby przesunÄ…Ä‡
                     </div>
                   </div>
                 )}
