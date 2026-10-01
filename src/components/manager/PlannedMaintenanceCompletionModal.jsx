@@ -19,6 +19,8 @@ export default function PlannedMaintenanceCompletionModal({
   const [actionItemDueDate, setActionItemDueDate] = useState('');
   const [partsUsed, setPartsUsed] = useState(false);
   const [actualManHours, setActualManHours] = useState('');
+  const [extraParts, setExtraParts] = useState([]);
+  const parts = useManagerStore(state => state.parts || []);
 
   if (!isOpen || !serviceToComplete) return null;
 
