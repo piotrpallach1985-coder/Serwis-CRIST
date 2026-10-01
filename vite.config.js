@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toLocaleString("pl-PL", {timeZone: "Europe/Warsaw"}))
+  },
   base: './',
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ['**/e2e/**', '**/node_modules/**', '**/functions/**'] },
   build: { sourcemap: true, emptyOutDir: false }, 
