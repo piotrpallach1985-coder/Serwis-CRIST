@@ -100,7 +100,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
           method: 'POST',
           headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'llama-3.1-70b-versatile',
             messages: [{ 
               role: 'system', 
               content: 'Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania). Zwróć obiekt JSON: {"note": "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach", "timeSpentHours": liczba_godzin (lub null), "actionItem": "Zadanie na przyszłość" (lub null), "actionItemDays": liczba_dni_do_wykonania (lub null)}. Wymagany format JSON. Użyj polskiego języka.' 
@@ -113,7 +113,11 @@ export default function DictationButton({ onResult, onStart, className = '', mod
           })
         });
 
-        if (!resAi.ok) throw new Error('Błąd API Smart Extraction');
+        if (!resAi.ok) {
+          const errorText = await resAi.text();
+          console.error('Groq AI Error:', errorText);
+          throw new Error('Błąd API Smart Extraction: ' + resAi.status + ' ' + errorText);
+        }
         const aiData = await resAi.json();
         try {
           finalResult = JSON.parse(aiData.choices[0].message.content);
@@ -138,7 +142,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'llama-3.1-70b-versatile',
             messages: [
               {
                 role: 'system',
