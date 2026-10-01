@@ -14,6 +14,7 @@ export default function MapPinTooltip({
   setCurrentSubmapId,
   setHoveredPin
 }) {
+  const { t } = useTranslation();
   return (
     <div className={`absolute ${tooltipPosClass} w-44 md:w-56 bg-slate-900/95 backdrop-blur-md text-white p-2 md:p-4 rounded-xl shadow-2xl border border-slate-700 pointer-events-auto z-50 animate-fade-in`} onMouseEnter={() => handleMouseEnter(pin.id)} onMouseLeave={handleMouseLeave}>
       <div className="font-black text-[10px] md:text-sm mb-1 pb-2 border-b border-slate-700 flex items-center gap-2">

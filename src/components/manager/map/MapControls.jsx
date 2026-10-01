@@ -25,6 +25,8 @@ export default function MapControls({
   isSettingsMinimized,
   setIsSettingsMinimized
 }) {
+  const { t } = useTranslation();
+
   const { user } = useAuth();
   return (
     <>
