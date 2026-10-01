@@ -100,10 +100,10 @@ export default function ShipyardMap({
       } else {
         await updateMapSettings({ defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
       }
-      alert('DomyĹ›lny kadr zostaĹ‚ zapisany poprawnie.');
+      alert(t('map_component.view_saved'));
     } catch (error) { 
       console.error('BĹ‚Ä…d zapisywania widoku:', error); 
-      alert('WystÄ…piĹ‚ bĹ‚Ä…d podczas zapisywania kadru: ' + error.message);
+      alert(t('map_component.view_save_error') + error.message);
     }
   };
 
@@ -272,11 +272,11 @@ export default function ShipyardMap({
       if (editingType === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
       if (editingType === 'region') await updateRegion(editingId, updateData); else await updateMachineRegion(editingId, updateData);
       setIsModalOpen(false); setTempPos(null);
-    } catch (error) { console.error('BĹ‚Ä…d podczas zapisywania pinezki:', error); alert('WystÄ…piĹ‚ bĹ‚Ä…d zapisu.'); }
+    } catch (error) { console.error('BĹ‚Ä…d podczas zapisywania pinezki:', error); alert(t('map_component.pin_save_error')); }
   };
 
   const handleDeletePin = async (id, type) => {
-    if (confirm('Czy na pewno chcesz usunÄ…Ä‡ tÄ™ pinezkÄ™ z mapy?')) {
+    if (confirm(t('map_component.delete_pin_confirm'))) {
       try { await updateDoc(doc(db, 'tenants', getCurrentTenant(), type === 'region' ? 'regions' : 'machines', id), { xPercent: null, yPercent: null }); }
       catch (error) { console.error('BĹ‚Ä…d usuwania pinezki:', error); }
     }
@@ -326,7 +326,7 @@ export default function ShipyardMap({
                 onClick={handleMapClick}
               >
                 <i className="ph ph-map-trifold text-6xl mb-4 opacity-50"></i>
-                BRAK MAPY.<br/>Wgraj nowÄ… mapÄ™ w trybie Edycji.
+                {t('map_component.no_map')}<br/>{t('map_component.upload_map_hint')}
               </div>
             )}
           </div>
@@ -335,7 +335,7 @@ export default function ShipyardMap({
           {(isImageLoading && !mapImageCache[currentMapUrl]) && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
               <i className="ph ph-spinner-gap animate-spin text-5xl mb-4 text-blue-500"></i>
-              <h3 className="text-base md:text-xl font-bold mb-2">Ĺadowanie mapy...</h3>
+              <h3 className="text-base md:text-xl font-bold mb-2">{t('map_component.loading_map')}</h3>
               <div className="w-64 h-2 bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${imageProgress}%` }}></div></div>
               <p className="mt-2 text-[10px] md:text-sm text-slate-400 font-mono">{imageProgress}%</p>
             </div>
@@ -348,8 +348,7 @@ export default function ShipyardMap({
                 {mode === 'edit' && !draggingPin && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none flex items-center justify-center z-10">
                     <div className="bg-amber-500/90 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse text-[10px] md:text-sm whitespace-nowrap">
-                      Kliknij aby przypiÄ…Ä‡, lub chwyÄ‡ pinezkÄ™ aby przesunÄ…Ä‡
-                    </div>
+                      {t('map_component.pin_hint')}</div>
                   </div>
                 )}
 

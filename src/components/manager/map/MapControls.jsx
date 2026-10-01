@@ -2,6 +2,8 @@ import { useAuth } from '../../../hooks/useAuth';
 import React from 'react';
 import { USER_ROLES } from '../../../utils/constants';
 
+import { useTranslation } from 'react-i18next';
+
 export default function MapControls({
   mode,
   setMode,
@@ -38,11 +40,11 @@ export default function MapControls({
               <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(true); }} className="absolute top-2 right-2 text-slate-400 p-1"><i className="ph ph-minus"></i></button>
               <h3 className="font-bold text-slate-800 text-[10px] md:text-sm mb-3 border-b pb-2 flex items-center gap-2"><i className="ph ph-image text-amber-500"></i> Ustawienia</h3>
               <div className="mb-4">
-                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">1. Wgraj nową mapę</label>
+                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">{t('map_component.upload_new_map')}</label>
                 <div className="relative">
                   <input type="file" accept="image/*" onChange={handleMapFileChange} disabled={uploadingMap} className="absolute inset-0 w-full h-full z-50 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                   <div className={'w-full border-2 border-dashed rounded-lg p-3 text-center transition-colors ' + (mapDragActive ? 'border-amber-500 bg-amber-50' : (uploadingMap ? 'bg-slate-50 border-slate-300' : 'bg-slate-50 border-blue-300 hover:bg-blue-50'))} onDragEnter={handleMapDragEnter} onDragLeave={handleMapDragLeave} onDragOver={handleMapDragOver} onDrop={handleMapDrop}>
-                    {uploadingMap ? (<><i className="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">Przetwarzanie...</p></>) : (<><i className="ph ph-upload-simple text-2xl text-blue-400 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">Kliknij lub upuść plik</p></>)}
+                    {uploadingMap ? (<><i className="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.processing')}</p></>) : (<><i className="ph ph-upload-simple text-2xl text-blue-400 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.click_or_drop')}</p></>)}
                   </div>
                 </div>
               </div>
@@ -64,12 +66,12 @@ export default function MapControls({
         )}
         {((user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || user?.permissions?.includes('edit_map')) && (
           <>
-            <button onClick={() => setMode('view')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-eye text-base sm:text-lg"></i><span className="hidden sm:inline">Podgląd</span></button>
-            <button onClick={() => setMode('edit')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-pencil-simple text-base sm:text-lg"></i><span className="hidden sm:inline">Edycja</span></button>
+            <button onClick={() => setMode('view')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'view' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-eye text-base sm:text-lg"></i><span className="hidden sm:inline">{t('map_component.preview')}</span></button>
+            <button onClick={() => setMode('edit')} className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mode === 'edit' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'}`}><i className="ph ph-pencil-simple text-base sm:text-lg"></i><span className="hidden sm:inline">{t('map_component.edit')}</span></button>
           </>
         )}
         <button onClick={toggleFullscreen} className="px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white flex items-center gap-2 shadow-md">
-          <i className={`ph ${isFullscreen ? 'ph-corners-in' : 'ph-corners-out'} text-base sm:text-lg`}></i><span className="hidden sm:inline">{isFullscreen ? 'Zamknij' : 'Pełny ekran'}</span>
+          <i className={`ph ${isFullscreen ? 'ph-corners-in' : 'ph-corners-out'} text-base sm:text-lg`}></i><span className="hidden sm:inline">{isFullscreen ? t('map_component.close_fullscreen') : t('map_component.fullscreen')}</span>
         </button>
       </div>
 
@@ -78,14 +80,14 @@ export default function MapControls({
         <button 
           onClick={() => setZoomScale(s => Math.min(parseFloat((s + 0.25).toFixed(2)), 4))} 
           className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors" 
-          title="Powiększ (+)"
+          title={t('map_component.zoom_in')}
         >
           +
         </button>
         <button 
           onClick={() => { setZoomScale(1); setZoomPan({ x: 0, y: 0 }); }} 
           className="w-9 h-9 flex items-center justify-center text-[10px] text-slate-300 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-mono font-bold shadow-sm transition-colors" 
-          title="Resetuj powiększenie"
+          title={t('map_component.zoom_reset')}
         >
           {Math.round(zoomScale * 100)}%
         </button>

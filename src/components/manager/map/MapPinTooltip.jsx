@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { PIN_STATUS } from '../../../utils/constants';
 
 export default function MapPinTooltip({
@@ -21,11 +22,11 @@ export default function MapPinTooltip({
       </div>
       <div className="mt-1 md:mt-3 space-y-1 md:space-y-2 mb-2 md:mb-4">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
-          <span className="text-slate-400">Stan:</span>
-          {pin.status === PIN_STATUS.CRITICAL ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? 'ZALEGŁOŚCI' : 'AWARIA KRYTYCZNA'}</span>) : pin.status === PIN_STATUS.IN_PROGRESS ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> Serwis w trakcie</span>) : pin.status === PIN_STATUS.WARNING ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? 'Zbliża się serwis' : 'Usterka'}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? 'Brak pilnych' : 'Gotowe'}</span>)}
+          <span className="text-slate-400">{t('map_component.state')}</span>
+          {pin.status === PIN_STATUS.CRITICAL ? (<span className="font-bold text-red-400 flex items-center gap-1"><i className="ph ph-siren animate-pulse"></i> {modeType === 'planned_maintenance' ? t('map_component.backlog') : t('map_component.critical_fault')}</span>) : pin.status === PIN_STATUS.IN_PROGRESS ? (<span className="font-bold text-blue-400 flex items-center gap-1"><i className="ph ph-wrench animate-pulse"></i> {t('map_component.service_in_progress')}</span>) : pin.status === PIN_STATUS.WARNING ? (<span className="font-bold text-amber-400">{modeType === 'planned_maintenance' ? t('map_component.approaching_service') : t('map_component.fault')}</span>) : (<span className="font-bold text-emerald-400">{modeType === 'planned_maintenance' ? t('map_component.no_urgent') : t('map_component.ready')}</span>)}
         </div>
         {pin.type === 'region' && (<div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">Maszyn w rejonie:</span><span className="font-bold">{pin.machineCount}</span></div>)}
-        <div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : 'Aktywne zgłoszenia:'}</span><span className="font-bold">{pin.itemCount}</span></div>
+        <div className="flex justify-between items-center text-[9px] md:text-xs"><span className="text-slate-400">{modeType === 'planned_maintenance' ? 'Zaległe/Oczekujące serwisy:' : t('map_component.active_tickets')}</span><span className="font-bold">{pin.itemCount}</span></div>
       </div>
       <div className="flex flex-col gap-2 w-full">
         <button onClick={(e) => { 
@@ -41,11 +42,11 @@ export default function MapPinTooltip({
             onNavigateToTickets(pin.name);
           }
         }} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-1.5 md:py-2.5 rounded-lg text-[9px] md:text-xs transition-colors shadow flex items-center justify-center gap-2">
-          <i className="ph ph-list-magnifying-glass text-sm md:text-base"></i> Przeglądaj
+          <i className="ph ph-list-magnifying-glass text-sm md:text-base"></i> {t('map_component.browse')}
         </button>
         {pin.type === 'region' && pin.hasSubmap && (
           <button onClick={(e) => { e.stopPropagation(); setCurrentSubmapId(pin.id); setHoveredPin(null); }} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 md:py-2.5 rounded-lg text-[9px] md:text-xs transition-colors shadow flex items-center justify-center gap-2">
-            <i className="ph ph-map-trifold text-sm md:text-base"></i> Otwórz mapę rejonu
+            <i className="ph ph-map-trifold text-sm md:text-base"></i> {t('map_component.open_region_map')}
           </button>
         )}
       </div>
