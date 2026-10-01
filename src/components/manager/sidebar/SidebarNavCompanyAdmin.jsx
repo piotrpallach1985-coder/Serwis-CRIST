@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { forceUpdatePWA } from '../../../utils/pwaHelper';
+
 
 export default function SidebarNavCompanyAdmin({ activeTab, handleItemClick }) {
   const { t } = useTranslation();
