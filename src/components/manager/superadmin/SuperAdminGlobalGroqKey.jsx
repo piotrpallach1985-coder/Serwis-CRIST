@@ -38,7 +38,7 @@ export default function SuperAdminGlobalGroqKey({
                 setGlobalGroqApiKey(e.target.value);
               }} 
               disabled={isReadOnly}
-              className={\w-full p-2 border border-slate-300 rounded-lg shadow-sm font-mono text-sm \\}
+              className={`w-full p-2 border border-slate-300 rounded-lg shadow-sm font-mono text-sm ${isReadOnly ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
               placeholder="gsk_..."
             />
             {showEditButton ? (
