@@ -52,14 +52,18 @@ export const fetchActiveMachineTickets = async (machineId) => {
 };
 
 export const addActionItem = async (data) => {
-  return await addDoc(collection(db, 'tenants', getCurrentTenant(), 'action_items'), {
+  const ref = await addDoc(collection(db, 'tenants', getCurrentTenant(), 'action_items'), {
     ...data,
     createdAt: serverTimestamp()
   });
+  logAudit('CREATE', 'ACTION_ITEM', ref.id, 'Dodano temat do realizacji');
+  return ref;
 };
 
 export const updateActionItem = async (id, data) => {
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'action_items', id), data);
+  const p = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'action_items', id), data);
+  logAudit('UPDATE', 'ACTION_ITEM', id, 'Zaktualizowano temat do realizacji');
+  return p;
 };
 
 export const subscribeToActionItems = (callback) => {
