@@ -50,22 +50,6 @@ export default function SidebarFooter({ user, onNavigate, handleReturnHome, onLo
         </button>
       </div>
       
-      <div className="px-3 pb-3">
-        <button
-          onClick={forceUpdatePWA}
-          className="w-full flex flex-col items-center justify-center gap-1 py-1.5 px-3 bg-emerald-950/40 hover:bg-emerald-900/60 active:bg-emerald-950 rounded-xl transition-all border border-emerald-900/50 cursor-pointer shadow-xs"
-          title="Aktualizuj aplikację (Wyczyść cache)"
-        >
-          <div className="flex items-center gap-2 text-emerald-400">
-            <i className="ph ph-arrows-clockwise text-lg"></i>
-            <span className="text-[11px] font-bold uppercase tracking-wider">Aktualizuj PWA</span>
-          </div>
-          <span className="text-[9px] text-emerald-500/70 truncate w-full text-center">
-            Wersja: {import.meta.env.VITE_BUILD_TIME || 'Brak danych'}
-          </span>
-        </button>
-      </div>
-      
       {/* Language Switcher */}
       <div className="p-3 mt-auto border-t border-white/5">
         <button 

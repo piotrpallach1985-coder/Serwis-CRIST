@@ -59,6 +59,21 @@ export default function SidebarNavCompanyAdmin({ activeTab, handleItemClick }) {
         <i className="ph ph-plugs-connected text-lg shrink-0"></i>
         <span className="text-[13px]">{t("sidebar.api_settings_menu", "Klucze API (Integracje)")}</span>
       </button>
+      <div className="pt-4 pb-2">
+        <button
+          onClick={forceUpdatePWA}
+          className="w-full flex flex-col items-center justify-center gap-1 py-1.5 px-3 bg-emerald-950/40 hover:bg-emerald-900/60 active:bg-emerald-950 rounded-xl transition-all border border-emerald-900/50 cursor-pointer shadow-xs"
+          title="Aktualizuj aplikację (Wyczyść cache)"
+        >
+          <div className="flex items-center gap-2 text-emerald-400">
+            <i className="ph ph-arrows-clockwise text-lg"></i>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Aktualizuj PWA</span>
+          </div>
+          <span className="text-[9px] text-emerald-500/70 truncate w-full text-center">
+            Wersja: {import.meta.env.VITE_BUILD_TIME || 'Brak danych'}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
