@@ -268,7 +268,21 @@ export const processServicePartsTransaction = async (serviceToComplete) => {
        finalCost += totalCost;
        transaction.update(p.ref, { stock: newStock, batches: currentBatches });
        const txRef = doc(collection(db, 'tenants', tenantId, 'part_transactions'));
-       transaction.set(txRef, { partId: p.id, type: 'issue', quantity: p.quantity, date: serverTimestamp(), user: 'System', notes: 'Zuzyto podczas realizacji serwisu', totalValue: totalCost, averageUnitPrice: avgUnitPrice, issueDetails: issueDetails, createdAt: serverTimestamp() });
+       transaction.set(txRef, { 
+           partId: p.id, 
+           type: 'issue_planned', 
+           quantity: Number(p.quantity), 
+           date: new Date().toISOString(), 
+           user: serviceToComplete.completedBy || 'System', 
+           notes: 'Zużyto podczas realizacji serwisu: ' + (serviceToComplete.name || ''), 
+           totalValue: totalCost, 
+           averageUnitPrice: avgUnitPrice, 
+           issueDetails: issueDetails, 
+           referenceId: serviceToComplete.id, 
+           machineId: serviceToComplete.machineId || null, 
+           machineName: serviceToComplete.machineName || null,
+           createdAt: new Date().toISOString() 
+         });
     }
   });
   return finalCost;

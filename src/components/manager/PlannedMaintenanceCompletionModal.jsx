@@ -101,7 +101,34 @@ export default function PlannedMaintenanceCompletionModal({
       
       let finalCost = 0;
       if (partsUsed && serviceToComplete.requiredParts && serviceToComplete.requiredParts.length > 0) {
-        finalCost = await processServicePartsTransaction(serviceToComplete);
+        finalCost = await processServicePartsTransaction({...serviceToComplete, completedBy: user?.name || 'System'});
+      }
+      
+      // Issue extra (unplanned) parts
+      const validExtraParts = extraParts.filter(ep => ep.partId && ep.partId !== '' && Number(ep.quantity) > 0);
+      if (validExtraParts.length > 0) {
+        const { issuePart } = await import('../../services/parts.service');
+        for (const ep of validExtraParts) {
+          try {
+            await issuePart({
+              partId: ep.partId,
+              quantity: Number(ep.quantity),
+              user: user?.name || 'System',
+              type: 'issue_planned',
+              notes: 'Część dodatkowa (poza planem) - serwis: ' + (serviceToComplete.name || ''),
+              referenceId: serviceToComplete.id,
+              machineId: serviceToComplete.machineId || null,
+            });
+          } catch (err) {
+            console.warn('Could not issue extra part:', ep.partId, err);
+          }
+        }
+        const extraNote = 'Pobrano dodatkowe części (poza planem): ' + validExtraParts.map(ep => {
+          const found = parts.find(p => p.id === ep.partId);
+          return (found ? found.name : ep.partId) + ' x' + ep.quantity;
+        }).join(', ');
+        historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + extraNote;
+        historyEntry.extraParts = validExtraParts;
       }
         
       if (finalCost > 0) {
@@ -162,17 +189,72 @@ export default function PlannedMaintenanceCompletionModal({
             placeholder="np. 2.5"
           />
         </div>
-<div className="mb-4 flex items-center gap-2">
-          <input
-            id="partsUsed"
-            type="checkbox"
-            checked={partsUsed}
-            onChange={e => setPartsUsed(e.target.checked)}
-            className="w-4 h-4 text-orange-600 rounded border-slate-300"
-          />
-          <label htmlFor="partsUsed" className="text-sm font-bold text-slate-700 cursor-pointer">
-            {t('planned.confirm_parts')}
-          </label>
+<div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              id="partsUsed"
+              type="checkbox"
+              checked={partsUsed}
+              onChange={e => setPartsUsed(e.target.checked)}
+              className="w-4 h-4 text-orange-600 rounded border-slate-300"
+            />
+            <label htmlFor="partsUsed" className="text-sm font-bold text-slate-700 cursor-pointer">
+              {t('planned.confirm_parts')}
+            </label>
+          </div>
+          {/* Extra parts outside the plan */}
+          <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-slate-600">Pobierz część poza planową listą</span>
+              <button
+                type="button"
+                onClick={() => setExtraParts(prev => [...prev, { partId: '', quantity: 1 }])}
+                className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold hover:bg-orange-200"
+              >
+                + Dodaj
+              </button>
+            </div>
+            {extraParts.length === 0 && (
+              <p className="text-xs text-slate-400 italic">Brak dodatkowych części</p>
+            )}
+            {extraParts.map((ep, idx) => (
+              <div key={idx} className="flex gap-2 items-center mb-2">
+                <select
+                  value={ep.partId}
+                  onChange={e => {
+                    const updated = [...extraParts];
+                    updated[idx].partId = e.target.value;
+                    setExtraParts(updated);
+                  }}
+                  className="flex-1 p-1.5 border border-slate-200 rounded text-xs bg-white outline-none"
+                >
+                  <option value="">-- Wybierz część --</option>
+                  {parts.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} (Stan: {p.stock})</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  value={ep.quantity}
+                  onChange={e => {
+                    const updated = [...extraParts];
+                    updated[idx].quantity = e.target.value;
+                    setExtraParts(updated);
+                  }}
+                  className="w-16 p-1.5 border border-slate-200 rounded text-xs outline-none"
+                  placeholder="Szt."
+                />
+                <button
+                  type="button"
+                  onClick={() => setExtraParts(prev => prev.filter((_, i) => i !== idx))}
+                  className="text-red-400 hover:text-red-600"
+                >
+                  <i className="ph ph-trash"></i>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mb-4">

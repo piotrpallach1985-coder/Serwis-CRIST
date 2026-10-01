@@ -43,32 +43,39 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const activeTicketsCount = tickets.length;
   const criticalTicketsCount = tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length;
   
-  const overdueServicesCount = plannedServices.filter(s => {
-    if (s.status === 'completed' || s.status === 'in_progress') return false;
-    let isOverdue = false;
-    const machine = machines.find(m => m.id === s.machineId);
-    if (s.nextDate) {
-      const nDate = safeParseDate(s.nextDate);
-      if (nDate && nDate < new Date()) isOverdue = true;
-    }
-    if (s.targetWorkHours && machine) {
-      if (machine.currentWorkHours >= s.targetWorkHours) isOverdue = true;
-    }
-    return isOverdue;
-  }).length;
-  
-  const upcomingServicesCount = plannedServices.filter(s => {
-    if (s.status === 'completed' || s.status === 'in_progress') return false;
-    if (!s.nextDate) return false;
-    const due = safeParseDate(s.nextDate);
-    if (!due) return false;
-    const now = new Date();
-    const diff = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
-    return diff <= plannedWarningDays;
-  }).length;
-  
-  const inProgressServicesCount = plannedServices.filter(s => s.status === 'in_progress').length;
-  const totalActionableServicesCount = upcomingServicesCount + inProgressServicesCount;
+  const actionableServices = plannedServices.filter(s => {
+      if (s.status === 'completed') return false;
+      if (s.status === 'in_progress') return true;
+      let isOverdue = false;
+      let isUpcoming = false;
+      const machine = machines.find(m => m.id === s.machineId);
+      if (s.nextDate) {
+        const nDate = safeParseDate(s.nextDate);
+        if (nDate && nDate < new Date()) isOverdue = true;
+        else if (nDate) {
+          const diff = Math.ceil((nDate - new Date()) / (1000 * 60 * 60 * 24));
+          if (diff <= plannedWarningDays) isUpcoming = true;
+        }
+      }
+      if (s.targetWorkHours && machine) {
+        if (machine.currentWorkHours >= s.targetWorkHours) isOverdue = true;
+      }
+      return isOverdue || isUpcoming;
+    });
+    
+    const totalActionableServicesCount = actionableServices.length;
+    const overdueServicesCount = actionableServices.filter(s => {
+      let isOverdue = false;
+      const machine = machines.find(m => m.id === s.machineId);
+      if (s.nextDate) {
+        const nDate = safeParseDate(s.nextDate);
+        if (nDate && nDate < new Date()) isOverdue = true;
+      }
+      if (s.targetWorkHours && machine) {
+        if (machine.currentWorkHours >= s.targetWorkHours) isOverdue = true;
+      }
+      return isOverdue;
+    }).length;
   const openActionItemsCount = actionItems.filter(i => i.status !== 'completed').length;
 
   return (
