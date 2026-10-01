@@ -15,6 +15,7 @@ export default function PlannedMaintenanceFormModal({
   const [name, setName] = useState('');
   const [machineId, setMachineId] = useState('');
   const [priority, setPriority] = useState('NieKrytyczny');
+  const [category, setCategory] = useState('preventive');
   const [triggerType, setTriggerType] = useState('calendar');
   const [calendarIntervalDays, setCalendarIntervalDays] = useState(30);
   const [nextDate, setNextDate] = useState('');
@@ -36,6 +37,7 @@ export default function PlannedMaintenanceFormModal({
         setName(editingService.name || '');
         setMachineId(editingService.machineId || '');
         setPriority(editingService.priority || 'NieKrytyczny');
+        setCategory(editingService.category || 'preventive');
         setTriggerType(editingService.triggerType || 'calendar');
         setCalendarIntervalDays(editingService.calendarIntervalDays || 30);
         
@@ -61,6 +63,7 @@ export default function PlannedMaintenanceFormModal({
         setName('');
         setMachineId('');
         setPriority('NieKrytyczny');
+        setCategory('preventive');
         setTriggerType('calendar');
         setCalendarIntervalDays(30);
         setNextDate('');
@@ -88,7 +91,7 @@ export default function PlannedMaintenanceFormModal({
     
     const selectedMachine = machines.find(m => m.id === machineId);
     const serviceData = { 
-      name, machineId, machineName: selectedMachine ? selectedMachine.name : "", priority, triggerType, 
+      name, machineId, machineName: selectedMachine ? selectedMachine.name : "", priority, category, triggerType, 
       estimatedDowntimeHours: Number(estimatedDowntimeHours), 
       estimatedManHours: Number(estimatedManHours), 
       requiredPersonnel, machineStatus, notified: false, 
@@ -153,18 +156,26 @@ export default function PlannedMaintenanceFormModal({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa / Typ serwisu</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="np. Wymiana oleju - Serwis 500h" className="w-full p-2 border border-gray-300 rounded outline-none" />
-          </div>
-          <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna</label>
             <select value={machineId} onChange={e => setMachineId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
-              <option value="">-- Wybierz --</option>
+              <option value="">-- Wybierz maszynę --</option>
               {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Kategoria / Priorytet</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa / Typ serwisu</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="np. Wymiana oleju - Serwis 500h" className="w-full p-2 border border-gray-300 rounded outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Kategoria serwisu</label>
+            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
+              <option value="preventive">Serwis Planowany / Prewencyjny (PM)</option>
+              <option value="predictive">Serwis Diagnostyczny / Predykcyjny</option>
+              <option value="bhp_audit">Przegląd Ustawowy i BHP (Audyt)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Priorytet</label>
             <select value={priority} onChange={e => setPriority(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
               <option value="NieKrytyczny">Standardowy (bez zatrzymania maszyny)</option>
               <option value="Krytyczny">Krytyczny (zatrzymuje linię)</option>
