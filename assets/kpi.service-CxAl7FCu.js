@@ -1,0 +1,2 @@
+import{v as e,t as n,x as c,w as d}from"./firebase-vendor-C5EvdceW.js";import{g as r,d as i,T as p}from"./index-DTYmdQXV.js";const m=async()=>{const s=r();if(!s)return[];const a=e(n(i,"tenants",s,"tickets"));return(await c(a)).docs.map(t=>({id:t.id,...t.data()})).filter(t=>!t.isDeleted&&Number(t.status)===p.CLOSED)},l=async()=>{const s=r();if(!s)return[];const a=e(n(i,"tenants",s,"planned_services"),d("status","==","completed"));return(await c(a)).docs.map(t=>({id:t.id,...t.data()}))};export{l as a,m as f};
+//# sourceMappingURL=kpi.service-CxAl7FCu.js.map
