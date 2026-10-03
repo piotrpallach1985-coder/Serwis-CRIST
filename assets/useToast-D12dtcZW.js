@@ -1,2 +1,0 @@
-import{r as o}from"./index-BkzuivvP.js";function u(){const[a,e]=o.useState({show:!1,message:"",type:"success"}),c=o.useCallback((s,n="success")=>{let t=s;s instanceof Error?t=s.message:typeof s=="object"&&s!==null&&(t=JSON.stringify(s)),e({show:!0,message:t,type:n})},[]),r=o.useCallback(()=>{e(s=>({...s,show:!1}))},[]);return{toastConfig:a,showToast:c,hideToast:r}}export{u};
-//# sourceMappingURL=useToast-D12dtcZW.js.map

@@ -1,2 +1,0 @@
-import{_ as l}from"./index-hvfKOKdv.js";const p=async(e,s="raport",n="Dane")=>{if(!e||e.length===0){alert("Brak danych do wyeksportowania.");return}try{const o=await l(()=>import("./xlsx-Yp4_-Dky.js"),[],import.meta.url),t=o.utils.book_new(),r=o.utils.json_to_sheet(e),a=Object.keys(e[0]).map(i=>({wch:Math.max(20,i.length+5)}));r["!cols"]=a,o.utils.book_append_sheet(t,r,n),o.writeFile(t,`${s}_${new Date().toISOString().split("T")[0]}.xlsx`)}catch{alert("Wystąpił błąd podczas generowania pliku.")}};export{p as e};
-//# sourceMappingURL=excelExport-BuHZT2xR.js.map
