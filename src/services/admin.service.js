@@ -10,6 +10,10 @@ export const subscribeToGlobalSettings = (callback, onError) => {
   return onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), callback, onError);
 };
 
+export const subscribeToGlobalSecrets = (callback, onError) => {
+  return onSnapshot(doc(db, 'tenant_registry', '_global_secrets_'), callback, onError);
+};
+
 export const fetchTenantUsageStats = async (tenantId) => {
   if (tenantId === '_global_settings_') return null;
   try {
@@ -35,8 +39,8 @@ export const fetchAllTenantsStats = async (tenants) => {
   return usages;
 };
 
-export const saveGlobalGroqApiKey = async (key) => {
-  return setDoc(doc(db, 'tenant_registry', '_global_settings_'), { groqApiKey: (key || '').trim() }, { merge: true });
+export const saveGlobalGroqApiKey = async (key, model, geminiPrice = 0.60, groqPrice = 0.40, geminiModel = 'gemini-2.5-flash') => {
+  return setDoc(doc(db, 'tenant_registry', '_global_secrets_'), { groqApiKey: (key || '').trim(), groqModel: (model || '').trim(), geminiPrice, groqPrice, geminiModel: (geminiModel || '').trim() }, { merge: true });
 };
 
 export const saveGlobalAppLogo = async (downloadURL, base64Data, tenants) => {
@@ -64,7 +68,7 @@ export const saveTenant = async (formData, isEditing) => {
       maxMachines: parseInt(formData.maxMachines) || 50
     },
     companyLogoUrl: formData.companyLogoUrl,
-    groqApiKey: formData.groqApiKey,
+    
     companyLogoBase64: formData.companyLogoBase64,
     modules: formData.modules
   };
@@ -85,7 +89,7 @@ export const saveTenant = async (formData, isEditing) => {
     companyName: data.name,
     systemSubtitle: 'DYSPOZYTORNIA UR',
     companyLogoUrl: data.companyLogoUrl,
-    groqApiKey: data.groqApiKey,
+    
     companyLogoBase64: data.companyLogoBase64,
     modules: data.modules
   }, { merge: true });

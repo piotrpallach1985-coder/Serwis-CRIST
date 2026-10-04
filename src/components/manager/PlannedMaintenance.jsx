@@ -8,6 +8,7 @@ import { arrayUnion } from 'firebase/firestore';
 import { fetchArchiveServices, addPlannedService, updatePlannedService, deletePlannedService, markServiceCompleted } from '../../services/plannedServices.service';
 import { updateMachineWorkHours } from '../../services/machines.service';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { checkServiceUrgency } from '../../utils/logicHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
 
 import PlannedMaintenanceFormModal from './PlannedMaintenanceFormModal';
@@ -238,7 +239,7 @@ export default function PlannedMaintenance({
   const [selectedServiceId, setSelectedServiceId] = useState(initialServiceId || null);
 
   useEffect(() => {
-    if (selectedServiceId) window.history.pushState({ ...window.history.state, internalDetails: true }, '');
+    if (selectedServiceId && selectedServiceId !== initialServiceId) { window.history.pushState({ ...window.history.state, internalDetails: true }, ''); }
   }, [selectedServiceId]);
 
   useEffect(() => {
@@ -468,3 +469,4 @@ PlannedMaintenance.propTypes = {
   initialSearchQuery: PropTypes.string,
   onClearSearchQuery: PropTypes.func
 };
+

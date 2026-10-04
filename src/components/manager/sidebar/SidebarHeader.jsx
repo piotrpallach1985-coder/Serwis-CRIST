@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import NotificationCenter from '../NotificationCenter';
 
 export default function SidebarHeader({ 
@@ -32,7 +32,7 @@ export default function SidebarHeader({
         
         <div className="overflow-hidden">
           <div className="font-bold text-sm sm:text-base leading-tight tracking-wide truncate text-white">
-            {branding?.companyName || 'CRIST S.A.'}
+            {branding?.companyName || 'VexoNT'}
           </div>
           <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold truncate">
             {isUrModule && 'PANEL AWARII & SERWISU'}

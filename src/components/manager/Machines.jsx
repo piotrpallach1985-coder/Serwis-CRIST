@@ -175,9 +175,20 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     }
   };
 
-  const handlePrint = (machine) => {
+    const handlePrint = (machine) => {
       const id = machine.id;
       const name = machine.name;
+      
+      const escapeHtml = (unsafe) => {
+        return (unsafe || '')
+          .toString()
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      };
+
     const svgElement = document.getElementById(`qr-svg-${id}`);
     if (!svgElement) return;
     const svgData = new XMLSerializer().serializeToString(svgElement);
@@ -185,7 +196,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     printWindow.document.write(`
       <html>
         <head>
-          <title>${t('machines.print.printQr')}${name}</title>
+          <title>${escapeHtml(t('machines.print.printQr'))}${escapeHtml(name)}</title>
           <style>
               body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
               .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
@@ -196,12 +207,12 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           <body>
             <div class="qr-container">
               ${svgData}
-              <h2>${name}</h2>
-              <p>${t('machines.print.date')}${(() => {
+              <h2>${escapeHtml(name)}</h2>
+              <p>${escapeHtml(t('machines.print.date'))}${(() => {
                 try {
                   const d = safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date();
-                  return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                } catch(e) { return t('machines.print.noData'); }
+                  return escapeHtml(d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }));
+                } catch(e) { return escapeHtml(t('machines.print.noData')); }
               })()}</p>
             </div>
             <script>window.onload = function() { window.print(); window.close(); }</script>
@@ -435,6 +446,16 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
               handleViewMachine={handleViewMachine}
                 handleCopyNfc={handleCopyNfc}
             />
+            {hasMoreLocalItems && (
+              <div className="p-4 flex justify-center border-t border-slate-200">
+                <button 
+                  onClick={loadMore} 
+                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-lg font-bold shadow-sm transition-all"
+                >
+                  {t('machines.buttons.loadMore', 'Wczytaj więcej')}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

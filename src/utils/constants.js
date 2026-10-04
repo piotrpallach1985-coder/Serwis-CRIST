@@ -1,6 +1,6 @@
 /**
  * @file constants.js
- * @description Centralny rejestr stałych, enumów i progów konfiguracyjnych dla aplikacji Serwis CRIST.
+ * @description Centralny rejestr stałych, enumów i progów konfiguracyjnych dla aplikacji Serwis VexoNT.
  * Konwencja: Nazwy zmiennych i kluczy w języku angielskim, opisy i etykiety UI w języku polskim.
  */
 

@@ -39,7 +39,9 @@ export const addPlannedService = async (serviceData) => {
  */
 export const updatePlannedService = async (serviceId, data) => {
   const tenantId = getCurrentTenant();
-  return await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), data);
+  const res = await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), data);
+  logAudit('UPDATE', 'PLANNED_SERVICE', serviceId, data);
+  return res;
 };
 
 /**
@@ -106,6 +108,7 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
   }
 
   await batch.commit();
+  logAudit('UPDATE', 'PLANNED_SERVICE', serviceId, 'Zakończono serwis planowany.');
 };
 
 /**
@@ -126,7 +129,9 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
     const snapshot = await getDocs(q);
     
     const now = new Date();
-    const batch = writeBatch(db);
+    const batches = [];
+    let currentBatch = writeBatch(db);
+    let currentBatchCount = 0;
     let hasWrites = false;
     
     for (const docSnap of snapshot.docs) {
@@ -144,10 +149,10 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
             const nextDate = data.nextDate.toDate ? data.nextDate.toDate() : new Date(data.nextDate);
             const daysLeft = (nextDate - now) / (1000 * 60 * 60 * 24);
             
-            // Alert jeĹ›li pozostaĹ‚o mniej niĹĽ zdefiniowany prĂłg dni
+            // Alert jeśli pozostało mniej niż zdefiniowany próg dni
             if (daysLeft <= TIME_THRESHOLDS.CRITICAL_DAYS_WARNING) {
               shouldAlert = true;
-              alertMessage = `ZbliĹĽa siÄ™ termin planowanego przeglÄ…du "${data.name}" (zostaĹ‚o ${Math.max(0, Math.ceil(daysLeft))} dni).`;
+              alertMessage = `Zbliża się termin planowanego przeglądu "${data.name}" (zostało ${Math.max(0, Math.ceil(daysLeft))} dni).`;
             }
           }
         }
@@ -156,18 +161,18 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
         if (!shouldAlert && (data.triggerType === 'hours' || data.triggerType === 'mixed')) {
           if (data.targetWorkHours && machine.currentWorkHours) {
             const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
-            // Alert jeĹ›li pozostaĹ‚o mniej niĹĽ prĂłg roboczogodzin
+            // Alert jeśli pozostało mniej niż próg roboczogodzin
             if (hoursLeft <= TIME_THRESHOLDS.CRITICAL_HOURS_WARNING && hoursLeft >= 0) {
               shouldAlert = true;
-              alertMessage = `ZbliĹĽa siÄ™ termin przeglÄ…du liczonego w roboczogodzinach "${data.name}" (zostaĹ‚o ${hoursLeft} rbg).`;
+              alertMessage = `Zbliża się termin przeglądu liczonego w roboczogodzinach "${data.name}" (zostało ${hoursLeft} rbg).`;
             }
           }
         }
 
         if (shouldAlert) {
-          // WysyĹ‚amy powiadomienie do batcha
-          const newNotifRef = doc(collection(db, 'tenants', getCurrentTenant(), 'notifications'));
-          batch.set(newNotifRef, {
+          // Wysyłamy powiadomienie do batcha
+          const newNotifRef = doc(collection(db, 'tenants', tenantId, 'notifications'));
+          currentBatch.set(newNotifRef, {
             title: `Planowany Serwis: ${machine.name}`,
             message: alertMessage,
             isCritical: data.priority === 'Krytyczny',
@@ -178,17 +183,31 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
           });
           
           // Aktualizujemy status dokumentu w batchu
-          batch.update(docSnap.ref, { notified: true });
+          currentBatch.update(docSnap.ref, { notified: true });
+          currentBatchCount += 2; // Dodajemy 2 operacje
           hasWrites = true;
+
+          // Jeśli batch zbliża się do limitu (np. > 490), dodajemy go do tablicy i tworzymy nowy
+          if (currentBatchCount > 490) {
+            batches.push(currentBatch);
+            currentBatch = writeBatch(db);
+            currentBatchCount = 0;
+          }
         }
       }
     }
     
+    if (currentBatchCount > 0) {
+      batches.push(currentBatch);
+    }
+    
     if (hasWrites) {
-      await batch.commit();
+      for (const b of batches) {
+        await b.commit();
+      }
     }
   } catch (error) {
-    console.error("BĹ‚Ä…d przy sprawdzaniu terminĂłw Serwisu Planowanego:", error);
+    console.error("Błąd przy sprawdzaniu terminów Serwisu Planowanego:", error);
   }
 };
 
@@ -286,4 +305,165 @@ export const processServicePartsTransaction = async (serviceToComplete) => {
     }
   });
   return finalCost;
+};
+
+/**
+ * Zamyka serwis planowany, rozlicza ewentualne części i generuje kolejny cykl za pomocą pojedynczej, atomowej transakcji.
+ * Zapewnia to integralność bazy danych na wypadek np. przerwania połączenia internetowego.
+ */
+export const completeServiceWithTransaction = async (serviceToComplete, completionData, nextPlanData = null, actionItemData = null, extraParts = []) => {
+  const tenantId = getCurrentTenant();
+  
+  await runTransaction(db, async (transaction) => {
+    // 1. Zbieranie wszystkich części do pobrania (planowane + pozaplanowe)
+    const allRequestedParts = [];
+    
+    if (completionData.partsUsed && serviceToComplete.requiredParts) {
+       for (const req of serviceToComplete.requiredParts) {
+          if (!req.partId || req.partId === 'custom') continue;
+          allRequestedParts.push({ partId: req.partId, quantity: Number(req.quantity || 1), type: 'issue_planned', notes: 'Zużycie planowe: ' + serviceToComplete.name });
+       }
+    }
+    
+    for (const ep of extraParts) {
+       if (!ep.partId || ep.partId === '') continue;
+       allRequestedParts.push({ partId: ep.partId, quantity: Number(ep.quantity || 1), type: 'issue_planned', notes: 'Część dodatkowa (poza planem) - serwis: ' + serviceToComplete.name });
+    }
+
+    // 2. Grupowanie ilości jeśli ta sama część została dodana dwukrotnie
+    const mergedRequests = {};
+    for (const req of allRequestedParts) {
+       if (!mergedRequests[req.partId]) {
+          mergedRequests[req.partId] = { partId: req.partId, quantity: 0, notes: req.notes, type: req.type };
+       }
+       mergedRequests[req.partId].quantity += req.quantity;
+    }
+
+    // 3. Faza ODCZYTÓW (READS) - Firestore wymaga by wszystkie read-y były przed write-ami w transakcji
+    const partsToUpdate = [];
+    for (const partId of Object.keys(mergedRequests)) {
+       const req = mergedRequests[partId];
+       const pRef = doc(db, 'tenants', tenantId, 'parts', partId);
+       const pSnap = await transaction.get(pRef);
+       if (pSnap.exists()) {
+           partsToUpdate.push({
+               ref: pRef,
+               id: partId,
+               currentStock: Number(pSnap.data().stock || 0),
+               unitPrice: Number(pSnap.data().unitPrice || 0),
+               quantity: req.quantity,
+               batches: pSnap.data().batches || [],
+               type: req.type,
+               notes: req.notes
+           });
+       }
+    }
+
+    // Odczyt opcjonalny - sam serwis do update'u upewnia nas, że dokument nadal istnieje
+    const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceToComplete.id);
+    await transaction.get(serviceRef); 
+
+    // 4. Faza ZAPISÓW (WRITES)
+    let finalCost = 0;
+    
+    for (const p of partsToUpdate) {
+       // Logika FIFO - kanoniczny schemat partii: { qty, price } (zgodny z TicketPartUsageModal / parts.service)
+       // Obsługa danych legacy: { quantity, unitPrice }
+       const newStock = Math.max(0, p.currentStock - p.quantity);
+       let currentBatches = (p.batches || []).map(b => ({
+         ...b,
+         qty: Number(b.qty ?? b.quantity ?? 0),
+         price: Number(b.price ?? b.unitPrice ?? 0)
+       })).filter(b => b.qty > 0);
+       if (currentBatches.length === 0 && p.currentStock > 0) {
+         currentBatches = [{ qty: p.currentStock, price: p.unitPrice, date: new Date().toISOString() }];
+       }
+       let remainingToIssue = p.quantity;
+       let totalCost = 0;
+       const issueDetails = [];
+       while (remainingToIssue > 0 && currentBatches.length > 0) {
+         const oldestBatch = currentBatches[0];
+         if (oldestBatch.qty <= remainingToIssue) {
+            totalCost += oldestBatch.qty * oldestBatch.price;
+            issueDetails.push({ qty: oldestBatch.qty, price: oldestBatch.price });
+            remainingToIssue -= oldestBatch.qty;
+            currentBatches.shift();
+         } else {
+            totalCost += remainingToIssue * oldestBatch.price;
+            issueDetails.push({ qty: remainingToIssue, price: oldestBatch.price });
+            oldestBatch.qty -= remainingToIssue;
+            remainingToIssue = 0;
+         }
+       }
+       if (remainingToIssue > 0) {
+         // Brak pokrycia w partiach - wyceniamy po cenie katalogowej
+         totalCost += remainingToIssue * p.unitPrice;
+         issueDetails.push({ qty: remainingToIssue, price: p.unitPrice });
+       }
+       finalCost += totalCost;
+       // Usuwamy pola legacy, aby partie miały jednolity schemat
+       const cleanBatches = currentBatches.map(({ quantity, unitPrice, ...rest }) => rest);
+       
+       transaction.update(p.ref, { stock: newStock, batches: cleanBatches });
+       
+       const txRef = doc(collection(db, 'tenants', tenantId, 'part_transactions'));
+       transaction.set(txRef, { 
+           partId: p.id, 
+           type: p.type, 
+           quantity: -Number(p.quantity), 
+           price: p.quantity > 0 ? totalCost / p.quantity : 0,
+           totalCost: totalCost,
+           issueDetails: issueDetails,
+           date: new Date().toISOString(), 
+           user: completionData.completedBy || 'System',
+           notes: p.notes,
+           referenceId: serviceToComplete.id,
+           machineId: serviceToComplete.machineId || null,
+           machineName: serviceToComplete.machineName || null,
+           createdAt: serverTimestamp()
+       });
+    }
+
+    // Aktualizacja kosztu w notatce historycznej
+    if (completionData.historyEntry && finalCost > 0) {
+       completionData.historyEntry.cost = finalCost;
+       completionData.historyEntry.note = (completionData.historyEntry.note ? completionData.historyEntry.note + '\n' : '') + 'Zużyto części o wartości: ' + finalCost.toLocaleString('pl-PL') + ' PLN.';
+    }
+
+    // Aktualizacja statusu serwisu
+    const payload = {
+      status: SERVICE_STATUS.COMPLETED,
+      completedAt: serverTimestamp(),
+      completionDetails: completionData
+    };
+    
+    if (completionData.historyEntry) {
+      payload.history = arrayUnion(completionData.historyEntry);
+      delete payload.completionDetails.historyEntry;
+    }
+    transaction.update(serviceRef, payload);
+
+    // Wygenerowanie następnego cyklu
+    if (nextPlanData) {
+      const nextDataObj = {
+        ...nextPlanData,
+        status: SERVICE_STATUS.PENDING,
+        createdAt: serverTimestamp()
+      };
+      const nextDateRaw = nextDataObj.nextDate;
+      if (nextDateRaw && typeof nextDateRaw.toISOString === 'function') {
+        nextDataObj.nextDate = nextDateRaw.toISOString();
+      }
+      const newServiceRef = doc(collection(db, 'tenants', tenantId, 'planned_services'));
+      transaction.set(newServiceRef, nextDataObj);
+    }
+
+    // Wygenerowanie tematu do realizacji
+    if (actionItemData) {
+      const newActionItemRef = doc(collection(db, 'tenants', tenantId, 'action_items'));
+      transaction.set(newActionItemRef, actionItemData);
+    }
+  });
+
+  logAudit('UPDATE', 'PLANNED_SERVICE', serviceToComplete.id, 'Zakończono serwis planowany (Pełna atomowa transakcja).');
 };

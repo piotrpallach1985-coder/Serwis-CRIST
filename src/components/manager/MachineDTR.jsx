@@ -110,7 +110,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
     setProgress(0);
     setErrorMsg('');
     const fileName = `${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, `machines/${machine.id}/dtr/${fileName}`);
+    const storageRef = ref(storage, `tenants/${getCurrentTenant()}/machines/${machine.id}/dtr/${fileName}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on('state_changed', 

@@ -7,64 +7,85 @@ service firebase.storage {
     }
 
     function getUserData() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) ? 
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data : null;
     }
 
     function getTenant() {
-      return getUserData().tenantId;
+      let data = getUserData();
+      return data != null ? data.tenantId : null;
+    }
+    
+    function isSuperAdmin() {
+      let data = getUserData();
+      return isSignedIn() && data != null && data.role == 'superadmin';
+    }
+
+    function isAnonymous() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isTenantUser(tenantId) {
+       return isSignedIn() && (getTenant() == tenantId || isSuperAdmin());
     }
 
     function isValidSize() {
       return request.resource.size < 30 * 1024 * 1024;
     }
 
-    function isValidType() {
-      return request.resource.contentType.matches('image/.*')
-          || request.resource.contentType == 'application/pdf';
+    // Nowe, bezpieczne reguly dla plikow w Multi-Tenancy (izolacja folderow)
+    match /tenants/{tenantId}/{allPaths=**} {
+       allow read, delete: if isTenantUser(tenantId);
+       allow create, update: if isTenantUser(tenantId) && isValidSize();
+    }
+    
+    // Zgloszenia anonimowe (kody QR)
+    match /tenants/{tenantId}/tickets/{ticketId}/{fileName} {
+       allow read: if isAnonymous();
+       allow create: if isAnonymous() && isValidSize();
+       allow update, delete: if false;
     }
 
+    // Stare sciezki zachowane wylacznie dla kompatybilnosci wstecz (Odczyt istniejacych plikow)
     match /tickets/{ticketId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && isValidType() && 
-                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/tickets/$(ticketId));
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false; 
     }
 
     match /machine_photos/{machineId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && isValidType() && 
-                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/machines/$(machineId));
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
 
     match /dtr_documents/{machineId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && 
-                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/machines/$(machineId));
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
     
     match /planned_services/{srvId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize() && 
-                   firestore.exists(/databases/(default)/documents/tenants/$(getTenant())/planned_services/$(srvId));
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
     
     match /checklists/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidSize();
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
     
     match /map_backgrounds/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
     
     match /regions_maps/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isSignedIn() && !isAnonymous();
+      allow write: if false;
     }
 
     match /branding/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous' && isValidSize() && isValidType();
+      allow delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin() && isValidSize();
     }
 
     match /{allPaths=**} {

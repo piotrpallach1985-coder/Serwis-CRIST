@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "CRIST S.A.",
+    "title": "VexoNT",
     "subtitle": "MAINTENANCE PANEL",
     "section_tickets": "MAINTENANCE TICKETS",
     "dashboard_kpi": "Failure Analysis (KPI)",
@@ -664,8 +664,8 @@
     "ai_stats": {
       "title": "AI Usage (Tokens)",
       "desc": "Monitor artificial intelligence usage in your company.",
-      "gemini_desc": "Searching in technical documentation",
-      "groq_desc": "Dictation and ticket correction",
+      "gemini_desc": "DTR, dictation correction and translations",
+      "groq_desc": "Speech recognition (Voice-to-Text)",
       "tokens_used": "Tokens used"
     },
     "superadmin": {

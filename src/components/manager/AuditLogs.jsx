@@ -120,7 +120,7 @@ export default function AuditLogs() {
 
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-full mx-auto 2xl:px-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
@@ -211,7 +211,7 @@ export default function AuditLogs() {
                         <td className="p-4 text-sm font-medium text-slate-700">
                           {log.entityType}
                         </td>
-                        <td className="p-4 text-xs text-slate-500 max-w-xs truncate" title={log.details}>
+                        <td className="p-4 text-xs text-slate-500 max-w-[800px] whitespace-normal break-words">
                           {log.details || '-'}
                         </td>
                       </tr>

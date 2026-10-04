@@ -21,7 +21,7 @@ export default function OfflineSyncManager() {
         for (const photo of photos) {
           try {
             const fileName = Date.now() + '_' + photo.fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const fileRef = ref(storage, `tickets/${photo.ticketId}/${fileName}`);
+            const fileRef = ref(storage, `tenants/${getCurrentTenant()}/tickets/${photo.ticketId}/${fileName}`);
             
             await uploadString(fileRef, photo.base64Data, 'data_url');
             const url = await getDownloadURL(fileRef);

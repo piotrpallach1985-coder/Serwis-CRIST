@@ -20,7 +20,7 @@ export const requestPushPermission = async (userId) => {
       
       if (currentToken) {
         // Zapisujemy token do profilu użytkownika
-        const userRef = doc(db, 'tenants', getCurrentTenant(), 'users', userId);
+        const userRef = doc(db, 'users', userId);
         await updateDoc(userRef, {
           fcmTokens: arrayUnion(currentToken)
         });

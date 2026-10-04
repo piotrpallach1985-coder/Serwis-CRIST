@@ -45,7 +45,7 @@ export const addMachine = async (machineData) => {
 
 export const updateMachine = async (machineId, machineData) => {
   const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), machineData);
-  logAudit('UPDATE', 'MACHINE', machineId, 'Edycja maszyny');
+  logAudit('UPDATE', 'MACHINE', machineId, machineData);
   return res;
 };
 

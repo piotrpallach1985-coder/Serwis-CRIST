@@ -102,7 +102,7 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
         
         transaction.set(txRef, {
           partId: selectedPart.id,
-          type: 'issue_adhoc',
+          type: ticket.triggerType ? 'issue_planned' : 'issue_adhoc',
           quantity: -qtyNum,
           price: avgPrice,
           totalCost: totalCost,

@@ -45,7 +45,7 @@ export default function Regions() {
       let finalImageUrl = mapImageUrl;
 
       if (mapFile) {
-        const fileRef = ref(storage, `regions_maps/${Date.now()}_${mapFile.name}`);
+        const fileRef = ref(storage, `tenants/${getCurrentTenant()}/regions_maps/${Date.now()}_${mapFile.name}`);
         const uploadTask = uploadBytesResumable(fileRef, mapFile);
         
         finalImageUrl = await new Promise((resolve, reject) => {

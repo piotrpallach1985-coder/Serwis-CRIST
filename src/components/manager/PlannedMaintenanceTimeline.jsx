@@ -1,3 +1,4 @@
+import { getCurrentTenant } from '../../utils/tenantHelper';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { storage } from '../../firebase';
@@ -15,6 +16,7 @@ export default function PlannedMaintenanceTimeline({
   setServiceToComplete,
   onEdit,
   onDelete,
+  onOpenPartModal,
   canEditPlanned,
   canDeletePlanned,
   isArchive,
@@ -117,7 +119,7 @@ export default function PlannedMaintenanceTimeline({
                                         for (let i = 0; i < files.length; i++) {
                                           const compressedFile = await compressImage(files[i], 2);
                                           const fileName = Date.now() + '_' + compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                                          const fileRef = ref(storage, `planned_services/${srv.id}/${fileName}`);
+                                          const fileRef = ref(storage, `tenants/${getCurrentTenant()}/planned_services/${srv.id}/${fileName}`);
                                           const uploadPromise = uploadBytes(fileRef, compressedFile).then(() => getDownloadURL(fileRef));
                                           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 60000));
                                           const url = await Promise.race([uploadPromise, timeoutPromise]);
@@ -149,7 +151,7 @@ export default function PlannedMaintenanceTimeline({
                                       try {
                                         const compressedFile = await compressImage(file, 2);
                                         const fileName = Date.now() + '_' + compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                                        const fileRef = ref(storage, `planned_services/${srv.id}/${fileName}`);
+                                        const fileRef = ref(storage, `tenants/${getCurrentTenant()}/planned_services/${srv.id}/${fileName}`);
                                         const uploadPromise = uploadBytes(fileRef, compressedFile).then(() => getDownloadURL(fileRef));
                                         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 60000));
                                         const url = await Promise.race([uploadPromise, timeoutPromise]);
@@ -207,6 +209,14 @@ export default function PlannedMaintenanceTimeline({
                                 ) : (
                                   <><i className="ph ph-paper-plane-tilt text-lg"></i> Zapisz notatkę/zdjęcie</>
                                 )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={onOpenPartModal}
+                                className="w-full mt-3 bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 px-4 py-3 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
+                              >
+                                <i className="ph ph-package text-lg"></i> Pobierz część poza planową listą
                               </button>
                             </div>
                           </div>

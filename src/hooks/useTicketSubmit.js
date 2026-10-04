@@ -144,7 +144,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
             setUploadProgress(`Wysyłanie zdjęć (0/${pendingPhotos.length})...`);
             for (const p of pendingPhotos) {
               const fileName = Date.now() + '_' + p.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-              const fileRef = ref(storage, `tickets/${ticketRef.id}/${fileName}`);
+              const fileRef = ref(storage, `tenants/${tenantId}/tickets/${ticketRef.id}/${fileName}`);
               await uploadString(fileRef, p.base64, 'data_url');
               const url = await getDownloadURL(fileRef);
               uploadedUrls.push(url);

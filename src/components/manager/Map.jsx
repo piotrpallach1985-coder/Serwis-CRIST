@@ -78,7 +78,7 @@ export default function ShipyardMap({
   const processMapFile = (file) => {
     if (!file) return;
     setUploadingMap(true);
-    const storageRef = ref(storage, 'map_backgrounds/' + Date.now() + '_' + file.name);
+    const storageRef = ref(storage, `tenants/${getCurrentTenant()}/map_backgrounds/${Date.now()}_${file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
     uploadTask.on('state_changed',
       (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),

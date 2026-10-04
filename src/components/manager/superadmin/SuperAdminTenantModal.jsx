@@ -81,7 +81,7 @@ export default function SuperAdminTenantModal({
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})} 
                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="np. CRIST S.A."
+                placeholder="np. VexoNT"
                 required 
               />
             </div>

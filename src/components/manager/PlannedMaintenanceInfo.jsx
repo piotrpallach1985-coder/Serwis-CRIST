@@ -65,7 +65,7 @@ export default function PlannedMaintenanceInfo({ srv, machine, parts, actualPart
         {/* Wymagane narzędzia i części */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
               <i className="ph ph-wrench text-xl text-slate-500"></i> Wymagane narzędzia
             </h3>
             <div className="text-sm text-slate-800">
@@ -125,18 +125,18 @@ export default function PlannedMaintenanceInfo({ srv, machine, parts, actualPart
         </div>
 
         {/* Zakres prac / Checklista */}
-        <div className="mb-8 bg-blue-50/40 p-6 rounded-xl border border-blue-100">
+        <div className="mb-4 bg-blue-50/40 p-3 rounded-lg border border-blue-100">
           <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
             <i className="ph ph-list-checks text-xl text-blue-600"></i> Zakres prac do wykonania
           </h3>
           {srv.checklist && srv.checklist.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="space-y-1">
               {srv.checklist.map((step, idx) => (
-                <li key={step.id} className="flex items-start gap-3 text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <li key={step.id} className="flex items-start gap-2 text-sm text-slate-700 bg-white p-1.5 px-2 rounded-md border border-slate-200 shadow-sm">
                   <span className="font-bold text-slate-400 mt-0.5">{idx + 1}.</span>
                   <div className="flex-1">
                     <div className="font-semibold text-slate-800">{step.taskName}</div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-slate-500">
                       Wymagane: {step.type === 'CHECKBOX' ? 'Potwierdzenie (odhaczenie)' : step.type === 'PHOTO' ? 'Zdjęcie dokumentujące' : 'Wpisanie wartości'}
                       <span className={step.isRequired ? "text-red-500 font-medium ml-1" : "text-slate-400 ml-1"}>
                         {step.isRequired ? '(Obowiązkowe)' : '(Opcjonalne)'}

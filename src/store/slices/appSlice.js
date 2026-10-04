@@ -4,6 +4,10 @@ export const createAppSlice = (set) => ({
   tenantId: null,
   limits: { maxUsers: 10, maxMachines: 50 },
   groqApiKey: '',
+  groqModel: 'llama-3.1-8b-instant',
+  geminiModel: 'gemini-2.5-flash',
+  geminiPrice: 0.60,
+  groqPrice: 0.40,
   branding: {
     companyName: '',
     systemSubtitle: 'DYSPOZYTORNIA UR',
@@ -15,5 +19,9 @@ export const createAppSlice = (set) => ({
   setTenantId: (tenantId) => set({ tenantId }),
   setLimits: (limits) => set({ limits }),
   setGroqApiKey: (groqApiKey) => set({ groqApiKey }),
+  setGroqModel: (groqModel) => set({ groqModel }),
+  setGeminiModel: (geminiModel) => set({ geminiModel }),
+  setGeminiPrice: (geminiPrice) => set({ geminiPrice }),
+  setGroqPrice: (groqPrice) => set({ groqPrice }),
   setBranding: (branding) => set({ branding }),
 });

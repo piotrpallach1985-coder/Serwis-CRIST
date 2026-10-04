@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useManagerStore } from '../../store/managerStore';
-import { doc, setDoc, increment } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { functions, app } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useTranslation } from 'react-i18next';
+import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
 
 export default function DictationButton({ onResult, onStart, className = '', mode = 'text' }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -11,16 +12,16 @@ export default function DictationButton({ onResult, onStart, className = '', mod
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
 
   const { i18n } = useTranslation();
-  const apiKey = useManagerStore(state => state.groqApiKey);
+  const groqModel = useManagerStore(state => state.groqModel);
+  const geminiModel = useManagerStore(state => state.geminiModel) || 'gemini-2.5-flash';
+  const modelName = groqModel || 'whisper-large-v3';
 
   const startRecording = async (e) => {
     e.preventDefault();
-    if (!apiKey) {
-      alert("Brak klucza API Groq. Poproś Administratora o dodanie klucza w Panelu SaaS.");
-      return;
-    }
+    // apiKey verification removed - it is now securely handled on the backend
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -42,10 +43,12 @@ export default function DictationButton({ onResult, onStart, className = '', mod
           streamRef.current.getTracks().forEach(track => track.stop());
         }
         
-        await processAudio(audioBlob, ext);
+        const durationSeconds = Math.max(1, Math.ceil((Date.now() - recordingStartTimeRef.current) / 1000));
+        await processAudio(audioBlob, ext, durationSeconds);
       };
 
       mediaRecorder.start();
+      recordingStartTimeRef.current = Date.now();
       setIsRecording(true);
       if (onStart) onStart();
     } catch (err) {
@@ -62,126 +65,111 @@ export default function DictationButton({ onResult, onStart, className = '', mod
     }
   };
 
-  const processAudio = async (audioBlob, ext) => {
+  const processAudio = async (audioBlob, ext, durationSeconds = 1) => {
     setIsProcessing(true);
     try {
-      // 1. Transkrypcja (Groq Whisper)
-      const formData = new FormData();
-      formData.append('file', audioBlob, `audio.${ext}`);
-      formData.append('model', 'whisper-large-v3');
-
-      const resTranscribe = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: formData
+      // 1. Transkrypcja (Groq Whisper via Cloud Function)
+      const base64Audio = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const b64 = reader.result.split(',')[1];
+          resolve(b64);
+        };
+        reader.onerror = reject;
       });
 
-      if (!resTranscribe.ok) {
-         const errData = await resTranscribe.json();
-         throw new Error(errData.error?.message || "Błąd podczas transkrypcji dźwięku.");
-      }
+      const transcribeFn = httpsCallable(functions, 'transcribeAudio');
+      const resTranscribe = await transcribeFn({
+        audioBase64: base64Audio,
+        model: modelName,
+        durationSeconds: durationSeconds,
+        tenantId: getCurrentTenant()
+      });
 
-      const transcribeData = await resTranscribe.json();
-      const originalText = transcribeData.text;
+      const originalText = resTranscribe.data.text;
 
       if (!originalText || originalText.trim().length === 0) {
         setIsProcessing(false);
         return;
       }
 
-      // 2. Przetwarzanie (Groq LLM)
-      let translatedText = originalText;
+      // 2. Przetwarzanie (Google Gemini - Vertex AI)
       let finalResult = originalText;
 
-      if (mode === 'smart') {
-        const resAi = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.1-70b-versatile',
-            messages: [{ 
-              role: 'system', 
-              content: 'Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania). Zwróć obiekt JSON: {"note": "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach", "timeSpentHours": liczba_godzin (lub null), "actionItem": "Zadanie na przyszłość" (lub null), "actionItemDays": liczba_dni_do_wykonania (lub null)}. Wymagany format JSON. Użyj polskiego języka.' 
-            }, { 
-              role: 'user', 
-              content: originalText 
-            }],
-            temperature: 0.1,
-            response_format: { type: 'json_object' }
-          })
-        });
-
-        if (!resAi.ok) {
-          const errorText = await resAi.text();
-          console.error('Groq AI Error:', errorText);
-          throw new Error('Błąd API Smart Extraction: ' + resAi.status + ' ' + errorText);
-        }
-        const aiData = await resAi.json();
-        try {
-          finalResult = JSON.parse(aiData.choices[0].message.content);
-        } catch (e) {
-          throw new Error('Niepoprawny format danych od AI');
-        }
-
-        const groqTokens = aiData.usage?.total_tokens || 0;
-        if (groqTokens > 0) {
-          const tenantId = getCurrentTenant();
-          if (tenantId) setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), { groqTokens: increment(groqTokens) }, { merge: true }).catch(err => console.error(err));
-        }
-
-      } else {
-        // Tłumaczenie i Korekta na Polski (Groq Llama 3)
+      try {
+        const vertexAI = getVertexAI(app);
         
-        const lang = i18n.language === 'en' ? 'angielski' : 'polski';
-        const resTranslate = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'llama-3.1-70b-versatile',
-            messages: [
-              {
-                role: 'system',
-                content: `Jesteś asystentem technicznym. Interfejs systemu jest w języku: ${lang.toUpperCase()}. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
+        if (mode === 'smart') {
+          const model = getGenerativeModel(vertexAI, { 
+            model: geminiModel,
+            systemInstruction: 'Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania).',
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: 'object',
+                properties: {
+                  note: { type: 'string', description: "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach" },
+                  timeSpentHours: { type: 'number', nullable: true },
+                  actionItem: { type: 'string', nullable: true },
+                  actionItemDays: { type: 'number', nullable: true }
+                },
+                required: ["note"]
+              }
+            }
+          });
+
+          const result = await model.generateContent(originalText);
+          const responseText = result.response.text();
+          
+          try {
+            finalResult = JSON.parse(responseText);
+          } catch (e) {
+            throw new Error('Niepoprawny format danych JSON od Gemini');
+          }
+
+          let geminiTokens = result.response.usageMetadata?.totalTokenCount || 0;
+          if (geminiTokens === 0) {
+            const inputLen = originalText.length + 300;
+            const outputLen = responseText.length;
+            geminiTokens = Math.ceil((inputLen + outputLen) / 4);
+          }
+          if (geminiTokens > 0) {
+            const logFn = httpsCallable(functions, 'logAIUsage');
+            logFn({ geminiTokens, tenantId: getCurrentTenant() }).catch(e => console.error("Billing log error:", e));
+          }
+
+        } else {
+          const lang = i18n.language === 'en' ? 'angielski' : 'polski';
+          const model = getGenerativeModel(vertexAI, { 
+            model: geminiModel,
+            systemInstruction: `Jesteś asystentem technicznym. Interfejs systemu jest w języku: ${lang.toUpperCase()}. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
 1. Jeśli oryginalny podyktowany tekst jest w języku ${lang} (albo bardzo do niego zbliżonym), po prostu sformatuj go poprawnie (dodaj interpunkcję) i zwróć TYLKO sam sformatowany tekst (bez dopisków o tłumaczeniu).
-2. Jeśli oryginalny tekst jest w INNYM języku (np. ukraińskim, hiszpańskim, itp.), przetłumacz go na język ${lang}. 
-Wtedy (i tylko wtedy) zwróć wynik DOKŁADNIE w tym formacie (zachowując oryginalny tekst u góry):
+2. Jeśli oryginalny tekst jest w INNYM języku, przetłumacz go na język ${lang}. Wtedy (i tylko wtedy) zwróć wynik DOKŁADNIE w tym formacie:
 [Oryginalny podyktowany tekst]
 
 ---
 Tłumaczenie (${lang}):
 [Przetłumaczony tekst]`
-              },
-              {
-                role: 'user',
-                content: originalText
-              }
-            ],
-            temperature: 0.1
-          })
-        });
+          });
 
-        if (!resTranslate.ok) {
-          const errData = await resTranslate.json().catch(() => ({}));
-          throw new Error("Błąd API Groq (tłumaczenie): " + (errData.error?.message || "Status " + resTranslate.status));
-        }
+          const result = await model.generateContent(originalText);
+          finalResult = result.response.text().trim();
 
-        const translateData = await resTranslate.json();
-        finalResult = translateData.choices[0].message.content.trim();
-
-        const groqTokens = translateData.usage?.total_tokens || 0;
-        if (groqTokens > 0) {
-          const tenantId = getCurrentTenant();
-          if (tenantId) {
-            setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
-              groqTokens: increment(groqTokens)
-            }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+          let geminiTokens = result.response.usageMetadata?.totalTokenCount || 0;
+          if (geminiTokens === 0) {
+            const inputLen = originalText.length + 500;
+            const outputLen = finalResult.length;
+            geminiTokens = Math.ceil((inputLen + outputLen) / 4);
+          }
+          if (geminiTokens > 0) {
+            const logFn = httpsCallable(functions, 'logAIUsage');
+            logFn({ geminiTokens, tenantId: getCurrentTenant() }).catch(e => console.error("Billing log error:", e));
           }
         }
+      } catch (geminiErr) {
+        console.error("Gemini processing error:", geminiErr);
+        throw new Error("Błąd AI Gemini: " + geminiErr.message);
       }
 
       if (onResult) {

@@ -43,7 +43,9 @@ export default function PlannedMaintenanceFormModal({
         
         let d = '';
         if (editingService.nextDate) {
-          const dt = new Date(editingService.nextDate);
+          const dt = typeof editingService.nextDate.toDate === 'function' 
+            ? editingService.nextDate.toDate() 
+            : new Date(editingService.nextDate);
           if (!isNaN(dt)) d = dt.toISOString().slice(0, 10);
         }
         setNextDate(d);
@@ -310,7 +312,7 @@ export default function PlannedMaintenanceFormModal({
                             updatePart(index, 'name', '');
                           }
                         }}
-                        className="w-full p-1.5 border border-slate-200 rounded text-sm outline-none bg-slate-50 font-bold"
+                        className="w-full p-1.5 border border-slate-200 rounded text-sm outline-none bg-slate-50 font-bold" required
                       >
                         <option value="">-- Wybierz z Magazynu --</option>
                         {parts.map(p => (
@@ -319,8 +321,8 @@ export default function PlannedMaintenanceFormModal({
                         <option value="custom">Inna część (spoza magazynu)</option>
                       </select>
                       
-                      {(part.partId === 'custom' || (!part.partId && part.name !== undefined)) && (
-                        <input type="text" value={part.name} onChange={e => updatePart(index, 'name', e.target.value)} placeholder="Nazwa części spoza magazynu" className="w-full p-1.5 border-b border-slate-200 text-sm outline-none" />
+                      {(part.partId === 'custom') && (
+                        <input type="text" value={part.name} onChange={e => updatePart(index, 'name', e.target.value)} placeholder="Nazwa części spoza magazynu" className="w-full p-1.5 border-b border-slate-200 text-sm outline-none" required />
                       )}
 
                       <div className="flex gap-2">

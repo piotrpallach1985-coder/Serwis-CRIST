@@ -1,7 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { markServiceCompleted, processServicePartsTransaction } from '../../services/plannedServices.service';
+import { completeServiceWithTransaction } from '../../services/plannedServices.service';
 import { addActionItem } from '../../services/tickets.service';
 import DictationButton from '../shared/DictationButton';
 import { useManagerStore } from '../../store/managerStore';
@@ -53,8 +53,9 @@ export default function PlannedMaintenanceCompletionModal({
         nextPlanData = { 
           name: serviceToComplete.name, 
           machineId: serviceToComplete.machineId || '', 
-            machineName: serviceToComplete.machineName || (getMachine(serviceToComplete.machineId)?.name) || '', 
+          machineName: serviceToComplete.machineName || (getMachine(serviceToComplete.machineId)?.name) || '', 
           priority: serviceToComplete.priority, 
+          category: serviceToComplete.category || 'preventive',
           triggerType: serviceToComplete.triggerType, 
           estimatedDowntimeHours: serviceToComplete.estimatedDowntimeHours, 
           estimatedManHours: serviceToComplete.estimatedManHours, 
@@ -62,6 +63,10 @@ export default function PlannedMaintenanceCompletionModal({
           machineStatus: serviceToComplete.machineStatus, 
           notified: false, 
           checklist: serviceToComplete.checklist || [], 
+          toolsType: serviceToComplete.toolsType || 'Podstawowe',
+          specialTools: serviceToComplete.specialTools || '',
+          otherTools: serviceToComplete.otherTools || '',
+          requiredParts: serviceToComplete.requiredParts || [],
           futureNotes: serviceToComplete.futureNotes || [] 
         };
         if (serviceToComplete.triggerType === 'calendar' || serviceToComplete.triggerType === 'mixed') { 
@@ -99,58 +104,50 @@ export default function PlannedMaintenanceCompletionModal({
         partsUsed 
       };
       
-      let finalCost = 0;
-      if (partsUsed && serviceToComplete.requiredParts && serviceToComplete.requiredParts.length > 0) {
-        finalCost = await processServicePartsTransaction({...serviceToComplete, completedBy: user?.name || 'System'});
-      }
       
-      // Issue extra (unplanned) parts
-      const validExtraParts = extraParts.filter(ep => ep.partId && ep.partId !== '' && Number(ep.quantity) > 0);
-      if (validExtraParts.length > 0) {
-        const { issuePart } = await import('../../services/parts.service');
-        for (const ep of validExtraParts) {
-          try {
-            await issuePart({
-              partId: ep.partId,
-              quantity: Number(ep.quantity),
-              user: user?.name || 'System',
-              type: 'issue_planned',
-              notes: 'Część dodatkowa (poza planem) - serwis: ' + (serviceToComplete.name || ''),
-              referenceId: serviceToComplete.id,
-              machineId: serviceToComplete.machineId || null,
-            });
-          } catch (err) {
-            console.warn('Could not issue extra part:', ep.partId, err);
-          }
-        }
-        const extraNote = 'Pobrano dodatkowe części (poza planem): ' + validExtraParts.map(ep => {
-          const found = parts.find(p => p.id === ep.partId);
-          return (found ? found.name : ep.partId) + ' x' + ep.quantity;
-        }).join(', ');
-        historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + extraNote;
-        historyEntry.extraParts = validExtraParts;
-      }
+        // Użycie nowej pojedynczej atomowej transakcji
+        const completionData = { 
+          completedBy: user?.name || 'System', 
+          notes: completionNotes, 
+          checklistResponses, 
+          historyEntry, 
+          partsUsed 
+        };
         
-      if (finalCost > 0) {
-         historyEntry.cost = finalCost;
-         historyEntry.note = (historyEntry.note ? historyEntry.note + '\\n' : '') + 'Zużyto części z magazynu o wartości: ' + finalCost.toLocaleString('pl-PL') + ' PLN.';
-      }
+        const validExtraParts = extraParts.filter(ep => ep.partId && ep.partId !== '' && Number(ep.quantity) > 0);
+        
+        let actionItemDataObj = null;
+        if (createActionItem && actionItemProblem.trim()) {
+          actionItemDataObj = {
+            machineId: serviceToComplete.machineId || '', 
+            plannedServiceId: serviceToComplete.id || '', 
+            problem: actionItemProblem.trim(), 
+            dueDate: actionItemDueDate ? new Date(actionItemDueDate).toISOString() : null, 
+            status: 'pending', 
+            createdAt: new Date().toISOString(), 
+            createdBy: user?.name || 'Nieznany' 
+          };
+        }
 
-      await markServiceCompleted(serviceToComplete.id, { completedBy: user?.name || 'System', notes: completionNotes, checklistResponses, historyEntry, partsUsed }, nextPlanData);
+        // Dodanie notatki o dodatkowych częściach
+        if (validExtraParts.length > 0) {
+          const extraNote = 'Pobrano dodatkowe części (poza planem): ' + validExtraParts.map(ep => {
+            const found = parts.find(p => p.id === ep.partId);
+            return (found ? found.name : ep.partId) + ' x' + ep.quantity;
+          }).join(', ');
+          historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + extraNote;
+          historyEntry.extraParts = validExtraParts;
+        }
 
-      if (createActionItem && actionItemProblem.trim()) {
-        await addActionItem({ 
-          machineId: serviceToComplete.machineId || '', 
-          plannedServiceId: serviceToComplete.id || '', 
-          problem: actionItemProblem.trim(), 
-          dueDate: actionItemDueDate ? new Date(actionItemDueDate).toISOString() : null, 
-          status: 'pending', 
-          createdAt: new Date().toISOString(), 
-          createdBy: user?.name || 'Nieznany' 
-        });
-      }
+        await completeServiceWithTransaction(
+          serviceToComplete, 
+          completionData, 
+          nextPlanData, 
+          actionItemDataObj, 
+          validExtraParts
+        );
 
-      setCompletionNotes('');
+        setCompletionNotes('');
       setCreateNewPlan(true);
       setCreateActionItem(false);
       setActionItemProblem('');
@@ -166,7 +163,7 @@ export default function PlannedMaintenanceCompletionModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-scale-in">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-scale-in max-h-[90vh] overflow-y-auto">
         
         <div className="flex justify-between items-start mb-4">
           <div>

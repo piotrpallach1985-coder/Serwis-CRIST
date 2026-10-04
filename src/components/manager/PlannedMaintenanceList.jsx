@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { usePagination } from '../../hooks/usePagination';
 import ServiceCalendar from './ServiceCalendar';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { checkServiceUrgency } from '../../utils/logicHelpers';
 import { SERVICE_STATUS } from '../../utils/constants';
 
 export default function PlannedMaintenanceList({
@@ -54,17 +55,7 @@ export default function PlannedMaintenanceList({
                   const machine = getMachine(srv.machineId);
                   const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;
                   const rowColor = getStatusColor(srv, machine);
-  const isOverdue = (() => {
-    if (srv.status === SERVICE_STATUS.COMPLETED) return false;
-    if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
-      const parsedDate = safeParseDate(srv.nextDate);
-      if (parsedDate && parsedDate < new Date()) return true;
-    }
-    if ((srv.triggerType === 'hours' || srv.triggerType === 'mixed') && srv.targetWorkHours) {
-      if ((machine?.currentWorkHours || 0) >= srv.targetWorkHours) return true;
-    }
-    return false;
-  })();
+  const { isOverdue } = checkServiceUrgency(srv, machine, 30);
   const isCritical = srv.priority === 'Krytyczny';
   const showRedCritical = false;
 
@@ -153,17 +144,7 @@ export default function PlannedMaintenanceList({
               const isCompleted = srv.status === SERVICE_STATUS.COMPLETED;
               const rowColor = getStatusColor(srv, machine);
 
-              const isOverdue = (() => {
-                      if (srv.status === SERVICE_STATUS.COMPLETED) return false;
-                      if ((srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && srv.nextDate) {
-                        const parsedDate = safeParseDate(srv.nextDate);
-      if (parsedDate && parsedDate < new Date()) return true;
-                      }
-                      if ((srv.triggerType === 'hours' || srv.triggerType === 'mixed') && srv.targetWorkHours) {
-                        if ((machine?.currentWorkHours || 0) >= srv.targetWorkHours) return true;
-                      }
-                      return false;
-                    })();
+              const { isOverdue } = checkServiceUrgency(srv, machine, 30);
                     const isCritical = srv.priority === 'Krytyczny';
                     const showRedCritical = false;
 return (
@@ -227,3 +208,5 @@ return (
     </>
   );
 }
+
+

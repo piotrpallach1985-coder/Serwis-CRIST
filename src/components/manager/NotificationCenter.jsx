@@ -1,44 +1,34 @@
-import { useAuth } from '../../hooks/useAuth';
-import { useState, useMemo } from 'react';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { db } from '../../firebase';
+﻿import { useAuth } from '../../hooks/useAuth';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { safeParseDate } from '../../utils/dateHelpers';
-import { USER_ROLES, TICKET_STATUS } from '../../utils/constants';
+import { db } from '../../firebase';
+import { doc, writeBatch } from 'firebase/firestore';
+import { TICKET_STATUS, USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { checkInventoryStatus, checkServiceUrgency } from '../../utils/logicHelpers';
 
-
-/**
- * NotificationCenter — dzwonek z powiadomieniami systemowymi.
- * Wyciągnięty z ManagerView.jsx jako osobny komponent.
- *
- * Props:
- *   tickets, plannedServices, machines, actionItems — dane do generowania dynamicznych powiadomień
- *   notifications — powiadomienia z Firestore
- *   currentModule — aktywny moduł (wpływa na filtrowanie powiadomień)
- *   user — zalogowany użytkownik
- *   onNavigate(module, tab, extra) — callback do nawigacji
- */
 export default function NotificationCenter({
   tickets = [],
   plannedServices = [],
   machines = [],
   reporters = [],
   actionItems = [],
-  notifications = [],
-  currentModule,
-  onNavigate,
-  align = 'left' }) {
+  align = 'left'
+}) {
   const { user } = useAuth();
+  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays) || 30;
   const [isOpen, setIsOpen] = useState(false);
   const parts = useManagerStore(state => state.parts || []);
+  const notifications = useManagerStore(state => state.notifications || []);
+  const currentModule = useManagerStore(state => state.currentModule || 'ur');
+  const onNavigate = useManagerStore(state => state.onNavigate);
+  const markAsRead = useManagerStore(state => state.markAsRead);
 
-  // --- Budowanie listy relevantnych powiadomień ---
   const relevantNotifications = useMemo(() => {
     const list = [];
     const isUrModule = currentModule === 'ur' || currentModule === 'tickets' || currentModule === 'planned_maintenance' || currentModule === 'master_data';
 
-    // 1. Awarie krytyczne (priorytet 1) oraz 2. Pozostałe awarie (priorytet 2)
     if (isUrModule || currentModule === 'tickets') {
       tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED).forEach(t => {
         const isCrit = !!t.isCritical;
@@ -60,47 +50,56 @@ export default function NotificationCenter({
       });
     }
 
-    // 2. Pozostałe standardowe powiadomienia systemowe z Firestore (priorytet 2, lub 1 gdy krytyczne)
     notifications.forEach(n => {
       if (!n.title && !n.message) return;
-      if (n.ticketId) return;
-      if (n.linkTo === 'planned_maintenance') return;
+      if (n.ticketId || n.linkTo === 'planned_maintenance') return;
       const isCrit = !!n.isCritical;
       list.push({
         ...n,
         priorityRank: isCrit ? 1 : 2,
         icon: n.icon || (isCrit ? 'ph-siren' : 'ph-bell'),
         colorClass: n.colorClass || (isCrit ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'),
-        badge: n.badge || (isCrit ? 'KRYTYCZNE' : 'SYSTEM'),
-        badgeClass: n.badgeClass || (isCrit ? 'bg-red-600 text-white font-bold animate-pulse' : 'bg-blue-100 text-blue-800 font-bold'),
+        badgeClass: n.badgeClass || (isCrit ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'),
+        createdAt: { toDate: () => safeParseDate(n.createdAt) || new Date() }
       });
     });
 
-    // 3. Przedawnione serwisy (priorytet 3 - czerwony status przeterminowania)
     if (isUrModule || currentModule === 'planned_maintenance') {
-      const now = new Date();
       plannedServices.forEach(srv => {
-        if (srv.status === 'completed' || srv.status === 'in_progress') return;
-        let isOverdue = false;
+        if (srv.status === 'completed') return;
         const machine = machines.find(m => m.id === srv.machineId);
-        if (srv.nextDate) {
-          const nDate = safeParseDate(srv.nextDate);
-          if (nDate && nDate < now) isOverdue = true;
-        }
-        if (srv.targetWorkHours && machine) {
-          if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
-        }
+        
+        const { isOverdue, isUpcoming, message } = checkServiceUrgency(srv, machine, plannedWarningDays);
+
         if (isOverdue) {
           list.push({
-            id: 'dyn_srv_' + srv.id,
+            id: 'dyn_srv_ov_' + srv.id,
             title: 'PRZEKROCZONY TERMIN SERWISU!',
-            message: 'Maszyna: ' + (machine?.name || 'Nieznana') + ' - ' + srv.name,
+            message: 'Maszyna: ' + (machine?.name || 'Nieznana') + ' - ' + srv.name + ' (' + message + ')',
             isCritical: true,
             priorityRank: 3,
             icon: 'ph-clock-countdown',
             colorClass: 'bg-red-100 text-red-600',
-            badge: 'PRZETERMINOWANY',
+            badge: 'WYMAGANY',
             badgeClass: 'bg-red-100 text-red-700 font-bold border border-red-200',
+            read: false,
+            linkTo: 'planned_maintenance',
+            serviceId: srv.id,
+            createdAt: { toDate: () => safeParseDate(srv.nextDate) || new Date() },
+            isDynamic: true,
+          });
+        } else if (isUpcoming && srv.status !== 'in_progress') {
+          const isCriticalPriority = ['Krytyczne', 'KRYTYCZNE', 'Krytyczny', 'KRYTYCZNY'].includes(srv.priority);
+          list.push({
+            id: 'dyn_srv_up_' + srv.id,
+            title: isCriticalPriority ? 'ZBLIŻA SIĘ KRYTYCZNY SERWIS!' : 'ZBLIŻA SIĘ SERWIS PLANOWANY',
+            message: 'Maszyna: ' + (machine?.name || 'Nieznana') + ' - ' + srv.name + ' (' + message + ')',
+            isCritical: isCriticalPriority,
+            priorityRank: isCriticalPriority ? 3 : 5,
+            icon: 'ph-calendar-blank',
+            colorClass: isCriticalPriority ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600',
+            badge: 'ZBLIŻA SIĘ',
+            badgeClass: isCriticalPriority ? 'bg-red-100 text-red-700 font-bold border border-red-200' : 'bg-orange-100 text-orange-700 font-bold border border-orange-200',
             read: false,
             linkTo: 'planned_maintenance',
             serviceId: srv.id,
@@ -109,29 +108,40 @@ export default function NotificationCenter({
           });
         }
       });
-
-      // 4. Tematy do realizacji (priorytet 4 - otwarte zadania z action items)
-      const openCount = actionItems.filter(i => i.status !== 'completed').length;
-      if (openCount > 0) {
-        list.push({
-          id: 'dyn_action_grouped',
-          title: 'TEMATY DO REALIZACJI',
-          message: `Liczba otwartych zadań: ${openCount}`,
-          isCritical: false,
-          priorityRank: 5,
-          icon: 'ph-clipboard-text',
-          colorClass: 'bg-indigo-100 text-indigo-600',
-          badge: 'DO REALIZACJI',
-          badgeClass: 'bg-indigo-100 text-indigo-700 font-bold',
-          read: false,
-          linkTo: 'action_items',
-          createdAt: { toDate: () => new Date() },
-          isDynamic: true,
-        });
-      }
     }
 
-    // 5. Maszyny do weryfikacji ((DO WERYFIKACJI)) & 6. Zgłaszający do weryfikacji ((DO WERYFIKACJI))
+    if (isUrModule || currentModule === 'parts' || currentModule === 'parts_list') {
+      parts.forEach(p => {
+        let reservedQty = 0;
+        plannedServices.forEach(s => {
+          if (s.status !== 'completed' && s.requiredParts) {
+            const req = s.requiredParts.find(rp => rp.partId === p.id);
+            if (req) reservedQty += Number(req.quantity) || 0;
+          }
+        });
+        
+        const { isLow, isOut, available, minStock, stock } = checkInventoryStatus(p, reservedQty);
+
+        if (isLow || isOut) {
+          list.push({
+            id: 'dyn_part_low_' + p.id,
+            title: isOut ? 'BRAK CZĘŚCI!' : 'NISKI STAN MAGAZYNOWY',
+            message: `Część "${p.name}" ma dostępne: ${available} (min: ${minStock}). Fizycznie: ${stock}`,
+            isCritical: isOut,
+            priorityRank: 4,
+            icon: 'ph-warning',
+            colorClass: isOut ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600',
+            badge: isOut ? 'BRAK' : 'NISKI STAN',
+            badgeClass: isOut ? 'bg-red-100 text-red-700 font-bold' : 'bg-orange-100 text-orange-700 font-bold',
+            read: false,
+            linkTo: 'parts',
+            createdAt: { toDate: () => new Date() },
+            isDynamic: true,
+          });
+        }
+      });
+    }
+
     if (isUrModule || currentModule === 'master_data' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)) {
       machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
         list.push({
@@ -151,50 +161,17 @@ export default function NotificationCenter({
           isDynamic: true,
         });
       });
-
-      parts.forEach(p => {
-        let reservedQty = 0;
-        (plannedServices || []).forEach(s => {
-          if (s.requiredParts && Array.isArray(s.requiredParts)) {
-            const req = s.requiredParts.find(rp => rp.partId === p.id);
-            if (req) reservedQty += Number(req.quantity) || 0;
-          }
-        });
-        const stock = Number(p.stock) || 0;
-        const available = stock - reservedQty;
-        const minStock = Number(p.minStock) || 0;
-
-        if (minStock > 0 && available < minStock) {
-          list.push({
-            id: 'dyn_part_low_' + p.id,
-            title: 'NISKI STAN MAGAZYNOWY',
-            message: `Część "${p.name}" ma dostępne: ${available} (min: ${minStock}). Fizycznie: ${stock}`,
-            isCritical: true,
-            priorityRank: 4,
-            icon: 'ph-warning',
-            colorClass: 'bg-orange-100 text-orange-700',
-            badge: 'UZUPEŁNIJ',
-            badgeClass: 'bg-orange-100 text-orange-800 font-bold border border-orange-200',
-            read: false,
-            linkTo: 'parts_inventory',
-            partId: p.id,
-            createdAt: { toDate: () => new Date() },
-            isDynamic: true,
-          });
-        }
-      });
-
       reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).forEach(r => {
         list.push({
           id: 'dyn_verif_reporter_' + r.id,
-          title: 'OSOBA DO WERYFIKACJI',
-          message: 'Nowy zgłaszający wymaga weryfikacji: ' + r.name,
+          title: 'ZGŁASZAJĄCY DO WERYFIKACJI',
+          message: 'Nowy pracownik wymaga weryfikacji: ' + r.name,
           isCritical: true,
-          priorityRank: 7,
-          icon: 'ph-user-focus',
-          colorClass: 'bg-purple-100 text-purple-700',
+          priorityRank: 6,
+          icon: 'ph-user',
+          colorClass: 'bg-amber-100 text-amber-700',
           badge: 'DO WERYFIKACJI',
-          badgeClass: 'bg-purple-100 text-purple-800 font-bold border border-purple-200',
+          badgeClass: 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
           read: false,
           linkTo: 'reporters',
           createdAt: { toDate: () => safeParseDate(r.createdAt) || new Date() },
@@ -203,139 +180,140 @@ export default function NotificationCenter({
       });
     }
 
-    // Sortowanie wg zadanego priorytetu:
-    // 1. Awarie krytyczne (czerwona syrena)
-    // 2. Pozostałe (nowe awarie, standardowe powiadomienia systemowe)
-    // 3. Przedawnione serwisy (czerwony status przeterminowania)
-    // 4. Tematy do realizacji (otwarte zadania z action items)
-    // 5. Nowe maszyny do weryfikacji ((DO WERYFIKACJI))
-    // 6. Nowi zgłaszający do weryfikacji ((DO WERYFIKACJI))
-    list.sort((a, b) => {
-      const rA = a.priorityRank || 99;
-      const rB = b.priorityRank || 99;
-      if (rA !== rB) {
-        return rA - rB;
-      }
-      const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : Date.now());
-      const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : Date.now());
-      return (tb || 0) - (ta || 0);
+    return list.sort((a, b) => {
+      if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
+      const dA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const dB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return dB - dA;
     });
-
-    return list;
-  }, [tickets, plannedServices, machines, actionItems, notifications, currentModule, user, reporters, parts]);
+  }, [tickets, plannedServices, machines, actionItems, notifications, currentModule, user, reporters, parts, plannedWarningDays]);
 
   const unreadCount = relevantNotifications.filter(n => !n.read).length;
 
-  // --- Akcje ---
-  const markAsRead = async (notifId) => {
-    if (!notifId || notifId.toString().startsWith('dyn_')) return;
-    try {
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'notifications', notifId), { read: true });
-    } catch (e) {
-      console.error('Błąd aktualizacji powiadomienia:', e);
-    }
-  };
-
-  const clearAll = async () => {
-    if (!window.confirm('Czy na pewno chcesz usunąć wszystkie widoczne powiadomienia?')) return;
-    try {
-      const batch = writeBatch(db);
-      relevantNotifications
-        .filter(n => !n.isDynamic)
-        .forEach(n => batch.delete(doc(db, 'tenants', getCurrentTenant(), 'notifications', n.id)));
-      await batch.commit();
-    } catch (e) {
-      console.error('Błąd usuwania powiadomień:', e);
-    }
-  };
-
   const handleNotifClick = (n) => {
-    markAsRead(n.id);
+    if (!n.isDynamic) markAsRead(n.id);
     setIsOpen(false);
     const targetModule = (currentModule === 'ur' || currentModule === 'tickets' || currentModule === 'planned_maintenance' || currentModule === 'master_data') ? 'ur' : currentModule;
     if (n.ticketId) {
-      onNavigate(targetModule, 'tickets', { ticketId: n.ticketId });
+      if (onNavigate) onNavigate(targetModule, 'tickets', { ticketId: n.ticketId });
     } else if (n.linkTo === 'planned_maintenance') {
-      onNavigate(targetModule, 'planned_maintenance', { serviceId: n.serviceId });
+      if (onNavigate) onNavigate(targetModule, 'planned_maintenance', { serviceId: n.serviceId });
     } else if (n.linkTo === 'action_items') {
-      onNavigate(targetModule, 'action_items');
+      if (onNavigate) onNavigate(targetModule, 'action_items');
     } else if (n.linkTo === 'machines') {
-      onNavigate(targetModule, 'machines', { machineId: n.machineId });
-    } else if (n.partId) {
-      onNavigate(targetModule, 'parts_inventory', { partId: n.partId });
+      if (onNavigate) onNavigate(targetModule, 'machines', { machineId: n.machineId });
     } else if (n.linkTo === 'reporters') {
-      onNavigate(targetModule, 'reporters');
+      if (onNavigate) onNavigate(targetModule, 'reporters');
+    } else if (n.linkTo === 'parts') {
+      if (onNavigate) onNavigate('parts_list');
     }
   };
 
+  const markAllAsRead = async () => {
+    if (!user) return;
+    try {
+      const tenantId = getCurrentTenant();
+      const batch = writeBatch(db);
+      relevantNotifications.forEach(n => {
+        if (!n.read && !n.isDynamic) {
+          const ref = doc(db, 'tenants', tenantId, 'notifications', n.id);
+          batch.update(ref, { read: true });
+        }
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Blad', err);
+    }
+  };
+
+  const menuRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <div className="relative">
-      {/* Przycisk dzwonka */}
-      <button
-        onClick={() => setIsOpen(prev => !prev)}
-        className="relative p-2 rounded-lg hover:bg-white/10 transition-colors"
-        title="Powiadomienia"
+    <div className="relative" ref={menuRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        className="p-2 lg:p-2.5 rounded-xl hover:bg-slate-100 transition-colors relative flex items-center justify-center text-slate-500 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
       >
-        <i className="ph ph-bell text-2xl"></i>
+        <i className="ph ph-bell text-xl lg:text-2xl"></i>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-            {unreadCount}
+          <span className="absolute top-1 lg:top-1.5 right-1 lg:right-1.5 w-4 h-4 lg:w-5 lg:h-5 bg-red-500 text-white text-[9px] lg:text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm shadow-red-500/30">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Panel powiadomień */}
       {isOpen && (
-        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden`}>
-          <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
-            <span className="font-bold text-sm">Powiadomienia systemowe</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-blue-900 px-2 py-0.5 rounded">{unreadCount} nowych</span>
-              {relevantNotifications.some(n => !n.isDynamic) && (
-                <button
-                  onClick={clearAll}
-                  className="text-xs text-gray-400 hover:text-white transition-colors"
-                  title="Usuń wszystkie"
-                >
-                  <i className="ph ph-trash"></i>
-                </button>
-              )}
-            </div>
+        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-[calc(100vw-32px)] sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50`}>
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center backdrop-blur-xl">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <i className="ph ph-bell-ringing text-blue-600"></i> Powiadomienia
+            </h3>
+            {unreadCount > 0 && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); markAllAsRead(); }} 
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <i className="ph ph-check-double"></i> Odczytaj wszystkie
+              </button>
+            )}
           </div>
-          <div className="max-h-80 overflow-y-auto overflow-x-hidden divide-y divide-gray-100">
+          <div className="max-h-[60vh] sm:max-h-96 overflow-y-auto overscroll-contain">
             {relevantNotifications.length === 0 ? (
-              <div className="p-6 text-center text-gray-400 text-sm">Brak powiadomień</div>
+              <div className="p-10 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                  <i className="ph ph-bell-z text-3xl text-slate-300"></i>
+                </div>
+                <p className="text-slate-500 font-medium">Brak powiadomień</p>
+                <p className="text-xs text-slate-400 mt-1">Wszystko jest pod kontrolą</p>
+              </div>
             ) : (
-              relevantNotifications.map(n => (
-                <div
-                  key={n.id}
+              relevantNotifications.map((n) => (
+                <div 
+                  key={n.id} 
                   onClick={() => handleNotifClick(n)}
-                  className={`p-3.5 sm:p-4 transition-colors cursor-pointer flex gap-3 items-start ${n.read ? 'bg-white opacity-60' : 'bg-blue-50/60 hover:bg-blue-50'}`}
+                  className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group relative ${!n.read ? 'bg-blue-50/30' : ''}`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.colorClass || (n.isCritical ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600')}`}>
-                    <i className={`ph ${n.icon || (n.isCritical ? 'ph-siren' : 'ph-info')} text-lg`}></i>
-                  </div>
-                  <div className="flex-1 min-w-0 text-xs">
-                    <div className="font-bold text-gray-800 mb-0.5 flex items-center justify-between gap-1.5">
-                      <span className="truncate">{n.title}</span>
-                      {n.badge && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded tracking-wide shrink-0 ${n.badgeClass || (n.isCritical ? 'bg-red-100 text-red-700 font-bold' : 'bg-blue-100 text-blue-700 font-bold')}`}>
-                          {n.badge}
-                        </span>
-                      )}
+                  {!n.read && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r"></div>}
+                  <div className="flex gap-3.5">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${n.colorClass || 'bg-blue-100 text-blue-600'}`}>
+                      <i className={`ph ${n.icon || 'ph-bell'} text-xl`}></i>
                     </div>
-                    <div className="text-gray-600 leading-relaxed break-words">{n.message}</div>
-                    <div className="text-[10px] text-gray-400 mt-1">
-                      {safeParseDate(n.createdAt)?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) || 'Przed chwilą'}
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="font-bold text-slate-800 text-sm leading-tight truncate pr-2">
+                          {n.title}
+                        </div>
+                        {n.badge && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${n.badgeClass || 'bg-slate-100 text-slate-600'}`}>
+                            {n.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{n.message}</p>
+                      <div className="text-[10px] text-slate-400 mt-2 font-medium flex items-center gap-1.5">
+                        <i className="ph ph-clock"></i>
+                        {(n.createdAt?.toDate ? n.createdAt.toDate() : new Date()).toLocaleString()}
+                      </div>
                     </div>
                   </div>
-                  {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>}
                 </div>
               ))
             )}
+          </div>
+          <div className="p-2 border-t border-slate-100 bg-slate-50/80 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Koniec powiadomień</span>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+

@@ -41,7 +41,7 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
     } else {
       doc.setFontSize(24);
       doc.setTextColor(30, 64, 175);
-      doc.text('CRIST S.A.', doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
+      doc.text('VexoNT', doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
     }
     
     doc.setFontSize(10);

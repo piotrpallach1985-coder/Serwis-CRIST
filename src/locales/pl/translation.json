@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "CRIST S.A.",
+    "title": "VexoNT",
     "subtitle": "PANEL AWARII & SERWISU",
     "section_tickets": "AWARIE UR",
     "dashboard_kpi": "Analiza Awarii (KPI)",
@@ -664,8 +664,8 @@
     "ai_stats": {
       "title": "Zużycie AI (Tokeny)",
       "desc": "Monitoruj wykorzystanie sztucznej inteligencji w Twojej firmie.",
-      "gemini_desc": "Wyszukiwanie w dokumentacjach DTR",
-      "groq_desc": "Dyktowanie i korekta zgłoszeń",
+      "gemini_desc": "DTR, korekta dyktowania i tłumaczenia",
+      "groq_desc": "Rozpoznawanie mowy (Voice-to-Text)",
       "tokens_used": "Tokenów zużyto"
     },
     "superadmin": {

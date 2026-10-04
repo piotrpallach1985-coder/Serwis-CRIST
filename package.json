@@ -1,5 +1,5 @@
 {
-    "name": "crist-awarie",
+    "name": "vexont-cmms",
     "homepage": "https://piotrpallach1985-coder.github.io/Serwis-CRIST",
     "private": true,
     "version": "1.0.0",
@@ -38,6 +38,7 @@
         "zustand": "^5.0.15"
     },
     "devDependencies": {
+        "@firebase/rules-unit-testing": "^5.0.2",
         "@playwright/test": "^1.63.0",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^14.3.1",

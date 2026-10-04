@@ -74,7 +74,7 @@ export default function Login({ onLogin, currentUser }) {
 
   const tenantId = useManagerStore(state => state.tenantId);
   const [branding, setBranding] = useState({
-    companyName: 'CRIST S.A.',
+    companyName: 'VexoNT',
     systemSubtitle: 'MAINT SYSTEM PORTAL',
     companyLogoUrl: '',
     appLogoUrl: ''
@@ -289,11 +289,11 @@ export default function Login({ onLogin, currentUser }) {
               ) : (
                 <div className="text-[#1f3f88] flex flex-col items-center">
                   <i className="ph-fill ph-hexagon text-4xl"></i>
-                  <span className="font-black text-sm mt-1 tracking-widest">CRIST</span>
+                  <span className="font-black text-sm mt-1 tracking-widest">VexoNT</span>
                 </div>
               )}
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-1">{branding?.companyName || 'CRIST S.A.'}</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-1">{branding?.companyName || 'VexoNT'}</h1>
             <h2 className="text-xs md:text-sm font-bold text-blue-600 uppercase tracking-widest mb-6">{branding?.systemSubtitle || 'DYSPOZYTORNIA UR'}</h2>
             
             <h3 className="text-lg md:text-xl font-bold text-slate-800">Wybierz moduł do pracy</h3>
@@ -382,7 +382,7 @@ export default function Login({ onLogin, currentUser }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#111827] outline-none font-medium bg-gray-50"
-                  placeholder="twój.email@crist.pl"
+                  placeholder="twój.email@VexoNT.pl"
                   required
                 />
               </div>

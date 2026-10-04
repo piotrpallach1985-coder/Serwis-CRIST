@@ -11,6 +11,7 @@ import PlannedMaintenanceCompletionModal from './PlannedMaintenanceCompletionMod
 import PlannedMaintenanceFormModal from './PlannedMaintenanceFormModal';
 import PlannedMaintenanceInfo from './PlannedMaintenanceInfo';
 import PlannedMaintenanceTimeline from './PlannedMaintenanceTimeline';
+import TicketPartUsageModal from './tickets/TicketPartUsageModal';
 
 import { USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
@@ -48,6 +49,7 @@ export default function PlannedMaintenanceDetails({
   const parts = useManagerStore(state => state.parts || []);
   
   const [partTransactions, setPartTransactions] = useState([]);
+  const [isPartUsageModalOpen, setIsPartUsageModalOpen] = useState(false);
   const [lightboxImg, setLightboxImg] = useState(null);
 
   useEffect(() => {
@@ -115,6 +117,7 @@ export default function PlannedMaintenanceDetails({
             setServiceToComplete={setServiceToComplete}
             onEdit={onEdit}
             onDelete={deletePlannedServiceAction}
+            onOpenPartModal={() => setIsPartUsageModalOpen(true)}
             canEditPlanned={canEditPlanned}
             canDeletePlanned={canDeletePlanned}
             isArchive={isArchive}
@@ -128,6 +131,17 @@ export default function PlannedMaintenanceDetails({
       </div>
 
       {/* Modals */}
+      <TicketPartUsageModal
+        isOpen={isPartUsageModalOpen}
+        onClose={() => setIsPartUsageModalOpen(false)}
+        ticketId={srv.id}
+        onPartUsed={(tx) => {
+          setPartTransactions(prev => [...prev, tx]);
+          setIsPartUsageModalOpen(false);
+          // Odswiezamy przez dodanie notatki
+          onAddFutureNote(srv.id, "Pobrano część: " + tx.partName + " x" + tx.quantity, [], () => {});
+        }}
+      />
       <PlannedMaintenanceRbgModal
         rbgUpdateModal={rbgUpdateModal}
         newRbgValue={newRbgValue}

@@ -5,13 +5,16 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase';
 import { useToast } from '../../hooks/useToast';
 import { useManagerStore } from '../../store/managerStore';
-import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
+import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, subscribeToGlobalSecrets, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
 
 import SuperAdminStats from './superadmin/SuperAdminStats';
 import SuperAdminGlobalLogo from './superadmin/SuperAdminGlobalLogo';
 import SuperAdminGlobalGroqKey from './superadmin/SuperAdminGlobalGroqKey';
 import SuperAdminTenantTable from './superadmin/SuperAdminTenantTable';
 import SuperAdminTenantModal from './superadmin/SuperAdminTenantModal';
+
+import { getDoc, setDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 export default function SuperAdminPanel({ onNavigate }) {
   const { t } = useTranslation();
@@ -30,6 +33,10 @@ export default function SuperAdminPanel({ onNavigate }) {
 
   const [globalAppLogoUrl, setGlobalAppLogoUrl] = useState('');
   const [globalGroqApiKey, setGlobalGroqApiKey] = useState('');
+  const [globalGeminiModel, setGlobalGeminiModel] = useState('gemini-2.5-flash');
+  const [globalGroqModel, setGlobalGroqModel] = useState('whisper-large-v3');
+  const [globalGeminiPrice, setGlobalGeminiPrice] = useState(0.60);
+  const [globalGroqPrice, setGlobalGroqPrice] = useState(0.40);
 
   const initialFormState = {
     id: '',
@@ -57,17 +64,26 @@ export default function SuperAdminPanel({ onNavigate }) {
   const tenantsWithTokens = tenants.map(tenantItem => ({
     ...tenantItem,
     aiTokensGemini: aiUsageMap[tenantItem.id]?.geminiTokens || 0,
-    aiTokensGroq: aiUsageMap[tenantItem.id]?.groqTokens || 0
+      aiCostGemini: aiUsageMap[tenantItem.id]?.geminiCost,
+      aiCostGroq: aiUsageMap[tenantItem.id]?.groqCost,
+    aiTokensGroq: aiUsageMap[tenantItem.id]?.groqTokens || 0,
+    whisperSeconds: aiUsageMap[tenantItem.id]?.whisperSeconds || 0
   }));
 
   const totalGeminiTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGemini || 0), 0);
+  const totalGeminiCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGemini !== undefined ? t.aiCostGemini : ((t.aiTokensGemini || 0) / 1000000) * globalGeminiPrice), 0);
+  const totalGroqCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGroq !== undefined ? t.aiCostGroq : ((t.whisperSeconds || 0) / 60) * globalGroqPrice), 0);
   const totalGroqTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGroq || 0), 0);
+  const totalWhisperSeconds = tenantsWithTokens.reduce((sum, t) => sum + (t.whisperSeconds || 0), 0);
 
   useEffect(() => {
     if (user?.role !== 'superadmin') return;
 
     const unsub = subscribeToTenants((snapshot) => {
-      setTenants(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const filteredTenants = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(t => t.id !== '_global_settings_' && t.id !== '_global_secrets_');
+      setTenants(filteredTenants);
       setLoading(false);
     }, (err) => {
       console.error("SuperAdmin error:", err);
@@ -78,16 +94,60 @@ export default function SuperAdminPanel({ onNavigate }) {
     const unsubGlobal = subscribeToGlobalSettings((docSnap) => {
       if (docSnap.exists()) {
         setGlobalAppLogoUrl(docSnap.data().appLogoUrl || '');
+      }
+    });
+
+    const unsubSecrets = subscribeToGlobalSecrets((docSnap) => {
+      if (docSnap.exists()) {
         setGlobalGroqApiKey(docSnap.data().groqApiKey || '');
-      }}, (err) => { console.debug("SA onSnapshot err:", err.code); });
+        setGlobalGroqModel(docSnap.data().groqModel || 'whisper-large-v3');
+        setGlobalGeminiModel(docSnap.data().geminiModel || 'gemini-2.5-flash');
+        if (docSnap.data().geminiPrice !== undefined) setGlobalGeminiPrice(docSnap.data().geminiPrice);
+        if (docSnap.data().groqPrice !== undefined) setGlobalGroqPrice(docSnap.data().groqPrice);
+      }
+    });
 
     return () => { unsub(); unsubGlobal(); };
   }, [user]);
 
+  // MIGRATION: Initialize missing costs
+  useEffect(() => {
+    const runMigration = async () => {
+      try {
+        for (const t of tenants) {
+          if (t.id === '_global_settings_') continue;
+          const snap = await getDoc(doc(db, 'tenants', t.id, 'stats', 'ai_usage'));
+          if (snap.exists()) {
+            const data = snap.data();
+            let updates = {};
+            if (data.geminiTokens > 0 && data.geminiCost === undefined) {
+              updates.geminiCost = (data.geminiTokens / 1000000) * globalGeminiPrice;
+            }
+            if (data.groqTokens > 0 && data.whisperSeconds === undefined) {
+                updates.whisperSeconds = Math.ceil(data.groqTokens * 0.26); // roughly 13500 tokens = 3600s => 1 token = 0.26s
+              }
+              if (data.groqTokens > 0 && data.groqCost === undefined) {
+              updates.groqCost = (data.groqTokens / 1000000) * globalGroqPrice;
+            }
+            if (Object.keys(updates).length > 0) {
+              await setDoc(doc(db, 'tenants', t.id, 'stats', 'ai_usage'), updates, { merge: true });
+              console.log(`Migrated ${t.id}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Migration err:", err);
+      }
+    };
+    if (tenants.length > 0) {
+      runMigration();
+    }
+  }, [tenants, globalGeminiPrice, globalGroqPrice]);
+
   const saveGlobalGroqApiKey = async (e) => {
     if(e) e.preventDefault();
     try {
-      await saveGlobalKey(globalGroqApiKey);
+      await saveGlobalKey(globalGroqApiKey, globalGroqModel, globalGeminiPrice, globalGroqPrice, globalGeminiModel);
       showToast('Globalny klucz AI został zapisany.', 'success');
     } catch (err) {
       showToast('Błąd zapisywania klucza: ' + err.message, 'error');
@@ -127,7 +187,7 @@ export default function SuperAdminPanel({ onNavigate }) {
     if (!file) return;
     setUploadingLogo(true);
     const base64Data = await compressImageToBase64(file);
-    const storageRef = ref(storage, 'branding/' + formData.id + '_' + Date.now() + '_' + file.name);
+    const storageRef = ref(storage, `tenants/${formData.id}/branding/${Date.now()}_${file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on('state_changed', 
@@ -240,18 +300,33 @@ export default function SuperAdminPanel({ onNavigate }) {
           openNewModal={openNewModal}
           openEditModal={openEditModal}
           handleDelete={handleDelete}
+          globalGeminiPrice={globalGeminiPrice}
+          globalGroqPrice={globalGroqPrice}
         />
 
         <SuperAdminStats 
           totalGeminiTokens={totalGeminiTokens} 
-          totalGroqTokens={totalGroqTokens} 
+          totalGroqTokens={totalGroqTokens}
+            totalWhisperSeconds={totalWhisperSeconds}
+          totalGeminiCost={totalGeminiCost}
+          totalGroqCost={totalGroqCost}
+          globalGeminiPrice={globalGeminiPrice}
+          globalGroqPrice={globalGroqPrice} 
         />
 
         <SuperAdminGlobalGroqKey
-          globalGroqApiKey={globalGroqApiKey}
-          setGlobalGroqApiKey={setGlobalGroqApiKey}
-          saveGlobalGroqApiKey={saveGlobalGroqApiKey}
-        />
+            globalGroqApiKey={globalGroqApiKey}
+            setGlobalGroqApiKey={setGlobalGroqApiKey}
+            saveGlobalGroqApiKey={saveGlobalGroqApiKey}
+            globalGroqModel={globalGroqModel}
+            setGlobalGroqModel={setGlobalGroqModel}
+            globalGeminiPrice={globalGeminiPrice}
+            setGlobalGeminiPrice={setGlobalGeminiPrice}
+            globalGroqPrice={globalGroqPrice}
+            setGlobalGroqPrice={setGlobalGroqPrice}
+            globalGeminiModel={globalGeminiModel}
+            setGlobalGeminiModel={setGlobalGeminiModel}
+          />
 
       </div>
 

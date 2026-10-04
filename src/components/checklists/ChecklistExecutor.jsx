@@ -1,3 +1,4 @@
+import { getCurrentTenant } from '../../utils/tenantHelper';
 import React, { useState, useEffect } from 'react';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -66,7 +67,7 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
       for (let i = 0; i < files.length; i++) {
         const compressedFile = await compressImage(files[i], 2);
         const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const storageRef = ref(storage, `checklists/${Date.now()}_${safeName}`);
+        const storageRef = ref(storage, `tenants/${getCurrentTenant()}/checklists/${Date.now()}_${safeName}`);
         await uploadBytes(storageRef, compressedFile);
         const photoUrl = await getDownloadURL(storageRef);
         newUrls.push(photoUrl);
@@ -100,7 +101,7 @@ export default function ChecklistExecutor({ steps, onComplete, initialResponses 
     try {
       const compressedFile = await compressImage(file);
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storageRef = ref(storage, `checklists/${Date.now()}_${safeName}`);
+      const storageRef = ref(storage, `tenants/${getCurrentTenant()}/checklists/${Date.now()}_${safeName}`);
       await uploadBytes(storageRef, compressedFile);
       const photoUrl = await getDownloadURL(storageRef);
       updateValue(stepId, photoUrl);

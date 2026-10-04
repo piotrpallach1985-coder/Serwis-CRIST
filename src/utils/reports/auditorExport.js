@@ -142,7 +142,7 @@ export const generateAuditorReport = async (tenantId) => {
       XLSX.utils.book_append_sheet(wb, wsMachines, "Maszyny");
     }
 
-    XLSX.writeFile(wb, `Raport_Audytorski_CRIST_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Raport_Audytorski_VexoNT_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     return true;
   } catch (error) {

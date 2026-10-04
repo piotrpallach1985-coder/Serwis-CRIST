@@ -24,14 +24,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     }
   }, []);
 
-  useEffect(() => {
-    const unsubGlobal = onSnapshot(doc(db, 'tenant_registry', '_global_settings_'), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().groqApiKey) {
-        useManagerStore.getState().setGroqApiKey(docSnap.data().groqApiKey);
-      }
-    });
-    return () => unsubGlobal();
-  }, []);
+  
   const tenantId = getCurrentTenant();
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);

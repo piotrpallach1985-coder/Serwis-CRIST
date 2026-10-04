@@ -5,7 +5,7 @@ import { logAudit } from './audit.service';
 
 export const updateTicket = async (ticketId, updateData) => {
   const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'tickets', ticketId), updateData);
-  logAudit('UPDATE', 'TICKET', ticketId, 'Zaktualizowano zgłoszenie');
+  logAudit('UPDATE', 'TICKET', ticketId, updateData);
   return res;
 };
 
@@ -62,7 +62,7 @@ export const addActionItem = async (data) => {
 
 export const updateActionItem = async (id, data) => {
   const p = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'action_items', id), data);
-  logAudit('UPDATE', 'ACTION_ITEM', id, 'Zaktualizowano temat do realizacji');
+  logAudit('UPDATE', 'ACTION_ITEM', id, data);
   return p;
 };
 

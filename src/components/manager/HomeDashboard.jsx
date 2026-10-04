@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import QRScannerModal from '../shared/QRScannerModal';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { checkServiceUrgency } from '../../utils/logicHelpers';
 import { TICKET_STATUS } from '../../utils/constants';
 
 export default function HomeDashboard({ onLogout }) {
@@ -64,9 +65,9 @@ export default function HomeDashboard({ onLogout }) {
   const criticalTicketsCount = tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length;
   const overdueServicesCount = plannedServices.filter(s => {
     if (s.status === 'completed' || s.status === 'in_progress') return false;
-    if (!s.nextDate) return false;
-    const nDate = safeParseDate(s.nextDate);
-    return nDate && nDate < new Date();
+    const machine = machines.find(m => m.id === s.machineId);
+    const { isOverdue } = checkServiceUrgency(s, machine, plannedWarningDays);
+    return isOverdue;
   }).length;
 
   const canAccessCompanyAdmin = isAdmin || canManageUsers || canManageRoles || canViewReports;
@@ -132,12 +133,12 @@ export default function HomeDashboard({ onLogout }) {
               ) : (
                 <div className="flex flex-col items-center">
                   <i className="ph-fill ph-hexagon text-3xl sm:text-5xl"></i>
-                  <span className="font-black text-[10px] sm:text-sm mt-1 tracking-widest">CRIST</span>
+                  <span className="font-black text-[10px] sm:text-sm mt-1 tracking-widest">VexoNT</span>
                 </div>
               )}
             </div>
             <h1 className="font-black text-xl sm:text-3xl leading-tight tracking-wide text-slate-900 mb-6 sm:mb-8">
-              {branding?.companyName || 'CRIST S.A.'}
+              {branding?.companyName || 'VexoNT'}
             </h1>
             
             
@@ -219,3 +220,4 @@ export default function HomeDashboard({ onLogout }) {
     </div>
   );
 }
+

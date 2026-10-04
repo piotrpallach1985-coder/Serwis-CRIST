@@ -12,7 +12,7 @@ export const addPart = async (tenantId, payload) => {
 };
 
 export const updatePart = async (tenantId, partId, payload) => {
-  logAudit('UPDATE', 'PART', partId, 'Zaktualizowano część');
+  logAudit('UPDATE', 'PART', partId, payload);
   payload.updatedAt = serverTimestamp();
   const ref = doc(db, 'tenants', tenantId, 'parts', partId);
   return await updateDoc(ref, payload);

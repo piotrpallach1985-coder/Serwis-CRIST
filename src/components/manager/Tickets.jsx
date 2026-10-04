@@ -22,18 +22,12 @@ import { safe } from "../../utils/safeRender";
 import { useToast } from '../../hooks/useToast';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { TICKET_STATUS } from '../../utils/constants';
+import { getTicketStatusConfig } from '../../utils/statusConfigs';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useTranslation } from 'react-i18next';
 
 
-const STATUSES = (t) => ({
-  1: { label: t('tickets.statuses.status_1'), color: 'bg-red-100 text-red-800 border-red-200' },
-  'new': { label: t('tickets.statuses.status_1'), color: 'bg-red-100 text-red-800 border-red-200' },
-  2: { label: t('tickets.statuses.status_2'), color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  3: { label: t('tickets.statuses.status_3'), color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  4: { label: t('tickets.statuses.status_4'), color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  5: { label: t('tickets.statuses.status_5'), color: 'bg-green-100 text-green-800 border-green-200' }
-});
+const STATUSES = (t) => getTicketStatusConfig(t);
 
 const calculateDuration = (createdAt, closedAt, t) => {
   const start = safeParseDate(createdAt);
@@ -171,7 +165,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   };
 
   useEffect(() => {
-    if (selectedTicketId) window.history.pushState({ ...window.history.state, internalDetails: true }, '');
+    if (selectedTicketId && selectedTicketId !== initialTicketId) { window.history.pushState({ ...window.history.state, internalDetails: true }, ''); }
   }, [selectedTicketId]);
 
   useEffect(() => {
@@ -343,3 +337,4 @@ Tickets.propTypes = {
   initialSearchQuery: PropTypes.string,
   onClearSearchQuery: PropTypes.func,
 };
+

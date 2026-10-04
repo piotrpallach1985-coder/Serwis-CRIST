@@ -71,6 +71,18 @@ function ManagerViewInner() {
   const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
   const branding = useManagerStore(state => state.branding);
   const partTransactions = useManagerStore(state => state.partTransactions || []);
+  const [hasCheckedServices, setHasCheckedServices] = useState(false);
+
+  useEffect(() => {
+    if (machines && machines.length > 0 && !hasCheckedServices) {
+      setHasCheckedServices(true);
+      const machinesMap = machines.reduce((acc, m) => {
+        acc[m.id] = m;
+        return acc;
+      }, {});
+      // checkAndTriggerDueServices(machinesMap).catch(err => console.error('Błąd triggera PM:', err));
+    }
+  }, [machines, hasCheckedServices]);
 
   useEffect(() => {
     const fixLegacyParts = async () => {
@@ -191,63 +203,7 @@ function ManagerViewInner() {
 
         <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
 
-          {/* ZAKŁADKI POZIOME DLA AWARII */}
-          {['kpi', 'dashboard_tickets', 'tickets', 'archive'].includes(activeTab) && (
-            <div className="lg:hidden sticky top-0 z-20 -mx-2 sm:-mx-4 px-2 sm:px-4 pb-2 bg-gray-50/90 backdrop-blur shadow-sm border-b border-gray-200 mb-4 pt-1">
-              <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                {[
-                  { id: 'kpi', label: 'KPI', icon: 'ph-chart-line-up' },
-                  { id: 'dashboard_tickets', label: 'Mapa', icon: 'ph-map-pin' },
-                  { id: 'tickets', label: 'Lista', icon: 'ph-list-dashes' },
-                  { id: 'archive', label: 'Archiwum', icon: 'ph-archive' }
-                ].map(tabItem => (
-                  <button
-                    key={tabItem.id}
-                    onClick={() => handleNavigate('ur', tabItem.id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
-                      activeTab === tabItem.id
-                        ? 'bg-red-600 text-white'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <i className={`ph ${tabItem.icon} text-lg`}></i>
-                    {tabItem.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ZAKŁADKI POZIOME DLA SERWISÓW PLANOWANYCH */}
-          {['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'action_items', 'archive_planned'].includes(activeTab) && (
-            <div className="lg:hidden sticky top-0 z-20 -mx-2 sm:-mx-4 px-2 sm:px-4 pb-2 bg-gray-50/90 backdrop-blur shadow-sm border-b border-gray-200 mb-4 pt-1">
-              <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                {[
-                  { id: 'planned_kpi', label: 'KPI', icon: 'ph-chart-line-up' },
-                  { id: 'dashboard_planned', label: 'Mapa', icon: 'ph-map-pin' },
-                  { id: 'planned_maintenance', label: 'Lista', icon: 'ph-calendar-check' },
-                  { id: 'action_items', label: 'Zadania', icon: 'ph-check-square' },
-                  { id: 'archive_planned', label: 'Archiwum', icon: 'ph-archive' }
-                ].map(tabItem => (
-                  <button
-                    key={tabItem.id}
-                    onClick={() => handleNavigate('ur', tabItem.id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-200 shadow-sm ${
-                      activeTab === tabItem.id
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <i className={`ph ${tabItem.icon} text-lg`}></i>
-                    {tabItem.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-
-          {/* Moduł: Awarie - mapa */}
+                    {/* Moduł: Awarie - mapa */}
           {activeTab === 'dashboard_tickets' && (
             <MapComponent
               modeType="tickets" onNavigateToTickets={(navData) => { 

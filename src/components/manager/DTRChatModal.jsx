@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
-import { app, db } from '../../firebase';
+import { app, db, functions } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, increment } from 'firebase/firestore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import DictationButton from '../shared/DictationButton';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function DTRChatModal({ isOpen, onClose, document, allDocuments, machineName }) {
+  const geminiPrice = useManagerStore(state => state.geminiPrice) || 0.60;
+  const geminiModel = useManagerStore(state => state.geminiModel) || 'gemini-2.5-flash';
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -67,7 +71,7 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
     try {
       const vertexAI = getVertexAI(app);
       const model = getGenerativeModel(vertexAI, { 
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         systemInstruction: "Jesteś eksperckim asystentem technicznym dla mechaników. Opieraj swoje odpowiedzi wyłącznie na załączonych dokumentach PDF. Zawsze podawaj nazwę dokumentu i numer strony, z której wziąłeś informację, jeśli to możliwe. Bądź zwięzły i konkretny, mechanik stoi przy maszynie i nie ma czasu czytać elaboratów."
       });
 
@@ -92,13 +96,16 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
       setMessages(prev => [...prev, { role: 'model', text: responseText }]);
 
       // Log AI Usage
-      const geminiTokens = response.response.usageMetadata?.totalTokenCount || 0;
+      let geminiTokens = response.response.usageMetadata?.totalTokenCount || 0;
+      if (geminiTokens === 0) {
+        // Fallback estimation if Vertex API omits metadata
+        geminiTokens = (docsToAnalyze.length * 1500) + Math.ceil(chatHistoryText.length / 4) + Math.ceil(responseText.length / 4);
+      }
       if (geminiTokens > 0) {
         const tenantId = getCurrentTenant();
         if (tenantId) {
-          setDoc(doc(db, 'tenants', tenantId, 'stats', 'ai_usage'), {
-            geminiTokens: increment(geminiTokens)
-          }, { merge: true }).catch(err => console.error('Token tracking error:', err));
+          const logAIUsage = httpsCallable(functions, 'logAIUsage');
+            logAIUsage({ tenantId, geminiTokens }).catch(err => console.error('Cloud Function token tracking error:', err));
         }
       }
 

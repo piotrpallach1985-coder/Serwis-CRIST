@@ -6,7 +6,9 @@ export default function SuperAdminTenantTable({
   loading,
   openNewModal,
   openEditModal,
-  handleDelete
+  handleDelete,
+  globalGeminiPrice = 0.60,
+  globalGroqPrice = 0.40
 }) {
   return (
     <>
@@ -78,7 +80,12 @@ export default function SuperAdminTenantTable({
                         </div>
                         <div className="flex items-center gap-1 text-slate-600">
                           <i className="ph ph-microphone-stage text-orange-500"></i>
-                          <span className="font-mono">{tenant.aiTokensGroq?.toLocaleString('pl-PL') || 0}</span>
+                          <div className="flex flex-col items-center">
+                            <span className="font-mono text-xs">W: {tenant.whisperSeconds ? (tenant.whisperSeconds / 60).toFixed(1) + 'm' : '0m'} / G: {tenant.aiTokensGemini?.toLocaleString('pl-PL') || 0}</span>
+                            <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full mt-1">
+                              ~ {((tenant.aiCostGroq !== undefined ? tenant.aiCostGroq : ((tenant.whisperSeconds || 0) / 60) * globalGroqPrice) + (tenant.aiCostGemini !== undefined ? tenant.aiCostGemini : ((tenant.aiTokensGemini || 0) / 1000000) * globalGeminiPrice)).toFixed(2)} PLN
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>

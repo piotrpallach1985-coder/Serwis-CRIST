@@ -1,9 +1,11 @@
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import DataTable from '../../shared/DataTable';
+import { usePagination } from '../../../hooks/usePagination';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useManagerStore } from '../../../store/managerStore';
+import { checkInventoryStatus } from '../../../utils/logicHelpers';
 import PartForm from './PartForm';
 import PartDetails from './PartDetails';
 import QRScannerModal from '../../shared/QRScannerModal';
@@ -68,6 +70,8 @@ export default function PartsList({ }) {
       return true;
     });
   }, [partsWithStats, filter, searchQuery]);
+
+  const { currentItems, hasMore, loadMore } = usePagination(filteredParts, 50, [searchQuery, filter]);
 
   const handleScan = (text) => {
     try {
@@ -166,14 +170,13 @@ export default function PartsList({ }) {
                       <div className="w-full">
               {/* WIDOK Z DATATABLE */}
               <DataTable 
-                data={filteredParts}
+                data={currentItems}
                 columns={[
                   {
                     header: t('parts.table.name_code'),
                     accessor: 'name',
                     render: (part) => {
-                      const isOut = part.available <= 0;
-                      const isLow = part.available <= (part.minStock || 0) && !isOut;
+                      const { isOut, isLow } = checkInventoryStatus(part);
                       return (
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 shadow-sm ${isOut ? 'bg-red-50 text-red-500' : isLow ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'}`}>
@@ -197,14 +200,20 @@ export default function PartsList({ }) {
                     accessor: 'available',
                     align: 'center',
                     render: (part) => {
-                      const isOut = part.available <= 0;
-                      const isLow = part.available <= (part.minStock || 0) && !isOut;
+                      const { isOut, isLow } = checkInventoryStatus(part);
                       return (
-                        <div className={`inline-flex items-baseline gap-1 px-2.5 py-1 rounded-lg ${isOut ? 'bg-red-50 text-red-700' : isLow ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                          <span className="text-sm font-black">{part.available}</span>
-                          <span className="text-[9px] font-bold uppercase opacity-70">{part.unit || 'szt.'}</span>
-                        </div>
-                      );
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className={`inline-flex items-baseline gap-1 px-2.5 py-1 rounded-lg ${isOut ? 'bg-red-50 text-red-700' : isLow ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                              <span className="text-sm font-black">{part.available}</span>
+                              <span className="text-[9px] font-bold uppercase opacity-70">{part.unit || 'szt.'}</span>
+                            </div>
+                            {Number(part.minStock) > 0 && (
+                              <div className={`text-[10px] font-bold flex items-center gap-1 ${isLow || isOut ? 'text-orange-600' : 'text-slate-400'}`}>
+                                Min: {part.minStock} {(isLow || isOut) && <i className="ph-fill ph-warning-circle animate-pulse"></i>}
+                              </div>
+                            )}
+                          </div>
+                        );
                     }
                   },
                   {
@@ -224,8 +233,7 @@ export default function PartsList({ }) {
                 rowClassName={() => 'group'}
                 onRowClick={(part) => setSelectedPartId(part.id)}
                 renderMobileCard={(part) => {
-                  const isOut = part.available <= 0;
-                  const isLow = part.available <= (part.minStock || 0) && !isOut;
+                  const { isOut, isLow } = checkInventoryStatus(part);
                   return (
                     <div 
                       key={part.id} 
@@ -248,8 +256,13 @@ export default function PartsList({ }) {
                         <div>
                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('parts.table.available')}</div>
                           <div className={`text-lg font-black ${isOut ? 'text-red-600' : isLow ? 'text-orange-500' : 'text-emerald-600'}`}>
-                            {part.available} <span className="text-xs font-semibold text-slate-400 ml-0.5">{part.unit || 'szt.'}</span>
-                          </div>
+                              {part.available} <span className="text-xs font-semibold text-slate-400 ml-0.5">{part.unit || 'szt.'}</span>
+                            </div>
+                            {Number(part.minStock) > 0 && (
+                              <div className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${isLow || isOut ? 'text-orange-600' : 'text-slate-400'}`}>
+                                Min: {part.minStock} {(isLow || isOut) && <i className="ph-fill ph-warning-circle animate-pulse"></i>}
+                              </div>
+                            )}
                         </div>
                         <div>
                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('parts.table.location')}</div>
@@ -259,8 +272,13 @@ export default function PartsList({ }) {
                     </div>
                   );
                 }}
-              />
-            </div>
+                />
+                {hasMore && (
+                  <div className="p-4 flex justify-center border-t border-slate-100">
+                    <button onClick={loadMore} className="px-6 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors">{t('tickets.table.load_more', 'Wczytaj wiêcej')}</button>
+                  </div>
+                )}
+              </div>
         )}
       </div>
 
@@ -282,3 +300,5 @@ export default function PartsList({ }) {
     </div>
   );
 }
+
+

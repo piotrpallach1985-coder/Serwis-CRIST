@@ -8,7 +8,19 @@ export default defineConfig({
   },
   base: './',
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ['**/e2e/**', '**/node_modules/**', '**/functions/**'] },
-  build: { sourcemap: true, emptyOutDir: false }, 
+  build: { 
+      sourcemap: true, 
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/functions', 'firebase/messaging'],
+            'ui-vendor': ['recharts', 'lucide-react']
+          }
+        }
+      }
+    }, 
   esbuild: {
     drop: ['console', 'debugger'],
   },
@@ -18,14 +30,14 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'CRIST S.A. System Awarii',
-        short_name: 'CRIST Awarie',
-        description: 'System zarzadzania awariami i serwisem dla CRIST S.A.',
+        name: 'VexoNT System Utrzymania Ruchu',
+        short_name: 'VexoNT',
+        description: 'System zarzadzania awariami i serwisem VexoNT',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
-        scope: '/Serwis-CRIST/',
-        start_url: '/Serwis-CRIST/?source=pwa',
+        scope: '/',
+        start_url: '/?source=pwa',
         icons: [
           {
             src: 'pwa-192x192.jpg',
