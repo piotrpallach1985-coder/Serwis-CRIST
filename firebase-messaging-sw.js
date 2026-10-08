@@ -3,10 +3,10 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 
 firebase.initializeApp({
   apiKey: "AIzaSyDhaAwJbcDNRp5wloQFweluHdAvbCiZ82U",
-  authDomain: "serwis-crist.firebaseapp.com",
-  databaseURL: "https://serwis-crist-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "serwis-crist",
-  storageBucket: "serwis-crist.firebasestorage.app",
+  authDomain: "serwis-VexoNT.firebaseapp.com",
+  databaseURL: "https://serwis-VexoNT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "serwis-VexoNT",
+  storageBucket: "serwis-VexoNT.firebasestorage.app",
   messagingSenderId: "321327519677",
   appId: "1:321327519677:web:107294ad94ad3eb45664d4"
 });
@@ -16,7 +16,7 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  const notificationTitle = payload.notification?.title || 'System Awarii CRIST';
+  const notificationTitle = payload.notification?.title || 'System Awarii VexoNT';
   const notificationOptions = {
     body: payload.notification?.body,
     icon: '/pwa-192x192.png',
