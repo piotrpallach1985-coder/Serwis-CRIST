@@ -30,6 +30,10 @@ vi.mock('../../hooks/useTicketSubmit', () => {
   };
 });
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { name: 'Jan Kowalski', phone: '111222333' } })
+}));
+
 describe('OperatorForm (Integration Test)', () => {
   const mockProps = {
     selectedMachine: { id: 'M1', name: 'Suwnica S1', regionId: 'R1' },
@@ -40,7 +44,8 @@ describe('OperatorForm (Integration Test)', () => {
     isOnline: true,
     topicsList: [],
     reportersList: [],
-    stopLiveScanner: vi.fn()
+    stopLiveScanner: vi.fn(),
+    isInternal: false // Test anonymous flow
   };
   
   let submitTicketMock;
@@ -64,20 +69,15 @@ describe('OperatorForm (Integration Test)', () => {
     const { container } = render(<OperatorForm {...mockProps} />);
     
     // Fill out form
-    fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'Test description' } });
-    fireEvent.change(screen.getByPlaceholderText(/np. Jan Kowalski/i), { target: { value: 'Jan Kowalski' } });
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Test description' } });
     fireEvent.change(screen.getByPlaceholderText(/np. 500 600 700/i), { target: { value: '500 600 700' } });
     
     const select = container.querySelector('select');
     fireEvent.change(select, { target: { value: 'manual' } });
     
-    fireEvent.change(screen.getByPlaceholderText(/Wpisz własny temat.../i), { target: { value: 'My custom topic' } });
-    
-    // Toggle RODO directly via change event, although not strictly needed if we test the hook call
-    const rodoCheckbox = container.querySelector('#rodo');
-    fireEvent.click(rodoCheckbox);
+    fireEvent.change(screen.getByPlaceholderText(/Wpisz w.asny temat.../i), { target: { value: 'My custom topic' } });
 
-    const form = screen.getByRole('button', { name: /Wyślij zgłoszenie/i }).closest('form');
+    const form = screen.getByRole('button', { name: /Wy.lij zg.oszenie/i }).closest('form');
     
     // Override the submit event to test our logic
     fireEvent.submit(form);

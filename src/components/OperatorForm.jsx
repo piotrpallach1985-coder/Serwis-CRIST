@@ -19,7 +19,8 @@ export default function OperatorForm({
   isOnline,
   topicsList,
   reportersList,
-  stopLiveScanner
+  stopLiveScanner,
+  isInternal
 }) {
   const branding = useManagerStore(state => state.branding);
   const storeTenantId = useManagerStore(state => state.tenantId);
@@ -42,7 +43,7 @@ export default function OperatorForm({
     toastConfig, hideToast,
     submitLoading, submitProgress,
     handleSubmit, handleFilesSelected
-  } = useOperatorForm({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline });
+  } = useOperatorForm({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline, isInternal });
 
   return (
     <div className="flex flex-col gap-4">
@@ -75,10 +76,10 @@ export default function OperatorForm({
       list="manual-machine-list"
     />
     <datalist id="manual-machine-list">
-      {machines?.map(m => (
-        <option key={m.id} value={m.name} />
-      ))}
-    </datalist>
+        {isInternal && machines?.map(m => (
+          <option key={m.id} value={m.name} />
+        ))}
+      </datalist>
                           <select
                             value={selectedMachine.regionId || ''}
                             onChange={(e) => setSelectedMachine({...selectedMachine, regionId: e.target.value})}
@@ -97,14 +98,14 @@ export default function OperatorForm({
                   
                   {/* Prawa strona: Przycisk Inna Maszyna / Powrót */}
                   <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto mt-3 sm:mt-0">
-                    {selectedMachine.id !== 'manual' && (
+                    {selectedMachine.id !== "manual" && (
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedMachine({ 
-                            id: 'manual', 
-                            name: '', 
-                            regionId: selectedMachine.regionId || '' 
+                            id: "manual", 
+                            name: "", 
+                            regionId: selectedMachine.regionId || "" 
                           });
                         }}
                         className="flex items-center justify-center gap-2 text-sm text-yellow-900 bg-yellow-400 hover:bg-yellow-300 border-2 border-yellow-500 font-bold px-6 py-2.5 rounded-xl transition-colors shadow-sm w-full sm:w-auto whitespace-nowrap"
@@ -114,10 +115,11 @@ export default function OperatorForm({
                       </button>
                     )}
                     
+                    
                     <button 
                         type="button"
                         onClick={() => {
-                          stopLiveScanner();
+                          if(stopLiveScanner) stopLiveScanner();
                           setSelectedMachine(null);
                           handleStepChange('scan');
                         }} 
@@ -165,65 +167,38 @@ export default function OperatorForm({
             )}
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-gray-100 pb-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">
-                    Imię i Nazwisko Zgłaszającego <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    list="reporters-list"
-                    value={reporterName}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setReporterName(val);
-                      const found = reportersList.find(r => r.name.toLowerCase() === val.toLowerCase());
-                      if (found) {
-                        setReporterPhone(found.phone);
-                      }
-                    }}
-                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none"
-                    placeholder="np. Jan Kowalski"
-                    required
-                  />
-                  <datalist id="reporters-list">
-                    {reportersList.map(r => (
-                      <option key={r.id} value={r.name} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">
-                    Numer Telefonu <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={reporterPhone}
-                    onChange={e => {
-                      let val = e.target.value.replace(/\D/g, '').slice(0, 9);
-                      let formatted = val;
-                      if (val.length > 3 && val.length <= 6) {
-                        formatted = `${val.slice(0, 3)} ${val.slice(3)}`;
-                      } else if (val.length > 6) {
-                        formatted = `${val.slice(0, 3)} ${val.slice(3, 6)} ${val.slice(6)}`;
-                      }
-                      setReporterPhone(formatted);
-                    }}
-                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none"
-                    placeholder="np. 500 600 700"
-                    pattern="[0-9]{3} [0-9]{3} [0-9]{3}"
-                    minLength={11}
-                    maxLength={11}
-                    required
-                  />
-                </div>
+              {!isInternal && (
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Numer telefonu (Opcjonalnie)
+                </label>
+                <input
+                  type="tel"
+                  value={reporterPhone}
+                  onChange={e => {
+                    let val = e.target.value.replace(/\D/g, '');
+                    let formatted = val;
+                    if (val.length > 3 && val.length <= 6) {
+                      formatted = `${val.slice(0, 3)} ${val.slice(3)}`;
+                    } else if (val.length > 6) {
+                      formatted = `${val.slice(0, 3)} ${val.slice(3, 6)} ${val.slice(6)}`;
+                    }
+                    setReporterPhone(formatted);
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none"
+                  placeholder="np. 500 600 700"
+                  pattern="[0-9]{3} [0-9]{3} [0-9]{3}"
+                  minLength={11}
+                  maxLength={11}
+                />
               </div>
+            )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Co się stało? (Temat)</label>
                 {topicMode === 'select' ? (
                   <select
-                    value={topicsList.includes(topic) ? topic : ''}
+                    value={(topicsList || []).includes(topic) ? topic : ''}
                     onChange={(e) => {
                       if (e.target.value === 'manual') {
                         setTopicMode('manual');
@@ -238,7 +213,7 @@ export default function OperatorForm({
                     <option value="" disabled>Wybierz z podpowiedzi...</option>
                     
                       <option value="manual" className="font-bold text-blue-900">+ Wpisz własny temat...</option>
-                    {topicsList.map((topicItem, i) => <option key={i} value={topicItem}>{topicItem}</option>)}
+                    {(topicsList || []).map((topicItem, i) => <option key={i} value={topicItem}>{topicItem}</option>)}
                   </select>
                 ) : (
                   <div className="flex gap-2">
@@ -325,24 +300,7 @@ export default function OperatorForm({
               </div>
 
               
-              {/* Sekcja Antyspam + RODO */}
-              <div className="mt-8 mb-6 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div className="flex items-start gap-3 mt-4">
-                  <div className="flex items-center h-5">
-                    <input
-                      id="rodo"
-                      type="checkbox"
-                      checked={acceptedRodo}
-                      onChange={(e) => setAcceptedRodo(e.target.checked)}
-                      className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <label htmlFor="rodo" className="text-xs text-gray-500 leading-tight">
-                    Akceptuję Politykę Prywatności. Wyrażam zgodę na przetwarzanie mojego numeru telefonu i imienia w celu obsługi zgłoszenia serwisowego przez aplikację VexoNT. <span className="text-red-500">*</span>
-                  </label>
-                </div>
-              </div>
+              
   <button 
                 type="submit" 
                 disabled={loading || submitLoading} 

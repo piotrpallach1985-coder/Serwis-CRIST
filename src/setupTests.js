@@ -6,3 +6,12 @@ vi.mock('firebase/messaging', () => ({
   onMessage: vi.fn(),
   getToken: vi.fn()
 }));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key) => key,
+    i18n: {
+      changeLanguage: () => new Promise(() => {}),
+    },
+  }),
+}));

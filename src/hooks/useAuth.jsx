@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }) => {
                 name: userData.name || firebaseUser.email,
                 role: userData.role || 'brak',
                 permissions: userData.permissions || [],
+                phone: userData.phone || "",
                 tenantId: tId
               });
             } else {

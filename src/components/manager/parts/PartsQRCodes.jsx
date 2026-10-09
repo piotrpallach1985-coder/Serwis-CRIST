@@ -172,7 +172,7 @@ export default function PartsQRCodes() {
                   {part.location && (
                     <div className="text-[10px] bg-slate-100 px-2 py-0.5 rounded mt-2 font-bold print:bg-white print:border print:border-slate-200">{part.location}</div>
                   )}
-                  <div className="text-[9px] text-slate-400 font-semibold mt-2 print:text-slate-500">{t('parts.qr.edited')} {safeParseDate(part.updatedAt || part.createdAt)?.toLocaleDateString('pl-PL') || '-'}</div>
+                  <div className="text-[9px] text-slate-400 font-semibold mt-2 print:text-slate-500">{t('parts.qr.edited')} {safeParseDate(part.createdAt)?.toLocaleDateString('pl-PL') || '-'}</div>
                 </div>
               );
             })}
@@ -196,3 +196,4 @@ export default function PartsQRCodes() {
     </div>
   );
 }
+

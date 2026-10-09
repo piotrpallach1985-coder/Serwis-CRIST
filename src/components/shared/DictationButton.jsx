@@ -4,7 +4,7 @@ import { functions, app } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useTranslation } from 'react-i18next';
-import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
+
 
 export default function DictationButton({ onResult, onStart, className = '', mode = 'text' }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -15,9 +15,9 @@ export default function DictationButton({ onResult, onStart, className = '', mod
   const recordingStartTimeRef = useRef(null);
 
   const { i18n } = useTranslation();
-  const groqModel = useManagerStore(state => state.groqModel);
-  const geminiModel = useManagerStore(state => state.geminiModel) || 'gemini-2.5-flash';
-  const modelName = groqModel || 'whisper-large-v3';
+  const transcribeModel = useManagerStore(state => state.transcribeModel);
+  const geminiModel = useManagerStore(state => state.geminiModel) || 'gemini-3.8-flash';
+  const modelName = transcribeModel || "gemini-3.5-transcribe";
 
   const startRecording = async (e) => {
     e.preventDefault();
@@ -38,13 +38,14 @@ export default function DictationButton({ onResult, onStart, className = '', mod
         const mimeType = mediaRecorder.mimeType || 'audio/webm';
         const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+          if (audioBlob.size < 100) { alert('Nagranie jest zbyt krotkie lub mikrofon nie nagrywa.'); return; }
         
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
         }
         
         const durationSeconds = Math.max(1, Math.ceil((Date.now() - recordingStartTimeRef.current) / 1000));
-        await processAudio(audioBlob, ext, durationSeconds);
+        await processAudio(audioBlob, ext, durationSeconds, mimeType);
       };
 
       mediaRecorder.start();
@@ -65,7 +66,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
     }
   };
 
-  const processAudio = async (audioBlob, ext, durationSeconds = 1) => {
+  const processAudio = async (audioBlob, ext, durationSeconds = 1, mimeType = 'audio/webm') => {
     setIsProcessing(true);
     try {
       // 1. Transkrypcja (Groq Whisper via Cloud Function)
@@ -81,6 +82,8 @@ export default function DictationButton({ onResult, onStart, className = '', mod
 
       const transcribeFn = httpsCallable(functions, 'transcribeAudio');
       const resTranscribe = await transcribeFn({
+          mimeType: mimeType,
+          ext: ext,
         audioBase64: base64Audio,
         model: modelName,
         durationSeconds: durationSeconds,
@@ -94,82 +97,21 @@ export default function DictationButton({ onResult, onStart, className = '', mod
         return;
       }
 
-      // 2. Przetwarzanie (Google Gemini - Vertex AI)
+      // 2. Przetwarzanie (Cloud Function - Gemini)
       let finalResult = originalText;
-
       try {
-        const vertexAI = getVertexAI(app);
-        
-        if (mode === 'smart') {
-          const model = getGenerativeModel(vertexAI, { 
-            model: geminiModel,
-            systemInstruction: 'Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania).',
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: 'object',
-                properties: {
-                  note: { type: 'string', description: "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach" },
-                  timeSpentHours: { type: 'number', nullable: true },
-                  actionItem: { type: 'string', nullable: true },
-                  actionItemDays: { type: 'number', nullable: true }
-                },
-                required: ["note"]
-              }
-            }
-          });
-
-          const result = await model.generateContent(originalText);
-          const responseText = result.response.text();
-          
-          try {
-            finalResult = JSON.parse(responseText);
-          } catch (e) {
-            throw new Error('Niepoprawny format danych JSON od Gemini');
-          }
-
-          let geminiTokens = result.response.usageMetadata?.totalTokenCount || 0;
-          if (geminiTokens === 0) {
-            const inputLen = originalText.length + 300;
-            const outputLen = responseText.length;
-            geminiTokens = Math.ceil((inputLen + outputLen) / 4);
-          }
-          if (geminiTokens > 0) {
-            const logFn = httpsCallable(functions, 'logAIUsage');
-            logFn({ geminiTokens, tenantId: getCurrentTenant() }).catch(e => console.error("Billing log error:", e));
-          }
-
-        } else {
-          const lang = i18n.language === 'en' ? 'angielski' : 'polski';
-          const model = getGenerativeModel(vertexAI, { 
-            model: geminiModel,
-            systemInstruction: `Jesteś asystentem technicznym. Interfejs systemu jest w języku: ${lang.toUpperCase()}. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
-1. Jeśli oryginalny podyktowany tekst jest w języku ${lang} (albo bardzo do niego zbliżonym), po prostu sformatuj go poprawnie (dodaj interpunkcję) i zwróć TYLKO sam sformatowany tekst (bez dopisków o tłumaczeniu).
-2. Jeśli oryginalny tekst jest w INNYM języku, przetłumacz go na język ${lang}. Wtedy (i tylko wtedy) zwróć wynik DOKŁADNIE w tym formacie:
-[Oryginalny podyktowany tekst]
-
----
-Tłumaczenie (${lang}):
-[Przetłumaczony tekst]`
-          });
-
-          const result = await model.generateContent(originalText);
-          finalResult = result.response.text().trim();
-
-          let geminiTokens = result.response.usageMetadata?.totalTokenCount || 0;
-          if (geminiTokens === 0) {
-            const inputLen = originalText.length + 500;
-            const outputLen = finalResult.length;
-            geminiTokens = Math.ceil((inputLen + outputLen) / 4);
-          }
-          if (geminiTokens > 0) {
-            const logFn = httpsCallable(functions, 'logAIUsage');
-            logFn({ geminiTokens, tenantId: getCurrentTenant() }).catch(e => console.error("Billing log error:", e));
-          }
-        }
+        const processFn = httpsCallable(functions, "processDictationText");
+        const lang = i18n.language === "en" ? "angielski" : "polski";
+        const processRes = await processFn({
+          rawText: originalText,
+          mode: mode,
+          lang: lang,
+          tenantId: getCurrentTenant()
+        });
+        finalResult = processRes.data.result;
       } catch (geminiErr) {
-        console.error("Gemini processing error:", geminiErr);
-        throw new Error("Błąd AI Gemini: " + geminiErr.message);
+        console.error("Cloud processing error:", geminiErr);
+        throw new Error("Błąd AI Gemini (Cloud): " + geminiErr.message);
       }
 
       if (onResult) {
@@ -214,3 +156,6 @@ Tłumaczenie (${lang}):
     </button>
   );
 }
+
+
+

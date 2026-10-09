@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { collection, query, orderBy, limit, startAfter, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -45,7 +45,7 @@ export function usePartTransactions(filterType, filterDateFrom, filterDateTo) {
       setHasMore(snap.docs.length === 50);
 
     } catch (err) {
-      console.error('Błąd pobierania transakcji magazynowych:', err);
+      console.error('BĹ‚Ä…d pobierania transakcji magazynowych:', err);
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,16 @@ export const fetchTransactionsForMachine = async (tenantId, machineId) => {
 
 export const fetchTransactionsForPart = async (tenantId, partId) => {
   if (!tenantId || !partId) return [];
-  const q = query(collection(db, 'tenants', tenantId, 'part_transactions'), where('partId', '==', partId), orderBy('date', 'desc'), limit(100));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Usunieto orderBy, aby uniknac bledu 'Missing composite index'
+  const q = query(collection(db, 'tenants', tenantId, 'part_transactions'), where('partId', '==', partId));
+  try {
+    const snap = await getDocs(q);
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return docs;
+  } catch (err) {
+    console.error("Błąd historii czesci:", err);
+    return [];
+  }
 };
+

@@ -7,7 +7,7 @@ export default defineConfig({
     'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toLocaleString("pl-PL", {timeZone: "Europe/Warsaw"}))
   },
   base: './',
-  test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ['**/e2e/**', '**/node_modules/**', '**/functions/**'] },
+  test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ['**/node_modules/**', '**/dist/**', '**/functions/**', '**/e2e/**'] },
   build: { 
       sourcemap: true, 
       emptyOutDir: true,

@@ -6,7 +6,7 @@ import DictationButton from '../DictationButton';
 // Mock Zustand
 vi.mock('../../../store/managerStore', () => ({
   useManagerStore: vi.fn((selector) => {
-    const state = { groqModel: 'whisper-large-v3', geminiModel: 'gemini-2.5-flash' };
+    const state = { groqModel: 'whisper-large-v3', geminiModel: 'gemini-3.8-flash' };
     return selector(state);
   })
 }));
@@ -73,7 +73,7 @@ class MockMediaRecorder {
     this.state = 'recording';
     // Simulate some data available
     if (this.ondataavailable) {
-      this.ondataavailable({ data: new Blob(['dummy audio data'], { type: 'audio/webm' }) });
+      this.ondataavailable({ data: new Blob(['x'.repeat(2048)], { type: 'audio/webm' }) });
     }
   }
   stop() {

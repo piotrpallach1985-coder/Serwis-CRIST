@@ -9,8 +9,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   
   const tickets = useManagerStore(state => state.tickets) || [];
   const machines = useManagerStore(state => state.machines) || [];
-  const reporters = useManagerStore(state => state.reporters) || [];
-  const plannedServices = useManagerStore(state => state.plannedServices) || [];
+    const plannedServices = useManagerStore(state => state.plannedServices) || [];
   const actionItems = useManagerStore(state => state.actionItems) || [];
   const plannedWarningDays = useManagerStore(state => state.plannedWarningDays) || 30;
   const parts = useManagerStore(state => state.parts) || [];
@@ -39,8 +38,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   }, [parts, plannedServices]);
 
   const unverifiedMachinesCount = machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).length;
-  const unverifiedReportersCount = reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).length;
-  const activeTicketsCount = tickets.length;
+    const activeTicketsCount = tickets.length;
   const criticalTicketsCount = tickets.filter(t => t.isCritical && Number(t.status) !== TICKET_STATUS.CLOSED).length;
   
   const actionableServices = plannedServices.filter(s => {
@@ -291,20 +289,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
                   <span className="text-[13px]">{t("sidebar.ticket_topics_menu")}</span>
                 </button>
 
-                <button
-                  onClick={() => handleItemClick('reporters')}
-                  className={`w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'reporters' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <i className="ph ph-users text-lg shrink-0"></i>
-                    <span className="text-[13px] truncate">{t("sidebar.reporters_menu")}</span>
-                  </div>
-                  {unverifiedReportersCount > 0 && (
-                    <span className="bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shrink-0 shadow-xs">
-                      {unverifiedReportersCount}
-                    </span>
-                  )}
-                </button>
+                
               </div>
             
 </>

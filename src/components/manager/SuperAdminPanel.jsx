@@ -5,11 +5,11 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase';
 import { useToast } from '../../hooks/useToast';
 import { useManagerStore } from '../../store/managerStore';
-import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, subscribeToGlobalSecrets, saveGlobalGroqApiKey as saveGlobalKey } from '../../services/admin.service';
+import { fetchAllTenantsStats, subscribeToTenants, subscribeToGlobalSettings, subscribeToGlobalSecrets, saveGlobalAIConfig as saveGlobalKey } from '../../services/admin.service';
 
-import SuperAdminStats from './superadmin/SuperAdminStats';
+
 import SuperAdminGlobalLogo from './superadmin/SuperAdminGlobalLogo';
-import SuperAdminGlobalGroqKey from './superadmin/SuperAdminGlobalGroqKey';
+import SuperAdminAIHub from './superadmin/SuperAdminAIHub';
 import SuperAdminTenantTable from './superadmin/SuperAdminTenantTable';
 import SuperAdminTenantModal from './superadmin/SuperAdminTenantModal';
 
@@ -32,11 +32,10 @@ export default function SuperAdminPanel({ onNavigate }) {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [globalAppLogoUrl, setGlobalAppLogoUrl] = useState('');
-  const [globalGroqApiKey, setGlobalGroqApiKey] = useState('');
-  const [globalGeminiModel, setGlobalGeminiModel] = useState('gemini-2.5-flash');
-  const [globalGroqModel, setGlobalGroqModel] = useState('whisper-large-v3');
+    const [globalGeminiModel, setGlobalGeminiModel] = useState('gemini-3.8-flash');
+  const [globalTranscribeModel, setGlobalTranscribeModel] = useState('gemini-3.5-transcribe');
   const [globalGeminiPrice, setGlobalGeminiPrice] = useState(0.60);
-  const [globalGroqPrice, setGlobalGroqPrice] = useState(0.40);
+  const [globalTranscribePrice, setGlobalTranscribePrice] = useState(0.40);
 
   const initialFormState = {
     id: '',
@@ -72,7 +71,7 @@ export default function SuperAdminPanel({ onNavigate }) {
 
   const totalGeminiTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGemini || 0), 0);
   const totalGeminiCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGemini !== undefined ? t.aiCostGemini : ((t.aiTokensGemini || 0) / 1000000) * globalGeminiPrice), 0);
-  const totalGroqCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGroq !== undefined ? t.aiCostGroq : ((t.whisperSeconds || 0) / 60) * globalGroqPrice), 0);
+  const totalGroqCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGroq !== undefined ? t.aiCostGroq : ((t.whisperSeconds || 0) / 60) * globalTranscribePrice), 0);
   const totalGroqTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGroq || 0), 0);
   const totalWhisperSeconds = tenantsWithTokens.reduce((sum, t) => sum + (t.whisperSeconds || 0), 0);
 
@@ -99,11 +98,10 @@ export default function SuperAdminPanel({ onNavigate }) {
 
     const unsubSecrets = subscribeToGlobalSecrets((docSnap) => {
       if (docSnap.exists()) {
-        setGlobalGroqApiKey(docSnap.data().groqApiKey || '');
-        setGlobalGroqModel(docSnap.data().groqModel || 'whisper-large-v3');
-        setGlobalGeminiModel(docSnap.data().geminiModel || 'gemini-2.5-flash');
+                setGlobalTranscribeModel(docSnap.data().transcribeModel || 'gemini-3.5-transcribe');
+        setGlobalGeminiModel(docSnap.data().geminiModel || 'gemini-3.8-flash');
         if (docSnap.data().geminiPrice !== undefined) setGlobalGeminiPrice(docSnap.data().geminiPrice);
-        if (docSnap.data().groqPrice !== undefined) setGlobalGroqPrice(docSnap.data().groqPrice);
+        if (docSnap.data().transcribePrice !== undefined) setGlobalTranscribePrice(docSnap.data().transcribePrice);
       }
     });
 
@@ -127,7 +125,7 @@ export default function SuperAdminPanel({ onNavigate }) {
                 updates.whisperSeconds = Math.ceil(data.groqTokens * 0.26); // roughly 13500 tokens = 3600s => 1 token = 0.26s
               }
               if (data.groqTokens > 0 && data.groqCost === undefined) {
-              updates.groqCost = (data.groqTokens / 1000000) * globalGroqPrice;
+              updates.groqCost = (data.groqTokens / 1000000) * globalTranscribePrice;
             }
             if (Object.keys(updates).length > 0) {
               await setDoc(doc(db, 'tenants', t.id, 'stats', 'ai_usage'), updates, { merge: true });
@@ -142,12 +140,12 @@ export default function SuperAdminPanel({ onNavigate }) {
     if (tenants.length > 0) {
       runMigration();
     }
-  }, [tenants, globalGeminiPrice, globalGroqPrice]);
+  }, [tenants, globalGeminiPrice, globalTranscribePrice]);
 
-  const saveGlobalGroqApiKey = async (e) => {
+  const saveGlobalAIConfig = async (e) => {
     if(e) e.preventDefault();
     try {
-      await saveGlobalKey(globalGroqApiKey, globalGroqModel, globalGeminiPrice, globalGroqPrice, globalGeminiModel);
+      await saveGlobalKey(globalTranscribeModel, globalGeminiPrice, globalTranscribePrice, globalGeminiModel);
       showToast('Globalny klucz AI został zapisany.', 'success');
     } catch (err) {
       showToast('Błąd zapisywania klucza: ' + err.message, 'error');
@@ -301,32 +299,26 @@ export default function SuperAdminPanel({ onNavigate }) {
           openEditModal={openEditModal}
           handleDelete={handleDelete}
           globalGeminiPrice={globalGeminiPrice}
-          globalGroqPrice={globalGroqPrice}
+          globalTranscribePrice={globalTranscribePrice}
         />
 
-        <SuperAdminStats 
+        
+
+        <SuperAdminAIHub 
           totalGeminiTokens={totalGeminiTokens} 
-          totalGroqTokens={totalGroqTokens}
-            totalWhisperSeconds={totalWhisperSeconds}
+          totalWhisperSeconds={totalWhisperSeconds}
           totalGeminiCost={totalGeminiCost}
           totalGroqCost={totalGroqCost}
+          saveGlobalAIConfig={saveGlobalAIConfig}
+          globalTranscribeModel={globalTranscribeModel}
+          setGlobalTranscribeModel={setGlobalTranscribeModel}
           globalGeminiPrice={globalGeminiPrice}
-          globalGroqPrice={globalGroqPrice} 
+          setGlobalGeminiPrice={setGlobalGeminiPrice}
+          globalTranscribePrice={globalTranscribePrice}
+          setGlobalTranscribePrice={setGlobalTranscribePrice}
+          globalGeminiModel={globalGeminiModel}
+          setGlobalGeminiModel={setGlobalGeminiModel}
         />
-
-        <SuperAdminGlobalGroqKey
-            globalGroqApiKey={globalGroqApiKey}
-            setGlobalGroqApiKey={setGlobalGroqApiKey}
-            saveGlobalGroqApiKey={saveGlobalGroqApiKey}
-            globalGroqModel={globalGroqModel}
-            setGlobalGroqModel={setGlobalGroqModel}
-            globalGeminiPrice={globalGeminiPrice}
-            setGlobalGeminiPrice={setGlobalGeminiPrice}
-            globalGroqPrice={globalGroqPrice}
-            setGlobalGroqPrice={setGlobalGroqPrice}
-            globalGeminiModel={globalGeminiModel}
-            setGlobalGeminiModel={setGlobalGeminiModel}
-          />
 
       </div>
 

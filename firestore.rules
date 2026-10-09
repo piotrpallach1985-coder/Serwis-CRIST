@@ -55,30 +55,51 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // Operator zgłaszający awarię z kodu QR (logowanie anonimowe, bez konta)
+    function isAnonymous() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     // Reguły dla tenantów (Multi-Tenancy)
     match /tenants/{tenantId} {
       match /reporters/{document=**} {
-        allow read: if isTenantUser(tenantId);
-        allow create: if isSignedIn();
+      allow read: if isTenantUser(tenantId);
+        // Anonim może dodać wyłącznie wpis "(DO WERYFIKACJI)" z ograniczonym zestawem pól
+        allow create: if isTenantUser(tenantId)
+          || (isAnonymous()
+              && request.resource.data.keys().hasOnly(['name', 'phone', 'createdAt'])
+              && request.resource.data.name is string
+              && request.resource.data.name.size() < 120
+              && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\)$'));
         allow update, delete: if isTenantUser(tenantId);
       }
 
       match /machines/{document=**} {
-        allow read, create, update, delete: if isTenantUser(tenantId);
+      allow get: if isTenantUser(tenantId) || isAnonymous();
+      allow list: if isTenantUser(tenantId);
+        // Anonim może dodać wyłącznie maszynę "(DO WERYFIKACJI)" z opcji "Inna maszyna"
+        allow create: if isTenantUser(tenantId)
+          || (isAnonymous()
+              && request.resource.data.keys().hasOnly(['name', 'regionId', 'bay', 'currentWorkHours', 'status', 'isDeleted', 'createdAt', 'createdBy', 'description'])
+              && request.resource.data.name is string
+              && request.resource.data.name.size() < 200
+              && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\)$')
+              && request.resource.data.isDeleted == false);
+        allow update, delete: if isTenantUser(tenantId);
       }
 
       match /tickets/{ticketId} {
         allow read, update, delete: if isTenantUser(tenantId);
-        allow create: if isSignedIn() && (request.auth.token.firebase.sign_in_provider == 'anonymous' || isTenantUser(tenantId));
+        allow create: if isTenantUser(tenantId) || isAnonymous();
       }
 
       match /regions/{document=**} {
-        allow read: if isTenantUser(tenantId);
+        allow read: if isTenantUser(tenantId) || isAnonymous();
         allow write: if isTenantUser(tenantId) && isStaff();
       }
       
       match /topics/{document=**} {
-        allow read: if isTenantUser(tenantId);
+        allow read: if isTenantUser(tenantId) || isAnonymous();
         allow write: if isTenantUser(tenantId) && isStaff();
       }
       
@@ -94,7 +115,11 @@ service cloud.firestore {
 
       match /notifications/{document=**} {
         allow read: if isTenantUser(tenantId);
-        allow create: if isTenantUser(tenantId);
+        allow create: if isTenantUser(tenantId)
+          || (isAnonymous()
+              && request.resource.data.keys().hasOnly(['title', 'message', 'isCritical', 'read', 'ticketId', 'createdAt'])
+              && request.resource.data.read == false
+              && request.resource.data.ticketId is string);
         allow update, delete: if isTenantUser(tenantId);
       }
 

@@ -9,6 +9,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 import { checkInventoryStatus, checkServiceUrgency } from '../../utils/logicHelpers';
 
 export default function NotificationCenter({
+  onNavigate,
   tickets = [],
   plannedServices = [],
   machines = [],
@@ -22,7 +23,6 @@ export default function NotificationCenter({
   const parts = useManagerStore(state => state.parts || []);
   const notifications = useManagerStore(state => state.notifications || []);
   const currentModule = useManagerStore(state => state.currentModule || 'ur');
-  const onNavigate = useManagerStore(state => state.onNavigate);
   const markAsRead = useManagerStore(state => state.markAsRead);
 
   const relevantNotifications = useMemo(() => {
@@ -110,7 +110,7 @@ export default function NotificationCenter({
       });
     }
 
-    if (isUrModule || currentModule === 'parts' || currentModule === 'parts_list') {
+    if (isUrModule || currentModule === 'parts' || currentModule === 'parts_inventory') {
       parts.forEach(p => {
         let reservedQty = 0;
         plannedServices.forEach(s => {
@@ -135,6 +135,7 @@ export default function NotificationCenter({
             badgeClass: isOut ? 'bg-red-100 text-red-700 font-bold' : 'bg-orange-100 text-orange-700 font-bold',
             read: false,
             linkTo: 'parts',
+            partId: p.id,
             createdAt: { toDate: () => new Date() },
             isDynamic: true,
           });
@@ -161,24 +162,7 @@ export default function NotificationCenter({
           isDynamic: true,
         });
       });
-      reporters.filter(r => r.name && r.name.includes('(DO WERYFIKACJI)')).forEach(r => {
-        list.push({
-          id: 'dyn_verif_reporter_' + r.id,
-          title: 'ZGŁASZAJĄCY DO WERYFIKACJI',
-          message: 'Nowy pracownik wymaga weryfikacji: ' + r.name,
-          isCritical: true,
-          priorityRank: 6,
-          icon: 'ph-user',
-          colorClass: 'bg-amber-100 text-amber-700',
-          badge: 'DO WERYFIKACJI',
-          badgeClass: 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
-          read: false,
-          linkTo: 'reporters',
-          createdAt: { toDate: () => safeParseDate(r.createdAt) || new Date() },
-          isDynamic: true,
-        });
-      });
-    }
+          }
 
     return list.sort((a, b) => {
       if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
@@ -205,7 +189,7 @@ export default function NotificationCenter({
     } else if (n.linkTo === 'reporters') {
       if (onNavigate) onNavigate(targetModule, 'reporters');
     } else if (n.linkTo === 'parts') {
-      if (onNavigate) onNavigate('parts_list');
+      if (onNavigate) onNavigate(targetModule, 'parts_inventory', { partId: n.partId });
     }
   };
 

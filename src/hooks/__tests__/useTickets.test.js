@@ -41,10 +41,10 @@ describe('useTickets hook filters', () => {
     localStorage.clear();
   });
 
-  it('zwraca wszystkie aktywne zg³oszenia domyœlnie', () => {
+  it('zwraca wszystkie aktywne zgÅ‚oszenia domyÅ›lnie', () => {
     const { result } = renderHook(() => useTickets({ tickets: mockTickets }));
     
-    // Zg³oszenie ID: 4 jest isDeleted=true, wiec powinno byc odrzucone
+    // ZgÅ‚oszenie ID: 4 jest isDeleted=true, wiec powinno byc odrzucone
     expect(result.current.filteredTickets.length).toBe(3);
     expect(result.current.filteredTickets.map(t => t.id)).toEqual(['1', '2', '3']);
   });
@@ -74,7 +74,7 @@ describe('useTickets hook filters', () => {
   it('filtruje po dacie w archiwum (filterTime)', () => {
     // Kiedy isArchive=true, archiwum jest pobierane z Firebase, 
     // zmockujmy po prostu internalArchive zeby przetestowac filtry archiwum.
-    // Hack: U¿yjemy useTickets i po prostu ustawimy filterTime, a nastepnie
+    // Hack: UÅ¼yjemy useTickets i po prostu ustawimy filterTime, a nastepnie
     // sprawdzimy logike zmockowujac setInternalArchive - ale prosciej jest
     // wywolac to samo co wywoluje archive
   });

@@ -1,5 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useEffect } from 'react';
+import { buildTree } from '../../utils/treeHelpers';
+
 import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../store/managerStore';
 import ChecklistBuilder from '../checklists/ChecklistBuilder';
@@ -11,9 +13,22 @@ export default function PlannedMaintenanceFormModal({
   const { t } = useTranslation();
   const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
+
+  const flattenedMachines = buildTree(machines);
+  
+
   
   const [name, setName] = useState('');
   const [machineId, setMachineId] = useState('');
+
+  const [machineSearchName, setMachineSearchName] = useState('');
+  useEffect(() => {
+    if (machineId) {
+      const m = machines.find(mac => mac.id === machineId);
+      if (m) setMachineSearchName(m.name);
+    }
+  }, [machineId, machines]);
+
   const [priority, setPriority] = useState('NieKrytyczny');
   const [category, setCategory] = useState('preventive');
   const [triggerType, setTriggerType] = useState('calendar');
@@ -159,10 +174,25 @@ export default function PlannedMaintenanceFormModal({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-1">Maszyna</label>
-            <select value={machineId} onChange={e => setMachineId(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
-              <option value="">-- Wybierz maszynę --</option>
-              {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            
+              <input 
+                type="text" 
+                list="machines-list" 
+                placeholder="-- Wpisz lub wybierz maszynę z listy --"
+                value={machineSearchName} 
+                onChange={e => {
+                  const val = e.target.value;
+                  setMachineSearchName(val);
+                  const found = flattenedMachines.find(m => m.treeName === val || m.name === val);
+                  if (found) setMachineId(found.id);
+                  else setMachineId('');
+                }} 
+                className="w-full p-2 border border-gray-300 rounded outline-none bg-white" 
+              />
+              <datalist id="machines-list">
+                {flattenedMachines.map(m => <option key={m.id} value={m.treeName} />)}
+              </datalist>
+
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Nazwa / Typ serwisu</label>
@@ -183,6 +213,16 @@ export default function PlannedMaintenanceFormModal({
               <option value="Krytyczny">Krytyczny (zatrzymuje linię)</option>
             </select>
           </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('planned.machine_status')}</label>
+              <select value={machineStatus} onChange={e => setMachineStatus(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
+                <option value="LOTO">LOTO (Całkowicie odłączona, Lockout/Tagout)</option>
+                <option value="Wyłączona">Wyłączona, ale zasilanie doprowadzone</option>
+                <option value="Ruch częściowy">Dopuszczony ruch częściowy (tryb serwisowy)</option>
+                <option value="Bez wpływu">Maszyna może pracować normalnie</option>
+              </select>
+            </div>
+
         </div>
         <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
           <label className="block text-sm font-bold text-gray-800 mb-3">Typ wyzwalacza (Trigger)</label>
@@ -231,16 +271,7 @@ export default function PlannedMaintenanceFormModal({
             <label className="block text-sm font-bold text-gray-700 mb-1">{t('planned.required_personnel')}</label>
             <input type="text" value={requiredPersonnel} onChange={e => setRequiredPersonnel(e.target.value)} placeholder="np. Elektryk SEP, 2x Mechanik" className="w-full p-2 border border-gray-300 rounded outline-none" />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-1">{t('planned.machine_status')}</label>
-            <select value={machineStatus} onChange={e => setMachineStatus(e.target.value)} className="w-full p-2 border border-gray-300 rounded outline-none bg-white">
-              <option value="LOTO">LOTO (Całkowicie odłączona, Lockout/Tagout)</option>
-              <option value="Wyłączona">Wyłączona, ale zasilanie doprowadzone</option>
-              <option value="Ruch częściowy">Dopuszczony ruch częściowy (tryb serwisowy)</option>
-              <option value="Bez wpływu">Maszyna może pracować normalnie</option>
-            </select>
           </div>
-        </div>
         
         {/* Narzędzia i części */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -298,32 +329,32 @@ export default function PlannedMaintenanceFormModal({
                         <i className="ph ph-trash text-lg"></i>
                       </button>
                       
-                      <select 
-                        value={part.partId || ''} 
-                        onChange={e => {
-                          const pid = e.target.value;
-                          const found = parts.find(p => p.id === pid);
-                          if (found) {
-                            updatePart(index, 'partId', pid);
-                            updatePart(index, 'name', found.name);
-                            updatePart(index, 'unitCost', found.unitPrice || 0);
-                          } else {
-                            updatePart(index, 'partId', pid === 'custom' ? 'custom' : '');
-                            updatePart(index, 'name', '');
-                          }
-                        }}
-                        className="w-full p-1.5 border border-slate-200 rounded text-sm outline-none bg-slate-50 font-bold" required
-                      >
-                        <option value="">-- Wybierz z Magazynu --</option>
-                        {parts.map(p => (
-                           <option key={p.id} value={p.id}>{p.name} (St: {p.stock} | Min: {p.minStock})</option>
-                        ))}
-                        <option value="custom">Inna część (spoza magazynu)</option>
-                      </select>
                       
-                      {(part.partId === 'custom') && (
-                        <input type="text" value={part.name} onChange={e => updatePart(index, 'name', e.target.value)} placeholder="Nazwa części spoza magazynu" className="w-full p-1.5 border-b border-slate-200 text-sm outline-none" required />
-                      )}
+                        <input 
+                          type="text" 
+                          list="parts-list"
+                          placeholder="Wpisz lub wybierz z magazynu..."
+                          value={part.searchName !== undefined ? part.searchName : (part.partId && part.partId !== 'custom' ? (parts.find(x => x.id === part.partId)?.name || part.name) : part.name)}
+                          onChange={e => {
+                            const val = e.target.value;
+                            updatePart(index, 'searchName', val);
+                            const found = parts.find(p => p.name === val || `${p.name} (St: ${p.stock})` === val);
+                            if (found) {
+                              updatePart(index, 'partId', found.id);
+                              updatePart(index, 'name', found.name);
+                            } else {
+                              updatePart(index, 'partId', 'custom');
+                              updatePart(index, 'name', val);
+                            }
+                          }}
+                          className="flex-1 p-1.5 border border-slate-200 rounded text-sm outline-none bg-white"
+                        />
+                        <datalist id="parts-list">
+                          {parts.map(p => <option key={p.id} value={`${p.name} (St: ${p.stock})`} />)}
+                        </datalist>
+
+                      
+                      
 
                       <div className="flex gap-2">
                         <input type="number" min="1" step="1" value={part.quantity || 1} onChange={e => updatePart(index, 'quantity', Number(e.target.value))} placeholder="Ilość sztuk" className="w-1/2 p-1.5 border border-slate-200 rounded text-xs outline-none" title="Ilość" />
@@ -346,3 +377,4 @@ export default function PlannedMaintenanceFormModal({
     </div>
   );
 }
+

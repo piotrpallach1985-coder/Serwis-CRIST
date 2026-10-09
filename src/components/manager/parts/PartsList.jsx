@@ -275,7 +275,7 @@ export default function PartsList({ }) {
                 />
                 {hasMore && (
                   <div className="p-4 flex justify-center border-t border-slate-100">
-                    <button onClick={loadMore} className="px-6 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors">{t('tickets.table.load_more', 'Wczytaj wiêcej')}</button>
+                    <button onClick={loadMore} className="px-6 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors">{t('tickets.table.load_more', 'Wczytaj wiÄ™cej')}</button>
                   </div>
                 )}
               </div>

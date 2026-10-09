@@ -37,24 +37,21 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       showToast('Podaj nazwę maszyny!', 'error');
       return false;
     }
-    if (!topic || !description || !reporterName.trim() || !reporterPhone.trim()) {
-      showToast('Wypełnij wszystkie wymagane pola (Imię, Telefon, Temat, Opis)!', 'error');
+    if (!topic || !description || !reporterName.trim()) {
+      showToast('Wypełnij wszystkie wymagane pola!', 'error');
       return false;
     }
-    const cleanedPhone = reporterPhone.replace(/\D/g, '');
+    const cleanedPhone = (reporterPhone || '').replace(/\D/g, '');
     
     
-    if (!acceptedRodo) {
-      showToast('Musisz zaakceptować zasady przetwarzania danych osobowych (RODO).', 'error');
-      return false;
-    }
+    // removed RODO check
 
     const lastTicketTime = localStorage.getItem('last_ticket_time');
     if (lastTicketTime && Date.now() - parseInt(lastTicketTime) < 2 * 60 * 1000) {
       showToast('Zbyt wiele zgłoszeń w krótkim czasie. Odczekaj 2 minuty.', 'error');
       return false;
     }
-    if (cleanedPhone.length !== 9) {
+    if (cleanedPhone.length > 0 && cleanedPhone.length !== 9) {
       showToast('Numer telefonu musi składać się z dokładnie 9 cyfr.', 'error');
       return false;
     }
@@ -96,24 +93,6 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
     setUploadProgress('Weryfikacja bazy danych...');
 
     try {
-      // 2. Dodawanie Zgłaszającego do bazy
-      const reporterNameTrimmed = reporterName.trim();
-      if (reporterNameTrimmed) {
-        try {
-          const repQ = query(collection(db, 'tenants', tenantId, 'reporters'), where('name', '==', reporterNameTrimmed));
-          const repSnap = await getDocs(repQ);
-          if (repSnap.empty) {
-            await addDoc(collection(db, 'tenants', tenantId, 'reporters'), {
-              name: reporterNameTrimmed + " (DO WERYFIKACJI)",
-              phone: reporterPhone.trim(),
-              createdAt: new Date().toISOString()
-            });
-          }
-        } catch (e) {
-          console.error("Błąd zapisywania zgłaszającego:", e);
-        }
-      }
-
       setUploadProgress('Przygotowywanie danych...');
       let finalMachineId = selectedMachine.id;
       

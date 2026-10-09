@@ -139,9 +139,10 @@ export default function Login({ onLogin, currentUser }) {
         onLogin({ 
           uid: userData.uid,
           name: userData.name || email, 
-          role: userData.role || 'brak', 
-          permissions: userData.permissions || [],
-          tenantId: getCurrentTenant() 
+          role: userData.role || 'brak',
+            permissions: userData.permissions || [],
+            phone: userData.phone || "",
+            tenantId: getCurrentTenant() 
         });
         setLoginModalTarget(null);
     } catch (err) {

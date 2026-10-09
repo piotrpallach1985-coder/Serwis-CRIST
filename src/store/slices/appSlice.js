@@ -3,11 +3,11 @@ export const createAppSlice = (set) => ({
   allowTicketDeletion: false,
   tenantId: null,
   limits: { maxUsers: 10, maxMachines: 50 },
-  groqApiKey: '',
-  groqModel: 'llama-3.1-8b-instant',
-  geminiModel: 'gemini-2.5-flash',
+  
+  transcribeModel: 'gemini-3.8-flash',
+  geminiModel: 'gemini-3.8-flash',
   geminiPrice: 0.60,
-  groqPrice: 0.40,
+  transcribePrice: 0.40,
   branding: {
     companyName: '',
     systemSubtitle: 'DYSPOZYTORNIA UR',
@@ -18,10 +18,10 @@ export const createAppSlice = (set) => ({
   setAllowTicketDeletion: (allowTicketDeletion) => set({ allowTicketDeletion }),
   setTenantId: (tenantId) => set({ tenantId }),
   setLimits: (limits) => set({ limits }),
-  setGroqApiKey: (groqApiKey) => set({ groqApiKey }),
-  setGroqModel: (groqModel) => set({ groqModel }),
+  
+  setTranscribeModel: (transcribeModel) => set({ transcribeModel }),
   setGeminiModel: (geminiModel) => set({ geminiModel }),
   setGeminiPrice: (geminiPrice) => set({ geminiPrice }),
-  setGroqPrice: (groqPrice) => set({ groqPrice }),
+  setTranscribePrice: (transcribePrice) => set({ transcribePrice }),
   setBranding: (branding) => set({ branding }),
 });

@@ -12,7 +12,10 @@ const fileToBase64 = (file) => {
   });
 };
 
-export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline }) => {
+import { useAuth } from './useAuth';
+
+export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline , isInternal}) => {
+  const { user } = useAuth();
   const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
@@ -66,8 +69,8 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       selectedMachine: machineToSubmit,
       topic,
       description,
-      reporterName,
-      reporterPhone,
+      reporterName: isInternal ? (user?.name || 'Pracownik (Wewnętrzny)') : 'Anonim',
+        reporterPhone: isInternal ? (user?.phone || '') : reporterPhone,
       isCritical,
       pendingPhotos,
       acceptedRodo,

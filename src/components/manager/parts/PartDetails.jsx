@@ -13,12 +13,13 @@ export default function PartDetails({ part, onBack, onEdit }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [txMode, setTxMode] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [transactions, setTransactions] = useState([]);
   useEffect(() => {
     import('../../../hooks/usePartTransactions').then(({ fetchTransactionsForPart }) => {
       fetchTransactionsForPart(getCurrentTenant(), part.id).then(setTransactions);
     });
-  }, [part.id]);
+  }, [part.id, refreshKey]);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const machines = useManagerStore(state => state.machines || []);
@@ -307,8 +308,10 @@ export default function PartDetails({ part, onBack, onEdit }) {
       </div>
 
       {txMode && (
-        <PartTransactionModal part={part} mode={txMode} onClose={() => setTxMode(null)} user={user} />
+        <PartTransactionModal part={part} mode={txMode} onClose={() => { setTxMode(null); setRefreshKey(prev => prev + 1); }} user={user} />
       )}
     </div>
   );
 }
+
+

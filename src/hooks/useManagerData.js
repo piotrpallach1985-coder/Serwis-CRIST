@@ -15,7 +15,7 @@ export function useManagerData() {
     setTickets, setMachines, setReporters, setParts, setPartTransactions, 
     setServices, setPlannedServices, setNotifications, setActionItems, 
     setRoles, setRegions, setAllowTicketDeletion, setPlannedWarningDays, 
-    setBranding, setLimits, setGroqApiKey, setGroqModel 
+    setBranding, setLimits, setTranscribeModel 
   } = useManagerStore.getState();
 
   useEffect(() => {
@@ -49,10 +49,7 @@ export function useManagerData() {
       setMachines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubReporters = onSnapshot(collection(db, 'tenants', tenantId, 'reporters'), (snap) => {
-      setReporters(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.isDeleted !== true));
-    });
-
+    
     const unsubServices = onSnapshot(collection(db, 'tenants', tenantId, 'services'), (snap) => {
       setServices(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
     });
@@ -144,8 +141,7 @@ export function useManagerData() {
     return () => {
       unsubRegions();
       unsubMachines();
-      unsubReporters();
-      unsubServices();
+            unsubServices();
       unsubRoles();
       
       unsubSettings();

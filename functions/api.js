@@ -217,4 +217,4 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
   }
 });
 
-exports.api = functions.region('europe-west1').https.onRequest(app);
+exports.api = functions.region("europe-central2").https.onRequest(app);

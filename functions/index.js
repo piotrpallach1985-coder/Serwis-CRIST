@@ -121,159 +121,203 @@ const apiModule = require('./api');
 exports.api = apiModule.api;
 
 // --- AI Proxy ---
-const fetch = require('node-fetch');
-const FormData = require('form-data');
+const { VertexAI } = require('@google-cloud/vertexai');
+const speech = require('@google-cloud/speech').v2;
+const speechClient = new speech.SpeechClient({ apiEndpoint: "europe-west4-speech.googleapis.com" });
 
 exports.transcribeAudio = functions.https.onCall(async (data, context) => {
-  // Nawet anonimowi uzytkownicy (QR) musza moc uzyc tej funkcji
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
-  }
-
-  const { audioBase64, model, language } = data;
-  if (!audioBase64) {
-    throw new functions.https.HttpsError('invalid-argument', 'Brak pliku audio');
-  }
-
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
+  const { audioBase64, model, mimeType } = data;
+  if (!audioBase64) throw new functions.https.HttpsError("invalid-argument", "Brak pliku audio");
+  
   try {
-    // Odczytaj klucz bezpiecznie z bazy (tylko serwer ma tu dostep)
-    const globalDoc = await db.collection('tenant_registry').doc('_global_secrets_').get();
-    if (!globalDoc.exists || !globalDoc.data().groqApiKey) {
-      throw new functions.https.HttpsError('failed-precondition', 'Brak skonfigurowanego klucza API');
-    }
-    const groqApiKey = globalDoc.data().groqApiKey;
-
-    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
+    let actualModel = (globalDoc.exists && globalDoc.data().transcribeModel) ? globalDoc.data().transcribeModel : (model || "gemini-3.8-flash");
+    actualModel = actualModel.trim().toLowerCase().replace(/\s+/g, "-");
     
-    const formData = new FormData();
-    formData.append('file', audioBuffer, { filename: 'audio.webm', contentType: 'audio/webm' });
-    formData.append('model', model || 'whisper-large-v3');
-    if (language) formData.append('language', language);
-    formData.append('response_format', 'json');
-
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        ...formData.getHeaders()
-      },
-      body: formData
-    });
-
-    if (!res.ok) {
-      const errorData = await res.text();
-      console.error('Groq API Error:', errorData);
-      throw new functions.https.HttpsError('internal', 'Blad zewnetrznego API Groq');
-    }
-
-    const result = await res.json();
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist";
+    let text = "";
     
-    // Log AI Usage (Whisper)
+    if (actualModel.includes("chirp")) {
+      // Use Cloud Speech-to-Text V2 API
+      const request = {
+        recognizer: `projects/${projectId}/locations/europe-west4/recognizers/_`,
+        config: {
+          autoDecodingConfig: {},
+          languageCodes: ["pl-PL"],
+          model: actualModel
+        },
+        content: audioBase64
+      };
+      
+      const [response] = await speechClient.recognize(request);
+      if (response.results && response.results.length > 0) {
+        text = response.results.map(r => r.alternatives[0].transcript).join(" ");
+      } else {
+        text = "";
+      }
+    } else {
+      // Use Vertex AI Generative Model
+      const vertex_ai = new VertexAI({ project: projectId, location: "europe-west4" });
+      const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
+      const req = {
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: mimeType || "audio/webm", data: audioBase64 } },
+            { text: "Dokonaj dokladnej transkrypcji tego nagrania audio. Zwracaj wylacznie sam tekst z transkrypcja, bez zadnego dodatkowego formatowania ani powitan." }
+          ]
+        }]
+      };
+      const resp = await generativeModel.generateContent(req);
+      text = resp.response.candidates[0].content.parts[0].text;
+    }
+    
     const durationSeconds = data.durationSeconds || 0;
     if (durationSeconds > 0) {
       const tenantId = context.auth?.token?.tenantId || data.tenantId;
       if (tenantId) {
-        // The frontend expects 'whisperSeconds' and 'groqCost' based on 'groqPrice' per minute
-        const groqPricePerMinute = globalDoc.data().groqPrice || 0.40;
-        const cost = (durationSeconds / 60) * groqPricePerMinute;
-        
-        await db.collection('tenants').doc(tenantId).collection('stats').doc('ai_usage').set({
+        const transcribePricePerMinute = globalDoc.exists ? (globalDoc.data().transcribePrice || 0.40) : 0.40;
+        const cost = (durationSeconds / 60) * transcribePricePerMinute;
+        await db.collection("tenants").doc(tenantId).collection("stats").doc("ai_usage").set({
           whisperSeconds: FieldValue.increment(durationSeconds),
           groqCost: FieldValue.increment(cost)
         }, { merge: true });
       }
     }
-
-    return { text: result.text };
+    return { text };
   } catch (err) {
-    console.error('Transcription error:', err);
-    throw new functions.https.HttpsError('internal', err.message || 'Blad transkrypcji');
+    console.error("Transcription error:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Blad transkrypcji");
   }
 });
 
-
-exports.extractServiceData = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
-  }
-
-  const { rawText } = data;
-  if (!rawText) {
-    throw new functions.https.HttpsError('invalid-argument', 'Brak tekstu wejsciowego');
-  }
-
+exports.chatWithDTR = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
+  const { messages, documentPaths, machineName } = data;
+  if (!messages || !messages.length) throw new functions.https.HttpsError("invalid-argument", "Brak wiadomosci");
+  
   try {
-    const globalDoc = await db.collection('tenant_registry').doc('_global_secrets_').get();
-    if (!globalDoc.exists || !globalDoc.data().groqApiKey) {
-      throw new functions.https.HttpsError('failed-precondition', 'Brak klucza API Groq');
-    }
-    const apiKey = globalDoc.data().groqApiKey;
-
-    const prompt = `JesteÅ› asystentem technicznym w systemie CMMS.
-Otrzymujesz surowÄ… notatkÄ™ z dyktowania od technika utrzymania ruchu po zakoÅ„czeniu serwisu maszyny.
-WyciÄ…gnij z niej konkretne informacje i zwrÃ³Ä‡ TYLKO czysty obiekt JSON.
-Oto notatka:
-"${rawText}"
-`;
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
-      })
+    const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
+    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-3.8-flash";
+    
+    const vertex_ai = new VertexAI({ project: process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist", location: "europe-central2" });
+    const generativeModel = vertex_ai.preview.getGenerativeModel({ 
+      model: actualModel,
+      systemInstruction: "JesteÅ› eksperckim asystentem technicznym dla mechanikÃ³w. Opieraj swoje odpowiedzi wyÅ‚Ä…cznie na zaÅ‚Ä…czonych dokumentach PDF. Zawsze podawaj nazwÄ™ dokumentu i numer strony, z ktÃ³rej wziÄ…Å‚eÅ› informacjÄ™, jeÅ›li to moÅ¼liwe. BÄ…dÅº zwiÄ™zÅ‚y i konkretny, mechanik stoi przy maszynie i nie ma czasu czytaÄ‡ elaboratÃ³w."
     });
 
-    if (!res.ok) {
-      console.error('Groq Chat Error:', await res.text());
-      throw new functions.https.HttpsError('internal', 'Blad zewnetrznego API Groq Chat');
+    const parts = [];
+    if (documentPaths && documentPaths.length > 0) {
+      documentPaths.forEach(path => {
+        parts.push({
+          fileData: {
+            fileUri: `gs://${process.env.GCLOUD_PROJECT || "serwis-crist"}.firebasestorage.app/${path}`,
+            mimeType: "application/pdf"
+          }
+        });
+      });
     }
 
-    const jsonRes = await res.json();
-    return JSON.parse(jsonRes.choices[0].message.content);
+    const chatHistoryText = messages.filter(m => m.role !== "system").map(m => `${m.role === "user" ? "Mechanik" : "Asystent"}: ${m.text}`).join("\n");
+    parts.push({ text: `Historia czatu:\n${chatHistoryText}\n\nAktualne zapytanie mechanika: ${messages[messages.length - 1].text}` });
+
+    const req = { contents: [{ role: "user", parts }] };
+    const resp = await generativeModel.generateContent(req);
+    
+    let text = resp.response.candidates[0].content.parts[0].text;
+    const tokens = resp.response.usageMetadata?.totalTokenCount || 0;
+    
+    return { text, tokens };
   } catch (err) {
-    console.error('Extraction error:', err);
-    throw new functions.https.HttpsError('internal', err.message || 'Blad ekstrakcji');
+    console.error("DTR Chat error:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Blad czatu DTR");
+  }
+});
+
+exports.processDictationText = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
+  const { rawText, mode, lang, tenantId } = data;
+  if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejsciowego");
+  
+  try {
+    const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
+    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-3.8-flash";
+    
+    const vertex_ai = new VertexAI({ project: process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist", location: "europe-central2" });
+    const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
+    
+    let result = rawText;
+    
+    if (mode === "smart") {
+      const prompt = `JesteÅ› ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania).
+WyciÄ…gnij z niego konkretne informacje i zwrÃ³Ä‡ TYLKO czysty obiekt JSON bez znacznikÃ³w formatowania (np. markdown).
+Wymagany format JSON:
+{
+  "note": "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach",
+  "timeSpentHours": liczba (opcjonalnie),
+  "actionItem": "opis problemu" (opcjonalnie),
+  "actionItemDays": liczba (opcjonalnie)
+}
+Oto notatka:
+"${rawText}"`;
+      
+      const resp = await generativeModel.generateContent(prompt);
+      let jsonText = resp.response.candidates[0].content.parts[0].text;
+      jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
+      result = JSON.parse(jsonText);
+    } else {
+      const language = lang || "polski";
+      const prompt = `JesteÅ› asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
+1. JeÅ›li oryginalny tekst jest w jÄ™zyku ${language} (albo bardzo do niego zbliÅ¼onym), sformatuj go poprawnie (dodaj interpunkcjÄ™) i zwrÃ³Ä‡ TYLKO sam sformatowany tekst.
+2. JeÅ›li oryginalny tekst jest w INNYM jÄ™zyku, przetÅ‚umacz go na ${language}. ZwrÃ³Ä‡ wynik w formacie:
+[Oryginalny podyktowany tekst]
+---
+TÅ‚umaczenie (${language}):
+[PrzetÅ‚umaczony tekst]
+
+Oto notatka:
+"${rawText}"`;
+
+      const resp = await generativeModel.generateContent(prompt);
+      result = resp.response.candidates[0].content.parts[0].text.trim();
+    }
+    
+    return { result };
+  } catch (err) {
+    console.error("Dictation processing error:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Blad przetwarzania tekstu");
   }
 });
 
 exports.logAIUsage = functions.https.onCall(async (data, context) => {
   const { HttpsError } = functions.https;
-  if (!context.auth) throw new HttpsError('unauthenticated', 'User not authenticated.');
+  if (!context.auth) throw new HttpsError("unauthenticated", "User not authenticated.");
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
-  if (!tenantId) throw new HttpsError('invalid-argument', 'Missing tenantId.');
+  if (!tenantId) throw new HttpsError("invalid-argument", "Missing tenantId.");
 
-  // Validate that user belongs to tenant
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  const userDoc = await db.collection("users").doc(context.auth.uid).get();
   if (!userDoc.exists || userDoc.data().tenantId !== tenantId) {
-    // Check if superadmin
-    if (!userDoc.exists || userDoc.data().role !== 'superadmin') {
-      throw new HttpsError('permission-denied', 'Unauthorized tenant access.');
+    if (!userDoc.exists || userDoc.data().role !== "superadmin") {
+      throw new HttpsError("permission-denied", "Unauthorized tenant access.");
     }
   }
 
   const { geminiTokens } = data || {};
   if (!geminiTokens || geminiTokens <= 0) return { success: true };
 
-  const globalDoc = await db.collection('tenant_registry').doc('_global_secrets_').get();
+  const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
   const globalData = globalDoc.exists ? globalDoc.data() : {};
   const geminiPrice = globalData.geminiPrice || 0.60;
-
   const safeTokens = Math.max(0, parseInt(geminiTokens, 10));
 
-  await db.collection('tenants').doc(tenantId).collection('stats').doc('ai_usage').set({
+  await db.collection("tenants").doc(tenantId).collection("stats").doc("ai_usage").set({
     geminiTokens: FieldValue.increment(safeTokens),
     geminiCost: FieldValue.increment((safeTokens / 1000000) * geminiPrice)
   }, { merge: true });
 
   return { success: true };
 });
-
 
 // --- Skalowalnosc: Automatyczne przeglady planowane (Cron o 2:00 w nocy) ---
 exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *')
@@ -327,7 +371,7 @@ exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *'
                 
                 if (daysLeft <= CRITICAL_DAYS_WARNING) {
                   shouldAlert = true;
-                  alertMessage = 'Zbli¿a siê termin planowanego przegl¹du "' + (data.name || 'Brak nazwy') + '" (zosta³o ' + Math.max(0, Math.ceil(daysLeft)) + ' dni).';
+                  alertMessage = 'Zbliï¿½a siï¿½ termin planowanego przeglï¿½du "' + (data.name || 'Brak nazwy') + '" (zostaï¿½o ' + Math.max(0, Math.ceil(daysLeft)) + ' dni).';
                 }
               }
             }
@@ -338,7 +382,7 @@ exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *'
                 const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
                 if (hoursLeft <= CRITICAL_HOURS_WARNING && hoursLeft >= 0) {
                   shouldAlert = true;
-                  alertMessage = 'Zbli¿a siê termin przegl¹du liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zosta³o ' + hoursLeft + ' rbg).';
+                  alertMessage = 'Zbliï¿½a siï¿½ termin przeglï¿½du liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zostaï¿½o ' + hoursLeft + ' rbg).';
                 }
               }
             }
@@ -351,7 +395,7 @@ exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *'
               // Wygeneruj powiadomienie
               const notifRef = db.collection('tenants').doc(tenantId).collection('notifications').doc();
               batch.set(notifRef, {
-                title: 'Zbli¿aj¹cy siê Przegl¹d',
+                title: 'Zbliï¿½ajï¿½cy siï¿½ Przeglï¿½d',
                 message: alertMessage,
                 type: 'warning',
                 createdAt: FieldValue.serverTimestamp(),
@@ -383,7 +427,7 @@ exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *'
     return null;
   });
 
-// --- Skalowalnosc: Agregacja KPI na ¿¹danie (zmniejszenie pobierania danych do przegl¹darki) ---
+// --- Skalowalnosc: Agregacja KPI na ï¿½ï¿½danie (zmniejszenie pobierania danych do przeglï¿½darki) ---
 exports.getKPIStats = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
@@ -399,11 +443,11 @@ exports.getKPIStats = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    // Odczyt z bazy (tylko na serwerze - nie zatykamy sieci u¿ytkownika)
+    // Odczyt z bazy (tylko na serwerze - nie zatykamy sieci uï¿½ytkownika)
     let q = db.collection('tenants').doc(tenantId).collection('tickets').where('isDeleted', '!=', true);
     
-    // Optymalizacja: jeœli Firestore ma index, mo¿na by tu filtrowaæ po dacie, 
-    // ale dla uproszczenia (bo tickets mo¿e nie mieæ indeksów) wyci¹gamy na serwerze i filtrujemy w RAM serwera.
+    // Optymalizacja: jeï¿½li Firestore ma index, moï¿½na by tu filtrowaï¿½ po dacie, 
+    // ale dla uproszczenia (bo tickets moï¿½e nie mieï¿½ indeksï¿½w) wyciï¿½gamy na serwerze i filtrujemy w RAM serwera.
     const snapshot = await q.get();
     
     let totalTickets = 0;
@@ -428,7 +472,7 @@ exports.getKPIStats = functions.https.onCall(async (data, context) => {
       const statusNum = Number(t.status);
       statusCounts[statusNum] = (statusCounts[statusNum] || 0) + 1;
 
-      // MTTR dla zakoñczonych (status 5)
+      // MTTR dla zakoï¿½czonych (status 5)
       if (statusNum === 5) {
         closedTicketsCount++;
         if (t.closedAt) {
@@ -461,7 +505,7 @@ exports.getKPIStats = functions.https.onCall(async (data, context) => {
     const trendData = Object.entries(trendMap)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-10); // Ostatnie 10 dni aktywnoœci
+      .slice(-10); // Ostatnie 10 dni aktywnoï¿½ci
 
     return {
       totalTickets,
@@ -475,11 +519,11 @@ exports.getKPIStats = functions.https.onCall(async (data, context) => {
 
   } catch (err) {
     console.error('KPI error:', err);
-    throw new functions.https.HttpsError('internal', 'B³¹d podczas liczenia KPI', err);
+    throw new functions.https.HttpsError('internal', 'Bï¿½ï¿½d podczas liczenia KPI', err);
   }
 });
 
-// --- Skalowalnosc: Agregacja KPI Serwisów Planowanych ---
+// --- Skalowalnosc: Agregacja KPI Serwisï¿½w Planowanych ---
 exports.getPlannedKPIStats = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
@@ -581,6 +625,6 @@ exports.getPlannedKPIStats = functions.https.onCall(async (data, context) => {
 
   } catch (err) {
     console.error('Planned KPI error:', err);
-    throw new functions.https.HttpsError('internal', 'B³¹d liczenia Planned KPI', err);
+    throw new functions.https.HttpsError('internal', 'Bï¿½ï¿½d liczenia Planned KPI', err);
   }
 });

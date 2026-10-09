@@ -26,10 +26,11 @@ const Reports = lazy(() => import('./manager/Reports'));
 const AIStats = lazy(() => import('./manager/AIStats'));
 const Services = lazy(() => import('./manager/Services'));
 const Topics = lazy(() => import('./manager/Topics'));
-const Reporters = lazy(() => import('./manager/Reporters'));
+
 const PlannedMaintenance = lazy(() => import('./manager/PlannedMaintenance'));
 const ActionItems = lazy(() => import('./manager/ActionItems'));
 import NotificationCenter from './manager/NotificationCenter';
+const InAppTicketScanner = lazy(() => import('./manager/InAppTicketScanner'));
 const SuperAdminPanel = lazy(() => import('./manager/SuperAdminPanel'));
 const AuditLogs = lazy(() => import('./manager/AuditLogs'));
 
@@ -136,10 +137,11 @@ function ManagerViewInner() {
 
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
+    <div className="flex min-h-screen bg-gray-100 font-sans">
 
       {/* === SIDEBAR === */}
-      <div className="flex flex-col flex-shrink-0 h-full relative z-[300]">
+        {activeTab !== 'new_ticket_scanner' && (
+        <div className="flex-shrink-0 relative z-[300] lg:w-64">
         <Sidebar
           currentModule={currentModule}
           activeTab={activeTab}
@@ -149,14 +151,17 @@ function ManagerViewInner() {
           onGoHome={() => handleNavigate('home', 'home')}
           onLogout={onLogout}
           onNavigate={handleNavigate}
-        />
-      </div>
+          />
+        </div>
+        )}
 
       {/* === GŁÓWNA TREŚĆ === */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 relative">
         <Suspense fallback={<div className="flex-1 flex items-center justify-center p-10"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
         
-        {/* MOBILNA GÓRNA BELKA (widoczna tylko na ekranach < lg) */}
+        {activeTab !== 'new_ticket_scanner' && (
+          <>
+          {/* MOBILNA GÓRNA BELKA (widoczna tylko na ekranach < lg) */}
         <div className="lg:hidden bg-[#1B253B] text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-gray-800 shrink-0 z-[200]">
           <div className="flex items-center gap-2.5">
             <button
@@ -196,12 +201,14 @@ function ManagerViewInner() {
                 reporters={reporters}
                 actionItems={actionItems}
                 notifications={notifications}
-              />
-            )}
+                />
+              )}
+            </div>
           </div>
-        </div>
+          </>
+          )}
 
-        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
+        <div className="flex-1 p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
 
                     {/* Moduł: Awarie - mapa */}
           {activeTab === 'dashboard_tickets' && (
@@ -304,12 +311,13 @@ function ManagerViewInner() {
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services />}
           {activeTab === 'topics' && <Topics />}
-          {activeTab === 'reporters' && <Reporters />}
+          
           {activeTab === 'users' && <Users />}
           {activeTab === 'audit' && <AuditLogs />}
           {activeTab === 'roles' && <Roles />}
                     {activeTab === 'reports' && <Reports />}
           {activeTab === 'ai_stats' && <AIStats />}
+          {activeTab === 'new_ticket_scanner' && <InAppTicketScanner />}
           {activeTab.startsWith('parts_') && <PartsLayout currentTab={activeTab} setActiveTab={setActiveTab} />}
 
         </div>

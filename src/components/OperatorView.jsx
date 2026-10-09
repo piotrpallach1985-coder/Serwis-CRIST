@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import OperatorScanner from './operator/OperatorScanner';
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc, query, where, getDocs, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import jsQR from 'jsqr';
@@ -29,7 +29,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
   const [topicsList, setTopicsList] = useState([]);
-  const [reportersList, setReportersList] = useState([]);
+  const reportersList = []; // Usunięto (Blind Drop)
     const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlMachineId = searchParams.get('machine') || initialMachineId;
@@ -53,26 +53,32 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   // Status sieci
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const handleScanSuccess = (decodedText) => {
+  const handleScanSuccess = async (decodedText) => {
     let mId = decodedText;
     let tenantFromQr = null;
     
-    let queryPart = decodedText;
-    if (decodedText.includes('?')) {
-      queryPart = decodedText.split('?')[1];
+    const match = decodedText.match(/machine=([^&]+)/);
+    if (match) mId = match[1];
+    
+    const tMatch = decodedText.match(/tenant=([^&#]+)/);
+    if (tMatch) tenantFromQr = tMatch[1];
+    
+    let targetMachine = machines.find(m => m.id === mId || (m.qrCode && (m.qrCode === mId || m.qrCode === decodedText)) || (m.internalId && m.internalId.toLowerCase() === mId.toLowerCase()));
+    
+    if (!targetMachine && mId && tenantId) {
+      try {
+        const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', mId));
+        if (d.exists() && !d.data().isDeleted) {
+          targetMachine = { id: d.id, ...d.data() };
+        } else {
+          const q = query(collection(db, 'tenants', tenantId, 'machines'), where('qrCode', '==', decodedText), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty && !snap.docs[0].data().isDeleted) {
+            targetMachine = { id: snap.docs[0].id, ...snap.docs[0].data() };
+          }
+        }
+      } catch (e) {}
     }
-    
-    try {
-      const urlParams = new URLSearchParams(queryPart);
-      if (urlParams.has('machine')) {
-        mId = urlParams.get('machine');
-      }
-      if (urlParams.has('tenant')) {
-        tenantFromQr = urlParams.get('tenant');
-      }
-    } catch (e) {}
-    
-    const targetMachine = machines.find(m => m.id === mId || (m.qrCode && m.qrCode === mId) || (m.internalId && m.internalId.toLowerCase() === mId.toLowerCase()));
     
     if (targetMachine) {
       setSelectedMachine(targetMachine);
@@ -83,9 +89,11 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       useManagerStore.getState().setTenantId(tenantFromQr);
       // HashRouter: query params muszą być PRZED hashem
       const base = window.location.pathname;
-      window.location.replace(`${base}?tenant=${tenantFromQr}#/operator?step=scan&machine=${mId}`);
+      window.location.replace(`${base}?tenant=${tenantFromQr}#/operator?step=form&machine=${mId}`);
     } else {
-      alert('Zeskanowana maszyna (' + mId + ') nie istnieje w Twojej bazie (tenant: ' + tenantId + ').');
+      setSelectedMachine({ id: 'manual', name: 'Nieznana Maszyna', manualInput: mId });
+      setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
+      setStep('form');
     }
   };
 
@@ -124,37 +132,32 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       authUnsub = onAuthStateChanged(auth, (authUser) => {
         if (authUser) {
           // Firebase Auth confirms we have a token, safe to attach listeners
-
-      unsubscribeMachines = onSnapshot(collection(db, 'tenants', tenantId, 'machines'), async (querySnapshot) => {
-        const machinesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(m => !m.isDeleted);
-        setMachines(machinesData);
-
-        if (urlMachineId && step === 'scan' && !urlMachineResolvedRef.current) {
-          urlMachineResolvedRef.current = true;
-          const targetMachine = machinesData.find(m => m.id === urlMachineId || (m.qrCode && m.qrCode === urlMachineId) || (m.internalId && m.internalId.toLowerCase() === urlMachineId.toLowerCase()));
-          if (targetMachine) {
-            setSelectedMachine(targetMachine);
-            handleStepChange('form');
-          } else {
-            const docRef = doc(db, 'tenants', getCurrentTenant(), 'machines', urlMachineId);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              setSelectedMachine({ id: docSnap.id, ...docSnap.data() });
-              handleStepChange('form');
-            } else {
-              alert("Błąd: Nie znaleziono maszyny o ID: " + urlMachineId);
+          
+          unsubscribeMachines = onSnapshot(query(collection(db, 'tenants', tenantId, 'machines'), where('isDeleted', '==', false)), (snapshot) => {
+            setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+            
+            // Re-resolve URL machine ID if it's pending
+            if (urlMachineId && !urlMachineResolvedRef.current) {
+              const target = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).find(m => 
+                m.id === urlMachineId || 
+                (m.qrCode && m.qrCode === urlMachineId) || 
+                (m.internalId && m.internalId.toLowerCase() === urlMachineId.toLowerCase())
+              );
+              if (target) {
+                setSelectedMachine(target);
+                urlMachineResolvedRef.current = true;
+                setStep("form");
+              }
             }
-          }
-        }
-      }, (error) => console.error("SNAPSHOT ERROR FOR machines:", error));
+          });
+
+      
 
       unsubscribeTopics = onSnapshot(collection(db, 'tenants', tenantId, 'topics'), (querySnapshot) => {
         setTopicsList(querySnapshot.docs.map(d => d.data()).filter(d => !d.isDeleted).map(d => d.text));
       }, (error) => console.error("SNAPSHOT ERROR FOR topics:", error));
 
-      unsubscribeReporters = onSnapshot(collection(db, 'tenants', tenantId, 'reporters'), (querySnapshot) => {
-        setReportersList(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));
-      }, (error) => console.error("SNAPSHOT ERROR FOR reporters:", error));
+      
 
       unsubscribeRegions = onSnapshot(collection(db, 'tenants', tenantId, 'regions'), (querySnapshot) => {
         setRegions(querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.isDeleted));

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { getVertexAI, getGenerativeModel } from '@firebase/vertexai-preview';
+
 import { app, db, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, increment } from 'firebase/firestore';
@@ -69,46 +69,30 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
     setIsLoading(true);
 
     try {
-      const vertexAI = getVertexAI(app);
-      const model = getGenerativeModel(vertexAI, { 
-        model: geminiModel,
-        systemInstruction: "Jesteś eksperckim asystentem technicznym dla mechaników. Opieraj swoje odpowiedzi wyłącznie na załączonych dokumentach PDF. Zawsze podawaj nazwę dokumentu i numer strony, z której wziąłeś informację, jeśli to możliwe. Bądź zwięzły i konkretny, mechanik stoi przy maszynie i nie ma czasu czytać elaboratów."
-      });
-
-      // Zbuduj request do API z gs:// URI (Vertex AI potrafi to czytać bez pobierania!)
-      const parts = docsToAnalyze.map(doc => ({
-        fileData: {
-          fileUri: `gs://${app.options.storageBucket}/${doc.path}`,
-          mimeType: 'application/pdf'
-        }
-      }));
-
-      // Dodaj historię czatu oraz najnowsze zapytanie
-      const chatHistoryText = messages.filter(m => m.role !== 'system').map(m => `${m.role === 'user' ? 'Mechanik' : 'Asystent'}: ${m.text}`).join('\n');
+      const chatWithDTR = httpsCallable(functions, "chatWithDTR");
+      const documentPaths = docsToAnalyze.map(doc => doc.path);
       
-      parts.push({ text: `Historia czatu:\n${chatHistoryText}\n\nAktualne zapytanie mechanika: ${userMessage}` });
-
-      const response = await model.generateContent({
-        contents: [{ role: 'user', parts }]
+      const response = await chatWithDTR({
+        messages: [...messages, { role: "user", text: userMessage }],
+        documentPaths,
+        machineName
       });
 
-      const responseText = response.response.text();
-      setMessages(prev => [...prev, { role: 'model', text: responseText }]);
+      const responseText = response.data.text;
+      setMessages(prev => [...prev, { role: "model", text: responseText }]);
 
       // Log AI Usage
-      let geminiTokens = response.response.usageMetadata?.totalTokenCount || 0;
+      let geminiTokens = response.data.tokens || 0;
       if (geminiTokens === 0) {
-        // Fallback estimation if Vertex API omits metadata
-        geminiTokens = (docsToAnalyze.length * 1500) + Math.ceil(chatHistoryText.length / 4) + Math.ceil(responseText.length / 4);
+        geminiTokens = (docsToAnalyze.length * 1500) + Math.ceil(userMessage.length / 4) + Math.ceil(responseText.length / 4);
       }
       if (geminiTokens > 0) {
         const tenantId = getCurrentTenant();
         if (tenantId) {
-          const logAIUsage = httpsCallable(functions, 'logAIUsage');
-            logAIUsage({ tenantId, geminiTokens }).catch(err => console.error('Cloud Function token tracking error:', err));
+          const logAIUsage = httpsCallable(functions, "logAIUsage");
+          logAIUsage({ tenantId, geminiTokens }).catch(err => console.error("Cloud Function token tracking error:", err));
         }
       }
-
     } catch (error) {
       console.error('Błąd Gemini:', error);
       let errorMsg = 'Wystąpił błąd podczas analizy. Upewnij się, że usługa Vertex AI jest włączona w konsoli Firebase.';

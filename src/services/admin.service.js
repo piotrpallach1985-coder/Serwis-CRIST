@@ -39,8 +39,8 @@ export const fetchAllTenantsStats = async (tenants) => {
   return usages;
 };
 
-export const saveGlobalGroqApiKey = async (key, model, geminiPrice = 0.60, groqPrice = 0.40, geminiModel = 'gemini-2.5-flash') => {
-  return setDoc(doc(db, 'tenant_registry', '_global_secrets_'), { groqApiKey: (key || '').trim(), groqModel: (model || '').trim(), geminiPrice, groqPrice, geminiModel: (geminiModel || '').trim() }, { merge: true });
+export const saveGlobalAIConfig = async (transcribeModel, geminiPrice = 0.60, transcribePrice = 0.40, geminiModel = 'gemini-3.8-flash') => {
+  return setDoc(doc(db, 'tenant_registry', '_global_secrets_'), { transcribeModel: (transcribeModel || '').trim(), geminiPrice, transcribePrice, geminiModel: (geminiModel || '').trim() }, { merge: true });
 };
 
 export const saveGlobalAppLogo = async (downloadURL, base64Data, tenants) => {

@@ -24,6 +24,7 @@ export default function HomeDashboard({ onLogout }) {
   const { isAdmin, canManageUsers, canManageRoles, canViewReports } = usePermissions(user, roles);
 
   const [isScanning, setIsScanning] = useState(false);
+  const [isScannerSelectOpen, setIsScannerSelectOpen] = useState(false);
   const [scannerMode, setScannerMode] = useState('qr');
 
   
@@ -114,6 +115,28 @@ export default function HomeDashboard({ onLogout }) {
         </div>
       </header>
 
+      
+      {isScannerSelectOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-10 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setIsScannerSelectOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-2">
+              <i className="ph ph-x text-xl"></i>
+            </button>
+            <h2 className="text-xl sm:text-2xl font-black text-center mb-6 text-slate-800">Wybierz metodę skanowania</h2>
+            <div className="flex gap-4">
+              <button onClick={() => { setIsScannerSelectOpen(false); setScannerMode('qr'); setIsScanning(true); }} className="flex-1 py-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3">
+                <i className="ph ph-qr-code text-5xl"></i>
+                Kamera (QR)
+              </button>
+              <button onClick={() => { setIsScannerSelectOpen(false); setScannerMode('nfc'); setIsScanning(true); }} className="flex-1 py-6 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3">
+                <i className="ph ph-waves text-5xl"></i>
+                Zbliżeniowo (NFC)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL SKANERA QR */}
       <QRScannerModal
         isOpen={isScanning}
@@ -149,30 +172,32 @@ export default function HomeDashboard({ onLogout }) {
             <div className="w-full max-w-md lg:max-w-6xl mx-auto px-2 mb-10">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 
-                {/* SKANER QR */}
+                
+                {/* SZYBKIE WYSZUKIWANIE MASZYNY */}
                 <button
                   type="button"
-                  onClick={() => { setScannerMode('qr'); setIsScanning(true); }}
-                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
+                  onClick={() => { setIsScannerSelectOpen(true); }}
+                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
                 >
-                  <i className="ph ph-qr-code text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
-                  <h3 className="text-base sm:text-xl font-bold tracking-wide">
-                    Skanuj QR
+                  <i className="ph ph-magnifying-glass text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
+                  <i className="ph ph-qr-code text-2xl absolute top-6 right-6 opacity-50"></i>
+                  <h3 className="text-base sm:text-lg font-bold tracking-wide">
+                    Szybkie szukanie maszyny
                   </h3>
                 </button>
 
-                {/* SKANER NFC */}
+                {/* ZGŁOŚ AWARIĘ */}
                 <button
                   type="button"
-                  onClick={() => { setScannerMode('nfc'); setIsScanning(true); }}
+                  onClick={() => navigate('/manager/ur/new_ticket_scanner')}
                   className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
                 >
-                  <i className="ph ph-waves text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
+                  <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
                   <h3 className="text-base sm:text-xl font-bold tracking-wide">
-                    Odczyt NFC
+                    Zgłoś awarię
                   </h3>
                 </button>
-    
+
                 {/* PANEL UR */}
                 <button
                   type="button"
