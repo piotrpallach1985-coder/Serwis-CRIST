@@ -662,10 +662,10 @@
       "unknown_user": "System/Nieznany"
     },
     "ai_stats": {
-      "title": "Zużycie AI (Tokeny)",
+      "title": "Zużycie AI",
       "desc": "Monitoruj wykorzystanie sztucznej inteligencji w Twojej firmie.",
-      "gemini_desc": "DTR, korekta dyktowania i tłumaczenia",
-      "groq_desc": "Rozpoznawanie mowy (Voice-to-Text)",
+      "gemini_desc": "Gemini Flash (Czat DTR, wyciąganie JSON)",
+      "groq_desc": "Voice-to-Text (Dyktowanie na żywo)",
       "tokens_used": "Tokenów zużyto"
     },
     "superadmin": {

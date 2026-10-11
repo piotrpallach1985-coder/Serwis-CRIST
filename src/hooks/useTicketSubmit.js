@@ -47,8 +47,8 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
     // removed RODO check
 
     const lastTicketTime = localStorage.getItem('last_ticket_time');
-    if (lastTicketTime && Date.now() - parseInt(lastTicketTime) < 2 * 60 * 1000) {
-      showToast('Zbyt wiele zgłoszeń w krótkim czasie. Odczekaj 2 minuty.', 'error');
+    if (lastTicketTime && Date.now() - parseInt(lastTicketTime) < 30 * 1000) {
+      showToast('Zbyt wiele zgłoszeń w krótkim czasie. Odczekaj 30 sekund.', 'error');
       return false;
     }
     if (cleanedPhone.length > 0 && cleanedPhone.length !== 9) {

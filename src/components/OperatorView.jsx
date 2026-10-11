@@ -62,16 +62,23 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     
     const tMatch = decodedText.match(/tenant=([^&#]+)/);
     if (tMatch) tenantFromQr = tMatch[1];
+
+    if (tenantFromQr && tenantFromQr !== tenantId) {
+      useManagerStore.getState().setTenantId(tenantFromQr);
+      const base = window.location.pathname;
+      window.location.replace(base + "?tenant=" + tenantFromQr + "#/operator?step=form&machine=" + mId);
+      return;
+    }
     
     let targetMachine = machines.find(m => m.id === mId || (m.qrCode && (m.qrCode === mId || m.qrCode === decodedText)) || (m.internalId && m.internalId.toLowerCase() === mId.toLowerCase()));
     
     if (!targetMachine && mId && tenantId) {
       try {
-        const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', mId));
+        const d = await getDoc(doc(db, "tenants", tenantId, "machines", mId));
         if (d.exists() && !d.data().isDeleted) {
           targetMachine = { id: d.id, ...d.data() };
         } else {
-          const q = query(collection(db, 'tenants', tenantId, 'machines'), where('qrCode', '==', decodedText), limit(1));
+          const q = query(collection(db, "tenants", tenantId, "machines"), where("qrCode", "==", decodedText), limit(1));
           const snap = await getDocs(q);
           if (!snap.empty && !snap.docs[0].data().isDeleted) {
             targetMachine = { id: snap.docs[0].id, ...snap.docs[0].data() };
@@ -82,18 +89,12 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     
     if (targetMachine) {
       setSelectedMachine(targetMachine);
-      setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
-      setStep('form');
-    } else if (tenantFromQr && tenantFromQr !== tenantId) {
-      // Maszyna z innej firmy – przełącz tenant i przeładuj stronę
-      useManagerStore.getState().setTenantId(tenantFromQr);
-      // HashRouter: query params muszą być PRZED hashem
-      const base = window.location.pathname;
-      window.location.replace(`${base}?tenant=${tenantFromQr}#/operator?step=form&machine=${mId}`);
+      setSearchParams({ step: "form", machine: targetMachine.id }, { replace: true });
+      setStep("form");
     } else {
-      setSelectedMachine({ id: 'manual', name: 'Nieznana Maszyna', manualInput: mId });
-      setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
-      setStep('form');
+      setSelectedMachine({ id: "manual", name: "Nieznana Maszyna", manualInput: mId });
+      setSearchParams({ step: "form", machine: "manual" }, { replace: true });
+      setStep("form");
     }
   };
 

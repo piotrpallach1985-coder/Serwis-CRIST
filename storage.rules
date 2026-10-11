@@ -33,7 +33,6 @@ service firebase.storage {
       return request.resource.size < 30 * 1024 * 1024;
     }
 
-    // Nowe, bezpieczne reguly dla plikow w Multi-Tenancy (izolacja folderow)
     match /tenants/{tenantId}/{allPaths=**} {
        allow read, delete: if isTenantUser(tenantId);
        allow create, update: if isTenantUser(tenantId) && isValidSize();
@@ -41,12 +40,12 @@ service firebase.storage {
     
     // Zgloszenia anonimowe (kody QR)
     match /tenants/{tenantId}/tickets/{ticketId}/{fileName} {
-       allow read: if isAnonymous();
+       // allow get zamiast read (read = get + list). Anonim nie moze listowac plikow.
+       allow get: if isAnonymous();
        allow create: if isAnonymous() && isValidSize();
        allow update, delete: if false;
     }
 
-    // Stare sciezki zachowane wylacznie dla kompatybilnosci wstecz (Odczyt istniejacych plikow)
     match /tickets/{ticketId}/{fileName} {
       allow read: if isSignedIn() && !isAnonymous();
       allow write: if false; 
@@ -93,3 +92,4 @@ service firebase.storage {
     }
   }
 }
+

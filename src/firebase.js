@@ -40,4 +40,4 @@ export const storage = getStorage(app);
 
 export const messaging = getMessaging(app);
 
-export const functions = getFunctions(app, 'us-central1');
+export const functions = getFunctions(app, 'europe-west1');

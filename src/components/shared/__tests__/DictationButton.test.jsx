@@ -13,6 +13,7 @@ vi.mock('../../../store/managerStore', () => ({
 
 // Mock Firebase functions
 const mockTranscribe = vi.fn(() => Promise.resolve({ data: { text: "Przykładowa transkrypcja testowa." } }));
+const mockProcessText = vi.fn(() => Promise.resolve({ data: { result: "Sformatowana transkrypcja" } }));
 const mockLogUsage = vi.fn(() => Promise.resolve({ data: { success: true } }));
 
 vi.mock('../../../firebase', () => ({
@@ -23,6 +24,7 @@ vi.mock('../../../firebase', () => ({
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn((fns, name) => {
     if (name === 'transcribeAudio') return mockTranscribe;
+    if (name === 'processDictationText') return mockProcessText;
     if (name === 'logAIUsage') return mockLogUsage;
     return vi.fn();
   }),
@@ -126,10 +128,11 @@ describe('DictationButton Security & AI Functionality', () => {
       expect(onResultMock).toHaveBeenCalledWith('Sformatowana transkrypcja');
     });
 
-    // Verify billing/usage was logged
-    expect(mockLogUsage).toHaveBeenCalled();
-    const logUsageArgs = mockLogUsage.mock.calls[0][0];
-    expect(logUsageArgs).toHaveProperty('geminiTokens');
+    // Verify processDictationText was called securely with tenantId
+    expect(mockProcessText).toHaveBeenCalled();
+    const processCallArgs = mockProcessText.mock.calls[0][0];
+    expect(processCallArgs).toHaveProperty('tenantId', 'test-tenant');
+    expect(processCallArgs).toHaveProperty('rawText', 'Przykładowa transkrypcja testowa.');
   });
 
   // Helper function to check if fetch was called with a specific URL

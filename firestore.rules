@@ -13,7 +13,7 @@ service cloud.firestore {
     
     function isActiveUser() {
       let data = getUserData();
-      return data != null && (!("isDeleted" in data) || data.isDeleted == false);
+      return data != null && (!('isDeleted' in data) || data.isDeleted == false);
     }
 
     function isTenantUser(tenantId) {
@@ -33,19 +33,17 @@ service cloud.firestore {
 
     function isStaff() {
       let data = getUserData();
-      return isSignedIn() && isActiveUser() && (data.role == 'admin' || data.role == 'superadmin' || data.role == 'kierownik' || data.role == 'tech');
+      return isSignedIn() && isActiveUser() && (data.role == 'admin' || data.role == 'superadmin' || data.role == 'kierownik' || data.role == 'manager' || data.role == 'tech' || (data.role != 'operator'));
     }
 
-    // Użytkownicy - tylko admin może zarządzać wszystkimi
     match /users/{userId} {
       allow read: if isSignedIn() && isActiveUser() && (request.auth.uid == userId || isSuperAdmin() || getUserData().tenantId == resource.data.tenantId);
       allow write: if isAdmin() 
           && (resource == null || resource.data.tenantId == getUserData().tenantId || isSuperAdmin())
           && (request.resource.data.tenantId == getUserData().tenantId || isSuperAdmin()) 
-          && (!("role" in request.resource.data) || request.resource.data.role != 'superadmin' || isSuperAdmin());
+          && (!('role' in request.resource.data) || request.resource.data.role != 'superadmin' || isSuperAdmin());
     }
 
-    // Centralny rejestr firm (SaaS) - Tylko superadmin
     match /tenant_registry/_global_settings_ {
       allow read: if true;
       allow write: if isSuperAdmin();
@@ -55,42 +53,42 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // Operator zgłaszający awarię z kodu QR (logowanie anonimowe, bez konta)
     function isAnonymous() {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    // Reguły dla tenantów (Multi-Tenancy)
     match /tenants/{tenantId} {
       match /reporters/{document=**} {
-      allow read: if isTenantUser(tenantId);
-        // Anonim może dodać wyłącznie wpis "(DO WERYFIKACJI)" z ograniczonym zestawem pól
+        allow read: if isTenantUser(tenantId) || isAnonymous();
         allow create: if isTenantUser(tenantId)
           || (isAnonymous()
               && request.resource.data.keys().hasOnly(['name', 'phone', 'createdAt'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 120
-              && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\)$'));
+              && request.resource.data.name.matches('.*\\\\(DO WERYFIKACJI\\\\)$'));
         allow update, delete: if isTenantUser(tenantId);
       }
 
       match /machines/{document=**} {
-      allow get: if isTenantUser(tenantId) || isAnonymous();
-      allow list: if isTenantUser(tenantId);
-        // Anonim może dodać wyłącznie maszynę "(DO WERYFIKACJI)" z opcji "Inna maszyna"
+        allow read: if isTenantUser(tenantId) || isAnonymous();
         allow create: if isTenantUser(tenantId)
           || (isAnonymous()
               && request.resource.data.keys().hasOnly(['name', 'regionId', 'bay', 'currentWorkHours', 'status', 'isDeleted', 'createdAt', 'createdBy', 'description'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 200
-              && request.resource.data.name.matches('.*\\(DO WERYFIKACJI\\)$')
+              && request.resource.data.name.matches('.*\\\\(DO WERYFIKACJI\\\\)$')
               && request.resource.data.isDeleted == false);
         allow update, delete: if isTenantUser(tenantId);
       }
 
       match /tickets/{ticketId} {
         allow read, update, delete: if isTenantUser(tenantId);
-        allow create: if isTenantUser(tenantId) || isAnonymous();
+        // Anonim musi podać machineId które rzeczywiście istnieje w tym tenancie, lub 'manual'
+        allow create: if isTenantUser(tenantId) || 
+          (isAnonymous() && (
+             (request.resource.data.machineId == 'manual' && exists(/databases/$(database)/documents/tenants/$(tenantId))) ||
+             exists(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(request.resource.data.machineId))
+          ));
       }
 
       match /regions/{document=**} {
@@ -117,14 +115,14 @@ service cloud.firestore {
         allow read: if isTenantUser(tenantId);
         allow create: if isTenantUser(tenantId)
           || (isAnonymous()
-              && request.resource.data.keys().hasOnly(['title', 'message', 'isCritical', 'read', 'ticketId', 'createdAt'])
+              && request.resource.data.keys().hasOnly(['title', 'message', 'isCritical', 'read', 'ticketId', 'createdAt', 'type'])
               && request.resource.data.read == false
               && request.resource.data.ticketId is string);
         allow update, delete: if isTenantUser(tenantId);
       }
 
       match /settings/{document=**} {
-        allow read: if isTenantUser(tenantId) || isSignedIn(); // Dopuszczamy anonimowych by czytali logo
+        allow read: if isTenantUser(tenantId) || isSignedIn(); 
         allow write: if isTenantUser(tenantId) && isAdmin();
       }
 
@@ -134,22 +132,18 @@ service cloud.firestore {
       }
       
       match /planned_services/{document=**} {
-        allow read: if isTenantUser(tenantId);
-        allow write: if isTenantUser(tenantId) && isStaff();
+        allow read, write: if isTenantUser(tenantId);
       }
       
       match /parts/{document=**} {
-        allow read: if isTenantUser(tenantId);
-        allow write: if isTenantUser(tenantId) && isStaff();
+        allow read, write: if isTenantUser(tenantId);
       }
 
       match /part_transactions/{document=**} {
-        allow read: if isTenantUser(tenantId);
-        allow write: if isTenantUser(tenantId) && isStaff();
+        allow read, write: if isTenantUser(tenantId);
       }
       match /action_items/{document=**} {
-        allow read: if isTenantUser(tenantId);
-        allow write: if isTenantUser(tenantId) && isStaff();
+        allow read, write: if isTenantUser(tenantId);
       }
 
       match /audit_logs/{document=**} {
@@ -165,3 +159,4 @@ service cloud.firestore {
     }
   }
 }
+

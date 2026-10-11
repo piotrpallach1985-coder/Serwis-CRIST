@@ -89,9 +89,9 @@ export default function TicketMainColumnStepper({
                         {user?.role !== USER_ROLES.MANAGER && (
                           <div className="space-y-4">
                             {step.id === 1 && (
-                              <div className="flex flex-col sm:flex-row gap-3">
-                                <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 2, t('tickets.details.started_search'), etr)} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-md transition-all">
-                                  {t('tickets.details.go_to_contractor')}
+                              <div className="flex flex-col sm:flex-row gap-3 -ml-[2.5rem] sm:-ml-[3rem]">
+                                <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 2, t("tickets.details.started_search"), etr)} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-4 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                                  <i className="ph ph-play-circle text-xl"></i> Rozpocznij naprawę
                                 </button>
                               </div>
                             )}
@@ -111,12 +111,11 @@ export default function TicketMainColumnStepper({
 
                             {step.id === 3 && (
                               <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 4, t('tickets.details.started_repair_action'), etr)} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-md transition-all">
-                                Rozpocznij Naprawę
-                              </button>
+                                Rozpocznij naprawę</button>
                             )}
                             
                             {step.id === 4 && (
-                              <div className="flex flex-col sm:flex-row gap-3">
+                              <div className="flex flex-col sm:flex-row gap-3 -ml-[2.5rem] sm:-ml-[3rem]">
                                 <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 5, t('tickets.details.finished_repair_action'), etr)} className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-md transition-all">
                                   Zakończ Naprawę
                                 </button>
@@ -160,60 +159,83 @@ export default function TicketMainColumnStepper({
                         )}
                         
                         {step.id !== TICKET_STATUS.CLOSED && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">{t('tickets.details.add_note_label')}</label>
-                            <div className="relative mb-2">
+                          <div className="mt-6 pt-4 border-t border-slate-200 -ml-[2.5rem] sm:-ml-[3rem]">
+                            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Dodaj notatkę</label>
+                            <div className="relative mb-3">
                               <textarea
                                 value={comment}
-                                onChange={e => setComment(e.target.value)}
-                                className="w-full p-2.5 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none pr-10 text-sm bg-white"
+                                onChange={e => {
+                                  setComment(e.target.value);
+                                  e.target.style.height = "auto";
+                                  e.target.style.height = (e.target.scrollHeight) + "px";
+                                }}
+                                className="w-full p-4 border border-slate-300 rounded-xl resize-none focus:ring-2 focus:ring-slate-800 outline-none pr-12 text-sm bg-white shadow-sm transition-all min-h-[80px]"
                                 rows="3"
-                                placeholder={t('tickets.details.note_placeholder')}
-                                disabled={loading}
+                                placeholder="Treść notatki..."
+                                disabled={loading || isUploading}
                               />
-                              <div className="absolute right-2 top-2">
-                                <DictationButton onResult={(text) => setComment(prev => prev ? prev + ' ' + text : text)} />
+                              <div className="absolute right-3 bottom-3">
+                                <DictationButton onResult={(text) => setComment(prev => prev ? prev + " " + text : text)} />
                               </div>
                             </div>
 
-                            <div className="mb-2 relative border border-slate-200 rounded p-1">
-                              <input 
-                                type="file" 
-                                multiple 
-                                accept="image/*"
-                                onChange={(e) => setUploadedPhotos([...e.target.files])}
-                                className="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                              />
-                              {uploadError && <p className="text-red-500 text-xs mt-1 absolute bottom-1 right-2">{uploadError}</p>}
+                            <div className="flex gap-2 mb-3">
+                              <label className="flex-1 cursor-pointer bg-white hover:bg-slate-50 text-slate-700 py-3 px-2 rounded-xl text-xs md:text-sm font-bold transition-all flex flex-col items-center justify-center gap-1 border border-slate-300 shadow-sm text-center">
+                                <i className="ph ph-image text-xl text-slate-500"></i> Dodaj zdjęcie
+                                <input 
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => setUploadedPhotos(prev => [...(prev || []), ...e.target.files])}
+                                />
+                              </label>
+                              
+                              <label className="flex-1 cursor-pointer bg-white hover:bg-slate-50 text-slate-700 py-3 px-2 rounded-xl text-xs md:text-sm font-bold transition-all flex flex-col items-center justify-center gap-1 border border-slate-300 shadow-sm text-center">
+                                <i className="ph ph-camera text-xl text-slate-500"></i> Aparat
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={(e) => setUploadedPhotos(prev => [...(prev || []), ...e.target.files])}
+                                />
+                              </label>
                             </div>
 
-                            <div className="flex gap-2">
-                              {branding?.modules?.inventory !== false && (
+                            {uploadedPhotos?.length > 0 && (
+                              <div className="mb-3 text-xs font-bold text-blue-600 bg-blue-50 p-2 rounded-lg border border-blue-100 flex justify-between items-center">
+                                <span>Wybrano plików: {uploadedPhotos.length}</span>
+                                <button type="button" onClick={() => setUploadedPhotos([])} className="text-red-500 hover:text-red-700"><i className="ph ph-x"></i> Usuń</button>
+                              </div>
+                            )}
+                            {uploadError && <p className="text-red-500 text-xs mb-3 text-center">{uploadError}</p>}
+                            
+                            <button 
+                              disabled={loading || isUploading || (!comment.trim() && (!uploadedPhotos || uploadedPhotos.length === 0))} 
+                              onClick={() => {
+                                handleUpdate(currentTicket.id, null, user?.role === "manager" || user?.role === "superadmin" || user?.role === "company_admin" ? t("tickets.details.manager_comment") : t("tickets.details.note_added"), currentTicket.etr, uploadedPhotos, comment);
+                                setUploadedPhotos([]);
+                                setComment("");
+                              }} 
+                              className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3.5 px-4 rounded-xl text-sm font-bold shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3"
+                            >
+                              {uploadProgress ? (
+                                <><i className="ph ph-spinner animate-spin text-xl"></i> {uploadProgress}</>
+                              ) : (
+                                <><i className="ph ph-paper-plane-tilt text-xl"></i> Zapisz notatkę/zdjęcie</>
+                              )}
+                            </button>
+
+                            {branding?.modules?.inventory !== false && (
                               <button 
                                 disabled={loading || isArchive} 
                                 onClick={() => setIsPartModalOpen(true)}
-                                className="mt-2 flex-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg shadow-sm border border-blue-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 py-3.5 px-4 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
                               >
-                                <i className="ph ph-qr-code text-lg"></i> {t('tickets.details.take_part')}
+                                <i className="ph ph-package text-xl"></i> Pobierz dodatkową część z magazynu
                               </button>
-                              )}
-                              
-                              <button 
-                                disabled={loading || isUploading || (!comment.trim() && (!uploadedPhotos || uploadedPhotos.length === 0))} 
-                                onClick={() => {
-                                  handleUpdate(currentTicket.id, null, user?.role === USER_ROLES.MANAGER ? t('tickets.details.manager_comment') : t('tickets.details.note_added'), currentTicket.etr, uploadedPhotos, comment);
-                                  setUploadedPhotos([]);
-                                  setComment('');
-                                }} 
-                                className="mt-2 flex-1 text-xs bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                              >
-                                {uploadProgress ? (
-                                  <><i className="ph ph-spinner animate-spin text-lg"></i> {uploadProgress}</>
-                                ) : (
-                                  <><i className="ph ph-paper-plane-tilt text-lg"></i> {t('tickets.details.send_note')}</>
-                                )}
-                              </button>
-                            </div>
+                            )}
                           </div>
                         )}
                         

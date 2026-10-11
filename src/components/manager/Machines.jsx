@@ -285,24 +285,23 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   const handleScanSuccess = (decoded, rawQr) => {
     setIsScanning(false);
     if (!decoded) {
-      showToast(t('machines.toasts.qrReadError'), 'error');
+      showToast(t("machines.toasts.qrReadError"), "error");
       return;
     }
 
-    let machineId = typeof decoded === 'string' ? decoded.trim() : String(decoded);
+    let machineId = typeof decoded === "string" ? decoded.trim() : String(decoded);
     const originalRaw = rawQr || machineId;
+    let tenantFromQr = null;
+    
+    const tMatch = decoded.match(/tenant=([^&#]+)/);
+    if (tMatch) tenantFromQr = tMatch[1];
+    
+    const mMatch = decoded.match(/machine=([^&#]+)/);
+    if (mMatch) machineId = mMatch[1];
 
-    if (machineId.includes('?machine=')) {
-      try {
-        const queryPart = machineId.split('?')[1];
-        const urlParams = new URLSearchParams(queryPart);
-        machineId = urlParams.get('machine') || machineId;
-      } catch (e) {}
-    } else if (machineId.startsWith('http://') || machineId.startsWith('https://')) {
-      try {
-        const parsedUrl = new URL(machineId);
-        machineId = parsedUrl.searchParams.get('machine') || machineId;
-      } catch (e) {}
+    if (tenantFromQr && tenantFromQr !== getCurrentTenant() && user?.role !== "superadmin") {
+      showToast("Ta maszyna należy do innej firmy!", "error");
+      return;
     }
 
     const found = machines.find(m =>

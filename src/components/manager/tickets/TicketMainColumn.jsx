@@ -1,3 +1,6 @@
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../firebase';
+import { compressImage } from '../../../utils/imageCompressor';
 import { useAuth } from '../../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import React, {  useState, useMemo , useEffect } from 'react';
@@ -49,6 +52,46 @@ export default function TicketMainColumn({
   const [uploadProgress, setUploadProgress] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+
+  const handleUploadAndUpdate = async (ticketId, newStatus, actionText, newEtr, files, noteText) => {
+    let finalUrls = [];
+    if (files && files.length > 0 && files[0] instanceof File) {
+      setIsUploading(true);
+      setUploadError(null);
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          setUploadProgress(`Wysyłanie zdjęcia (${i + 1}/${files.length})...`);
+          
+          let fileToUpload = file;
+          try {
+             fileToUpload = await compressImage(file);
+          } catch(e) { console.warn("Kompresja nieudana", e) }
+
+          const fileName = Date.now() + "_" + fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const tenantId = getCurrentTenant();
+          const fileRef = ref(storage, `tenants/${tenantId}/tickets/${ticketId}/${fileName}`);
+          await uploadBytes(fileRef, fileToUpload);
+          const url = await getDownloadURL(fileRef);
+          finalUrls.push(url);
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        setUploadError("Błąd wgrywania zdjęć: " + err.message);
+        setIsUploading(false);
+        setUploadProgress("");
+        return;
+      }
+    } else if (files && files.length > 0) {
+      finalUrls = files;
+    }
+    
+    setIsUploading(false);
+    setUploadProgress("");
+    
+    return handleUpdate(ticketId, newStatus, actionText, newEtr, finalUrls, noteText);
+  };
+
   const [isPartModalOpen, setIsPartModalOpen] = useState(false);
 
   return (
@@ -79,7 +122,7 @@ export default function TicketMainColumn({
           etr={etr}
           comment={comment}
           setComment={setComment}
-          handleUpdate={handleUpdate}
+          handleUpdate={handleUploadAndUpdate}
           handleArchiveTicket={handleArchiveTicket}
           handleDeleteTicket={handleDeleteTicket}
           allowTicketDeletion={allowTicketDeletion}

@@ -300,29 +300,34 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
             {t('machines.dtr.techNotesTitle')}
           </h3>
         </div>
-        <div className="p-4">
+        <div className="p-2 sm:p-4">
           {canManage && (
-            <div className="flex gap-2 mb-4">
-              <div className="relative flex-1 flex items-center">
-<input 
-                type="text" 
-                value={newNote} 
-                onChange={(e) => setNewNote(e.target.value)} 
-                onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
-                placeholder={t('machines.dtr.addNotePlaceholder')} 
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-<div className="absolute right-2">
-  <DictationButton onResult={(text) => setNewNote(prev => prev ? prev + ' ' + text : text)} className="scale-75" />
-</div>
-</div>
-              <button 
-                onClick={handleAddNote} 
-                disabled={!newNote.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm"
-              >
-                {t('machines.buttons.add')}
-              </button>
+            <div className="flex flex-col gap-2 mb-4">
+              <div className="relative w-full">
+                <textarea 
+                  value={newNote} 
+                  onChange={(e) => {
+                    setNewNote(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
+                  }} 
+                  placeholder={t("machines.dtr.addNotePlaceholder")} 
+                  className="w-full border border-gray-300 rounded-lg p-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden min-h-[60px]"
+                  rows={2}
+                />
+                <div className="absolute right-2 bottom-3">
+                  <DictationButton onResult={(text) => setNewNote(prev => prev ? prev + " " + text : text)} className="scale-75" />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  onClick={handleAddNote} 
+                  disabled={!newNote.trim()}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-lg shadow-sm transition-colors text-sm"
+                >
+                  {t("machines.buttons.add")}
+                </button>
+              </div>
             </div>
           )}
 

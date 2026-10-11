@@ -17,7 +17,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
   const { i18n } = useTranslation();
   const transcribeModel = useManagerStore(state => state.transcribeModel);
   const geminiModel = useManagerStore(state => state.geminiModel) || 'gemini-3.8-flash';
-  const modelName = transcribeModel || "gemini-3.5-transcribe";
+  const modelName = transcribeModel || "whisper-large-v3";
 
   const startRecording = async (e) => {
     e.preventDefault();
@@ -108,10 +108,13 @@ export default function DictationButton({ onResult, onStart, className = '', mod
           lang: lang,
           tenantId: getCurrentTenant()
         });
-        finalResult = processRes.data.result;
+        if (processRes && processRes.data && processRes.data.result) {
+          finalResult = processRes.data.result;
+        }
       } catch (geminiErr) {
-        console.error("Cloud processing error:", geminiErr);
-        throw new Error("Błąd AI Gemini (Cloud): " + geminiErr.message);
+        console.warn("Cloud formatting error, using raw transcription:", geminiErr);
+        // Bezpieczny fallback - jeśli chmura Gemini ma opóźnienie/błąd, wstawiamy surowy tekst z Whisper!
+        finalResult = originalText;
       }
 
       if (onResult) {

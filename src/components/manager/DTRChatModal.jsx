@@ -198,7 +198,7 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
           </form>
           <div className="text-center mt-2">
             <span className="text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1">
-              <i className="ph ph-shield-check"></i> Vertex AI przetwarza pliki wewnątrz Google Cloud (0 pobierania)
+              <i className="ph ph-shield-check"></i> Vertex AI przetwarza pliki wewnątrz Google Cloud. <strong>Odpowiedzi generuje AI - weryfikuj z oryginałem.</strong>
             </span>
           </div>
         </div>

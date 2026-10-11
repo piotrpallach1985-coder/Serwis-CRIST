@@ -1,3 +1,5 @@
+import Toast from './Toast';
+import { useToast } from '../../hooks/useToast';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OperatorScanner from '../operator/OperatorScanner';
@@ -12,6 +14,7 @@ export default function InAppTicketScanner() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const tenantId = getCurrentTenant();
+  const { showToast, toastConfig, hideToast } = useToast();
   
   const machines = useManagerStore(state => state.machines || []);
   const regions = useManagerStore(state => state.regions || []);
@@ -31,11 +34,19 @@ export default function InAppTicketScanner() {
 
   const handleScanSuccess = async (decodedText, rawQr) => {
     let machineId = decodedText;
+    let tenantFromQr = null;
     
-    // Parse URL if it's a full URL
     const match = decodedText.match(/machine=([^&]+)/);
     if (match) machineId = match[1];
+    
+    const tMatch = decodedText.match(/tenant=([^&#]+)/);
+    if (tMatch) tenantFromQr = tMatch[1];
 
+    if (tenantFromQr && tenantFromQr !== tenantId && user?.role !== "superadmin") {
+      showToast("Ta maszyna należy do innej firmy!", "error");
+      return;
+    }
+    
     let targetMachine = machines.find(m => 
       m.id === machineId || 
       (m.qrCode && (m.qrCode === machineId || m.qrCode === decodedText || m.qrCode === rawQr)) || 
@@ -75,8 +86,8 @@ export default function InAppTicketScanner() {
         <button onClick={() => navigate(-1)} className="text-slate-500 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-sm">
           <i className="ph ph-arrow-left"></i> Wróć
         </button>
+        {toastConfig.visible && <Toast {...toastConfig} onClose={hideToast} />}
       </div>
-
       {step === 'scan' && (
         <OperatorScanner onScanSuccess={handleScanSuccess} />
       )}

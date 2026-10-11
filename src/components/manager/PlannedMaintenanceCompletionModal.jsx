@@ -83,7 +83,7 @@ export default function PlannedMaintenanceCompletionModal({
         }
       }
 
-      const checklistResponses = serviceToComplete.checklistResponses || {};
+      const checklistResponses = serviceToComplete.checklistResponses || serviceToComplete.responses || {};
       let checklistSummary = [];
       if (serviceToComplete.checklist) {
         checklistSummary = serviceToComplete.checklist.map(step => ({

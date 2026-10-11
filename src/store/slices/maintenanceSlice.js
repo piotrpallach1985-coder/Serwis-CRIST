@@ -32,6 +32,17 @@ export const createMaintenanceSlice = (set, get) => ({
     await updatePlannedService(srv.id, { status: 'in_progress', history: newHistory });
   },
 
+  setServicePendingAction: async (srv, user) => {
+    const historyEntry = { 
+      date: new Date().toISOString(), 
+      user: user?.name || 'System', 
+      action: 'Przywrócono status: Oczekujący', 
+      note: '' 
+    };
+    const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
+    await updatePlannedService(srv.id, { status: 'pending', history: newHistory });
+  },
+
   addServiceNoteAction: async (srv, noteText, user) => {
     const historyEntry = { 
       date: new Date().toISOString(), 

@@ -46,6 +46,7 @@ export default function PlannedMaintenanceDetails({
   const deletePlannedServiceAction = useManagerStore(state => state.deletePlannedServiceAction);
   const updateRbgAction = useManagerStore(state => state.updateRbgAction);
   const setServiceInProgressAction = useManagerStore(state => state.setServiceInProgressAction);
+  const setServicePendingAction = useManagerStore(state => state.setServicePendingAction);
   const parts = useManagerStore(state => state.parts || []);
   
   const [partTransactions, setPartTransactions] = useState([]);
@@ -113,6 +114,7 @@ export default function PlannedMaintenanceDetails({
             isCompleted={isCompleted}
             user={user}
             setServiceInProgressAction={setServiceInProgressAction}
+            setServicePendingAction={setServicePendingAction}
             onAddFutureNote={onAddFutureNote}
             setServiceToComplete={setServiceToComplete}
             onEdit={onEdit}

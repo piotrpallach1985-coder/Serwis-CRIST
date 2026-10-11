@@ -177,7 +177,7 @@ export default function HomeDashboard({ onLogout }) {
                 <button
                   type="button"
                   onClick={() => { setIsScannerSelectOpen(true); }}
-                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
+                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
                 >
                   <i className="ph ph-magnifying-glass text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
                   <i className="ph ph-qr-code text-2xl absolute top-6 right-6 opacity-50"></i>
@@ -190,7 +190,7 @@ export default function HomeDashboard({ onLogout }) {
                 <button
                   type="button"
                   onClick={() => navigate('/manager/ur/new_ticket_scanner')}
-                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
+                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
                 >
                   <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
                   <h3 className="text-base sm:text-xl font-bold tracking-wide">
@@ -202,7 +202,7 @@ export default function HomeDashboard({ onLogout }) {
                 <button
                   type="button"
                   onClick={() => navigateToModule('ur', 'dashboard_tickets')}
-                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
+                  className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
                 >
                   <i className="ph ph-wrench text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
                   <h3 className="text-base sm:text-xl font-bold tracking-wide">
@@ -215,7 +215,7 @@ export default function HomeDashboard({ onLogout }) {
                   <button
                     type="button"
                     onClick={() => navigateToModule('company_admin', 'users')}
-                    className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
+                    className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
                   >
                     <i className="ph ph-desktop text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
                     <h3 className="text-base sm:text-xl font-bold tracking-wide">

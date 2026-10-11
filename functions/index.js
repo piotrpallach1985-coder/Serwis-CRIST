@@ -37,7 +37,7 @@ async function getTokensForPermission(permissionId) {
   return Array.from(tokens);
 }
 
-exports.onTicketCreated = functions.firestore
+exports.onTicketCreated = functions.region('europe-west1').firestore
   .document('tenants/{tenantId}/tickets/{ticketId}')
   .onCreate(async (snap, context) => {
     const ticket = snap.data();
@@ -69,7 +69,7 @@ exports.onTicketCreated = functions.firestore
     }
   });
 
-exports.onTicketStatusUpdated = functions.firestore
+exports.onTicketStatusUpdated = functions.region('europe-west1').firestore
   .document('tenants/{tenantId}/tickets/{ticketId}')
   .onUpdate(async (change, context) => {
     const newValue = change.after.data();
@@ -125,7 +125,7 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const speech = require('@google-cloud/speech').v2;
 const speechClient = new speech.SpeechClient({ apiEndpoint: "europe-west4-speech.googleapis.com" });
 
-exports.transcribeAudio = functions.https.onCall(async (data, context) => {
+exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
   const { audioBase64, model, mimeType } = data;
   if (!audioBase64) throw new functions.https.HttpsError("invalid-argument", "Brak pliku audio");
@@ -192,7 +192,7 @@ exports.transcribeAudio = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.chatWithDTR = functions.https.onCall(async (data, context) => {
+exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
   const { messages, documentPaths, machineName } = data;
   if (!messages || !messages.length) throw new functions.https.HttpsError("invalid-argument", "Brak wiadomosci");
@@ -235,7 +235,7 @@ exports.chatWithDTR = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.processDictationText = functions.https.onCall(async (data, context) => {
+exports.processDictationText = functions.region('europe-west1').https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
   const { rawText, mode, lang, tenantId } = data;
   if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejsciowego");
@@ -290,7 +290,7 @@ Oto notatka:
   }
 });
 
-exports.logAIUsage = functions.https.onCall(async (data, context) => {
+exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, context) => {
   const { HttpsError } = functions.https;
   if (!context.auth) throw new HttpsError("unauthenticated", "User not authenticated.");
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
@@ -320,7 +320,7 @@ exports.logAIUsage = functions.https.onCall(async (data, context) => {
 });
 
 // --- Skalowalnosc: Automatyczne przeglady planowane (Cron o 2:00 w nocy) ---
-exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *')
+exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubsub.schedule('0 2 * * *')
   .timeZone('Europe/Warsaw')
   .onRun(async (context) => {
     console.log('Rozpoczecie weryfikacji serwisow planowanych...');
@@ -428,7 +428,7 @@ exports.scheduledCheckPlannedMaintenance = functions.pubsub.schedule('0 2 * * *'
   });
 
 // --- Skalowalnosc: Agregacja KPI na ��danie (zmniejszenie pobierania danych do przegl�darki) ---
-exports.getKPIStats = functions.https.onCall(async (data, context) => {
+exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
   if (!tenantId) throw new functions.https.HttpsError('invalid-argument', 'Brak tenantId');
@@ -524,7 +524,7 @@ exports.getKPIStats = functions.https.onCall(async (data, context) => {
 });
 
 // --- Skalowalnosc: Agregacja KPI Serwis�w Planowanych ---
-exports.getPlannedKPIStats = functions.https.onCall(async (data, context) => {
+exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
   const tenantId = context.auth.token.tenantId || (data && data.tenantId);
   if (!tenantId) throw new functions.https.HttpsError('invalid-argument', 'Brak tenantId');
