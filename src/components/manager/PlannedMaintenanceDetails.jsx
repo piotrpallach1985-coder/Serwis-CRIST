@@ -137,11 +137,17 @@ export default function PlannedMaintenanceDetails({
         isOpen={isPartUsageModalOpen}
         onClose={() => setIsPartUsageModalOpen(false)}
         ticketId={srv.id}
-        onPartUsed={(tx) => {
-          setPartTransactions(prev => [...prev, tx]);
+        onPartUsed={(msgOrTx, maybeTx) => {
+          const tx = (typeof msgOrTx === 'object' && msgOrTx !== null) ? msgOrTx : (maybeTx || {});
+          const noteText = typeof msgOrTx === 'string' && msgOrTx.startsWith('Pobrano')
+            ? msgOrTx
+            : (tx.partName ? `Pobrano z magazynu: ${tx.partName} (${tx.quantity || 1} szt.)` : 'Pobrano część z magazynu');
+          if (tx.partId) {
+            setPartTransactions(prev => [...prev, tx]);
+          }
           setIsPartUsageModalOpen(false);
           // Odswiezamy przez dodanie notatki
-          onAddFutureNote(srv.id, "Pobrano część: " + tx.partName + " x" + tx.quantity, [], () => {});
+          onAddFutureNote(srv.id, noteText, [], () => {});
         }}
       />
       <PlannedMaintenanceRbgModal

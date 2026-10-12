@@ -337,12 +337,49 @@ export default function PlannedMaintenanceCompletionModal({
               </div>
               <div>
                 <label className="block text-xs font-bold text-blue-800 mb-1">{t('planned.expected_date')}</label>
-                <input
-                  type="date"
-                  value={actionItemDueDate}
-                  onChange={e => setActionItemDueDate(e.target.value)}
-                  className="w-full p-2 rounded border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <input
+                    type="date"
+                    value={actionItemDueDate}
+                    onChange={e => setActionItemDueDate(e.target.value)}
+                    className="w-full sm:w-auto flex-1 p-2 rounded border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 7);
+                        setActionItemDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 text-xs font-bold rounded border border-blue-200 shadow-2xs"
+                    >
+                      +7 dni
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 14);
+                        setActionItemDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 text-xs font-bold rounded border border-blue-200 shadow-2xs"
+                    >
+                      +14 dni
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 30);
+                        setActionItemDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 text-xs font-bold rounded border border-blue-200 shadow-2xs"
+                    >
+                      +30 dni
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

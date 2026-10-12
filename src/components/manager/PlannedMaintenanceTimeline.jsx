@@ -29,6 +29,7 @@ export default function PlannedMaintenanceTimeline({
   const { t } = useTranslation();
   const services = useManagerStore(state => state.services || []);
   const machines = useManagerStore(state => state.machines || []);
+  const parts = useManagerStore(state => state.parts || []);
 
   const [timelineNote, setTimelineNote] = useState('');
   const [timelinePhotos, setTimelinePhotos] = useState([]);
@@ -46,8 +47,16 @@ export default function PlannedMaintenanceTimeline({
   const [summaryNotes, setSummaryNotes] = useState('');
   const [summaryCreateActionItem, setSummaryCreateActionItem] = useState(false);
   const [summaryActionItemDetails, setSummaryActionItemDetails] = useState('');
+  const [summaryActionItemDueDate, setSummaryActionItemDueDate] = useState('');
+  const [summaryExtraParts, setSummaryExtraParts] = useState([]);
   const [summaryCreateNewPlan, setSummaryCreateNewPlan] = useState(true);
   const [isCompletingService, setIsCompletingService] = useState(false);
+
+  const setQuickActionItemDueDate = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setSummaryActionItemDueDate(d.toISOString().split('T')[0]);
+  };
 
   // Pozwala na swobodne przeglądanie kroków przez technika / kierownika
   const [selectedStepOverride, setSelectedStepOverride] = useState(null);
@@ -151,6 +160,14 @@ export default function PlannedMaintenanceTimeline({
         if (details) {
           setSummaryActionItemDetails(details);
         }
+        if (result.actionItemDays || result.termin_dni) {
+          const days = Number(result.actionItemDays || result.termin_dni);
+          if (!isNaN(days) && days > 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            setSummaryActionItemDueDate(d.toISOString().split('T')[0]);
+          }
+        }
       }
     } else if (typeof result === 'string') {
       setSummaryNotes(prev => prev ? prev + ' ' + result : result);
@@ -231,12 +248,27 @@ export default function PlannedMaintenanceTimeline({
       if (summaryCreateActionItem && summaryActionItemDetails.trim()) {
         actionItemDataObj = {
           machineId: srv.machineId || '',
+          machineName: srv.machineName || '',
           plannedServiceId: srv.id || '',
           problem: summaryActionItemDetails.trim(),
+          dueDate: summaryActionItemDueDate ? new Date(summaryActionItemDueDate).toISOString() : null,
           status: 'pending',
           createdAt: new Date().toISOString(),
           createdBy: user?.name || 'Nieznany'
         };
+      }
+
+      const validExtraParts = summaryExtraParts.filter(
+        ep => ep.partId && ep.partId !== '' && Number(ep.quantity) > 0
+      );
+
+      if (validExtraParts.length > 0) {
+        const extraNote = 'Pobrano dodatkowe części (poza planem): ' + validExtraParts.map(ep => {
+          const found = parts.find(p => p.id === ep.partId);
+          return (found ? found.name : ep.partId) + ' x' + ep.quantity;
+        }).join(', ');
+        historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + extraNote;
+        historyEntry.extraParts = validExtraParts;
       }
 
       await completeServiceWithTransaction(
@@ -244,7 +276,7 @@ export default function PlannedMaintenanceTimeline({
         completionData,
         nextPlanData,
         actionItemDataObj,
-        []
+        validExtraParts
       );
 
       setSelectedStepOverride(5);
@@ -472,20 +504,28 @@ export default function PlannedMaintenanceTimeline({
 
                           {/* Lista kontrolna dla kroku 3 (jeśli zdefiniowana w serwisie) */}
                           {srv.checklist && srv.checklist.length > 0 && (
-                            <div className="w-full bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
-                              <h4 className="text-base font-bold mb-3 text-slate-800 border-b pb-2 flex items-center gap-2">
-                                <i className="ph ph-clipboard-text text-blue-600"></i>
+                            <div className="w-full bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+                              <h4 className="text-sm font-bold mb-2.5 text-slate-800 border-b pb-2 flex items-center gap-2">
+                                <i className="ph ph-clipboard-text text-blue-600 text-base"></i>
                                 Lista Kontrolna (Checklista do wykonania)
                               </h4>
                               <ChecklistExecutor
                                 steps={srv.checklist}
-                                onComplete={(responses) => {
-                                  updatePlannedService(srv.id, {
-                                    checklistResponses: responses,
-                                    responses
-                                  });
-                                  setTimelineSuccessMsg('Odpowiedzi checklisty zostały zapisane!');
-                                  setTimeout(() => setTimelineSuccessMsg(null), 3000);
+                                initialResponses={srv.checklistResponses || srv.responses || {}}
+                                onComplete={async (responses) => {
+                                  try {
+                                    await updatePlannedService(srv.id, {
+                                      checklistResponses: responses,
+                                      responses,
+                                      currentStep: 4
+                                    });
+                                    setSelectedStepOverride(4);
+                                    setTimelineSuccessMsg('Checklista zatwierdzona! Przejście do podsumowania serwisu.');
+                                    setTimeout(() => setTimelineSuccessMsg(null), 3000);
+                                  } catch (err) {
+                                    console.error('Błąd zapisu checklisty:', err);
+                                    setSelectedStepOverride(4);
+                                  }
                                 }}
                               />
                             </div>
@@ -718,17 +758,119 @@ export default function PlannedMaintenanceTimeline({
                                 </label>
                               </div>
                               {summaryCreateActionItem && (
-                                <div className="relative pl-6">
-                                  <input
-                                    type="text"
-                                    value={summaryActionItemDetails}
-                                    onChange={e => setSummaryActionItemDetails(e.target.value)}
-                                    placeholder="Szczegóły tematu do realizacji (np. wymiana paska napędowego za 2 tygodnie)..."
-                                    className="w-full p-2.5 pr-10 border border-blue-200 rounded-lg text-sm bg-blue-50/40 focus:ring-2 focus:ring-blue-500"
-                                  />
-                                  <div className="absolute right-2 top-2">
-                                    <DictationButton onResult={text => setSummaryActionItemDetails(prev => prev ? prev + ' ' + text : text)} />
+                                <div className="space-y-2.5 pl-6">
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={summaryActionItemDetails}
+                                      onChange={e => setSummaryActionItemDetails(e.target.value)}
+                                      placeholder="Szczegóły tematu do realizacji (np. wymiana paska napędowego za 2 tygodnie)..."
+                                      className="w-full p-2.5 pr-10 border border-blue-200 rounded-lg text-sm bg-blue-50/40 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <div className="absolute right-2 top-2">
+                                      <DictationButton onResult={text => setSummaryActionItemDetails(prev => prev ? prev + ' ' + text : text)} />
+                                    </div>
                                   </div>
+
+                                  <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <label className="text-xs font-bold text-blue-900 shrink-0">
+                                        Data wymagalności (termin):
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={summaryActionItemDueDate}
+                                        onChange={e => setSummaryActionItemDueDate(e.target.value)}
+                                        className="p-1.5 px-2 text-xs border border-blue-300 rounded-md bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] text-blue-700 font-semibold mr-1">Szybki termin:</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuickActionItemDueDate(7)}
+                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
+                                      >
+                                        +7 dni
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuickActionItemDueDate(14)}
+                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
+                                      >
+                                        +14 dni
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuickActionItemDueDate(30)}
+                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
+                                      >
+                                        +30 dni
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Dodatkowe części poza planem (pobranie z magazynu) */}
+                            <div className="pt-2 border-t border-slate-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                  <i className="ph ph-package text-orange-600 text-base"></i>
+                                  Pobierz dodatkowe części z magazynu (poza planem):
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => setSummaryExtraParts(prev => [...prev, { partId: '', quantity: 1 }])}
+                                  className="text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                                >
+                                  <i className="ph ph-plus-circle"></i> Dodaj część
+                                </button>
+                              </div>
+
+                              {summaryExtraParts.length > 0 && (
+                                <div className="space-y-1.5 bg-orange-50/40 p-2.5 rounded-lg border border-orange-100">
+                                  {summaryExtraParts.map((ep, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <select
+                                        value={ep.partId}
+                                        onChange={e => {
+                                          const copy = [...summaryExtraParts];
+                                          copy[idx].partId = e.target.value;
+                                          setSummaryExtraParts(copy);
+                                        }}
+                                        className="flex-1 p-1.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-orange-500"
+                                      >
+                                        <option value="">-- Wybierz część z magazynu --</option>
+                                        {parts.map(p => (
+                                          <option key={p.id} value={p.id}>
+                                            {p.name} (Stan: {p.stock || 0})
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={ep.quantity}
+                                        onChange={e => {
+                                          const copy = [...summaryExtraParts];
+                                          copy[idx].quantity = Math.max(1, parseInt(e.target.value) || 1);
+                                          setSummaryExtraParts(copy);
+                                        }}
+                                        className="w-16 p-1.5 border border-slate-300 rounded text-xs bg-white text-center font-bold outline-none focus:ring-1 focus:ring-orange-500"
+                                        placeholder="Szt."
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setSummaryExtraParts(prev => prev.filter((_, i) => i !== idx))}
+                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                        title="Usuń pozycję"
+                                      >
+                                        <i className="ph ph-trash text-base"></i>
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>

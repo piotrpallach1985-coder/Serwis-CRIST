@@ -120,7 +120,20 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
       const costText = finalCost > 0 ? ` (Wartość: ${finalCost.toLocaleString('pl-PL')} PLN)` : '';
       const message = `Pobrano z magazynu: ${selectedPart.name} (${qtyNum} szt.)${costText}`;
       
-      onPartUsed(message);
+      const txData = {
+        partId: selectedPart.id,
+        partName: selectedPart.name,
+        quantity: qtyNum,
+        unitPrice: finalCost > 0 ? (finalCost / qtyNum) : 0,
+        totalCost: finalCost,
+        type: 'issue_planned',
+        referenceId: ticketId,
+        createdAt: new Date()
+      };
+
+      if (onPartUsed) {
+        onPartUsed(message, txData);
+      }
       onClose();
     } catch (err) {
       console.error(err);
