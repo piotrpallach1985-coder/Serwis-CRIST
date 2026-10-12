@@ -250,17 +250,27 @@ exports.processDictationText = functions.region('europe-west1').https.onCall(asy
     let result = rawText;
     
     if (mode === "smart") {
-      const prompt = `Jesteś ekspertem utrzymania ruchu. Otrzymasz surowy tekst (z dyktowania).
-Wyciągnij z niego konkretne informacje i zwróć TYLKO czysty obiekt JSON bez znaczników formatowania (np. markdown).
-Wymagany format JSON:
+      const prompt = `Jesteś asystentem uzupełniającym formularz serwisowy. Otrzymasz transkrypcję głosu mechanika.
+Twoim zadaniem jest wyciągnięcie danych i zwrócenie ich w formacie JSON.
+Zasady mapowania:
+1. "czas_pracy": wyciągnij liczbę godzin (jako float).
+2. "zuzyto_wymagane_czesci": ustaw na true, jeśli mechanik potwierdził użycie części.
+3. "czysta_notatka": to absolutnie najważniejsze! Zignoruj polecenia wydawane do Ciebie (np. "wpisz", "dodaj", "notatka to"). Zapisz tu tylko faktyczną treść techniczną dotyczącą maszyny.
+4. "tematy_do_realizacji": ustaw na true, jeśli mechanik zlecił kolejne kroki.
+5. "szczegoly_tematu": opis kolejnych kroków/tematu jeśli mechanik podał.
+
+Zwróć TYLKO czysty obiekt JSON bez znaczników formatowania (np. markdown) i bez dodatkowego tekstu.
+
+Format wyjściowy:
 {
-  "note": "profesjonalna notatka o zrobionej pracy, bez wspominania o czasie i zadaniach",
-  "timeSpentHours": liczba (opcjonalnie),
-  "actionItem": "opis problemu" (opcjonalnie),
-  "actionItemDays": liczba (opcjonalnie)
+  "czas_pracy": 2.0,
+  "zuzyto_wymagane_czesci": true,
+  "czysta_notatka": "Maszyna w dobrym stanie ogólnym.",
+  "tematy_do_realizacji": true,
+  "szczegoly_tematu": "Wymagana wymiana paska napędowego za dwa tygodnie."
 }
-Oto notatka:
-"${rawText}"`;
+
+Surowy tekst od mechanika: "${rawText}"`;
       
       const resp = await generativeModel.generateContent(prompt);
       let jsonText = resp.response.candidates[0].content.parts[0].text;

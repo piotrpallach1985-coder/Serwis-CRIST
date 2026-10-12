@@ -28,18 +28,35 @@ export default function PlannedMaintenanceCompletionModal({
 
   const handleSmartAiResult = (result) => {
     if (typeof result === 'object' && result !== null) {
-      if (result.note) setCompletionNotes(prev => prev ? prev + ' \n' + result.note : result.note);
-      if (result.timeSpentHours) setActualManHours(result.timeSpentHours);
-      if (result.actionItem) {
+      // 1. Czysta notatka techniczna
+      const noteVal = result.czysta_notatka || result.note;
+      if (noteVal) {
+        setCompletionNotes(prev => prev ? prev + '\n' + noteVal : noteVal);
+      }
+      // 2. Czas pracy (RBG / godziny)
+      if (result.czas_pracy !== undefined && result.czas_pracy !== null) {
+        setActualManHours(result.czas_pracy);
+      } else if (result.timeSpentHours) {
+        setActualManHours(result.timeSpentHours);
+      }
+      // 3. Zużyto wymagane części
+      if (result.zuzyto_wymagane_czesci !== undefined) {
+        setPartsUsed(Boolean(result.zuzyto_wymagane_czesci));
+      }
+      // 4. Tematy do realizacji / kolejne kroki
+      if (result.tematy_do_realizacji || result.szczegoly_tematu || result.actionItem) {
         setCreateActionItem(true);
-        setActionItemProblem(result.actionItem);
+        const details = result.szczegoly_tematu || result.actionItem || '';
+        if (details) {
+          setActionItemProblem(details);
+        }
         if (result.actionItemDays) {
           const d = new Date();
           d.setDate(d.getDate() + result.actionItemDays);
           setActionItemDueDate(d.toISOString().split('T')[0]);
         }
       }
-    } else {
+    } else if (typeof result === 'string') {
       setCompletionNotes(prev => prev ? prev + ' ' + result : result);
     }
   };
@@ -170,7 +187,10 @@ export default function PlannedMaintenanceCompletionModal({
             <h3 className="text-lg font-bold text-slate-800 mb-1">{t('planned.complete_service')}</h3>
             <p className="text-sm text-slate-600 font-bold">{serviceToComplete.name}</p>
           </div>
-          <DictationButton mode="smart" onResult={handleSmartAiResult} />
+          <div className="flex items-center gap-2 bg-purple-50 p-1.5 px-3 rounded-xl border border-purple-200 shadow-sm" title="Inteligentne podsumowanie głosowe (AI)">
+            <span className="text-xs font-bold text-purple-800 hidden sm:inline">Smart AI</span>
+            <DictationButton mode="smart" onResult={handleSmartAiResult} />
+          </div>
         </div>
 
 
@@ -255,7 +275,10 @@ export default function PlannedMaintenanceCompletionModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-bold text-slate-700 mb-2">{t('planned.exec_notes')}</label>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-bold text-slate-700">{t('planned.exec_notes')}</label>
+            <span className="text-xs text-gray-400 font-normal">AI voice to text</span>
+          </div>
           <div className="relative">
             <textarea
               className="w-full p-3 pr-10 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 min-h-[100px]"

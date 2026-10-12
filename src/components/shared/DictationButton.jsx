@@ -97,23 +97,39 @@ export default function DictationButton({ onResult, onStart, className = '', mod
         return;
       }
 
-      // 2. Przetwarzanie (Cloud Function - Gemini)
+      // 2. Przetwarzanie (Cloud Function - Gemini wyłącznie w trybie smart / podsumowania)
       let finalResult = originalText;
-      try {
-        const processFn = httpsCallable(functions, "processDictationText");
-        const lang = i18n.language === "en" ? "angielski" : "polski";
-        const processRes = await processFn({
-          rawText: originalText,
-          mode: mode,
-          lang: lang,
-          tenantId: getCurrentTenant()
-        });
-        if (processRes && processRes.data && processRes.data.result) {
-          finalResult = processRes.data.result;
+      if (mode === 'smart') {
+        try {
+          const processFn = httpsCallable(functions, "processDictationText");
+          const lang = i18n.language === "en" ? "angielski" : "polski";
+          const processRes = await processFn({
+            rawText: originalText,
+            mode: 'smart',
+            lang: lang,
+            tenantId: getCurrentTenant()
+          });
+          if (processRes && processRes.data && processRes.data.result) {
+            let resData = processRes.data.result;
+            if (typeof resData === 'string') {
+              try {
+                resData = JSON.parse(resData.replace(/```json/g, "").replace(/```/g, "").trim());
+              } catch (parseErr) {
+                const match = resData.match(/\{[\s\S]*\}/);
+                if (match) {
+                  try { resData = JSON.parse(match[0]); } catch (e) {}
+                }
+              }
+            }
+            finalResult = resData;
+          }
+        } catch (geminiErr) {
+          console.warn("Cloud formatting error, using raw transcription:", geminiErr);
+          // Bezpieczny fallback - jeśli chmura Gemini ma opóźnienie/błąd, wstawiamy surowy tekst z Whisper!
+          finalResult = originalText;
         }
-      } catch (geminiErr) {
-        console.warn("Cloud formatting error, using raw transcription:", geminiErr);
-        // Bezpieczny fallback - jeśli chmura Gemini ma opóźnienie/błąd, wstawiamy surowy tekst z Whisper!
+      } else {
+        // Wszędzie indziej czyste AI voice to text bez ingerencji modelu językowego
         finalResult = originalText;
       }
 
@@ -139,10 +155,10 @@ export default function DictationButton({ onResult, onStart, className = '', mod
           : isProcessing 
             ? 'bg-amber-400 text-white cursor-wait' 
             : mode === 'smart' 
-              ? 'bg-purple-100 hover:bg-purple-200 text-purple-600 hover:text-purple-700 shadow-sm'
+              ? 'bg-purple-100 hover:bg-purple-200 text-purple-600 hover:text-purple-700 shadow-sm' 
               : 'bg-slate-100 hover:bg-blue-100 text-slate-500 hover:text-blue-600'
         } ${className}`}
-      title={isRecording ? "Zatrzymaj nagrywanie" : mode === 'smart' ? "Inteligentne Dyktowanie (Wypełnij automatycznie formularz)" : "Podyktuj tekst (AI Whisper)"}
+      title={isRecording ? "Zatrzymaj nagrywanie" : mode === 'smart' ? "Inteligentne Dyktowanie (Wypełnij automatycznie formularz)" : "Podyktuj tekst (AI voice to text)"}
     >
       {isProcessing ? (
         <i className="ph ph-spinner animate-spin text-lg"></i>

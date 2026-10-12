@@ -123,16 +123,36 @@ describe('DictationButton Security & AI Functionality', () => {
     const groqFetchCalls = mockFetchCallsTo('api.groq.com');
     expect(groqFetchCalls).toBe(0);
 
-    // Verify it called onResult with the processed text
+    // Verify it called onResult with the pure voice-to-text transcription (no Gemini call in text mode)
     await waitFor(() => {
+      expect(onResultMock).toHaveBeenCalledWith('Przykładowa transkrypcja testowa.');
+    });
+
+    // Verify processDictationText was NOT called in text mode (voice to text only)
+    expect(mockProcessText).not.toHaveBeenCalled();
+  });
+
+  it('calls Gemini processDictationText in smart mode and returns structured data', async () => {
+    const onResultMock = vi.fn();
+    render(<DictationButton mode="smart" onResult={onResultMock} />);
+    
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled());
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(mockTranscribe).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(mockProcessText).toHaveBeenCalled();
       expect(onResultMock).toHaveBeenCalledWith('Sformatowana transkrypcja');
     });
 
-    // Verify processDictationText was called securely with tenantId
-    expect(mockProcessText).toHaveBeenCalled();
     const processCallArgs = mockProcessText.mock.calls[0][0];
+    expect(processCallArgs).toHaveProperty('mode', 'smart');
     expect(processCallArgs).toHaveProperty('tenantId', 'test-tenant');
-    expect(processCallArgs).toHaveProperty('rawText', 'Przykładowa transkrypcja testowa.');
   });
 
   // Helper function to check if fetch was called with a specific URL
