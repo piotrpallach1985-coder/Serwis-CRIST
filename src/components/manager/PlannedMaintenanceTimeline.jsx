@@ -24,12 +24,27 @@ export default function PlannedMaintenanceTimeline({
   canDeletePlanned,
   isArchive,
   allowTicketDeletion,
-  onBack
+  onBack,
+  actualPartsUsed = []
 }) {
   const { t } = useTranslation();
   const services = useManagerStore(state => state.services || []);
   const machines = useManagerStore(state => state.machines || []);
   const parts = useManagerStore(state => state.parts || []);
+
+  const [loadedPartsUsed, setLoadedPartsUsed] = useState([]);
+  useEffect(() => {
+    if ((!actualPartsUsed || actualPartsUsed.length === 0) && srv?.id) {
+      import('../../hooks/usePartTransactions').then(({ fetchTransactionsForReference }) => {
+        fetchTransactionsForReference(getCurrentTenant(), srv.id).then(txs => {
+          const filtered = (txs || []).filter(tx => tx.referenceId === srv.id && (tx.type === 'issue_planned' || tx.type === 'issue_adhoc'));
+          setLoadedPartsUsed(filtered);
+        });
+      });
+    }
+  }, [srv?.id, actualPartsUsed]);
+
+  const displayedPartsUsed = (actualPartsUsed && actualPartsUsed.length > 0) ? actualPartsUsed : loadedPartsUsed;
 
   const [timelineNote, setTimelineNote] = useState('');
   const [timelinePhotos, setTimelinePhotos] = useState([]);
@@ -812,6 +827,42 @@ export default function PlannedMaintenanceTimeline({
                                 </div>
                               )}
                             </div>
+
+                            {/* Już pobrane części w ramach serwisu */}
+                            {displayedPartsUsed && displayedPartsUsed.length > 0 && (
+                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                                    <i className="ph ph-check-circle text-blue-600 text-base"></i>
+                                    Faktycznie pobrane części ({displayedPartsUsed.length}):
+                                  </label>
+                                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                                    Łączny koszt: {displayedPartsUsed.reduce((sum, tx) => sum + (tx.totalCost ? Number(tx.totalCost) : (Math.abs(Number(tx.quantity) || 1) * (Number(tx.price) || 0))), 0).toFixed(2)} PLN
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+                                  {displayedPartsUsed.map((tx, idx) => {
+                                    const pName = parts.find(p => p.id === tx.partId)?.name || tx.partName || 'Część z magazynu';
+                                    const qty = Math.abs(Number(tx.quantity) || 1);
+                                    const costVal = tx.totalCost ? Number(tx.totalCost) : (qty * (Number(tx.price) || 0));
+                                    const costStr = costVal.toFixed(2) + ' PLN';
+                                    const userName = tx.user || 'System';
+                                    return (
+                                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs bg-white p-2 rounded-md border border-blue-100 shadow-2xs gap-1">
+                                        <div className="flex items-center gap-2">
+                                          <i className="ph ph-nut text-blue-500 text-sm"></i>
+                                          <span className="font-bold text-slate-800">{pName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-slate-600 text-[11px] font-medium pl-6 sm:pl-0">
+                                          <span>Pobrano: <strong className="text-slate-800">{qty}</strong> ({userName})</span>
+                                          <span className="text-blue-700 font-bold">Koszt: {costStr}</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
 
                             {/* Dodatkowe części poza planem (pobranie z magazynu) */}
                             <div className="pt-2 border-t border-slate-100 space-y-2">

@@ -125,6 +125,7 @@ export default function PlannedMaintenanceDetails({
             isArchive={isArchive}
             allowTicketDeletion={allowTicketDeletion}
             onBack={onBack}
+            actualPartsUsed={actualPartsUsed}
           />
         </div>
         

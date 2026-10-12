@@ -1,5 +1,5 @@
 import { useAuth } from '../../hooks/useAuth';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { completeServiceWithTransaction } from '../../services/plannedServices.service';
 import { addActionItem } from '../../services/tickets.service';
@@ -20,7 +20,21 @@ export default function PlannedMaintenanceCompletionModal({
   const [partsUsed, setPartsUsed] = useState(false);
   const [actualManHours, setActualManHours] = useState('');
   const [extraParts, setExtraParts] = useState([]);
+  const [alreadyUsedParts, setAlreadyUsedParts] = useState([]);
   const parts = useManagerStore(state => state.parts || []);
+
+  useEffect(() => {
+    if (serviceToComplete?.id) {
+      import('../../hooks/usePartTransactions').then(({ fetchTransactionsForReference }) => {
+        import('../../utils/tenantHelper').then(({ getCurrentTenant }) => {
+          fetchTransactionsForReference(getCurrentTenant(), serviceToComplete.id).then(txs => {
+            const filtered = (txs || []).filter(tx => tx.referenceId === serviceToComplete.id && (tx.type === 'issue_planned' || tx.type === 'issue_adhoc'));
+            setAlreadyUsedParts(filtered);
+          });
+        });
+      });
+    }
+  }, [serviceToComplete?.id]);
 
   if (!isOpen || !serviceToComplete) return null;
 
@@ -219,6 +233,34 @@ export default function PlannedMaintenanceCompletionModal({
               {t('planned.confirm_parts')}
             </label>
           </div>
+
+          {/* Już pobrane części w ramach serwisu */}
+          {alreadyUsedParts.length > 0 && (
+            <div className="mb-4 bg-blue-50/60 p-3 rounded-lg border border-blue-200">
+              <div className="text-xs font-bold text-blue-900 mb-2 flex items-center justify-between">
+                <span>Faktycznie pobrane części ({alreadyUsedParts.length}):</span>
+                <span className="text-[11px] text-blue-700 font-semibold bg-blue-100/70 px-2 py-0.5 rounded-full">
+                  Łącznie: {alreadyUsedParts.reduce((sum, tx) => sum + (tx.totalCost ? Number(tx.totalCost) : (Math.abs(Number(tx.quantity) || 1) * (Number(tx.price) || 0))), 0).toFixed(2)} PLN
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {alreadyUsedParts.map((tx, idx) => {
+                  const pName = parts.find(p => p.id === tx.partId)?.name || tx.partName || 'Część';
+                  const qty = Math.abs(Number(tx.quantity) || 1);
+                  const cost = tx.totalCost ? Number(tx.totalCost).toFixed(2) : (qty * (Number(tx.price) || 0)).toFixed(2);
+                  return (
+                    <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-blue-100">
+                      <span className="font-bold text-slate-800">{pName}</span>
+                      <div className="text-slate-600 text-[11px]">
+                        <span>Pobrano: {qty} ({tx.user || 'System'})</span> | <strong className="text-blue-700">{cost} PLN</strong>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Extra parts outside the plan */}
           <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
             <div className="flex justify-between items-center mb-2">
