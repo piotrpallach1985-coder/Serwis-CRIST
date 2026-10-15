@@ -21,7 +21,14 @@ async function verifyTenantAccess(context, requestedTenantId, options = { allowA
     if (!options.allowAnonymous) {
       throw new functions.https.HttpsError('permission-denied', 'Funkcja niedostępna dla sesji anonimowych.');
     }
-    return tenantId || 'crist';
+    // Anonim (QR) musi być powiązany z firmą przez anon_sessions/{uid} (spójnie z firestore.rules)
+    const sessionDoc = await db.collection('anon_sessions').doc(context.auth.uid).get();
+    const boundTenant = sessionDoc.exists ? sessionDoc.data().tenantId : null;
+    const wanted = tenantId || 'crist';
+    if (boundTenant ? boundTenant !== wanted : wanted !== 'crist') {
+      throw new functions.https.HttpsError('permission-denied', 'Sesja QR nie jest powiązana z tą firmą.');
+    }
+    return wanted;
   }
 
   const userDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -218,6 +225,15 @@ exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (d
       };
       const resp = await generativeModel.generateContent(req);
       text = resp.response.candidates[0].content.parts[0].text;
+      const tTokens = resp.response.usageMetadata?.totalTokenCount || 0;
+      if (tTokens > 0 && verifiedTenantId) {
+        const geminiPrice = (globalDoc.exists && globalDoc.data().geminiPrice) ? globalDoc.data().geminiPrice : 0.60;
+        await db.collection("tenants").doc(verifiedTenantId).collection("stats").doc("ai_usage").set({
+          vertexTokens: FieldValue.increment(tTokens),
+          vertexCost: FieldValue.increment((tTokens / 1000000) * geminiPrice),
+          vertexCalls: FieldValue.increment(1)
+        }, { merge: true });
+      }
     }
     
     const durationSeconds = Math.min(Math.max(0, Number(data.durationSeconds || 0)), 600);
@@ -298,7 +314,7 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
 });
 
 exports.processDictationText = functions.region('europe-west1').https.onCall(async (data, context) => {
-  await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
+  const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
   const { rawText, mode, lang } = data || {};
   if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejściowego");
   
@@ -310,6 +326,7 @@ exports.processDictationText = functions.region('europe-west1').https.onCall(asy
     const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
     
     let result = rawText;
+    let resp = null;
     
     if (mode === "smart") {
       const prompt = `Jesteś asystentem uzupełniającym formularz serwisowy. Otrzymasz transkrypcję głosu mechanika.
@@ -337,7 +354,7 @@ Format wyjściowy:
 
 Surowy tekst od mechanika: "${rawText}"`;
       
-      const resp = await generativeModel.generateContent(prompt);
+      resp = await generativeModel.generateContent(prompt);
       let jsonText = resp.response.candidates[0].content.parts[0].text;
       jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
       result = JSON.parse(jsonText);
@@ -354,12 +371,12 @@ Tłumaczenie (${language}):
 Oto notatka:
 "${rawText}"`;
 
-      const resp = await generativeModel.generateContent(prompt);
+      resp = await generativeModel.generateContent(prompt);
       result = resp.response.candidates[0].content.parts[0].text.trim();
     }
     
     const tokens = resp?.response?.usageMetadata?.totalTokenCount || 0;
-    const targetTenantId = data?.tenantId || (context.auth?.token?.tenantId);
+    const targetTenantId = verifiedTenantId;
     if (tokens > 0 && targetTenantId) {
       const geminiPrice = (globalDoc.exists && globalDoc.data().geminiPrice) ? globalDoc.data().geminiPrice : 0.60;
       await db.collection("tenants").doc(targetTenantId).collection("stats").doc("ai_usage").set({
@@ -422,9 +439,10 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
           machinesMap[doc.id] = doc.data();
         });
         
+        // UWAGA: bez where('isDeleted','!=',true) – taki filtr pomija dokumenty BEZ pola isDeleted
+        // (addPlannedService go nie ustawia) i wymaga indeksu złożonego. Filtrujemy w kodzie.
         const servicesSnap = await db.collection('tenants').doc(tenantId).collection('planned_services')
           .where('status', 'in', ['pending', 1])
-          .where('isDeleted', '!=', true)
           .get();
         
         let batch = db.batch();
@@ -433,6 +451,7 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
         
         for (const sDoc of servicesSnap.docs) {
           const data = sDoc.data();
+          if (data.isDeleted === true) continue;
           const machine = machinesMap[data.machineId];
           if (!machine) continue;
 

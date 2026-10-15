@@ -12,7 +12,7 @@ describe('Firestore Security Rules', () => {
       testEnv = await initializeTestEnvironment({
         projectId: 'serwis-crist',
         firestore: {
-          rules: fs.readFileSync(path.resolve(__dirname, '../../firestore.rules'), 'utf8'),
+          rules: fs.readFileSync(path.resolve(__dirname, '../../../../firestore.rules'), 'utf8'),
         },
       });
     } catch (e) {

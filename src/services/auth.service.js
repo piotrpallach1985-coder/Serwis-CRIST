@@ -1,5 +1,5 @@
 import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInAnonymously, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 export const loginWithEmail = async (email, password) => {
@@ -16,27 +16,48 @@ export const loginWithEmail = async (email, password) => {
   return { uid: user.uid, ...userDoc.data() };
 };
 
-export const loginAnon = async (targetTenantId) => {
-  if (!auth.currentUser) {
-    await signInAnonymously(auth);
-  }
-  const user = auth.currentUser;
-  if (user && targetTenantId) {
+let anonBindInFlight = null;
+
+/**
+ * Zapewnia, że anonimowa sesja (operator QR) jest powiązana z daną firmą (anon_sessions/{uid}).
+ * Jeśli urządzenie było powiązane z INNĄ firmą, tworzy nową sesję anonimową i wiąże ją z docelową.
+ * Zwraca aktualnego użytkownika Firebase Auth (może mieć inne uid niż przed wywołaniem).
+ */
+export const ensureAnonSessionForTenant = async (targetTenantId) => {
+  if (anonBindInFlight) return anonBindInFlight;
+  anonBindInFlight = (async () => {
+    let user = auth.currentUser;
+    if (!user) {
+      await signInAnonymously(auth);
+      user = auth.currentUser;
+    }
+    if (!user || !user.isAnonymous || !targetTenantId) return user;
     try {
-      const sessionRef = doc(db, 'anon_sessions', user.uid);
-      const sessionSnap = await getDoc(sessionRef);
-      if (!sessionSnap.exists()) {
-        await setDoc(sessionRef, {
-          tenantId: targetTenantId,
-          createdAt: serverTimestamp()
-        });
+      const snap = await getDoc(doc(db, 'anon_sessions', user.uid));
+      if (snap.exists()) {
+        if (snap.data().tenantId === targetTenantId) return user;
+        // Urządzenie było powiązane z inną firmą -> nowa sesja anonimowa
+        await signOut(auth);
+        await signInAnonymously(auth);
+        user = auth.currentUser;
       }
+      await setDoc(doc(db, 'anon_sessions', user.uid), {
+        tenantId: targetTenantId,
+        createdAt: serverTimestamp()
+      });
     } catch (e) {
       console.warn('Could not bind anon session:', e);
     }
+    return user;
+  })();
+  try {
+    return await anonBindInFlight;
+  } finally {
+    anonBindInFlight = null;
   }
-  return user;
 };
+
+export const loginAnon = async (targetTenantId) => ensureAnonSessionForTenant(targetTenantId);
 
 export const subscribeToGeneralSettings = (tenantId, callback) => {
   return onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (snap) => {

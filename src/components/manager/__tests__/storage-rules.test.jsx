@@ -13,6 +13,9 @@ describe('Storage Security Rules', () => {
         storage: {
           rules: fs.readFileSync(path.resolve(__dirname, '../../../../storage.rules'), 'utf8'),
         },
+        firestore: {
+          rules: fs.readFileSync(path.resolve(__dirname, '../../../../firestore.rules'), 'utf8'),
+        },
       });
     } catch (e) {
       console.warn("Could not connect to Firebase Emulator.");
@@ -27,17 +30,7 @@ describe('Storage Security Rules', () => {
     if (testEnv) await testEnv.clearStorage();
   });
 
-  it('allows anonymous users to upload only to their specific ticket directory', async () => {
-    if (!testEnv) return;
-    const anonStorage = testEnv.authenticatedContext('anon123', { firebase: { sign_in_provider: 'anonymous' } }).storage();
-    
-    // Valid path
-    const validRef = anonStorage.ref('tenants/tenant-A/tickets/ticket123/photo.jpg');
-    // Using string to mock file for test payload size limit check (<30MB)
-    const fileContent = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); // Fake 8 bytes
-    
-    await assertSucceeds(validRef.put(fileContent, { contentType: 'image/jpeg' }));
-  });
+  // Upload anonima (powiązany / niepowiązany / inna firma / SVG) – patrz anon-tenant-rules.test.jsx
 
   it('blocks anonymous users from reading other tenants general files', async () => {
     if (!testEnv) return;

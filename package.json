@@ -11,6 +11,7 @@
         "predeploy": "npm run build",
         "deploy": "gh-pages -d dist -b main -r https://github.com/piotrpallach1985-coder/Serwis-CRIST.git",
         "test": "vitest run",
+        "test:rules": "npx firebase-tools emulators:exec --only firestore,storage --project serwis-crist \"vitest run --no-file-parallelism src/components/manager/__tests__/anon-tenant-rules.test.jsx src/components/manager/__tests__/firestore-rules.test.jsx src/components/manager/__tests__/storage-rules.test.jsx\"",
         "lint": "eslint src --ext .js,.jsx",
         "test:e2e": "playwright test"
     },

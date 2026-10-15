@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc, query, where, getDocs, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { ensureAnonSessionForTenant } from '../services/auth.service';
 import jsQR from 'jsqr';
 import { Html5Qrcode } from 'html5-qrcode';
 import OperatorForm from './OperatorForm';
@@ -133,15 +134,9 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       authUnsub = onAuthStateChanged(auth, async (authUser) => {
         if (authUser) {
           if (authUser.isAnonymous && tenantId) {
-            try {
-              const sRef = doc(db, 'anon_sessions', authUser.uid);
-              const sSnap = await getDoc(sRef);
-              if (!sSnap.exists()) {
-                await setDoc(sRef, { tenantId, createdAt: serverTimestamp() });
-              }
-            } catch (e) {
-              console.warn("Could not bind anon session:", e);
-            }
+            const boundUser = await ensureAnonSessionForTenant(tenantId);
+            // Sesja została odtworzona dla tej firmy (nowe uid) – listenery podepnie kolejne wywołanie onAuthStateChanged
+            if (boundUser && boundUser.uid !== authUser.uid) return;
           }
           // Firebase Auth confirms we have a token, safe to attach listeners
           
