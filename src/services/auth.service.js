@@ -1,6 +1,6 @@
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 export const loginWithEmail = async (email, password) => {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -16,11 +16,26 @@ export const loginWithEmail = async (email, password) => {
   return { uid: user.uid, ...userDoc.data() };
 };
 
-export const loginAnon = async () => {
+export const loginAnon = async (targetTenantId) => {
   if (!auth.currentUser) {
     await signInAnonymously(auth);
   }
-  return auth.currentUser;
+  const user = auth.currentUser;
+  if (user && targetTenantId) {
+    try {
+      const sessionRef = doc(db, 'anon_sessions', user.uid);
+      const sessionSnap = await getDoc(sessionRef);
+      if (!sessionSnap.exists()) {
+        await setDoc(sessionRef, {
+          tenantId: targetTenantId,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.warn('Could not bind anon session:', e);
+    }
+  }
+  return user;
 };
 
 export const subscribeToGeneralSettings = (tenantId, callback) => {

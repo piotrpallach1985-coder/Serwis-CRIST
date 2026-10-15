@@ -130,8 +130,19 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
         signInAnonymously(auth).catch((error) => console.error("Anonymous login error:", error));
       }
 
-      authUnsub = onAuthStateChanged(auth, (authUser) => {
+      authUnsub = onAuthStateChanged(auth, async (authUser) => {
         if (authUser) {
+          if (authUser.isAnonymous && tenantId) {
+            try {
+              const sRef = doc(db, 'anon_sessions', authUser.uid);
+              const sSnap = await getDoc(sRef);
+              if (!sSnap.exists()) {
+                await setDoc(sRef, { tenantId, createdAt: serverTimestamp() });
+              }
+            } catch (e) {
+              console.warn("Could not bind anon session:", e);
+            }
+          }
           // Firebase Auth confirms we have a token, safe to attach listeners
           
           unsubscribeMachines = onSnapshot(query(collection(db, 'tenants', tenantId, 'machines'), where('isDeleted', '==', false)), (snapshot) => {

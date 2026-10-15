@@ -63,10 +63,13 @@ export default function SuperAdminPanel({ onNavigate }) {
   const tenantsWithTokens = tenants.map(tenantItem => ({
     ...tenantItem,
     aiTokensGemini: aiUsageMap[tenantItem.id]?.geminiTokens || 0,
-      aiCostGemini: aiUsageMap[tenantItem.id]?.geminiCost,
-      aiCostGroq: aiUsageMap[tenantItem.id]?.groqCost,
+    aiCostGemini: aiUsageMap[tenantItem.id]?.geminiCost,
+    aiCostGroq: aiUsageMap[tenantItem.id]?.groqCost,
     aiTokensGroq: aiUsageMap[tenantItem.id]?.groqTokens || 0,
-    whisperSeconds: aiUsageMap[tenantItem.id]?.whisperSeconds || 0
+    whisperSeconds: aiUsageMap[tenantItem.id]?.whisperSeconds || 0,
+    vertexTokens: aiUsageMap[tenantItem.id]?.vertexTokens || 0,
+    vertexCost: aiUsageMap[tenantItem.id]?.vertexCost,
+    vertexCalls: aiUsageMap[tenantItem.id]?.vertexCalls || 0
   }));
 
   const totalGeminiTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGemini || 0), 0);
@@ -74,6 +77,9 @@ export default function SuperAdminPanel({ onNavigate }) {
   const totalGroqCost = tenantsWithTokens.reduce((sum, t) => sum + (t.aiCostGroq !== undefined ? t.aiCostGroq : ((t.whisperSeconds || 0) / 60) * globalTranscribePrice), 0);
   const totalGroqTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.aiTokensGroq || 0), 0);
   const totalWhisperSeconds = tenantsWithTokens.reduce((sum, t) => sum + (t.whisperSeconds || 0), 0);
+  const totalVertexTokens = tenantsWithTokens.reduce((sum, t) => sum + (t.vertexTokens || 0), 0);
+  const totalVertexCost = tenantsWithTokens.reduce((sum, t) => sum + (t.vertexCost !== undefined ? t.vertexCost : ((t.vertexTokens || 0) / 1000000) * globalGeminiPrice), 0);
+  const totalVertexCalls = tenantsWithTokens.reduce((sum, t) => sum + (t.vertexCalls || 0), 0);
 
   useEffect(() => {
     if (user?.role !== 'superadmin') return;
@@ -309,6 +315,9 @@ export default function SuperAdminPanel({ onNavigate }) {
           totalWhisperSeconds={totalWhisperSeconds}
           totalGeminiCost={totalGeminiCost}
           totalGroqCost={totalGroqCost}
+          totalVertexTokens={totalVertexTokens}
+          totalVertexCost={totalVertexCost}
+          totalVertexCalls={totalVertexCalls}
           saveGlobalAIConfig={saveGlobalAIConfig}
           globalTranscribeModel={globalTranscribeModel}
           setGlobalTranscribeModel={setGlobalTranscribeModel}

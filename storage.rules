@@ -25,6 +25,15 @@ service firebase.storage {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
+    function getAnonTenant() {
+      return firestore.exists(/databases/(default)/documents/anon_sessions/$(request.auth.uid)) ? 
+             firestore.get(/databases/(default)/documents/anon_sessions/$(request.auth.uid)).data.tenantId : null;
+    }
+
+    function isAnonymousInTenant(tenantId) {
+      return isAnonymous() && (getAnonTenant() == tenantId || (tenantId == 'crist' && (getAnonTenant() == null || getAnonTenant() == 'crist')));
+    }
+
     function isTenantUser(tenantId) {
        return isSignedIn() && (getTenant() == tenantId || isSuperAdmin());
     }
@@ -34,7 +43,7 @@ service firebase.storage {
     }
 
     function isValidContentType() {
-      return request.resource.contentType.matches('image/.*|video/.*|audio/.*|application/pdf');
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif|bmp)|video/.*|audio/.*|application/pdf');
     }
 
     function isLegacyAllowed() {
@@ -49,8 +58,8 @@ service firebase.storage {
     // Zgloszenia anonimowe (kody QR)
     match /tenants/{tenantId}/tickets/{ticketId}/{fileName} {
        // allow get zamiast read (read = get + list). Anonim nie moze listowac plikow.
-       allow get: if isAnonymous();
-       allow create: if isAnonymous() && isValidSize() && isValidContentType();
+       allow get: if isAnonymousInTenant(tenantId);
+       allow create: if isAnonymousInTenant(tenantId) && isValidSize() && isValidContentType();
        allow update, delete: if false;
     }
 

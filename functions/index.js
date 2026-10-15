@@ -280,6 +280,15 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
     let text = resp.response.candidates[0].content.parts[0].text;
     const tokens = resp.response.usageMetadata?.totalTokenCount || 0;
     
+    if (tokens > 0 && verifiedTenantId) {
+      const geminiPrice = (globalDoc.exists && globalDoc.data().geminiPrice) ? globalDoc.data().geminiPrice : 0.60;
+      await db.collection("tenants").doc(verifiedTenantId).collection("stats").doc("ai_usage").set({
+        vertexTokens: FieldValue.increment(tokens),
+        vertexCost: FieldValue.increment((tokens / 1000000) * geminiPrice),
+        vertexCalls: FieldValue.increment(1)
+      }, { merge: true });
+    }
+    
     return { text, tokens };
   } catch (err) {
     console.error("DTR Chat error:", err);
@@ -349,6 +358,17 @@ Oto notatka:
       result = resp.response.candidates[0].content.parts[0].text.trim();
     }
     
+    const tokens = resp?.response?.usageMetadata?.totalTokenCount || 0;
+    const targetTenantId = data?.tenantId || (context.auth?.token?.tenantId);
+    if (tokens > 0 && targetTenantId) {
+      const geminiPrice = (globalDoc.exists && globalDoc.data().geminiPrice) ? globalDoc.data().geminiPrice : 0.60;
+      await db.collection("tenants").doc(targetTenantId).collection("stats").doc("ai_usage").set({
+        vertexTokens: FieldValue.increment(tokens),
+        vertexCost: FieldValue.increment((tokens / 1000000) * geminiPrice),
+        vertexCalls: FieldValue.increment(1)
+      }, { merge: true });
+    }
+    
     return { result };
   } catch (err) {
     console.error("Dictation processing error:", err);
@@ -402,7 +422,10 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
           machinesMap[doc.id] = doc.data();
         });
         
-        const servicesSnap = await db.collection('tenants').doc(tenantId).collection('planned_services').where('status', '==', 1).get();
+        const servicesSnap = await db.collection('tenants').doc(tenantId).collection('planned_services')
+          .where('status', 'in', ['pending', 1])
+          .where('isDeleted', '!=', true)
+          .get();
         
         let batch = db.batch();
         let writesCount = 0;
@@ -440,7 +463,8 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
             }
 
             if (shouldAlert) {
-              batch.update(sDoc.ref, { status: 2, notified: true });
+              // Aktualizujemy tylko flagę notified (NIE zmieniamy statusu, aby nie pomijać kroków realizacji)
+              batch.update(sDoc.ref, { notified: true });
               writesCount++;
               
               const notifRef = db.collection('tenants').doc(tenantId).collection('notifications').doc();

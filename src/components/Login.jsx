@@ -30,7 +30,8 @@ export default function Login({ onLogin, currentUser }) {
       }
       const autoBypass = async () => {
         try {
-          await loginAnon();
+          const finalTenant = tId || getCurrentTenant();
+          await loginAnon(finalTenant);
         } catch (e) {
           console.warn('Anonymous sign-in failed', e);
         }
@@ -57,11 +58,12 @@ export default function Login({ onLogin, currentUser }) {
       useManagerStore.getState().setTenantId(tenantFromQr);
     }
     try {
-      await loginAnon();
+      const finalTenant = tenantFromQr || getCurrentTenant();
+      await loginAnon(finalTenant);
     } catch (e) {
       console.warn('Anonymous sign-in failed', e);
     }
-    const finalTenant = tenantFromQr || getCurrentTenant();
+
     onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon', tenantId: finalTenant });
     navigate('/operator?machine=' + mId);
   };

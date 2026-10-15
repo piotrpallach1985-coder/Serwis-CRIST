@@ -72,19 +72,29 @@ export default function SuperAdminTenantTable({
                          ))}
                       </div>
                     </td>
-                    <td className="p-4 w-32">
-                      <div className="flex flex-col gap-1 text-xs">
-                        <div className="flex items-center gap-1 text-slate-600">
-                          <i className="ph ph-google-logo text-blue-500"></i>
-                          <span className="font-mono">{tenant.aiTokensGemini?.toLocaleString('pl-PL') || 0}</span>
+                    <td className="p-4 w-48">
+                      <div className="flex flex-col gap-1.5 text-xs">
+                        <div className="bg-slate-50 p-1.5 rounded border border-slate-200">
+                          <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">Biling Klienta (Śr. stawki)</div>
+                          <div className="flex items-center justify-between text-slate-700 font-mono text-[11px]">
+                            <span>Gemini: {tenant.aiTokensGemini?.toLocaleString('pl-PL') || 0}</span>
+                            <span>Audio: {tenant.whisperSeconds ? (tenant.whisperSeconds / 60).toFixed(1) + 'm' : '0m'}</span>
+                          </div>
+                          <div className="text-[10px] text-blue-700 font-bold mt-0.5">
+                            ~ {((tenant.aiCostGroq !== undefined ? tenant.aiCostGroq : ((tenant.whisperSeconds || 0) / 60) * globalGroqPrice) + (tenant.aiCostGemini !== undefined ? tenant.aiCostGemini : ((tenant.aiTokensGemini || 0) / 1000000) * globalGeminiPrice)).toFixed(2)} PLN
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 text-slate-600">
-                          <i className="ph ph-microphone-stage text-orange-500"></i>
-                          <div className="flex flex-col items-center">
-                            <span className="font-mono text-xs">W: {tenant.whisperSeconds ? (tenant.whisperSeconds / 60).toFixed(1) + 'm' : '0m'} / G: {tenant.aiTokensGemini?.toLocaleString('pl-PL') || 0}</span>
-                            <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full mt-1">
-                              ~ {((tenant.aiCostGroq !== undefined ? tenant.aiCostGroq : ((tenant.whisperSeconds || 0) / 60) * globalGroqPrice) + (tenant.aiCostGemini !== undefined ? tenant.aiCostGemini : ((tenant.aiTokensGemini || 0) / 1000000) * globalGeminiPrice)).toFixed(2)} PLN
-                            </span>
+
+                        <div className="bg-purple-50/70 p-1.5 rounded border border-purple-200">
+                          <div className="text-[10px] uppercase font-bold text-purple-700 flex items-center justify-between">
+                            <span>Google Vertex AI (API)</span>
+                            <span className="font-mono">{tenant.vertexCalls || 0} wyw.</span>
+                          </div>
+                          <div className="text-slate-700 font-mono text-[11px] mt-0.5">
+                            {tenant.vertexTokens?.toLocaleString('pl-PL') || 0} tok
+                          </div>
+                          <div className="text-[10px] text-purple-700 font-bold mt-0.5">
+                            ~ {(tenant.vertexCost !== undefined ? tenant.vertexCost : ((tenant.vertexTokens || 0) / 1000000) * globalGeminiPrice).toFixed(2)} PLN
                           </div>
                         </div>
                       </div>

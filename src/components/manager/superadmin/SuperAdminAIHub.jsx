@@ -6,6 +6,9 @@ export default function SuperAdminAIHub({
   totalWhisperSeconds,
   totalGeminiCost,
   totalGroqCost,
+  totalVertexTokens = 0,
+  totalVertexCost = 0,
+  totalVertexCalls = 0,
   saveGlobalAIConfig,
   globalTranscribeModel,
   setGlobalTranscribeModel,
@@ -41,37 +44,59 @@ export default function SuperAdminAIHub({
          </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-        <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        {/* Licznik 1A: Klient - Analityka */}
+        <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
           <div className="text-blue-500 mb-2 text-2xl"><i className="ph ph-chat-teardrop-text"></i></div>
-          <h3 className="text-md font-bold text-slate-700">Zużycie Modeli Analitycznych</h3>
-          <p className="text-xs text-slate-400 mb-2">Gemini Flash (Czat DTR, wyciąganie JSON)</p>
-          <div className="text-3xl font-black text-blue-600">
+          <h3 className="text-sm font-bold text-slate-700">Zużycie Analityczne (Klient)</h3>
+          <p className="text-[11px] text-slate-400 mb-2">Gemini Flash (Czat DTR, wyciąganie JSON)</p>
+          <div className="text-2xl font-black text-blue-600">
             {totalGeminiTokens.toLocaleString("pl-PL")}
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Tokenów Łącznie (SaaS)</p>
-          <div className="text-sm font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Tokenów (Biling)</p>
+          <div className="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
             Koszt: {(totalGeminiCost || 0).toFixed(2)} PLN
           </div>
         </div>
 
-        <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
+        {/* Licznik 1B: Klient - Audio */}
+        <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
           <div className="text-orange-500 mb-2 text-2xl"><i className="ph ph-microphone-stage"></i></div>
-          <h3 className="text-md font-bold text-slate-700">Zużycie Modeli Transkrypcyjnych</h3>
-          <p className="text-xs text-slate-400 mb-2">Voice-to-Text (Dyktowanie na żywo)</p>
-          <div className="text-3xl font-black text-orange-600">
+          <h3 className="text-sm font-bold text-slate-700">Zużycie Audio (Klient)</h3>
+          <p className="text-[11px] text-slate-400 mb-2">Voice-to-Text (Dyktowanie na żywo)</p>
+          <div className="text-2xl font-black text-orange-600">
             {((totalWhisperSeconds || 0) / 60).toFixed(1)} min
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Minut Audio Łącznie (SaaS)</p>
-          <div className="text-sm font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Minut Audio (Biling)</p>
+          <div className="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
             Koszt: {(totalGroqCost || 0).toFixed(2)} PLN
+          </div>
+        </div>
+
+        {/* Licznik 2: Google Vertex AI (Weryfikacja Serwerowa) */}
+        <div className="bg-purple-50/70 p-5 rounded-xl border border-purple-200 flex flex-col items-center justify-center text-center">
+          <div className="text-purple-600 mb-2 text-2xl"><i className="ph ph-shield-check"></i></div>
+          <h3 className="text-sm font-bold text-purple-900">Google Vertex AI (Serwer API)</h3>
+          <p className="text-[11px] text-purple-500 mb-2">Bezpośredni licznik odpowiedzi Vertex Cloud</p>
+          <div className="text-2xl font-black text-purple-700">
+            {totalVertexTokens.toLocaleString("pl-PL")}
+          </div>
+          <p className="text-[10px] text-purple-600 uppercase font-bold tracking-wider mt-1 mb-2">{totalVertexCalls} Wywołań API</p>
+          <div className="text-xs font-semibold text-purple-800 bg-white px-3 py-1 rounded-full border border-purple-200">
+            Koszt API: {(totalVertexCost || 0).toFixed(2)} PLN
           </div>
         </div>
       </div>
       
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-8 flex justify-between items-center">
-         <span className="font-bold text-blue-800 text-sm">Szacunkowy koszt AI w tym miesiącu (SaaS):</span>
-         <span className="font-black text-blue-700 text-xl">{totalCost.toFixed(2)} PLN</span>
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-8 flex flex-col sm:flex-row justify-between items-center gap-2">
+         <div className="flex items-center gap-2">
+           <i className="ph ph-coins text-blue-700 text-xl"></i>
+           <span className="font-bold text-blue-900 text-sm">Szacunkowy koszt bilingowy w tym miesiącu (SaaS):</span>
+         </div>
+         <div className="flex items-center gap-3">
+           <span className="text-xs text-slate-500">Vertex API: <strong className="text-purple-700">{(totalVertexCost || 0).toFixed(2)} PLN</strong></span>
+           <span className="font-black text-blue-700 text-xl">{totalCost.toFixed(2)} PLN</span>
+         </div>
       </div>
 
       <div>

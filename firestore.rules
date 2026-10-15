@@ -61,15 +61,32 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    match /anon_sessions/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['tenantId', 'createdAt'])
+        && request.resource.data.tenantId is string;
+      allow update, delete: if isSuperAdmin();
+    }
+
     function isAnonymous() {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function getAnonTenant() {
+      return exists(/databases/$(database)/documents/anon_sessions/$(request.auth.uid)) ?
+             get(/databases/$(database)/documents/anon_sessions/$(request.auth.uid)).data.tenantId : null;
+    }
+
+    function isAnonymousInTenant(tenantId) {
+      return isAnonymous() && (getAnonTenant() == tenantId || (tenantId == 'crist' && (getAnonTenant() == null || getAnonTenant() == 'crist')));
     }
 
     match /tenants/{tenantId} {
       match /reporters/{document=**} {
         allow read: if isTenantUser(tenantId);
         allow create: if isTenantUser(tenantId)
-          || (isAnonymous()
+          || (isAnonymousInTenant(tenantId)
               && request.resource.data.keys().hasOnly(['name', 'phone', 'createdAt'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 120
@@ -78,9 +95,9 @@ service cloud.firestore {
       }
 
       match /machines/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymous();
+        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
         allow create: if isTenantUser(tenantId)
-          || (isAnonymous()
+          || (isAnonymousInTenant(tenantId)
               && request.resource.data.keys().hasOnly(['name', 'regionId', 'bay', 'currentWorkHours', 'status', 'isDeleted', 'createdAt', 'createdBy', 'description'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 200
@@ -93,19 +110,19 @@ service cloud.firestore {
         allow read, update, delete: if isTenantUser(tenantId);
         // Anonim musi podać machineId które rzeczywiście istnieje w tym tenancie, lub 'manual'
         allow create: if isTenantUser(tenantId) || 
-          (isAnonymous() && (
+          (isAnonymousInTenant(tenantId) && (
              (request.resource.data.machineId == 'manual' && exists(/databases/$(database)/documents/tenants/$(tenantId))) ||
              exists(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(request.resource.data.machineId))
           ));
       }
 
       match /regions/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymous();
+        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
         allow write: if isTenantUser(tenantId) && isStaff();
       }
       
       match /topics/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymous();
+        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
         allow write: if isTenantUser(tenantId) && isStaff();
       }
       
@@ -122,7 +139,7 @@ service cloud.firestore {
       match /notifications/{document=**} {
         allow read: if isTenantUser(tenantId);
         allow create: if isTenantUser(tenantId)
-          || (isAnonymous()
+          || (isAnonymousInTenant(tenantId)
               && request.resource.data.keys().hasOnly(['title', 'message', 'isCritical', 'read', 'ticketId', 'createdAt', 'type'])
               && request.resource.data.read == false
               && request.resource.data.ticketId is string);
