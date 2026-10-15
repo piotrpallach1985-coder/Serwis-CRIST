@@ -124,4 +124,3 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */const QL=xn("Upload",[["path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}],["polyline",{points:"17 8 12 3 7 8",key:"t8dd8p"}],["line",{x1:"12",x2:"12",y1:"3",y2:"15",key:"widbto"}]]);export{HL as B,Q$ as C,UL as L,VL as P,WL as R,XL as S,KL as T,QL as U,cR as X,wR as Y,Y2 as a,YM as b,mo as c,UN as d,YL as e,qL as f,GL as g,ZL as h,fb as s};
-//# sourceMappingURL=ui-vendor-CTEh-saJ.js.map
