@@ -1,6 +1,7 @@
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, signInAnonymously, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { getOperatorQrKey, saveOperatorQrKey } from './qrAccess.service';
 
 export const loginWithEmail = async (email, password) => {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -20,11 +21,15 @@ let anonBindInFlight = null;
 
 /**
  * Zapewnia, że anonimowa sesja (operator QR) jest powiązana z daną firmą (anon_sessions/{uid}).
- * Jeśli urządzenie było powiązane z INNĄ firmą, tworzy nową sesję anonimową i wiąże ją z docelową.
+ * Wymaga klucza QR firmy (z zeskanowanego kodu lub zapamiętanego na urządzeniu) – weryfikują go reguły.
+ * Jeśli urządzenie było powiązane z INNĄ firmą albo ze starym kluczem, tworzy nową sesję anonimową.
  * Zwraca aktualnego użytkownika Firebase Auth (może mieć inne uid niż przed wywołaniem).
  */
-export const ensureAnonSessionForTenant = async (targetTenantId) => {
-  if (anonBindInFlight) return anonBindInFlight;
+export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) => {
+  while (anonBindInFlight) {
+    const prev = await anonBindInFlight.catch(() => null);
+    if (!qrKey) return prev; // wywołanie z kluczem (skan QR) wykonujemy po zakończeniu poprzedniego
+  }
   anonBindInFlight = (async () => {
     let user = auth.currentUser;
     if (!user) {
@@ -32,19 +37,25 @@ export const ensureAnonSessionForTenant = async (targetTenantId) => {
       user = auth.currentUser;
     }
     if (!user || !user.isAnonymous || !targetTenantId) return user;
+    const key = qrKey || getOperatorQrKey(targetTenantId);
     try {
       const snap = await getDoc(doc(db, 'anon_sessions', user.uid));
       if (snap.exists()) {
-        if (snap.data().tenantId === targetTenantId) return user;
-        // Urządzenie było powiązane z inną firmą -> nowa sesja anonimowa
+        const s = snap.data();
+        if (s.tenantId === targetTenantId && (!key || s.qrKey === key)) return user;
+        if (!key) return user; // brak klucza – nie da się przepiąć, reguły odmówią dostępu
+        // Inna firma lub nowy klucz -> nowa sesja anonimowa (sesji nie można edytować)
         await signOut(auth);
         await signInAnonymously(auth);
         user = auth.currentUser;
       }
+      if (!key) return user; // operator musi zeskanować kod QR firmy
       await setDoc(doc(db, 'anon_sessions', user.uid), {
         tenantId: targetTenantId,
+        qrKey: key,
         createdAt: serverTimestamp()
       });
+      saveOperatorQrKey(targetTenantId, key);
     } catch (e) {
       console.warn('Could not bind anon session:', e);
     }
@@ -57,7 +68,7 @@ export const ensureAnonSessionForTenant = async (targetTenantId) => {
   }
 };
 
-export const loginAnon = async (targetTenantId) => ensureAnonSessionForTenant(targetTenantId);
+export const loginAnon = async (targetTenantId, qrKey = null) => ensureAnonSessionForTenant(targetTenantId, qrKey);
 
 export const subscribeToGeneralSettings = (tenantId, callback) => {
   return onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (snap) => {

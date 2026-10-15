@@ -3,6 +3,9 @@ import { useToast } from './useToast';
 import { useTicketSubmit } from './useTicketSubmit';
 import { compressImage } from '../utils/imageCompressor';
 
+// Spójne z limitem w firestore.rules (anonimowe zgłoszenia)
+export const MAX_TICKET_PHOTOS = 10;
+
 const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -95,7 +98,10 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
         const preview = URL.createObjectURL(compressedFile);
         newPhotos.push({ file: compressedFile, base64, preview, name: compressedFile.name });
       }
-      setPendingPhotos(prev => [...prev, ...newPhotos]);
+      if (pendingPhotos.length + newPhotos.length > MAX_TICKET_PHOTOS) {
+        showToast(`Maksymalnie ${MAX_TICKET_PHOTOS} zdjęć na zgłoszenie.`, 'warning');
+      }
+      setPendingPhotos(prev => [...prev, ...newPhotos].slice(0, MAX_TICKET_PHOTOS));
     } catch (err) {
       console.error(err);
       showToast('Błąd przetwarzania: ' + err.message, 'error');

@@ -3,6 +3,7 @@ import QRScannerModal from './shared/QRScannerModal';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginWithEmail, loginAnon, subscribeToGeneralSettings, subscribeToBranding } from '../services/auth.service';
+import { parseQrPayload } from '../services/qrAccess.service';
 
 
 import { generateAuditorReport } from '../utils/reports/auditorExport';
@@ -24,18 +25,18 @@ export default function Login({ onLogin, currentUser }) {
     const realParams = new URLSearchParams(window.location.search);
     const mId = realParams.get('machine');
     const tId = realParams.get('tenant');
+    const qrKey = realParams.get('k');
     if (mId && !currentUser) {
       if (tId) {
         useManagerStore.getState().setTenantId(tId);
       }
+      const finalTenant = tId || getCurrentTenant();
       const autoBypass = async () => {
         try {
-          const finalTenant = tId || getCurrentTenant();
-          await loginAnon(finalTenant);
+          await loginAnon(finalTenant, qrKey);
         } catch (e) {
           console.warn('Anonymous sign-in failed', e);
         }
-        const finalTenant = tId || getCurrentTenant();
         onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon', tenantId: finalTenant });
         navigate('/operator?machine=' + mId);
       };
@@ -45,27 +46,21 @@ export default function Login({ onLogin, currentUser }) {
 
   const handleScanSuccess = async (decodedText) => {
     setIsScanning(false);
-    let mId = decodedText;
-    let tenantFromQr = null;
-    if (decodedText.includes('?')) {
-      try {
-        const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-        mId = urlParams.get('machine') || mId;
-        tenantFromQr = urlParams.get('tenant');
-      } catch (e) {}
-    }
+    const parsed = parseQrPayload(decodedText);
+    const mId = parsed.machineId || decodedText;
+    const tenantFromQr = parsed.tenantId;
     if (tenantFromQr) {
       useManagerStore.getState().setTenantId(tenantFromQr);
     }
+    const finalTenant = tenantFromQr || getCurrentTenant();
     try {
-      const finalTenant = tenantFromQr || getCurrentTenant();
-      await loginAnon(finalTenant);
+      await loginAnon(finalTenant, parsed.key);
     } catch (e) {
       console.warn('Anonymous sign-in failed', e);
     }
 
     onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon', tenantId: finalTenant });
-    navigate('/operator?machine=' + mId);
+    navigate('/operator?machine=' + encodeURIComponent(mId));
   };
 
   const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });

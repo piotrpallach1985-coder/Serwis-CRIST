@@ -6,6 +6,7 @@ import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc, q
 import { db, auth } from '../firebase';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ensureAnonSessionForTenant } from '../services/auth.service';
+import { parseQrPayload, saveOperatorQrKey } from '../services/qrAccess.service';
 import jsQR from 'jsqr';
 import { Html5Qrcode } from 'html5-qrcode';
 import OperatorForm from './OperatorForm';
@@ -54,21 +55,28 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   // Status sieci
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  const [bindNonce, setBindNonce] = useState(0);
+  const [needsQr, setNeedsQr] = useState(false);
+
   const handleScanSuccess = async (decodedText) => {
-    let mId = decodedText;
-    let tenantFromQr = null;
-    
-    const match = decodedText.match(/machine=([^&]+)/);
-    if (match) mId = match[1];
-    
-    const tMatch = decodedText.match(/tenant=([^&#]+)/);
-    if (tMatch) tenantFromQr = tMatch[1];
+    const parsed = parseQrPayload(decodedText);
+    const mId = parsed.machineId || decodedText;
+    const tenantFromQr = parsed.tenantId;
 
     if (tenantFromQr && tenantFromQr !== tenantId) {
+      // Klucz zapamiętujemy przed przeładowaniem – powiązanie nastąpi po starcie widoku dla nowej firmy
+      if (parsed.key) saveOperatorQrKey(tenantFromQr, parsed.key);
       useManagerStore.getState().setTenantId(tenantFromQr);
       const base = window.location.pathname;
-      window.location.replace(base + "?tenant=" + tenantFromQr + "#/operator?step=form&machine=" + mId);
+      window.location.replace(base + "?tenant=" + tenantFromQr + "#/operator?step=form&machine=" + encodeURIComponent(mId));
       return;
+    }
+
+    // Kod QR z kluczem firmy -> powiązanie sesji operatora z firmą (wymagane przez reguły)
+    if (parsed.key && tenantId && auth.currentUser?.isAnonymous) {
+      await ensureAnonSessionForTenant(tenantId, parsed.key);
+      setNeedsQr(false);
+      setBindNonce(n => n + 1);
     }
     
     let targetMachine = machines.find(m => m.id === mId || (m.qrCode && (m.qrCode === mId || m.qrCode === decodedText)) || (m.internalId && m.internalId.toLowerCase() === mId.toLowerCase()));
@@ -125,6 +133,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     let unsubscribeReporters = () => {};
     let unsubscribeRegions = () => {};
     let authUnsub = () => {};
+    let cancelled = false;
 
     try {
       if (!auth.currentUser) {
@@ -138,9 +147,14 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             // Sesja została odtworzona dla tej firmy (nowe uid) – listenery podepnie kolejne wywołanie onAuthStateChanged
             if (boundUser && boundUser.uid !== authUser.uid) return;
           }
+          if (cancelled) return;
           // Firebase Auth confirms we have a token, safe to attach listeners
+          unsubscribeMachines();
+          unsubscribeTopics();
+          unsubscribeRegions();
           
           unsubscribeMachines = onSnapshot(query(collection(db, 'tenants', tenantId, 'machines'), where('isDeleted', '==', false)), (snapshot) => {
+            setNeedsQr(false);
             setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
             
             // Re-resolve URL machine ID if it's pending
@@ -156,6 +170,9 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                 setStep("form");
               }
             }
+          }, (error) => {
+            console.error("SNAPSHOT ERROR FOR machines:", error);
+            if (error?.code === 'permission-denied' && auth.currentUser?.isAnonymous) setNeedsQr(true);
           });
 
       
@@ -176,13 +193,14 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setErrorMsg("Krytyczny błąd: " + error.message);
     }
     return () => {
+      cancelled = true;
       unsubscribeMachines();
       unsubscribeTopics();
       unsubscribeReporters();
       unsubscribeRegions();
         if (authUnsub) authUnsub();
     };
-  }, [urlMachineId]);
+  }, [urlMachineId, bindNonce]);
 
   const machinesRef = useRef([]);
   useEffect(() => {
@@ -240,6 +258,13 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           </div>
         )}
 
+        {step === 'scan' && needsQr && (
+          <div className="mb-4 bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 rounded shadow-sm">
+            <p className="font-bold text-sm">Zeskanuj kod QR dowolnej maszyny w zakładzie</p>
+            <p className="text-xs mt-1">To jednorazowo połączy telefon z systemem Twojej firmy. Potem możesz zgłaszać awarie dowolnych maszyn.</p>
+          </div>
+        )}
+
         {step === 'scan' && (
           <OperatorScanner 
             onScanSuccess={handleScanSuccess} 
@@ -247,7 +272,18 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           />
         )}
 
-        {step === 'form' && !selectedMachine && (
+        {step === 'form' && !selectedMachine && needsQr && (
+          <div className="bg-white p-8 rounded-lg shadow-sm border border-amber-200 text-center flex flex-col items-center justify-center">
+            <i className="ph ph-qr-code text-5xl text-amber-500 mb-4"></i>
+            <h2 className="text-lg font-semibold text-gray-800">Zeskanuj kod QR maszyny</h2>
+            <p className="text-gray-500 text-sm mt-2 mb-6">Telefon nie jest jeszcze połączony z systemem tej firmy.</p>
+            <button onClick={() => handleStepChange('scan')} className="bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-xl">
+              Otwórz skaner
+            </button>
+          </div>
+        )}
+
+        {step === 'form' && !selectedMachine && !needsQr && (
           <div className="bg-white p-12 rounded-lg shadow-sm border border-gray-200 text-center flex flex-col items-center justify-center">
             <i className="ph ph-spinner-gap animate-spin text-4xl text-blue-600 mb-4"></i>
             <h2 className="text-xl font-semibold text-gray-800">Wczytywanie maszyny...</h2>

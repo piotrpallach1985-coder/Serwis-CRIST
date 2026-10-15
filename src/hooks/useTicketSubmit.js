@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { collection, doc, setDoc, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db, storage, auth } from '../firebase';
 import { savePhotoToIndexedDB } from '../utils/offlineStorage';
 import { logAudit } from '../services/audit.service';
 import { TICKET_STATUS } from '../utils/constants';
@@ -154,6 +154,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         reporterPhone: reporterPhone.trim(),
         reporterDevice: navigator.userAgent,
         reporterDeviceId: reporterDeviceId,
+        reporterUid: auth.currentUser?.uid || null,
         status: TICKET_STATUS.OPEN,
         createdAt: new Date().toISOString(),
         photos: uploadedUrls,

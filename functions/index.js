@@ -21,12 +21,19 @@ async function verifyTenantAccess(context, requestedTenantId, options = { allowA
     if (!options.allowAnonymous) {
       throw new functions.https.HttpsError('permission-denied', 'Funkcja niedostępna dla sesji anonimowych.');
     }
-    // Anonim (QR) musi być powiązany z firmą przez anon_sessions/{uid} (spójnie z firestore.rules)
+    // Anonim (QR) musi mieć sesję powiązaną z firmą aktualnym kluczem QR (spójnie z firestore.rules)
     const sessionDoc = await db.collection('anon_sessions').doc(context.auth.uid).get();
-    const boundTenant = sessionDoc.exists ? sessionDoc.data().tenantId : null;
-    const wanted = tenantId || 'crist';
-    if (boundTenant ? boundTenant !== wanted : wanted !== 'crist') {
+    if (!sessionDoc.exists) {
+      throw new functions.https.HttpsError('permission-denied', 'Zeskanuj kod QR maszyny, aby połączyć urządzenie z firmą.');
+    }
+    const session = sessionDoc.data();
+    const wanted = tenantId || session.tenantId;
+    if (session.tenantId !== wanted) {
       throw new functions.https.HttpsError('permission-denied', 'Sesja QR nie jest powiązana z tą firmą.');
+    }
+    const keyDoc = await db.collection('tenants').doc(wanted).collection('settings').doc('qr_access').get();
+    if (!keyDoc.exists || !session.qrKey || keyDoc.data().key !== session.qrKey) {
+      throw new functions.https.HttpsError('permission-denied', 'Kod QR firmy wygasł. Zeskanuj aktualny kod QR maszyny.');
     }
     return wanted;
   }

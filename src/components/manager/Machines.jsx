@@ -27,6 +27,7 @@ import DebouncedInput from './DebouncedInput';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { getOrCreateQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
 
 
 export default function Machines({ onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
@@ -223,13 +224,15 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     };
 
     
-    const handleCopyNfc = (machine) => {
-      const baseUrl = window.location.origin;
+    const handleCopyNfc = async (machine) => {
       const currentTenantId = getCurrentTenant();
-      const qrValue = `tenant=${currentTenantId}&machine=${machine.id}`;
-      navigator.clipboard.writeText(qrValue)
-        .then(() => showToast(t('machines.toasts.copiedNfc'), 'success'))
-        .catch(() => showToast(t('machines.toasts.copyNfcError'), 'error'));
+      try {
+        const key = await getOrCreateQrKey(currentTenantId);
+        await navigator.clipboard.writeText(buildMachineQrValue(currentTenantId, machine.id, key));
+        showToast(t('machines.toasts.copiedNfc'), 'success');
+      } catch (e) {
+        showToast(t('machines.toasts.copyNfcError'), 'error');
+      }
     };
 
     const handleGenerateNewQR = async (machineId) => {

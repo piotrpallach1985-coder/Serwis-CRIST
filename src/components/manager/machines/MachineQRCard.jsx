@@ -22,7 +22,13 @@ export default function MachineQRCard({ machine, qrValue }) {
         <>
           <div className="font-bold text-gray-700">{t('machines.details.qrCodeTitle')}</div>
           <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl shadow-sm">
-            <div id={"qr-svg-" + machine.id}><QRCodeSVG value={qrValue} size={150} /></div>
+            {qrValue ? (
+              <div id={"qr-svg-" + machine.id}><QRCodeSVG value={qrValue} size={150} /></div>
+            ) : (
+              <div className="w-[150px] h-[150px] flex items-center justify-center text-gray-300">
+                <i className="ph ph-spinner-gap animate-spin text-3xl"></i>
+              </div>
+            )}
           </div>
           <div className="flex flex-col items-center gap-1 mt-1">
             <div className="text-[10px] text-gray-400 font-medium">{t('machines.details.qrDate')}{(safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date()).toLocaleDateString('pl-PL')}</div>

@@ -61,11 +61,17 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // ===== Operatorzy QR (sesje anonimowe) =====
+    // Sesję można powiązać z firmą TYLKO znając klucz QR tej firmy (tenants/{t}/settings/qr_access).
+    // Zmiana klucza przez admina unieważnia wszystkie istniejące sesje QR i stare naklejki.
     match /anon_sessions/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
-      allow create: if isSignedIn() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['tenantId', 'createdAt'])
-        && request.resource.data.tenantId is string;
+      allow create: if isAnonymous() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['tenantId', 'qrKey', 'createdAt'])
+        && request.resource.data.tenantId is string
+        && request.resource.data.qrKey is string
+        && exists(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId)/settings/qr_access)
+        && get(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId)/settings/qr_access).data.key == request.resource.data.qrKey;
       allow update, delete: if isSuperAdmin();
     }
 
@@ -73,13 +79,68 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function getAnonTenant() {
-      return exists(/databases/$(database)/documents/anon_sessions/$(request.auth.uid)) ?
-             get(/databases/$(database)/documents/anon_sessions/$(request.auth.uid)).data.tenantId : null;
+    function anonSessionValid(tenantId) {
+      let sessionPath = /databases/$(database)/documents/anon_sessions/$(request.auth.uid);
+      let keyPath = /databases/$(database)/documents/tenants/$(tenantId)/settings/qr_access;
+      return exists(sessionPath)
+        && get(sessionPath).data.tenantId == tenantId
+        && exists(keyPath)
+        && get(sessionPath).data.get('qrKey', '') == get(keyPath).data.key;
     }
 
     function isAnonymousInTenant(tenantId) {
-      return isAnonymous() && (getAnonTenant() == tenantId || (tenantId == 'crist' && (getAnonTenant() == null || getAnonTenant() == 'crist')));
+      return isAnonymous() && anonSessionValid(tenantId);
+    }
+
+    // Zdjęcie zgłoszenia musi pochodzić z katalogu TEGO zgłoszenia w Storage tej firmy
+    function isTicketPhotoUrl(url, tenantId, ticketId) {
+      return url is string && url.size() < 2000
+        && url.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[^/]+/o/tenants%2F' + tenantId + '%2Ftickets%2F' + ticketId + '%2F[^?]+([?].*)?');
+    }
+
+    function photoOk(list, i, tenantId, ticketId) {
+      return list.size() <= i || isTicketPhotoUrl(list[i], tenantId, ticketId);
+    }
+
+    function photosValid(list, tenantId, ticketId) {
+      return list.size() <= 10
+        && photoOk(list, 0, tenantId, ticketId) && photoOk(list, 1, tenantId, ticketId)
+        && photoOk(list, 2, tenantId, ticketId) && photoOk(list, 3, tenantId, ticketId)
+        && photoOk(list, 4, tenantId, ticketId) && photoOk(list, 5, tenantId, ticketId)
+        && photoOk(list, 6, tenantId, ticketId) && photoOk(list, 7, tenantId, ticketId)
+        && photoOk(list, 8, tenantId, ticketId) && photoOk(list, 9, tenantId, ticketId);
+    }
+
+    function optString(d, field, maxLen) {
+      return !(field in d) || d[field] == null || (d[field] is string && d[field].size() <= maxLen);
+    }
+
+    // Zgłoszenie anonima: tylko pola formularza, status "Nowe" (1), bez przypisań/zamknięć/kosztów
+    function isValidAnonTicket(tenantId, ticketId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['machineId', 'machineName', 'bay', 'regionId', 'regionName', 'topic', 'description',
+                               'isCritical', 'reportedBy', 'reporterPhone', 'reporterDevice', 'reporterDeviceId',
+                               'reporterUid', 'status', 'createdAt', 'photos', 'updates'])
+        && d.keys().hasAll(['machineId', 'topic', 'description', 'status', 'reporterUid'])
+        && d.status == 1
+        && d.reporterUid == request.auth.uid
+        && d.machineId is string
+        && (d.machineId == 'manual' || exists(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)))
+        && d.topic is string && d.topic.size() > 0 && d.topic.size() <= 300
+        && d.description is string && d.description.size() > 0 && d.description.size() <= 5000
+        && optString(d, 'machineName', 300)
+        && optString(d, 'bay', 100)
+        && optString(d, 'regionId', 100)
+        && optString(d, 'regionName', 200)
+        && optString(d, 'reportedBy', 120)
+        && optString(d, 'reporterPhone', 20)
+        && optString(d, 'reporterDevice', 500)
+        && optString(d, 'reporterDeviceId', 200)
+        && optString(d, 'createdAt', 40)
+        && (!('isCritical' in d) || d.isCritical is bool)
+        && (!('photos' in d) || (d.photos is list && photosValid(d.photos, tenantId, ticketId)))
+        && (!('updates' in d) || (d.updates is list && d.updates.size() <= 1
+              && (d.updates.size() == 0 || (d.updates[0].status == 1 && d.updates[0].keys().hasOnly(['timestamp', 'status', 'comment', 'author'])))));
     }
 
     match /tenants/{tenantId} {
@@ -90,7 +151,7 @@ service cloud.firestore {
               && request.resource.data.keys().hasOnly(['name', 'phone', 'createdAt'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 120
-              && request.resource.data.name.matches('.*\\\\(DO WERYFIKACJI\\\\)$'));
+              && request.resource.data.name.matches('.*[(]DO WERYFIKACJI[)]$'));
         allow update, delete: if isTenantUser(tenantId);
       }
 
@@ -101,19 +162,25 @@ service cloud.firestore {
               && request.resource.data.keys().hasOnly(['name', 'regionId', 'bay', 'currentWorkHours', 'status', 'isDeleted', 'createdAt', 'createdBy', 'description'])
               && request.resource.data.name is string
               && request.resource.data.name.size() < 200
-              && request.resource.data.name.matches('.*\\\\(DO WERYFIKACJI\\\\)$')
+              && request.resource.data.name.matches('.*[(]DO WERYFIKACJI[)]$')
               && request.resource.data.isDeleted == false);
         allow update, delete: if isTenantUser(tenantId);
       }
 
       match /tickets/{ticketId} {
         allow read, update, delete: if isTenantUser(tenantId);
-        // Anonim musi podać machineId które rzeczywiście istnieje w tym tenancie, lub 'manual'
-        allow create: if isTenantUser(tenantId) || 
-          (isAnonymousInTenant(tenantId) && (
-             (request.resource.data.machineId == 'manual' && exists(/databases/$(database)/documents/tenants/$(tenantId))) ||
-             exists(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(request.resource.data.machineId))
-          ));
+        allow create: if isTenantUser(tenantId)
+          || (isAnonymousInTenant(tenantId) && isValidAnonTicket(tenantId, ticketId));
+        // Anonim: dopięcie JEDNEGO zdjęcia do WŁASNEGO zgłoszenia (synchronizacja offline, arrayUnion)
+        allow update: if isAnonymousInTenant(tenantId)
+          && resource.data.get('reporterUid', null) == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos'])
+          && request.resource.data.photos is list
+          && request.resource.data.photos.size() == resource.data.get('photos', []).size() + 1
+          && request.resource.data.photos.size() <= 10
+          && request.resource.data.photos.hasAll(resource.data.get('photos', []))
+          && request.resource.data.photos.removeAll(resource.data.get('photos', [])).size() == 1
+          && isTicketPhotoUrl(request.resource.data.photos.removeAll(resource.data.get('photos', []))[0], tenantId, ticketId);
       }
 
       match /regions/{document=**} {
@@ -142,7 +209,9 @@ service cloud.firestore {
           || (isAnonymousInTenant(tenantId)
               && request.resource.data.keys().hasOnly(['title', 'message', 'isCritical', 'read', 'ticketId', 'createdAt', 'type'])
               && request.resource.data.read == false
-              && request.resource.data.ticketId is string);
+              && request.resource.data.ticketId is string
+              && request.resource.data.title is string && request.resource.data.title.size() <= 200
+              && request.resource.data.message is string && request.resource.data.message.size() <= 1000);
         allow update, delete: if isTenantUser(tenantId);
       }
 
@@ -154,6 +223,19 @@ service cloud.firestore {
       match /settings/general {
         allow read: if true;
         allow write: if isTenantUser(tenantId) && isAdmin();
+      }
+
+      // Klucz QR firmy: odczyt dla personelu (generowanie naklejek), utworzenie przez personel (gdy brak),
+      // zmiana (unieważnienie wszystkich kodów i sesji QR) tylko przez admina. Anonim nie ma odczytu.
+      match /settings/qr_access {
+        allow read: if isTenantUser(tenantId) && isStaff();
+        allow create: if isTenantUser(tenantId) && isStaff()
+          && request.resource.data.keys().hasOnly(['key', 'createdAt'])
+          && request.resource.data.key is string
+          && request.resource.data.key.size() >= 20;
+        allow update: if isTenantUser(tenantId) && isAdmin()
+          && request.resource.data.key is string
+          && request.resource.data.key.size() >= 20;
       }
 
       match /settings/{document=**} {
@@ -194,4 +276,3 @@ service cloud.firestore {
     }
   }
 }
-

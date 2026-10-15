@@ -7,6 +7,7 @@ import MachineDTR from './MachineDTR';
 import MachineWorkHoursModal from './MachineWorkHoursModal';
 import { USER_ROLES } from '../../utils/constants';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { getOrCreateQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
 
 import MachineHeader from './machines/MachineHeader';
 import MachineInfoCard from './machines/MachineInfoCard';
@@ -61,7 +62,16 @@ export default function MachineDetails({ isFromQR, onScanNext, onNfcNext, machin
     }).reduce((sum, tx) => sum + Number(tx.totalCost || (Math.abs(Number(tx.quantity)) * Number(tx.price)) || 0), 0);
   }, [partTransactions, machine.id, tickets, plannedServices]);
 
-  const qrValue = `tenant=${currentTenantId}&machine=${machine.id}`;
+  const [qrKey, setQrKey] = useState(null);
+  useEffect(() => {
+    let active = true;
+    getOrCreateQrKey(currentTenantId)
+      .then(k => { if (active) setQrKey(k); })
+      .catch(err => console.error('Nie udało się pobrać klucza QR firmy:', err));
+    return () => { active = false; };
+  }, [currentTenantId]);
+
+  const qrValue = qrKey ? buildMachineQrValue(currentTenantId, machine.id, qrKey) : null;
 
   return (
     <div className="bg-[#f8f9fa] w-full flex flex-col h-full animate-fade-in relative text-[#111827]">

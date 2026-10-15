@@ -25,17 +25,22 @@ service firebase.storage {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function getAnonTenant() {
-      return firestore.exists(/databases/(default)/documents/anon_sessions/$(request.auth.uid)) ? 
-             firestore.get(/databases/(default)/documents/anon_sessions/$(request.auth.uid)).data.tenantId : null;
+    // Sesja QR musi wskazywać firmę i aktualny klucz QR firmy (2 unikalne dokumenty – limit Storage)
+    function anonSessionValid(tenantId) {
+      let s = firestore.get(/databases/(default)/documents/anon_sessions/$(request.auth.uid));
+      let k = firestore.get(/databases/(default)/documents/tenants/$(tenantId)/settings/qr_access);
+      return s != null && k != null
+        && s.data.tenantId == tenantId
+        && s.data.get('qrKey', '') == k.data.key;
     }
 
     function isAnonymousInTenant(tenantId) {
-      return isAnonymous() && (getAnonTenant() == tenantId || (tenantId == 'crist' && (getAnonTenant() == null || getAnonTenant() == 'crist')));
+      return isAnonymous() && anonSessionValid(tenantId);
     }
 
     function isTenantUser(tenantId) {
-       return isSignedIn() && (getTenant() == tenantId || isSuperAdmin());
+       // !isAnonymous() – anonim nie czyta users/{uid} (limit 2 dokumentów Firestore na ocenę reguł Storage)
+       return isSignedIn() && !isAnonymous() && (getTenant() == tenantId || isSuperAdmin());
     }
 
     function isValidSize() {
