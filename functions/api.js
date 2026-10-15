@@ -174,15 +174,18 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
       t.update(partRef, { stock: newStock, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 
       const txRef = db.collection('tenants').doc(req.tenantId).collection('part_transactions').doc();
+      const unitPrice = Number(partDoc.data().unitPrice || partDoc.data().price || 0);
       t.set(txRef, {
         partId: req.params.id,
         partName: partDoc.data().name,
         type: (type === 'add' || diff > 0) ? 'receive' : 'issue_adhoc',
-        quantity: Math.abs(diff),
+        quantity: diff,
+        price: unitPrice,
         date: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
         userId: userId || 'API_ERP',
         user: userName || 'Zewnętrzny System ERP',
-        totalCost: Math.abs(diff) * (partDoc.data().price || 0)
+        totalCost: Math.abs(diff) * unitPrice
       });
     });
 

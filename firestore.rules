@@ -53,13 +53,21 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    match /tenant_api_keys/{keyId} {
+      allow read: if isStaff() && (resource == null || isTenantUser(resource.data.tenantId));
+      allow create: if isStaff() && isTenantUser(request.resource.data.tenantId)
+        && request.resource.data.keys().hasOnly(['prefix', 'tenantId', 'name', 'active', 'createdAt']);
+      allow delete: if isStaff() && isTenantUser(resource.data.tenantId);
+      allow update: if false;
+    }
+
     function isAnonymous() {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
     match /tenants/{tenantId} {
       match /reporters/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymous();
+        allow read: if isTenantUser(tenantId);
         allow create: if isTenantUser(tenantId)
           || (isAnonymous()
               && request.resource.data.keys().hasOnly(['name', 'phone', 'createdAt'])
@@ -121,8 +129,18 @@ service cloud.firestore {
         allow update, delete: if isTenantUser(tenantId);
       }
 
+      match /settings/branding {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isAdmin();
+      }
+
+      match /settings/general {
+        allow read: if true;
+        allow write: if isTenantUser(tenantId) && isAdmin();
+      }
+
       match /settings/{document=**} {
-        allow read: if isTenantUser(tenantId) || isSignedIn(); 
+        allow read: if isTenantUser(tenantId); 
         allow write: if isTenantUser(tenantId) && isAdmin();
       }
 

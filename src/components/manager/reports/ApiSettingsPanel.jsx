@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase';
-import { collection, query, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 
 export default function ApiSettingsPanel() {
@@ -12,13 +12,10 @@ export default function ApiSettingsPanel() {
 
   const fetchApiKeys = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'tenant_api_keys')));
+      const snap = await getDocs(query(collection(db, 'tenant_api_keys'), where('tenantId', '==', tenantId)));
       const keys = [];
       snap.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.tenantId === tenantId) {
-          keys.push({ id: docSnap.id, ...data });
-        }
+        keys.push({ id: docSnap.id, ...docSnap.data() });
       });
       setApiKeys(keys);
     } catch (e) {
@@ -28,10 +25,13 @@ export default function ApiSettingsPanel() {
 
   useEffect(() => {
     fetchApiKeys();
-  }, []);
+  }, [tenantId]);
 
   const generateKey = () => {
-    return 'vxnt_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    const randomHex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return 'vxnt_' + randomHex;
   };
 
   const handleCreateKey = async () => {

@@ -9,7 +9,7 @@ export default defineConfig({
   base: './',
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/setupTests.js"], exclude: ['**/node_modules/**', '**/dist/**', '**/functions/**', '**/e2e/**'] },
   build: { 
-      sourcemap: true, 
+      sourcemap: false, 
       emptyOutDir: true,
       rollupOptions: {
         output: {

@@ -7,29 +7,75 @@ const db = admin.firestore();
 const messaging = admin.messaging();
 
 /**
- * Helper do pobierania tokenów na podstawie uprawnień z ról.
+ * Helper do weryfikacji dostępu użytkownika do wskazanego tenanta.
+ */
+async function verifyTenantAccess(context, requestedTenantId, options = { allowAnonymous: false }) {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
+  }
+
+  const isAnon = context.auth.token?.firebase?.sign_in_provider === 'anonymous';
+  const tenantId = context.auth.token?.tenantId || requestedTenantId;
+
+  if (isAnon) {
+    if (!options.allowAnonymous) {
+      throw new functions.https.HttpsError('permission-denied', 'Funkcja niedostępna dla sesji anonimowych.');
+    }
+    return tenantId || 'crist';
+  }
+
+  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('permission-denied', 'Brak profilu użytkownika.');
+  }
+  const userData = userDoc.data();
+  if (userData.isDeleted) {
+    throw new functions.https.HttpsError('permission-denied', 'Konto użytkownika jest nieaktywne.');
+  }
+
+  const userTenant = userData.tenantId || 'crist';
+  if (userData.role !== 'superadmin' && tenantId && userTenant !== tenantId) {
+    throw new functions.https.HttpsError('permission-denied', 'Brak dostępu do danych tego dzierżawcy.');
+  }
+
+  return tenantId || userTenant;
+}
+
+/**
+ * Helper do pobierania tokenów na podstawie uprawnień z ról w obrębie danego tenanta.
  * Zwraca tablicę unikalnych tokenów FCM.
  */
-async function getTokensForPermission(permissionId) {
+async function getTokensForPermission(tenantId, permissionId) {
   const tokens = new Set();
-  
-  // Pobieramy wszystkie role, które mają to uprawnienie
-  const rolesSnap = await db.collection('roles').get();
   const validRoleIds = [];
-  rolesSnap.forEach(doc => {
+
+  // Pobieramy role z kolekcji tenanta (oraz fallback z głównej kolekcji roles)
+  const tenantRolesSnap = await db.collection('tenants').doc(tenantId).collection('roles').get();
+  tenantRolesSnap.forEach(doc => {
     const data = doc.data();
     if (data.permissions && data.permissions.includes(permissionId) && !data.isDeleted) {
       validRoleIds.push(doc.id);
     }
   });
 
+  if (validRoleIds.length === 0) {
+    const rootRolesSnap = await db.collection('roles').get();
+    rootRolesSnap.forEach(doc => {
+      const data = doc.data();
+      if (data.permissions && data.permissions.includes(permissionId) && !data.isDeleted) {
+        validRoleIds.push(doc.id);
+      }
+    });
+  }
+
   if (validRoleIds.length === 0) return [];
 
-  // Pobieramy użytkowników z tymi rolami, którzy mają fcmTokens
-  const usersSnap = await db.collection('users').where('roleId', 'in', validRoleIds).get();
+  // Pobieramy użytkowników z tymi rolami należących do danego tenanta
+  const usersSnap = await db.collection('users').where('roleId', 'in', validRoleIds.slice(0, 10)).get();
   usersSnap.forEach(doc => {
     const data = doc.data();
-    if (data.fcmTokens && Array.isArray(data.fcmTokens)) {
+    const userTenant = data.tenantId || 'crist';
+    if (!data.isDeleted && userTenant === tenantId && data.fcmTokens && Array.isArray(data.fcmTokens)) {
       data.fcmTokens.forEach(t => tokens.add(t));
     }
   });
@@ -41,20 +87,18 @@ exports.onTicketCreated = functions.region('europe-west1').firestore
   .document('tenants/{tenantId}/tickets/{ticketId}')
   .onCreate(async (snap, context) => {
     const ticket = snap.data();
+    const tenantId = context.params.tenantId;
     const isCritical = ticket.isCritical;
     
-    // Zależnie od krytyczności, wysyłamy do innych grup
     const targetPermission = isCritical ? 'push_new_critical' : 'push_new_all';
-    let tokens = await getTokensForPermission(targetPermission);
+    let tokens = await getTokensForPermission(tenantId, targetPermission);
     
-    // Jeśli to awaria zwykła, dodajemy też tokeny tych co chcą krytyczne (bo to zazwyczaj nadrzędne), 
-    // ale możemy zostawić ekskluzywne wg uprawnień (user ma zaznaczone oba)
     if (!tokens.length) return null;
 
     const payload = {
       notification: {
         title: isCritical ? 'KRYTYCZNA AWARIA!' : 'Nowa Awaria Zgłoszona',
-        body: `Zgłaszający: ${ticket.reporterName}\nTemat: ${ticket.topic}`,
+        body: `Zgłaszający: ${ticket.reporterName || ticket.reportedBy || 'Operator'}\nTemat: ${ticket.topic}`,
       },
       data: {
         click_action: `/?module=master_data&tab=tickets&openTicket=${context.params.ticketId}`
@@ -74,11 +118,10 @@ exports.onTicketStatusUpdated = functions.region('europe-west1').firestore
   .onUpdate(async (change, context) => {
     const newValue = change.after.data();
     const previousValue = change.before.data();
+    const tenantId = context.params.tenantId;
     
     if (newValue.status === previousValue.status) return null;
     
-    // Szukamy osób zainteresowanych zmianą statusu (albo przypisanych, albo wszystkich z uprawnieniem push_status_updates)
-    // Zgodnie ze wskazówkami, wysyłamy do przypisanego technika, i osób powiązanych.
     const tokens = new Set();
     
     // Jeśli jest przypisany technik, pobierz jego token
@@ -86,14 +129,15 @@ exports.onTicketStatusUpdated = functions.region('europe-west1').firestore
       const userDoc = await db.collection('users').doc(newValue.assignedTo).get();
       if (userDoc.exists) {
         const uData = userDoc.data();
-        if (uData.fcmTokens) uData.fcmTokens.forEach(t => tokens.add(t));
+        const uTenant = uData.tenantId || 'crist';
+        if (uTenant === tenantId && uData.fcmTokens) {
+          uData.fcmTokens.forEach(t => tokens.add(t));
+        }
       }
     }
     
-    // Zgłaszający: jeśli ma konto (nie obsługiwane jeszcze w tej wersji, bazujemy na Imię/Nazwisko tekstowym)
-    
-    // Opcjonalnie wszyscy z uprawnieniem ogólnym (np. koordynatorzy)
-    const coordTokens = await getTokensForPermission('push_status_updates');
+    // Wszyscy z uprawnieniem ogólnym w tym tenancie (np. koordynatorzy)
+    const coordTokens = await getTokensForPermission(tenantId, 'push_status_updates');
     coordTokens.forEach(t => tokens.add(t));
     
     const uniqueTokens = Array.from(tokens);
@@ -126,9 +170,12 @@ const speech = require('@google-cloud/speech').v2;
 const speechClient = new speech.SpeechClient({ apiEndpoint: "europe-west4-speech.googleapis.com" });
 
 exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
-  const { audioBase64, model, mimeType } = data;
+  const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
+  const { audioBase64, model, mimeType } = data || {};
   if (!audioBase64) throw new functions.https.HttpsError("invalid-argument", "Brak pliku audio");
+  if (typeof audioBase64 === 'string' && audioBase64.length > 25 * 1024 * 1024) {
+    throw new functions.https.HttpsError("invalid-argument", "Plik audio przekracza dopuszczalny rozmiar");
+  }
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
@@ -165,7 +212,7 @@ exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (d
           role: "user",
           parts: [
             { inlineData: { mimeType: mimeType || "audio/webm", data: audioBase64 } },
-            { text: "Dokonaj dokladnej transkrypcji tego nagrania audio. Zwracaj wylacznie sam tekst z transkrypcja, bez zadnego dodatkowego formatowania ani powitan." }
+            { text: "Dokonaj dokładnej transkrypcji tego nagrania audio. Zwracaj wyłącznie sam tekst z transkrypcją, bez żadnego dodatkowego formatowania ani powitań." }
           ]
         }]
       };
@@ -173,29 +220,26 @@ exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (d
       text = resp.response.candidates[0].content.parts[0].text;
     }
     
-    const durationSeconds = data.durationSeconds || 0;
-    if (durationSeconds > 0) {
-      const tenantId = context.auth?.token?.tenantId || data.tenantId;
-      if (tenantId) {
-        const transcribePricePerMinute = globalDoc.exists ? (globalDoc.data().transcribePrice || 0.40) : 0.40;
-        const cost = (durationSeconds / 60) * transcribePricePerMinute;
-        await db.collection("tenants").doc(tenantId).collection("stats").doc("ai_usage").set({
-          whisperSeconds: FieldValue.increment(durationSeconds),
-          groqCost: FieldValue.increment(cost)
-        }, { merge: true });
-      }
+    const durationSeconds = Math.min(Math.max(0, Number(data.durationSeconds || 0)), 600);
+    if (durationSeconds > 0 && verifiedTenantId) {
+      const transcribePricePerMinute = globalDoc.exists ? (globalDoc.data().transcribePrice || 0.40) : 0.40;
+      const cost = (durationSeconds / 60) * transcribePricePerMinute;
+      await db.collection("tenants").doc(verifiedTenantId).collection("stats").doc("ai_usage").set({
+        whisperSeconds: FieldValue.increment(durationSeconds),
+        groqCost: FieldValue.increment(cost)
+      }, { merge: true });
     }
     return { text };
   } catch (err) {
     console.error("Transcription error:", err);
-    throw new functions.https.HttpsError("internal", err.message || "Blad transkrypcji");
+    throw new functions.https.HttpsError("internal", err.message || "Błąd transkrypcji");
   }
 });
 
 exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
-  const { messages, documentPaths, machineName } = data;
-  if (!messages || !messages.length) throw new functions.https.HttpsError("invalid-argument", "Brak wiadomosci");
+  const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: false });
+  const { messages, documentPaths } = data || {};
+  if (!messages || !messages.length) throw new functions.https.HttpsError("invalid-argument", "Brak wiadomości");
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
@@ -209,14 +253,22 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
 
     const parts = [];
     if (documentPaths && documentPaths.length > 0) {
-      documentPaths.forEach(path => {
+      for (const path of documentPaths) {
+        if (typeof path !== 'string' || path.includes('..')) {
+          throw new functions.https.HttpsError("permission-denied", "Nieprawidłowa ścieżka dokumentu DTR.");
+        }
+        const isTenantPath = path.startsWith(`tenants/${verifiedTenantId}/`);
+        const isLegacyPath = path.startsWith('dtr_documents/') && (verifiedTenantId === 'crist' || verifiedTenantId === 'default');
+        if (!isTenantPath && !isLegacyPath) {
+          throw new functions.https.HttpsError("permission-denied", "Brak dostępu do dokumentu DTR innego dzierżawcy.");
+        }
         parts.push({
           fileData: {
             fileUri: `gs://${process.env.GCLOUD_PROJECT || "serwis-crist"}.firebasestorage.app/${path}`,
             mimeType: "application/pdf"
           }
         });
-      });
+      }
     }
 
     const chatHistoryText = messages.filter(m => m.role !== "system").map(m => `${m.role === "user" ? "Mechanik" : "Asystent"}: ${m.text}`).join("\n");
@@ -231,14 +283,15 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
     return { text, tokens };
   } catch (err) {
     console.error("DTR Chat error:", err);
-    throw new functions.https.HttpsError("internal", err.message || "Blad czatu DTR");
+    if (err instanceof functions.https.HttpsError) throw err;
+    throw new functions.https.HttpsError("internal", err.message || "Błąd czatu DTR");
   }
 });
 
 exports.processDictationText = functions.region('europe-west1').https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Wymagane uwierzytelnienie");
-  const { rawText, mode, lang, tenantId } = data;
-  if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejsciowego");
+  await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
+  const { rawText, mode, lang } = data || {};
+  if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejściowego");
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
@@ -299,22 +352,14 @@ Oto notatka:
     return { result };
   } catch (err) {
     console.error("Dictation processing error:", err);
-    throw new functions.https.HttpsError("internal", err.message || "Blad przetwarzania tekstu");
+    throw new functions.https.HttpsError("internal", err.message || "Błąd przetwarzania tekstu");
   }
 });
 
 exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, context) => {
   const { HttpsError } = functions.https;
-  if (!context.auth) throw new HttpsError("unauthenticated", "User not authenticated.");
-  const tenantId = context.auth.token.tenantId || (data && data.tenantId);
+  const tenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: false });
   if (!tenantId) throw new HttpsError("invalid-argument", "Missing tenantId.");
-
-  const userDoc = await db.collection("users").doc(context.auth.uid).get();
-  if (!userDoc.exists || userDoc.data().tenantId !== tenantId) {
-    if (!userDoc.exists || userDoc.data().role !== "superadmin") {
-      throw new HttpsError("permission-denied", "Unauthorized tenant access.");
-    }
-  }
 
   const { geminiTokens } = data || {};
   if (!geminiTokens || geminiTokens <= 0) return { success: true };
@@ -322,7 +367,7 @@ exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, 
   const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
   const globalData = globalDoc.exists ? globalDoc.data() : {};
   const geminiPrice = globalData.geminiPrice || 0.60;
-  const safeTokens = Math.max(0, parseInt(geminiTokens, 10));
+  const safeTokens = Math.min(Math.max(0, parseInt(geminiTokens, 10)), 1000000);
 
   await db.collection("tenants").doc(tenantId).collection("stats").doc("ai_usage").set({
     geminiTokens: FieldValue.increment(safeTokens),
@@ -332,13 +377,12 @@ exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, 
   return { success: true };
 });
 
-// --- Skalowalnosc: Automatyczne przeglady planowane (Cron o 2:00 w nocy) ---
+// --- Skalowalność: Automatyczne przeglądy planowane (Cron o 2:00 w nocy) ---
 exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubsub.schedule('0 2 * * *')
   .timeZone('Europe/Warsaw')
   .onRun(async (context) => {
-    console.log('Rozpoczecie weryfikacji serwisow planowanych...');
+    console.log('Rozpoczęcie weryfikacji serwisów planowanych...');
     
-    // Pobranie listy firm (tenants)
     const tenantsSnap = await db.collection('tenant_registry').get();
     
     const CRITICAL_DAYS_WARNING = 7;
@@ -349,34 +393,30 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
       if (tenantDoc.id === '_global_secrets_' || tenantDoc.id === '_global_settings_') continue;
       
       const tenantId = tenantDoc.id;
-      console.log('Sprawdzanie dzierzawcy: ' + tenantId);
+      console.log('Sprawdzanie dzierżawcy: ' + tenantId);
       
       try {
-        // Pobranie maszyn (zeby zderzyc roboczogodziny)
         const machinesSnap = await db.collection('tenants').doc(tenantId).collection('machines').where('isDeleted', '==', false).get();
         const machinesMap = {};
         machinesSnap.docs.forEach(doc => {
           machinesMap[doc.id] = doc.data();
         });
         
-        // Pobranie wszystkich zaplanowanych (pending) serwisow
-        // W constants.js PENDING ma wartosc 1
         const servicesSnap = await db.collection('tenants').doc(tenantId).collection('planned_services').where('status', '==', 1).get();
         
         let batch = db.batch();
         let writesCount = 0;
-        const BATCH_LIMIT = 400; // bezpieczny limit (max 500)
+        const BATCH_LIMIT = 400;
         
         for (const sDoc of servicesSnap.docs) {
           const data = sDoc.data();
           const machine = machinesMap[data.machineId];
-          if (!machine) continue; // Maszyna nie istnieje
+          if (!machine) continue;
 
           let shouldAlert = false;
           let alertMessage = '';
           
           if (!data.notified) {
-            // KALENDARZ
             if (data.triggerType === 'calendar' || data.triggerType === 'mixed') {
               if (data.nextDate) {
                 const nextDate = data.nextDate.toDate ? data.nextDate.toDate() : new Date(data.nextDate);
@@ -384,31 +424,28 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
                 
                 if (daysLeft <= CRITICAL_DAYS_WARNING) {
                   shouldAlert = true;
-                  alertMessage = 'Zbli�a si� termin planowanego przegl�du "' + (data.name || 'Brak nazwy') + '" (zosta�o ' + Math.max(0, Math.ceil(daysLeft)) + ' dni).';
+                  alertMessage = 'Zbliża się termin planowanego przeglądu "' + (data.name || 'Brak nazwy') + '" (zostało ' + Math.max(0, Math.ceil(daysLeft)) + ' dni).';
                 }
               }
             }
 
-            // ROBOCZOGODZINY
             if (!shouldAlert && (data.triggerType === 'hours' || data.triggerType === 'mixed')) {
               if (data.targetWorkHours && machine.currentWorkHours) {
                 const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
                 if (hoursLeft <= CRITICAL_HOURS_WARNING && hoursLeft >= 0) {
                   shouldAlert = true;
-                  alertMessage = 'Zbli�a si� termin przegl�du liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zosta�o ' + hoursLeft + ' rbg).';
+                  alertMessage = 'Zbliża się termin przeglądu liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zostało ' + hoursLeft + ' rbg).';
                 }
               }
             }
 
             if (shouldAlert) {
-              // Aktualizuj status serwisu (1 = PENDING, 2 = IN_PROGRESS - zgodne z SERVICE_STATUS)
               batch.update(sDoc.ref, { status: 2, notified: true });
               writesCount++;
               
-              // Wygeneruj powiadomienie
               const notifRef = db.collection('tenants').doc(tenantId).collection('notifications').doc();
               batch.set(notifRef, {
-                title: 'Zbli�aj�cy si� Przegl�d',
+                title: 'Zbliżający się Przegląd',
                 message: alertMessage,
                 type: 'warning',
                 createdAt: FieldValue.serverTimestamp(),
@@ -420,7 +457,7 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
               
               if (writesCount >= BATCH_LIMIT) {
                 await batch.commit();
-                batch = db.batch(); // Re-create batch after commit!
+                batch = db.batch();
                 writesCount = 0;
               }
             }
@@ -432,35 +469,30 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
         }
         
       } catch (err) {
-        console.error('Blad dla dzierzawcy ' + tenantId + ':', err);
+        console.error('Błąd dla dzierżawcy ' + tenantId + ':', err);
       }
     }
     
-    console.log('Weryfikacja zakonczona sukcesem.');
+    console.log('Weryfikacja zakończona sukcesem.');
     return null;
   });
 
-// --- Skalowalnosc: Agregacja KPI na ��danie (zmniejszenie pobierania danych do przegl�darki) ---
+// --- Skalowalność: Agregacja KPI na żądanie ---
 exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
-  const tenantId = context.auth.token.tenantId || (data && data.tenantId);
+  const tenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: false });
   if (!tenantId) throw new functions.https.HttpsError('invalid-argument', 'Brak tenantId');
 
-  const { period } = data; // '7', '30', '90', 'all'
+  const { period } = data || {}; // '7', '30', '90', 'all'
   const now = new Date();
   let startDate = null;
   
-  if (period !== 'all') {
+  if (period && period !== 'all') {
     startDate = new Date();
     startDate.setDate(now.getDate() - parseInt(period, 10));
   }
 
   try {
-    // Odczyt z bazy (tylko na serwerze - nie zatykamy sieci u�ytkownika)
     let q = db.collection('tenants').doc(tenantId).collection('tickets').where('isDeleted', '!=', true);
-    
-    // Optymalizacja: je�li Firestore ma index, mo�na by tu filtrowa� po dacie, 
-    // ale dla uproszczenia (bo tickets mo�e nie mie� indeks�w) wyci�gamy na serwerze i filtrujemy w RAM serwera.
     const snapshot = await q.get();
     
     let totalTickets = 0;
@@ -475,17 +507,14 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
       const t = docSnap.data();
       const createdAt = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt);
       
-      // Filtracja czasu
       if (startDate && createdAt < startDate) return;
 
       totalTickets++;
       if (t.isCritical) criticalTicketsCount++;
       
-      // Status
       const statusNum = Number(t.status);
       statusCounts[statusNum] = (statusCounts[statusNum] || 0) + 1;
 
-      // MTTR dla zako�czonych (status 5)
       if (statusNum === 5) {
         closedTicketsCount++;
         if (t.closedAt) {
@@ -495,11 +524,9 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
         }
       }
 
-      // Maszyny
       const mName = t.machineName || 'Nieznana maszyna';
       machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
 
-      // Trend (ostatnie dni)
       if (period === '7' || period === '30') {
         const dateKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
         trendMap[dateKey] = (trendMap[dateKey] || 0) + 1;
@@ -508,17 +535,15 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
 
     const avgRepairMinutes = closedTicketsCount > 0 ? Math.round(totalRepairTimeMinutes / closedTicketsCount) : 0;
     
-    // Sort top machines
     const topMachines = Object.entries(machineFaultCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Sort trend
     const trendData = Object.entries(trendMap)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-10); // Ostatnie 10 dni aktywno�ci
+      .slice(-10);
 
     return {
       totalTickets,
@@ -532,21 +557,20 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
 
   } catch (err) {
     console.error('KPI error:', err);
-    throw new functions.https.HttpsError('internal', 'B��d podczas liczenia KPI', err);
+    throw new functions.https.HttpsError('internal', 'Błąd podczas liczenia KPI', err);
   }
 });
 
-// --- Skalowalnosc: Agregacja KPI Serwis�w Planowanych ---
+// --- Skalowalność: Agregacja KPI Serwisów Planowanych ---
 exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Wymagane uwierzytelnienie');
-  const tenantId = context.auth.token.tenantId || (data && data.tenantId);
+  const tenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: false });
   if (!tenantId) throw new functions.https.HttpsError('invalid-argument', 'Brak tenantId');
 
-  const { period } = data; // '7', '30', '90', 'all'
+  const { period } = data || {}; // '7', '30', '90', 'all'
   const now = new Date();
   let startDate = null;
   
-  if (period !== 'all') {
+  if (period && period !== 'all') {
     startDate = new Date();
     startDate.setDate(now.getDate() - parseInt(period, 10));
   }
@@ -583,7 +607,8 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
         typeCounts[s.triggerType] = (typeCounts[s.triggerType] || 0) + 1;
       }
 
-      if (s.status === 'completed') {
+      const statusNum = Number(s.status);
+      if (s.status === 'completed' || statusNum === 5 || statusNum === 3) {
         completedCount++;
         
         let delayed = false;
@@ -603,7 +628,6 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
           onTimeCount++;
         }
         
-        // Trend
         if (period === '7' || period === '30') {
           const dateKey = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}-${String(refDate.getDate()).padStart(2, '0')}`;
           trendMap[dateKey] = (trendMap[dateKey] || 0) + 1;
@@ -638,6 +662,6 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
 
   } catch (err) {
     console.error('Planned KPI error:', err);
-    throw new functions.https.HttpsError('internal', 'B��d liczenia Planned KPI', err);
+    throw new functions.https.HttpsError('internal', 'Błąd liczenia Planned KPI', err);
   }
 });

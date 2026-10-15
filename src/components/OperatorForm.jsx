@@ -318,6 +318,9 @@ export default function OperatorForm({
                   <><i className="ph ph-paper-plane-tilt text-xl"></i> Wyślij zgłoszenie</>
                 )}
               </button>
+              <p className="text-[11px] text-slate-400 text-center leading-relaxed pt-1">
+                Administratorem danych przetwarzanych w celu obsługi zgłoszenia serwisowego jest zarządzający zakładem ({companyName}). Funkcja dyktowania głosu (AI voice to text) wykorzystuje modele sztucznej inteligencji.
+              </p>
             </form>
           </div>
       {toastConfig && toastConfig.show && <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />}

@@ -33,51 +33,59 @@ service firebase.storage {
       return request.resource.size < 30 * 1024 * 1024;
     }
 
+    function isValidContentType() {
+      return request.resource.contentType.matches('image/.*|video/.*|audio/.*|application/pdf');
+    }
+
+    function isLegacyAllowed() {
+      return isSignedIn() && !isAnonymous() && (isSuperAdmin() || getTenant() == 'crist' || getTenant() == 'default');
+    }
+
     match /tenants/{tenantId}/{allPaths=**} {
        allow read, delete: if isTenantUser(tenantId);
-       allow create, update: if isTenantUser(tenantId) && isValidSize();
+       allow create, update: if isTenantUser(tenantId) && isValidSize() && isValidContentType();
     }
     
     // Zgloszenia anonimowe (kody QR)
     match /tenants/{tenantId}/tickets/{ticketId}/{fileName} {
        // allow get zamiast read (read = get + list). Anonim nie moze listowac plikow.
        allow get: if isAnonymous();
-       allow create: if isAnonymous() && isValidSize();
+       allow create: if isAnonymous() && isValidSize() && isValidContentType();
        allow update, delete: if false;
     }
 
     match /tickets/{ticketId}/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false; 
     }
 
     match /machine_photos/{machineId}/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
 
     match /dtr_documents/{machineId}/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
     
     match /planned_services/{srvId}/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
     
     match /checklists/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
     
     match /map_backgrounds/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
     
     match /regions_maps/{fileName} {
-      allow read: if isSignedIn() && !isAnonymous();
+      allow read: if isLegacyAllowed();
       allow write: if false;
     }
 
