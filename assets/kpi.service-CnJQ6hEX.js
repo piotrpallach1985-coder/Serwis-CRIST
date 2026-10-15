@@ -1,0 +1,1 @@
+import{U as n}from"./firebase-vendor-VtznGO3Z.js";import{g as e,h as s}from"./index-DiBUCsl5.js";const u=async a=>{const t=e();return t?(await n(s,"getKPIStats")({tenantId:t,period:a})).data:null},P=async a=>{const t=e();return t?(await n(s,"getPlannedKPIStats")({tenantId:t,period:a})).data:null};export{P as a,u as f};
