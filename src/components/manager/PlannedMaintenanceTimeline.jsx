@@ -8,6 +8,7 @@ import ChecklistExecutor from '../checklists/ChecklistExecutor';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { updatePlannedService, completeServiceWithTransaction } from '../../services/plannedServices.service';
+import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSummaryParser';
 
 export default function PlannedMaintenanceTimeline({
   srv,
@@ -150,42 +151,24 @@ export default function PlannedMaintenanceTimeline({
     }
   };
 
-  // Obsługa inteligentnego AI w Kroku 4 (Smart AI szablon z Gemini)
+  // Obsługa inteligentnego AI w Kroku 4 (AI voice to text -> Gemini -> szablon zamknięcia serwisu)
   const handleSmartSummaryResult = (result) => {
-    if (typeof result === 'object' && result !== null) {
-      // 1. Czysta notatka techniczna
-      const noteVal = result.czysta_notatka || result.note;
-      if (noteVal) {
-        setSummaryNotes(prev => prev ? prev + '\n' + noteVal : noteVal);
+    const r = normalizeSmartSummary(result);
+    if (r.note) {
+      setSummaryNotes(prev => prev ? prev + '\n' + r.note : r.note);
+    }
+    if (r.manHours !== undefined) {
+      setSummaryManHours(String(r.manHours));
+    }
+    if (r.partsUsed !== undefined) {
+      setSummaryPartsUsed(r.partsUsed);
+    }
+    if (r.createActionItem) {
+      setSummaryCreateActionItem(true);
+      if (r.actionItemDetails) setSummaryActionItemDetails(r.actionItemDetails);
+      if (r.actionItemDays && r.actionItemDays > 0) {
+        setSummaryActionItemDueDate(daysFromNowISODate(r.actionItemDays));
       }
-      // 2. Czas pracy (RBG / float)
-      if (result.czas_pracy !== undefined && result.czas_pracy !== null) {
-        setSummaryManHours(result.czas_pracy);
-      } else if (result.timeSpentHours) {
-        setSummaryManHours(result.timeSpentHours);
-      }
-      // 3. Zużyto wymagane części (boolean)
-      if (result.zuzyto_wymagane_czesci !== undefined) {
-        setSummaryPartsUsed(Boolean(result.zuzyto_wymagane_czesci));
-      }
-      // 4. Tematy do realizacji
-      if (result.tematy_do_realizacji || result.szczegoly_tematu || result.actionItem) {
-        setSummaryCreateActionItem(true);
-        const details = result.szczegoly_tematu || result.actionItem || '';
-        if (details) {
-          setSummaryActionItemDetails(details);
-        }
-        if (result.actionItemDays || result.termin_dni) {
-          const days = Number(result.actionItemDays || result.termin_dni);
-          if (!isNaN(days) && days > 0) {
-            const d = new Date();
-            d.setDate(d.getDate() + days);
-            setSummaryActionItemDueDate(d.toISOString().split('T')[0]);
-          }
-        }
-      }
-    } else if (typeof result === 'string') {
-      setSummaryNotes(prev => prev ? prev + ' ' + result : result);
     }
   };
 
@@ -381,7 +364,7 @@ export default function PlannedMaintenanceTimeline({
         </div>
       </div>
       
-      <div className="p-4 md:p-6 space-y-6 bg-gray-50/50">
+      <div className="p-2 sm:p-4 md:p-6 space-y-6 bg-gray-50/50">
         <div className="space-y-4">
           {stepsList.map(step => {
             const isActualStatus = step.id === naturalStepNum;
@@ -411,17 +394,17 @@ export default function PlannedMaintenanceTimeline({
                   {isPast ? <i className="ph ph-check font-bold text-base"></i> : step.id}
                 </button>
                 
-                {/* Karta kroku */}
-                <div className={`flex-1 rounded-xl transition-all duration-300 border ${
+                {/* Karta kroku (aktywna karta wchodzi pod kółko – maksymalne wykorzystanie szerokości jak w awariach) */}
+                <div className={`flex-1 min-w-0 rounded-xl transition-all duration-300 border relative z-0 ${
                   isSelected 
-                    ? 'bg-[#f4f1eb] p-4 sm:p-5 shadow-sm border-[#e8e4db]' 
+                    ? 'bg-[#f4f1eb] -ml-12 pl-14 pr-3 py-3 sm:pr-5 sm:py-4 shadow-sm border-[#e8e4db]' 
                     : 'bg-white p-3.5 border-gray-200 hover:border-gray-300'
                 }`}>
                   <div 
                     className="flex items-center justify-between cursor-pointer select-none"
                     onClick={() => setSelectedStepOverride(step.id === currentStepNum ? null : step.id)}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-x-2 gap-y-1 flex-wrap min-w-0">
                       <h4 className={`text-sm md:text-base transition-colors ${
                         isSelected 
                           ? 'font-extrabold text-gray-900' 
@@ -440,9 +423,9 @@ export default function PlannedMaintenanceTimeline({
                     <i className={`ph ${isSelected ? 'ph-caret-up' : 'ph-caret-down'} text-gray-400`}></i>
                   </div>
                   
-                  {/* Treść rozwiniętego kroku */}
+                  {/* Treść rozwiniętego kroku – rozciągnięta na całą szerokość karty (także pod kółkiem) */}
                   {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-4 animate-fade-in">
+                    <div className="mt-3 pt-3 -ml-11 border-t border-slate-200/80 space-y-4 animate-fade-in min-w-0">
                       
                       {/* ==================== KROK 1: PRZYJĘCIE DO REALIZACJI ==================== */}
                       {step.id === 1 && (
@@ -688,283 +671,238 @@ export default function PlannedMaintenanceTimeline({
 
                       {/* ==================== KROK 4: PODSUMOWANIE SERWISU ==================== */}
                       {step.id === 4 && (
-                        <div className="space-y-4">
-                          {/* Baner Smart AI */}
-                          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2 font-bold text-purple-950 text-sm">
-                                <i className="ph ph-magic-wand text-purple-600 text-lg"></i>
-                                <span>Inteligentne Podsumowanie Serwisu (AI)</span>
-                              </div>
-                              <p className="text-xs text-purple-700">
-                                Kliknij fioletowy przycisk różdżki i podyktuj podsumowanie – model AI automatycznie uzupełni czas pracy, zużyte części, notatkę i tematy do realizacji!
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 sm:p-4 space-y-4">
+                          {/* Nagłówek w stylu okna "Zakończ Serwis" + różdżka AI (voice to text -> Gemini -> szablon) */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="text-base font-bold text-slate-800 leading-tight">Zakończ Serwis</h4>
+                              <p className="text-xs text-slate-500 truncate">{srv.name}</p>
+                              <p className="text-[11px] text-purple-700 mt-1 leading-snug">
+                                Różdżka AI: podyktuj podsumowanie – uzupełni czas pracy, części, notatkę i tematy do realizacji.
                               </p>
                             </div>
-                            <div className="shrink-0 flex items-center gap-2">
+                            <div className="shrink-0 bg-purple-50 border border-purple-200 rounded-xl p-1">
                               <DictationButton mode="smart" onResult={handleSmartSummaryResult} />
                             </div>
                           </div>
 
-                          {/* Formularz podsumowania */}
-                          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                            {/* Czas pracy */}
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">
-                                Czas pracy (RBG / Godziny robocze):
-                              </label>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={summaryManHours}
-                                onChange={e => setSummaryManHours(e.target.value)}
-                                placeholder="np. 2.0"
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
+                          {/* Czas pracy */}
+                          <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Czas pracy (RBG / Godziny)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              inputMode="decimal"
+                              value={summaryManHours}
+                              onChange={e => setSummaryManHours(e.target.value)}
+                              placeholder="np. 2.5"
+                              className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                          </div>
 
-                            {/* Zużyto wymagane części */}
-                            <div className="flex items-center gap-2 pt-1">
+                          {/* Potwierdzenie zużycia części planowych */}
+                          <label htmlFor="timelineSummaryPartsUsed" className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              id="timelineSummaryPartsUsed"
+                              checked={summaryPartsUsed}
+                              onChange={e => setSummaryPartsUsed(e.target.checked)}
+                              className="w-4 h-4 text-orange-600 rounded border-slate-300 cursor-pointer shrink-0"
+                            />
+                            <span className="text-sm font-bold text-slate-700">Potwierdzam zużycie wymaganych części</span>
+                          </label>
+
+                          {/* Już pobrane części w ramach serwisu */}
+                          {displayedPartsUsed && displayedPartsUsed.length > 0 && (
+                            <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50 space-y-1.5">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-blue-900">Faktycznie pobrane części ({displayedPartsUsed.length})</span>
+                                <span className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 px-2 py-0.5 rounded-full">
+                                  Łącznie: {displayedPartsUsed.reduce((sum, tx) => sum + (tx.totalCost ? Number(tx.totalCost) : (Math.abs(Number(tx.quantity) || 1) * (Number(tx.price) || 0))), 0).toFixed(2)} PLN
+                                </span>
+                              </div>
+                              {displayedPartsUsed.map((tx, idx) => {
+                                const pName = parts.find(p => p.id === tx.partId)?.name || tx.partName || 'Część z magazynu';
+                                const qty = Math.abs(Number(tx.quantity) || 1);
+                                const costVal = tx.totalCost ? Number(tx.totalCost) : (qty * (Number(tx.price) || 0));
+                                return (
+                                  <div key={idx} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-xs bg-white p-2 rounded-md border border-blue-100">
+                                    <span className="font-bold text-slate-800 min-w-0 break-words">{pName}</span>
+                                    <span className="text-[11px] text-slate-600">
+                                      Pobrano: <strong className="text-slate-800">{qty}</strong> ({tx.user || 'System'}) · <strong className="text-blue-700">{costVal.toFixed(2)} PLN</strong>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Części poza planową listą */}
+                          <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                            <div className="flex justify-between items-center gap-2 mb-2">
+                              <span className="text-xs font-bold text-slate-600">Pobierz część poza planową listą</span>
+                              <button
+                                type="button"
+                                onClick={() => setSummaryExtraParts(prev => [...prev, { partId: '', quantity: 1 }])}
+                                className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold hover:bg-orange-200 shrink-0"
+                              >
+                                + Dodaj
+                              </button>
+                            </div>
+                            {summaryExtraParts.length === 0 && (
+                              <p className="text-xs text-slate-400 italic">Brak dodatkowych części</p>
+                            )}
+                            {summaryExtraParts.map((ep, idx) => (
+                              <div key={idx} className="flex gap-2 items-center mb-2 last:mb-0">
+                                <select
+                                  value={ep.partId}
+                                  onChange={e => {
+                                    const copy = [...summaryExtraParts];
+                                    copy[idx] = { ...copy[idx], partId: e.target.value };
+                                    setSummaryExtraParts(copy);
+                                  }}
+                                  className="flex-1 min-w-0 p-1.5 border border-slate-200 rounded text-xs bg-white outline-none"
+                                >
+                                  <option value="">-- Wybierz część --</option>
+                                  {parts.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} (Stan: {p.stock || 0})</option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={ep.quantity}
+                                  onChange={e => {
+                                    const copy = [...summaryExtraParts];
+                                    copy[idx] = { ...copy[idx], quantity: Math.max(1, parseInt(e.target.value) || 1) };
+                                    setSummaryExtraParts(copy);
+                                  }}
+                                  className="w-14 p-1.5 border border-slate-200 rounded text-xs text-center outline-none"
+                                  placeholder="Szt."
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setSummaryExtraParts(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-red-400 hover:text-red-600 shrink-0"
+                                  title="Usuń pozycję"
+                                >
+                                  <i className="ph ph-trash"></i>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Notatki z wykonania */}
+                          <div>
+                            <div className="flex justify-between items-center mb-1 gap-2">
+                              <label className="text-sm font-bold text-slate-700">Notatki z wykonania</label>
+                              <span className="text-xs text-gray-400 font-normal shrink-0">AI voice to text</span>
+                            </div>
+                            <div className="relative">
+                              <textarea
+                                value={summaryNotes}
+                                onChange={e => setSummaryNotes(e.target.value)}
+                                placeholder="Opcjonalne notatki..."
+                                className="w-full p-3 pr-12 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px]"
+                              />
+                              <div className="absolute right-2 top-2">
+                                <DictationButton onResult={text => setSummaryNotes(prev => prev ? prev + ' ' + text : text)} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Kolejny cykl */}
+                          <label htmlFor="timelineSummaryNextPlan" className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              id="timelineSummaryNextPlan"
+                              checked={summaryCreateNewPlan}
+                              onChange={e => setSummaryCreateNewPlan(e.target.checked)}
+                              className="w-4 h-4 text-green-600 rounded border-slate-300 cursor-pointer shrink-0"
+                            />
+                            <span className="text-sm font-bold text-slate-700">Wygeneruj automatycznie kolejny termin przeglądu</span>
+                          </label>
+
+                          {/* Temat do realizacji (Action Item) */}
+                          <div className="border-t border-slate-200 pt-3 space-y-3">
+                            <label htmlFor="timelineSummaryActionItem" className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="checkbox"
-                                id="timelineSummaryPartsUsed"
-                                checked={summaryPartsUsed}
-                                onChange={e => setSummaryPartsUsed(e.target.checked)}
-                                className="w-4 h-4 text-orange-600 rounded border-slate-300 cursor-pointer"
+                                id="timelineSummaryActionItem"
+                                checked={summaryCreateActionItem}
+                                onChange={e => setSummaryCreateActionItem(e.target.checked)}
+                                className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer shrink-0"
                               />
-                              <label htmlFor="timelineSummaryPartsUsed" className="text-sm font-bold text-slate-700 cursor-pointer">
-                                Potwierdzam zużycie wymaganych części planowych
-                              </label>
-                            </div>
-
-                            {/* Czysta notatka z prac */}
-                            <div>
-                              <div className="flex justify-between items-center mb-1">
-                                <label className="text-xs font-bold text-slate-700">
-                                  Czysta notatka techniczna z wykonanych prac:
-                                </label>
-                                <span className="text-gray-400 text-xs">AI voice to text</span>
-                              </div>
-                              <div className="relative">
-                                <textarea
-                                  value={summaryNotes}
-                                  onChange={e => setSummaryNotes(e.target.value)}
-                                  rows="3"
-                                  placeholder="Wpisz treść podsumowania lub podyktuj głosem..."
-                                  className="w-full p-2.5 pr-10 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
-                                />
-                                <div className="absolute right-2 bottom-2">
-                                  <DictationButton onResult={text => setSummaryNotes(prev => prev ? prev + ' ' + text : text)} />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tematy do realizacji (Action Item) */}
-                            <div className="space-y-2 pt-1 border-t border-slate-100">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  id="timelineSummaryActionItem"
-                                  checked={summaryCreateActionItem}
-                                  onChange={e => setSummaryCreateActionItem(e.target.checked)}
-                                  className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer"
-                                />
-                                <label htmlFor="timelineSummaryActionItem" className="text-sm font-bold text-slate-700 cursor-pointer">
-                                  Zleć kolejny krok / temat do realizacji (Action Item)
-                                </label>
-                              </div>
-                              {summaryCreateActionItem && (
-                                <div className="space-y-2.5 pl-6">
+                              <span className="text-sm font-bold text-slate-700">Dodaj do Tematy do Realizacji</span>
+                            </label>
+                            {summaryCreateActionItem && (
+                              <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                <div>
+                                  <label className="block text-xs font-bold text-blue-800 mb-1">Opis tematu do realizacji</label>
                                   <div className="relative">
                                     <input
                                       type="text"
                                       value={summaryActionItemDetails}
                                       onChange={e => setSummaryActionItemDetails(e.target.value)}
-                                      placeholder="Szczegóły tematu do realizacji (np. wymiana paska napędowego za 2 tygodnie)..."
-                                      className="w-full p-2.5 pr-10 border border-blue-200 rounded-lg text-sm bg-blue-50/40 focus:ring-2 focus:ring-blue-500"
+                                      placeholder="np. wymiana paska napędowego"
+                                      className="w-full p-2 pr-12 rounded border border-blue-200 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
-                                    <div className="absolute right-2 top-2">
+                                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
                                       <DictationButton onResult={text => setSummaryActionItemDetails(prev => prev ? prev + ' ' + text : text)} />
                                     </div>
                                   </div>
-
-                                  <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                      <label className="text-xs font-bold text-blue-900 shrink-0">
-                                        Data wymagalności (termin):
-                                      </label>
-                                      <input
-                                        type="date"
-                                        value={summaryActionItemDueDate}
-                                        onChange={e => setSummaryActionItemDueDate(e.target.value)}
-                                        className="p-1.5 px-2 text-xs border border-blue-300 rounded-md bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                      />
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-[10px] text-blue-700 font-semibold mr-1">Szybki termin:</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setQuickActionItemDueDate(7)}
-                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
-                                      >
-                                        +7 dni
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setQuickActionItemDueDate(14)}
-                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
-                                      >
-                                        +14 dni
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setQuickActionItemDueDate(30)}
-                                        className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded border border-blue-200 transition-colors shadow-2xs"
-                                      >
-                                        +30 dni
-                                      </button>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-blue-800 mb-1">Data wymagalności (termin)</label>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <input
+                                      type="date"
+                                      value={summaryActionItemDueDate}
+                                      onChange={e => setSummaryActionItemDueDate(e.target.value)}
+                                      className="flex-1 min-w-[140px] p-2 rounded border border-blue-200 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                    <div className="flex gap-1">
+                                      {[7, 14, 30].map(days => (
+                                        <button
+                                          key={days}
+                                          type="button"
+                                          onClick={() => setQuickActionItemDueDate(days)}
+                                          className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 text-xs font-bold rounded border border-blue-200 whitespace-nowrap"
+                                        >
+                                          +{days} dni
+                                        </button>
+                                      ))}
                                     </div>
                                   </div>
                                 </div>
-                              )}
-                            </div>
-
-                            {/* Już pobrane części w ramach serwisu */}
-                            {displayedPartsUsed && displayedPartsUsed.length > 0 && (
-                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                                    <i className="ph ph-check-circle text-blue-600 text-base"></i>
-                                    Faktycznie pobrane części ({displayedPartsUsed.length}):
-                                  </label>
-                                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                                    Łączny koszt: {displayedPartsUsed.reduce((sum, tx) => sum + (tx.totalCost ? Number(tx.totalCost) : (Math.abs(Number(tx.quantity) || 1) * (Number(tx.price) || 0))), 0).toFixed(2)} PLN
-                                  </span>
-                                </div>
-                                <div className="space-y-1.5 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
-                                  {displayedPartsUsed.map((tx, idx) => {
-                                    const pName = parts.find(p => p.id === tx.partId)?.name || tx.partName || 'Część z magazynu';
-                                    const qty = Math.abs(Number(tx.quantity) || 1);
-                                    const costVal = tx.totalCost ? Number(tx.totalCost) : (qty * (Number(tx.price) || 0));
-                                    const costStr = costVal.toFixed(2) + ' PLN';
-                                    const userName = tx.user || 'System';
-                                    return (
-                                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs bg-white p-2 rounded-md border border-blue-100 shadow-2xs gap-1">
-                                        <div className="flex items-center gap-2">
-                                          <i className="ph ph-nut text-blue-500 text-sm"></i>
-                                          <span className="font-bold text-slate-800">{pName}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-slate-600 text-[11px] font-medium pl-6 sm:pl-0">
-                                          <span>Pobrano: <strong className="text-slate-800">{qty}</strong> ({userName})</span>
-                                          <span className="text-blue-700 font-bold">Koszt: {costStr}</span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
                               </div>
                             )}
-
-                            {/* Dodatkowe części poza planem (pobranie z magazynu) */}
-                            <div className="pt-2 border-t border-slate-100 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                  <i className="ph ph-package text-orange-600 text-base"></i>
-                                  Pobierz dodatkowe części z magazynu (poza planem):
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => setSummaryExtraParts(prev => [...prev, { partId: '', quantity: 1 }])}
-                                  className="text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
-                                >
-                                  <i className="ph ph-plus-circle"></i> Dodaj część
-                                </button>
-                              </div>
-
-                              {summaryExtraParts.length > 0 && (
-                                <div className="space-y-1.5 bg-orange-50/40 p-2.5 rounded-lg border border-orange-100">
-                                  {summaryExtraParts.map((ep, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                      <select
-                                        value={ep.partId}
-                                        onChange={e => {
-                                          const copy = [...summaryExtraParts];
-                                          copy[idx].partId = e.target.value;
-                                          setSummaryExtraParts(copy);
-                                        }}
-                                        className="flex-1 p-1.5 border border-slate-300 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-orange-500"
-                                      >
-                                        <option value="">-- Wybierz część z magazynu --</option>
-                                        {parts.map(p => (
-                                          <option key={p.id} value={p.id}>
-                                            {p.name} (Stan: {p.stock || 0})
-                                          </option>
-                                        ))}
-                                      </select>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        value={ep.quantity}
-                                        onChange={e => {
-                                          const copy = [...summaryExtraParts];
-                                          copy[idx].quantity = Math.max(1, parseInt(e.target.value) || 1);
-                                          setSummaryExtraParts(copy);
-                                        }}
-                                        className="w-16 p-1.5 border border-slate-300 rounded text-xs bg-white text-center font-bold outline-none focus:ring-1 focus:ring-orange-500"
-                                        placeholder="Szt."
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setSummaryExtraParts(prev => prev.filter((_, i) => i !== idx))}
-                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                        title="Usuń pozycję"
-                                      >
-                                        <i className="ph ph-trash text-base"></i>
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Zaplanuj kolejny cykl */}
-                            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                              <input
-                                type="checkbox"
-                                id="timelineSummaryNextPlan"
-                                checked={summaryCreateNewPlan}
-                                onChange={e => setSummaryCreateNewPlan(e.target.checked)}
-                                className="w-4 h-4 text-green-600 rounded border-slate-300 cursor-pointer"
-                              />
-                              <label htmlFor="timelineSummaryNextPlan" className="text-sm font-bold text-slate-700 cursor-pointer">
-                                Automatycznie zaplanuj kolejny cykl serwisu
-                              </label>
-                            </div>
                           </div>
 
                           {/* Przyciski zakończenia i cofnięcia */}
                           {!isCompleted && srv.status !== 'completed' && (
-                            <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-slate-200">
-                              <button
-                                type="button"
-                                disabled={isCompletingService}
-                                onClick={handleCompleteServiceFromStep4}
-                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3.5 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2"
-                              >
-                                {isCompletingService ? (
-                                  <><i className="ph ph-spinner-gap animate-spin text-xl"></i> Rozliczanie serwisu...</>
-                                ) : (
-                                  <><i className="ph ph-check-circle text-xl"></i> Zakończ Serwis</>
-                                )}
-                              </button>
+                            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-3 border-t border-slate-200">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedStepOverride(3);
                                   updatePlannedService(srv.id, { currentStep: 3 });
                                 }}
-                                className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
+                                className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
                               >
                                 <i className="ph ph-arrow-left text-lg"></i> Cofnij do Realizacji
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isCompletingService}
+                                onClick={handleCompleteServiceFromStep4}
+                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2"
+                              >
+                                {isCompletingService ? (
+                                  <><i className="ph ph-spinner-gap animate-spin text-xl"></i> Rozliczanie serwisu...</>
+                                ) : (
+                                  <><i className="ph ph-check-circle text-xl"></i> Zatwierdź Wykonanie</>
+                                )}
                               </button>
                             </div>
                           )}

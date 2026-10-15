@@ -5,6 +5,7 @@ import { completeServiceWithTransaction } from '../../services/plannedServices.s
 import { addActionItem } from '../../services/tickets.service';
 import DictationButton from '../shared/DictationButton';
 import { useManagerStore } from '../../store/managerStore';
+import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSummaryParser';
 
 export default function PlannedMaintenanceCompletionModal({
   isOpen, onClose, serviceToComplete }) {
@@ -41,37 +42,22 @@ export default function PlannedMaintenanceCompletionModal({
   const getMachine = (id) => machines.find(m => m.id === id);
 
   const handleSmartAiResult = (result) => {
-    if (typeof result === 'object' && result !== null) {
-      // 1. Czysta notatka techniczna
-      const noteVal = result.czysta_notatka || result.note;
-      if (noteVal) {
-        setCompletionNotes(prev => prev ? prev + '\n' + noteVal : noteVal);
+    const r = normalizeSmartSummary(result);
+    if (r.note) {
+      setCompletionNotes(prev => prev ? prev + '\n' + r.note : r.note);
+    }
+    if (r.manHours !== undefined) {
+      setActualManHours(String(r.manHours));
+    }
+    if (r.partsUsed !== undefined) {
+      setPartsUsed(r.partsUsed);
+    }
+    if (r.createActionItem) {
+      setCreateActionItem(true);
+      if (r.actionItemDetails) setActionItemProblem(r.actionItemDetails);
+      if (r.actionItemDays && r.actionItemDays > 0) {
+        setActionItemDueDate(daysFromNowISODate(r.actionItemDays));
       }
-      // 2. Czas pracy (RBG / godziny)
-      if (result.czas_pracy !== undefined && result.czas_pracy !== null) {
-        setActualManHours(result.czas_pracy);
-      } else if (result.timeSpentHours) {
-        setActualManHours(result.timeSpentHours);
-      }
-      // 3. Zużyto wymagane części
-      if (result.zuzyto_wymagane_czesci !== undefined) {
-        setPartsUsed(Boolean(result.zuzyto_wymagane_czesci));
-      }
-      // 4. Tematy do realizacji / kolejne kroki
-      if (result.tematy_do_realizacji || result.szczegoly_tematu || result.actionItem) {
-        setCreateActionItem(true);
-        const details = result.szczegoly_tematu || result.actionItem || '';
-        if (details) {
-          setActionItemProblem(details);
-        }
-        if (result.actionItemDays) {
-          const d = new Date();
-          d.setDate(d.getDate() + result.actionItemDays);
-          setActionItemDueDate(d.toISOString().split('T')[0]);
-        }
-      }
-    } else if (typeof result === 'string') {
-      setCompletionNotes(prev => prev ? prev + ' ' + result : result);
     }
   };
 
