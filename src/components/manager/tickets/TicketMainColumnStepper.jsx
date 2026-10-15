@@ -37,8 +37,8 @@ export default function TicketMainColumnStepper({
         </h3>
       </div>
       
-      <div className="p-4 md:p-5 space-y-6 bg-gray-50/50">
-        <div className="mt-2">
+      <div className="p-2.5 sm:p-4 md:p-5 space-y-6 bg-gray-50/50">
+        <div className="mt-1 space-y-2.5">
           {[
             { id: 1, label: t('tickets.details.step_1') },
             { id: 2, label: t('tickets.details.step_2') },
@@ -56,23 +56,23 @@ export default function TicketMainColumnStepper({
             const isPast = step.id < currentStepNum;
 
             return (
-              <div key={step.id} className="flex flex-col md:flex-row md:gap-4 relative">
+              <div key={step.id} className="relative flex items-start">
                 {step.id !== 5 && (
-                  <div className={`hidden md:block absolute left-[15px] top-[30px] bottom-[-20px] w-0.5 z-0 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                  <div className={`absolute left-[7px] md:left-[12px] top-6 md:top-9 bottom-[-14px] w-0.5 z-0 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`}></div>
                 )}
                 
-                <div className="flex gap-4 w-full">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold border-2 relative z-10 shrink-0 transition-colors ${isActive ? 'bg-white border-blue-600 text-blue-600 shadow-md scale-110' : isPast ? 'bg-green-500 border-green-500 text-white' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
-                    {isPast ? <i className="ph ph-check text-lg"></i> : step.id}
+                <div className="flex items-start gap-1.5 md:gap-2.5 w-full min-w-0">
+                  <div className={`w-4 h-4 md:w-[26px] md:h-[26px] rounded-full flex items-center justify-center font-bold text-[9px] md:text-xs leading-none border md:border-2 mt-2.5 md:mt-3 relative z-10 shrink-0 transition-colors ${isActive ? 'bg-white border-blue-600 text-blue-600 shadow-sm' : isPast ? 'bg-green-500 border-green-500 text-white' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
+                    {isPast ? <i className="ph ph-check text-[10px] md:text-sm font-bold"></i> : step.id}
                   </div>
                   
-                  <div className={`flex-1 mb-2 md:mb-4 rounded-xl transition-all duration-300 relative z-0 ${isActive ? 'bg-[#f4f1eb] py-4 pr-4 pl-[3.5rem] sm:pl-[4rem] shadow-sm border border-[#e8e4db] -ml-[3rem] -mt-1' : 'py-3 pr-3'}`}>
-                    <h4 className={`text-sm md:text-lg transition-colors ${isActive ? 'font-extrabold text-gray-900' : isPast ? 'font-bold text-gray-500' : 'font-medium text-gray-400'}`}>
+                  <div className={`flex-1 min-w-0 rounded-xl transition-all duration-300 relative z-0 ${isActive ? 'bg-[#f4f1eb] p-3 sm:p-4 shadow-sm border border-[#e8e4db]' : 'py-2.5 px-3 bg-white border border-gray-200'}`}>
+                    <h4 className={`text-sm md:text-base transition-colors ${isActive ? 'font-extrabold text-gray-900' : isPast ? 'font-bold text-gray-500' : 'font-medium text-gray-400'}`}>
                       {step.label}
                     </h4>
                     
                     {step.id === TICKET_STATUS.CLOSED && currentTicket.status !== TICKET_STATUS.CLOSED && currentTicket.status !== 'closed' && (
-                      <div className="mt-4 pt-3 mb-4">
+                      <div className="mt-3 pt-2">
                         <button 
                           disabled={loading || isArchive} 
                           onClick={() => handleUpdate(currentTicket.id, TICKET_STATUS.CLOSED, t('tickets.details.closed_false_alarm_action'), null)}
@@ -85,11 +85,11 @@ export default function TicketMainColumnStepper({
                     )}
 
                     {isActive && (
-                      <div className="mt-5 space-y-5 animate-fade-in">
+                      <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-4 animate-fade-in">
                         {user?.role !== USER_ROLES.MANAGER && (
                           <div className="space-y-4">
                             {step.id === 1 && (
-                              <div className="flex flex-col sm:flex-row gap-3 -ml-[2.5rem] sm:-ml-[3rem]">
+                              <div className="flex flex-col sm:flex-row gap-3">
                                 <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 2, t("tickets.details.started_search"), etr)} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-6 py-4 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2">
                                   <i className="ph ph-play-circle text-xl"></i> Rozpocznij naprawę
                                 </button>
@@ -115,7 +115,7 @@ export default function TicketMainColumnStepper({
                             )}
                             
                             {step.id === 4 && (
-                              <div className="flex flex-col sm:flex-row gap-3 -ml-[2.5rem] sm:-ml-[3rem]">
+                              <div className="flex flex-col sm:flex-row gap-3">
                                 <button disabled={loading} onClick={() => handleUpdate(currentTicket.id, 5, t('tickets.details.finished_repair_action'), etr)} className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 md:px-5 md:py-3.5 rounded-lg md:rounded-xl text-xs md:text-sm font-bold shadow-md transition-all">
                                   Zakończ Naprawę
                                 </button>
@@ -159,7 +159,7 @@ export default function TicketMainColumnStepper({
                         )}
                         
                         {step.id !== TICKET_STATUS.CLOSED && (
-                          <div className="mt-6 pt-4 border-t border-slate-200 -ml-[2.5rem] sm:-ml-[3rem]">
+                          <div className="mt-4 pt-4 border-t border-slate-200">
                             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Dodaj notatkę</label>
                             <div className="relative mb-3">
                               <textarea

@@ -375,30 +375,30 @@ export default function PlannedMaintenanceTimeline({
               <div key={step.id} className="relative flex items-start group">
                 {/* Liniowa łączówka pionowa */}
                 {step.id !== 5 && (
-                  <div className={`absolute left-4 top-10 bottom-[-16px] w-0.5 z-0 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                  <div className={`absolute left-[7px] md:left-[12px] top-6 md:top-9 bottom-[-16px] w-0.5 z-0 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`}></div>
                 )}
                 
-                {/* Kółko z numerem kroku */}
+                {/* Kółko z numerem kroku (40% na mobile PWA, 80% na PC) */}
                 <button
                   type="button"
                   onClick={() => setSelectedStepOverride(step.id === currentStepNum ? null : step.id)}
-                  className={`relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold text-sm mt-3 mr-4 transition-all cursor-pointer ${
+                  className={`relative z-10 flex-shrink-0 w-4 h-4 md:w-[26px] md:h-[26px] rounded-full flex items-center justify-center border md:border-2 font-bold text-[9px] md:text-xs leading-none mt-2.5 md:mt-3 mr-1.5 md:mr-2.5 transition-all cursor-pointer ${
                     isSelected 
-                      ? 'bg-[#111827] border-[#111827] text-white shadow-md scale-105' 
+                      ? 'bg-[#111827] border-[#111827] text-white shadow-sm' 
                       : isPast 
                         ? 'bg-white border-green-500 text-green-600 hover:bg-green-50' 
                         : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
                   }`}
                   title="Kliknij, aby rozwinąć ten krok"
                 >
-                  {isPast ? <i className="ph ph-check font-bold text-base"></i> : step.id}
+                  {isPast ? <i className="ph ph-check font-bold text-[10px] md:text-sm"></i> : step.id}
                 </button>
                 
-                {/* Karta kroku (aktywna karta wchodzi pod kółko – maksymalne wykorzystanie szerokości jak w awariach) */}
+                {/* Karta kroku */}
                 <div className={`flex-1 min-w-0 rounded-xl transition-all duration-300 border relative z-0 ${
                   isSelected 
-                    ? 'bg-[#f4f1eb] -ml-12 pl-14 pr-3 py-3 sm:pr-5 sm:py-4 shadow-sm border-[#e8e4db]' 
-                    : 'bg-white p-3.5 border-gray-200 hover:border-gray-300'
+                    ? 'bg-[#f4f1eb] p-3 sm:p-4 shadow-sm border-[#e8e4db]' 
+                    : 'bg-white py-2.5 px-3 sm:p-3.5 border-gray-200 hover:border-gray-300'
                 }`}>
                   <div 
                     className="flex items-center justify-between cursor-pointer select-none"
@@ -423,9 +423,9 @@ export default function PlannedMaintenanceTimeline({
                     <i className={`ph ${isSelected ? 'ph-caret-up' : 'ph-caret-down'} text-gray-400`}></i>
                   </div>
                   
-                  {/* Treść rozwiniętego kroku – rozciągnięta na całą szerokość karty (także pod kółkiem) */}
+                  {/* Treść rozwiniętego kroku */}
                   {isSelected && (
-                    <div className="mt-3 pt-3 -ml-11 border-t border-slate-200/80 space-y-4 animate-fade-in min-w-0">
+                    <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-4 animate-fade-in min-w-0">
                       
                       {/* ==================== KROK 1: PRZYJĘCIE DO REALIZACJI ==================== */}
                       {step.id === 1 && (

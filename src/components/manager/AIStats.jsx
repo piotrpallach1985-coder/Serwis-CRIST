@@ -95,36 +95,6 @@ export default function AIStats() {
           </div>
         </div>
       </div>
-
-      {/* Drugi licznik - weryfikacja bezpośrednia z Google Vertex AI */}
-      <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-6 rounded-2xl shadow-lg border border-purple-800 flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-purple-800/80 rounded-xl flex items-center justify-center text-2xl text-purple-200 shrink-0">
-            <i className="ph ph-shield-check"></i>
-          </div>
-          <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-purple-300">Weryfikacja Serwerowa (Google Vertex AI)</div>
-            <div className="text-lg font-extrabold text-white mt-0.5">Bezpośredni licznik zużycia API Cloud</div>
-            <p className="text-xs text-purple-200/80 mt-1">Licznik zliczany bezpośrednio z metadanych odpowiedzi serwerów Google (dla pełnej pewności i audytowalności rozliczeń).</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-6 shrink-0 bg-white/10 px-5 py-3 rounded-xl backdrop-blur-sm border border-white/10">
-          <div className="text-center">
-            <div className="text-xs text-purple-200 font-medium">Tokeny API</div>
-            <div className="text-xl font-black text-purple-100 font-mono mt-0.5">{stats.vertexTokens.toLocaleString('pl-PL')}</div>
-          </div>
-          <div className="w-px h-8 bg-white/20"></div>
-          <div className="text-center">
-            <div className="text-xs text-purple-200 font-medium">Wywołania API</div>
-            <div className="text-xl font-black text-purple-100 font-mono mt-0.5">{stats.vertexCalls}</div>
-          </div>
-          <div className="w-px h-8 bg-white/20"></div>
-          <div className="text-center">
-            <div className="text-xs text-purple-200 font-medium">Szac. Koszt</div>
-            <div className="text-xl font-black text-emerald-300 font-mono mt-0.5">~ {(stats.vertexCost !== undefined ? stats.vertexCost : (stats.vertexTokens / 1000000) * geminiPrice).toFixed(4)} PLN</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
