@@ -1,29 +1,55 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useManagerStore } from '../../store/managerStore';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { fetchServerKPIStats } from '../../services/kpi.service';
+import { computeClientKPIStats, fetchServerKPIStats } from '../../services/kpi.service';
 import { getTicketStatusConfig } from '../../utils/statusConfigs';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTileGrid';
 
 export default function KPIDashboard() {
-  const [period, setPeriod] = useState('7');
+  const machines = useManagerStore(state => state.machines || []);
+  const [period, setPeriod] = useState('30');
   const [kpiStats, setKpiStats] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const didAutoFallbackRef = useRef(false);
 
   useEffect(() => {
+    let active = true;
     const fetchKPIs = async () => {
       setLoadingHistory(true);
       try {
-        const data = await fetchServerKPIStats(period);
-        setKpiStats(data);
+        // Najpierw obliczamy dokładne statystyki bezpośrednio z kolekcji Firestore (z cache + serwer)
+        let data = await computeClientKPIStats(period, machines);
+
+        // Jeśli w domyślnym okresie 30 dni nie ma zgłoszeń, a w bazie istnieją starsze zgłoszenia, przełącz na 'all'
+        if (
+          active &&
+          !didAutoFallbackRef.current &&
+          period === '30' &&
+          data &&
+          data.totalTickets === 0 &&
+          data.rawTotalAllTime > 0
+        ) {
+          didAutoFallbackRef.current = true;
+          setPeriod('all');
+          return;
+        }
+
+        if (!data) {
+          data = await fetchServerKPIStats(period);
+        }
+        if (active) setKpiStats(data);
       } catch (err) {
-        console.error('Blad pobierania KPI:', err);
+        console.error('Błąd pobierania KPI:', err);
       } finally {
-        setLoadingHistory(false);
+        if (active) setLoadingHistory(false);
       }
     };
     fetchKPIs();
-  }, [period]);
+    return () => {
+      active = false;
+    };
+  }, [period, machines]);
 
   const totalTickets = kpiStats?.totalTickets || 0;
   const closedTicketsCount = kpiStats?.closedTicketsCount || 0;
@@ -133,7 +159,7 @@ export default function KPIDashboard() {
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" allowDecimals={false} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
+                    <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 10 }} />
                     <Tooltip formatter={value => [value, 'Awarie']} />
                     <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} isAnimationActive={false} />
                   </BarChart>
@@ -216,7 +242,7 @@ export default function KPIDashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-500">
-                  Brak danych (Ostatnie 30 dni)
+                  Brak danych w wybranym okresie
                 </div>
               )}
             </div>
@@ -246,7 +272,7 @@ export default function KPIDashboard() {
             <i className="ph ph-chart-line-up text-blue-300"></i> Dashboard KPI (Awarie)
           </h1>
           <p className="text-blue-100 text-sm lg:text-base opacity-90">
-            Zagregowane na żywo na serwerze (oszczędność transferu i RAM)
+            Statystyki awarii, czasy reakcji (MTTR) i rozkład zgłoszeń
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -257,7 +283,10 @@ export default function KPIDashboard() {
           />
           <select
             value={period}
-            onChange={e => setPeriod(e.target.value)}
+            onChange={e => {
+              didAutoFallbackRef.current = true;
+              setPeriod(e.target.value);
+            }}
             className="bg-white/10 border border-white/20 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto cursor-pointer text-sm font-semibold"
           >
             <option value="7" className="text-gray-800">Ostatnie 7 dni</option>

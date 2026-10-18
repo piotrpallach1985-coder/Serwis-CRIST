@@ -80,7 +80,7 @@ export default function PlannedMaintenanceDetails({
         id: 'info_params',
         title: 'Dane i parametry serwisu',
         icon: 'ph-sliders-horizontal',
-        defaultColSpan: 9,
+        defaultColSpan: 8,
         render: () => (
           <PlannedMaintenanceInfo
             srv={srv}
@@ -97,7 +97,7 @@ export default function PlannedMaintenanceDetails({
         id: 'history',
         title: 'Historia zdarzeń',
         icon: 'ph-clock-counter-clockwise',
-        defaultColSpan: 3,
+        defaultColSpan: 4,
         render: () => (
           <PlannedMaintenanceHistory srv={srv} setLightboxImg={setLightboxImg} />
         ),
@@ -106,7 +106,7 @@ export default function PlannedMaintenanceDetails({
         id: 'info_resources',
         title: 'Wymagane narzędzia i części',
         icon: 'ph-wrench',
-        defaultColSpan: 6,
+        defaultColSpan: 4,
         render: () => (
           <PlannedMaintenanceInfo
             srv={srv}
@@ -123,7 +123,7 @@ export default function PlannedMaintenanceDetails({
         id: 'info_checklist',
         title: 'Zakres prac do wykonania',
         icon: 'ph-list-checks',
-        defaultColSpan: 6,
+        defaultColSpan: 4,
         render: () => (
           <PlannedMaintenanceInfo
             srv={srv}

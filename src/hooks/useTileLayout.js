@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-const STORAGE_PREFIX = 'vexont_tiles_v1_';
+const STORAGE_PREFIX = 'vexont_tiles_v2_';
 
 function getDeviceMode() {
   if (typeof window === 'undefined') return 'desktop';
@@ -17,7 +17,6 @@ function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
     const mapById = new Map(parsed.map(item => [item.id, item]));
     const ordered = [];
 
-    // Keep saved order for existing tiles
     for (const savedItem of parsed) {
       const def = defaultTiles.find(d => d.id === savedItem.id);
       if (def) {
@@ -31,7 +30,6 @@ function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
       }
     }
 
-    // Append any newly added default tiles not yet in saved layout
     for (const def of defaultTiles) {
       if (!mapById.has(def.id)) {
         ordered.push({
@@ -140,9 +138,34 @@ export function useTileLayout(layoutId, defaultTiles) {
     (id, colSpan) => {
       const allowed = [3, 4, 6, 8, 9, 12];
       const normalized = allowed.includes(colSpan) ? colSpan : 12;
-      persistLayout(prev =>
-        prev.map(item => (item.id === id ? { ...item, colSpan: normalized } : item))
-      );
+      persistLayout(prev => {
+        const idx = prev.findIndex(item => item.id === id);
+        if (idx === -1) return prev;
+        const copy = prev.map(item => (item.id === id ? { ...item, colSpan: normalized } : { ...item }));
+
+        // Gdy użytkownik ustawia kafelek (np. Historię) na 33% (4 kol.), wszystkie kafelki 75% (9 kol.)
+        // przekraczałyby 12 kolumn (9 + 4 = 13 > 12) i spychały kafelek 33% do nowego rzędu po lewej.
+        // Automatycznie dopasowujemy kafelki 75% -> 66% (8 kol.), aby 66% + 33% = 100% (8 + 4 = 12).
+        if (normalized === 4) {
+          copy.forEach((item, i) => {
+            if (i !== idx && item.colSpan === 9) {
+              item.colSpan = 8;
+            }
+          });
+        } else if (normalized === 9) {
+          // Analogicznie: gdy użytkownik ustawia kafelek na 75% (9 kol.), sąsiedni kafelek 33% (4 kol.)
+          // dopasowujemy do 25% (3 kol.), aby zmieściły się w jednym wierszu (9 + 3 = 12).
+          const prevNeighbor = idx > 0 ? copy[idx - 1] : null;
+          const nextNeighbor = idx < copy.length - 1 ? copy[idx + 1] : null;
+          if (nextNeighbor && nextNeighbor.colSpan === 4) {
+            nextNeighbor.colSpan = 3;
+          } else if (prevNeighbor && prevNeighbor.colSpan === 4) {
+            prevNeighbor.colSpan = 3;
+          }
+        }
+
+        return copy;
+      });
     },
     [persistLayout]
   );

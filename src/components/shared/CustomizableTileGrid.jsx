@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 const COL_SPAN_CLASSES = {
@@ -25,6 +25,8 @@ const HEIGHT_PRESETS = [
   { height: 420, label: 'M' },
   { height: 600, label: 'L' },
 ];
+
+const ROW_UNIT_PX = 8;
 
 function snapRatioToColSpan(ratio) {
   const cols = ratio * 12;
@@ -83,6 +85,87 @@ TileLayoutButton.propTypes = {
   compact: PropTypes.bool,
 };
 
+function MasonryGridItem({
+  tileItem,
+  isDesktop,
+  colSpanClass,
+  isBeingDragged,
+  isDragTarget,
+  isEditing,
+  resizingState,
+  onRegisterRef,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  children,
+}) {
+  const innerRef = useRef(null);
+  const [rowSpan, setRowSpan] = useState(null);
+
+  useEffect(() => {
+    if (!isDesktop) {
+      setRowSpan(null);
+      return;
+    }
+    const el = innerRef.current;
+    if (!el) return;
+
+    const updateSpan = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) {
+        const nextSpan = Math.max(1, Math.ceil(h / ROW_UNIT_PX));
+        setRowSpan(prev => (prev !== nextSpan ? nextSpan : prev));
+      }
+    };
+
+    updateSpan();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(updateSpan);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+  }, [isDesktop, tileItem.collapsed, tileItem.height, tileItem.colSpan, isEditing]);
+
+  return (
+    <div
+      ref={el => {
+        onRegisterRef(tileItem.id, el);
+      }}
+      style={
+        isDesktop && rowSpan
+          ? { gridRowEnd: `span ${rowSpan}` }
+          : undefined
+      }
+      draggable={isEditing && !resizingState}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`col-span-1 ${colSpanClass} min-w-0 relative ${
+        tileItem.hidden ? 'opacity-50' : ''
+      } ${isBeingDragged ? 'opacity-40 scale-[0.99]' : ''}`}
+    >
+      <div ref={innerRef} className="pb-4 sm:pb-5">
+        <div
+          className={`relative transition-all duration-150 ${
+            isDragTarget ? 'ring-4 ring-blue-500 rounded-xl' : ''
+          } ${
+            isEditing
+              ? 'ring-2 ring-blue-400/80 rounded-xl bg-white/60 shadow-md'
+              : ''
+          }`}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomizableTileGrid({
   tiles,
   layoutState,
@@ -90,6 +173,7 @@ export default function CustomizableTileGrid({
 }) {
   const {
     layout,
+    deviceMode,
     isEditing,
     setIsEditing,
     moveTile,
@@ -101,11 +185,12 @@ export default function CustomizableTileGrid({
     resetLayout,
   } = layoutState;
 
+  const isDesktop = deviceMode === 'desktop';
   const gridRef = useRef(null);
   const tileRefs = useRef({});
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
-  const [resizingState, setResizingState] = useState(null); // { id, mode: 'width'|'height'|'both', liveColSpan, liveHeight }
+  const [resizingState, setResizingState] = useState(null);
 
   const tilesMap = new Map(tiles.map(t => [t.id, t]));
 
@@ -120,7 +205,6 @@ export default function CustomizableTileGrid({
     .filter(item => item.hidden && tilesMap.has(item.id))
     .map(item => tilesMap.get(item.id));
 
-  // Mouse / Touch resize handler (width, height, or corner both)
   const startResize = (e, tileItem, mode) => {
     e.preventDefault();
     e.stopPropagation();
@@ -134,7 +218,7 @@ export default function CustomizableTileGrid({
     const tileRect = tileEl.getBoundingClientRect();
     const gridRect = gridEl.getBoundingClientRect();
     const startWidth = tileRect.width;
-    const startHeight = tileItem.height || Math.max(180, tileRect.height - 38);
+    const startHeight = tileItem.height || Math.max(180, tileRect.height - 56);
 
     setResizingState({
       id: tileItem.id,
@@ -206,7 +290,7 @@ export default function CustomizableTileGrid({
                   Tryb dostosowywania okienek (Układ + Rozmiar)
                 </div>
                 <div className="text-[11px] sm:text-xs text-blue-800">
-                  Przeciągaj okienka za pasek lub użyj strzałek <span className="font-bold">↑ ↓</span>. Na PC zmieniaj szerokość przyciskami (<span className="font-bold">25%–100%</span>) lub rozciągaj za <span className="font-bold">prawy dolny róg / krawędzie</span>.
+                  Przeciągaj okienka za pasek lub użyj strzałek <span className="font-bold">↑ ↓</span>. Na PC zmieniaj szerokość przyciskami (<span className="font-bold">25%–100%</span>) lub rozciągaj za <span className="font-bold">prawy dolny róg / krawędzie</span>. Okienka automatycznie dosuwają się w pionie i poziomie bez pustych luk.
                 </div>
               </div>
             </div>
@@ -246,10 +330,15 @@ export default function CustomizableTileGrid({
         </div>
       )}
 
-      {/* SIATKA 12-KOLUMNOWA */}
+      {/* SIATKA 12-KOLUMNOWA Z KOMPAKTOWYM PAKOWANIEM WIERSZY (MASONRY DENSE) */}
       <div
         ref={gridRef}
-        className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start"
+        style={
+          isDesktop
+            ? { gridAutoRows: `${ROW_UNIT_PX}px`, gridAutoFlow: 'row dense' }
+            : undefined
+        }
+        className="grid grid-cols-1 lg:grid-cols-12 gap-x-4 sm:gap-x-5 items-start"
       >
         {visibleLayout.map((tileItem, idx) => {
           const def = tilesMap.get(tileItem.id);
@@ -262,12 +351,18 @@ export default function CustomizableTileGrid({
           const pctLabel = WIDTH_OPTIONS.find(w => w.span === tileItem.colSpan)?.label || '100%';
 
           return (
-            <div
+            <MasonryGridItem
               key={tileItem.id}
-              ref={el => {
-                tileRefs.current[tileItem.id] = el;
+              tileItem={tileItem}
+              isDesktop={isDesktop}
+              colSpanClass={colSpanClass}
+              isBeingDragged={isBeingDragged}
+              isDragTarget={isDragTarget}
+              isEditing={isEditing}
+              resizingState={resizingState}
+              onRegisterRef={(id, el) => {
+                tileRefs.current[id] = el;
               }}
-              draggable={isEditing && !resizingState}
               onDragStart={e => {
                 if (!isEditing) return;
                 setDraggedId(tileItem.id);
@@ -297,15 +392,6 @@ export default function CustomizableTileGrid({
                 setDraggedId(null);
                 setDragOverId(null);
               }}
-              className={`col-span-1 ${colSpanClass} min-w-0 relative transition-all duration-150 ${
-                tileItem.hidden ? 'opacity-50' : ''
-              } ${isBeingDragged ? 'opacity-40 scale-[0.99]' : ''} ${
-                isDragTarget ? 'ring-4 ring-blue-500 rounded-xl' : ''
-              } ${
-                isEditing
-                  ? 'ring-2 ring-blue-400/80 rounded-xl bg-white/60 shadow-md'
-                  : ''
-              }`}
             >
               {/* PASEK NAGŁÓWKOWY KAFELKA (Zwijanie + Narzędzia w trybie edycji) */}
               <div
@@ -345,8 +431,8 @@ export default function CustomizableTileGrid({
                   )}
                 </div>
 
-                {/* Prawa strona paska: kontrolki */}
-                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                {/* Prawa strona paska: kontrolki (z flex-wrap dla wąskich kafelków 25%/33%) */}
+                <div className="flex flex-wrap items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                   {isEditing ? (
                     <>
                       {/* Strzałki Góra / Dół */}
@@ -370,7 +456,7 @@ export default function CustomizableTileGrid({
                       </button>
 
                       {/* Przyciski szerokości (Desktop) */}
-                      <div className="hidden lg:flex items-center bg-blue-800/70 rounded p-0.5 gap-0.5 ml-1">
+                      <div className="hidden lg:flex items-center bg-blue-800/70 rounded p-0.5 gap-0.5">
                         {WIDTH_OPTIONS.map(opt => (
                           <button
                             key={opt.span}
@@ -389,7 +475,7 @@ export default function CustomizableTileGrid({
                       </div>
 
                       {/* Przyciski wysokości */}
-                      <div className="flex items-center bg-blue-800/70 rounded p-0.5 gap-0.5 ml-1">
+                      <div className="flex items-center bg-blue-800/70 rounded p-0.5 gap-0.5">
                         {HEIGHT_PRESETS.map(hp => {
                           const isSelected =
                             hp.height === null
@@ -417,7 +503,7 @@ export default function CustomizableTileGrid({
                       <button
                         type="button"
                         onClick={() => toggleHidden(tileItem.id)}
-                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 text-white ml-1 transition-colors"
+                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 text-white transition-colors"
                         title={tileItem.hidden ? 'Pokaż kafelek' : 'Ukryj kafelek'}
                       >
                         <i className={`ph ${tileItem.hidden ? 'ph-eye' : 'ph-eye-slash'} text-xs`}></i>
@@ -483,9 +569,7 @@ export default function CustomizableTileGrid({
                     onMouseDown={e => startResize(e, tileItem, 'height')}
                     onTouchStart={e => startResize(e, tileItem, 'height')}
                     onDoubleClick={() => setTileHeight(tileItem.id, null)}
-                    className="
-                      absolute left-0 right-6 bottom-0 h-2.5 cursor-ns-resize flex items-center justify-center group z-30 hover:bg-blue-500/20 rounded-b
-                    "
+                    className="absolute left-0 right-6 bottom-0 h-2.5 cursor-ns-resize flex items-center justify-center group z-30 hover:bg-blue-500/20 rounded-b"
                     title="Przeciągnij w pionie, aby ustawić wysokość (dwuklik = Auto)"
                   >
                     <div className="w-10 h-1 rounded-full bg-blue-400 group-hover:bg-blue-600 transition-colors"></div>
@@ -503,7 +587,7 @@ export default function CustomizableTileGrid({
                   </div>
                 </>
               )}
-            </div>
+            </MasonryGridItem>
           );
         })}
       </div>

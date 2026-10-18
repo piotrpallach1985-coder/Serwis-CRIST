@@ -542,7 +542,7 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
   }
 
   try {
-    let q = db.collection('tenants').doc(tenantId).collection('tickets').where('isDeleted', '!=', true);
+    let q = db.collection('tenants').doc(tenantId).collection('tickets');
     const snapshot = await q.get();
     
     let totalTickets = 0;
@@ -555,6 +555,7 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
 
     snapshot.docs.forEach(docSnap => {
       const t = docSnap.data();
+      if (t.isDeleted === true) return;
       const createdAt = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt);
       
       if (startDate && createdAt < startDate) return;
@@ -577,7 +578,7 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
       const mName = t.machineName || 'Nieznana maszyna';
       machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
 
-      if (period === '7' || period === '30') {
+      if (!isNaN(createdAt.getTime())) {
         const dateKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
         trendMap[dateKey] = (trendMap[dateKey] || 0) + 1;
       }
@@ -626,7 +627,7 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
   }
 
   try {
-    const q = db.collection('tenants').doc(tenantId).collection('planned_services').where('isDeleted', '!=', true);
+    const q = db.collection('tenants').doc(tenantId).collection('planned_services');
     const snapshot = await q.get();
     
     let totalServicesCount = 0;
@@ -641,12 +642,12 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
 
     snapshot.docs.forEach(docSnap => {
       const s = docSnap.data();
+      if (s.isDeleted === true) return;
       
-      const referenceDateRaw = s.completedAt || s.createdAt;
-      if (!referenceDateRaw) return;
-      const refDate = referenceDateRaw.toDate ? referenceDateRaw.toDate() : new Date(referenceDateRaw);
+      const referenceDateRaw = s.completedAt || s.createdAt || s.nextDate;
+      const refDate = referenceDateRaw ? (referenceDateRaw.toDate ? referenceDateRaw.toDate() : new Date(referenceDateRaw)) : now;
       
-      if (startDate && refDate < startDate) return;
+      if (s.status === 'completed' && startDate && refDate < startDate) return;
 
       totalServicesCount++;
       

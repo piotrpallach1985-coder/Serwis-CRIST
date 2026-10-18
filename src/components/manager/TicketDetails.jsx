@@ -109,7 +109,7 @@ export default function TicketDetails({
         id: 'header',
         title: 'Dane obiektu i zgłoszenia',
         icon: 'ph-info',
-        defaultColSpan: 9,
+        defaultColSpan: 8,
         render: () => (
           <TicketMainColumnHeader
             currentTicket={currentTicket}
@@ -123,7 +123,7 @@ export default function TicketDetails({
         id: 'history',
         title: 'Historia zdarzeń',
         icon: 'ph-clock-counter-clockwise',
-        defaultColSpan: 3,
+        defaultColSpan: 4,
         render: () => (
           <TicketHistory
             history={currentTicket.history}
@@ -135,7 +135,7 @@ export default function TicketDetails({
         id: 'content',
         title: 'Opis awarii, zdjęcia i części',
         icon: 'ph-file-text',
-        defaultColSpan: 9,
+        defaultColSpan: 8,
         render: () => (
           <TicketMainColumnContent
             currentTicket={currentTicket}
@@ -149,7 +149,7 @@ export default function TicketDetails({
         id: 'stepper',
         title: 'Kroki realizacji awarii (1–5)',
         icon: 'ph-list-numbers',
-        defaultColSpan: 9,
+        defaultColSpan: 8,
         render: () => (
           <TicketMainColumnStepper
             currentTicket={currentTicket}
