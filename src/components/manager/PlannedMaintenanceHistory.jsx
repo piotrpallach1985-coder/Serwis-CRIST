@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 export default function PlannedMaintenanceHistory({ srv, setLightboxImg }) {
   const { t } = useTranslation();
   return (
-    <div className="w-full lg:w-1/4">
+    <div className="w-full">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
         <h4 className="font-bold text-xs text-slate-500 uppercase tracking-widest mb-8 flex items-center gap-2">
           <i className="ph ph-clock-counter-clockwise text-lg"></i> {t('planned.history_title')}

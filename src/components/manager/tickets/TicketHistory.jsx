@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function TicketHistory({ history, setLightboxImg }) {
   const { t } = useTranslation();
-  if (!history || !Array.isArray(history)) return null;
+  const safeHistory = Array.isArray(history) ? history : [];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -14,7 +14,10 @@ export default function TicketHistory({ history, setLightboxImg }) {
       </h4>
       
       <div className="relative border-l-2 border-gray-100 ml-3 space-y-5 pb-4">
-        {[...history].reverse().map((entry, index) => (
+        {safeHistory.length === 0 && (
+          <div className="text-sm text-gray-400 italic pl-6">Brak wpisów w historii</div>
+        )}
+        {[...safeHistory].reverse().map((entry, index) => (
           <div key={index} className="relative pl-8">
             <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-[3px] border-[#111827]"></div>
             
