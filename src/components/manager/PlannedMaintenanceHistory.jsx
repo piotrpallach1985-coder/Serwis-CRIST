@@ -43,7 +43,7 @@ export default function PlannedMaintenanceHistory({ srv, setLightboxImg }) {
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{t('planned.checklist_title')}</div>
                   {entry.checklistSummary.map((item, i) => (
                     <div key={i} className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
-                      <div className="font-semibold mb-1">{item.taskName}:</div>
+                      <div className="font-semibold mb-1">{item.taskName || item.step}:</div>
                       <div className="mb-1">
                       {item.type === 'CHECKBOX' ? (
                         item.answer ? `✅ ${t('planned.done')}` : `❌ ${t('planned.skipped')}`

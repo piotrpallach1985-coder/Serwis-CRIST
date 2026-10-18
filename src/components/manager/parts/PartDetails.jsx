@@ -241,61 +241,62 @@ export default function PartDetails({ part, onBack, onEdit }) {
           </div>
 
           {/* AUDYT */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="ph ph-clock-counter-clockwise text-lg"></i> {t('parts.details.audit')} </h3>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+              <i className="ph ph-clock-counter-clockwise text-base"></i> {t('parts.details.audit')} </h3>
             {partTxs.length === 0 ? (
               <div className="text-xs text-slate-400 italic text-center py-2">{t('parts.details.no_audit')}</div>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+              <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto pr-1">
                 {partTxs.map(tx => {
                   const isAdd = tx.type === 'receive' || tx.type === 'return';
+                  const isIssue = ["issue_planned", "issue_adhoc", "issue"].includes(tx.type);
+                  let mName = tx.machineName;
+                  if (isIssue) {
+                    if (tx.machineId) {
+                      const m = machines.find(mac => mac.id === tx.machineId);
+                      if (m) mName = m.name;
+                    } else if (tx.referenceId) {
+                      if (tx.type === "issue_adhoc" || tx.type === "issue") {
+                        const tObj = tickets.find(tic => tic.id === tx.referenceId);
+                        if (tObj && tObj.machineId) {
+                          const m = machines.find(mac => mac.id === tObj.machineId);
+                          if (m) mName = m.name;
+                        }
+                      } else if (tx.type === 'issue_planned') {
+                        const s = plannedServices.find(srv => srv.id === tx.referenceId);
+                        if (s && s.machineId) {
+                          const m = machines.find(mac => mac.id === s.machineId);
+                          if (m) mName = m.name;
+                        }
+                      }
+                    }
+                  }
+                  const partUnit = part.unit || 'szt.';
                   return (
-                    <div key={tx.id} className="flex justify-between items-center text-xs border-b border-slate-50 pb-2 last:border-0 last:pb-0">
-                      <div>
-                        <div className="font-bold text-slate-700">
-                          {tx.type === 'receive' ? t('parts.transactions.types.receive') : tx.type === 'return' ? t('parts.transactions.types.return') : tx.type === 'issue_planned' ? t('parts.transactions.types.issue_planned') : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? t('parts.transactions.types.issue_adhoc') : tx.type}
+                    <div key={tx.id} className="py-1.5 first:pt-0 last:pb-0 text-xs">
+                      <div className="flex justify-between items-center gap-2 leading-tight">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <span className="font-bold text-slate-700 text-[11px]">
+                            {tx.type === 'receive' ? t('parts.transactions.types.receive') : tx.type === 'return' ? t('parts.transactions.types.return') : tx.type === 'issue_planned' ? t('parts.transactions.types.issue_planned') : (tx.type === 'issue_adhoc' || tx.type === 'issue') ? t('parts.transactions.types.issue_adhoc') : tx.type}
+                          </span>
+                          {mName && (
+                            <span className="text-[10px] text-blue-600 font-semibold bg-blue-50/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 truncate max-w-[160px]">
+                              <i className="ph ph-gear text-[10px]"></i>{mName}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-slate-400 text-[10px] mt-0.5">
-                          {safeParseDate(tx.date)?.toLocaleDateString('pl-PL')} • {tx.user}
+                        <div className={`font-black text-xs shrink-0 ${isAdd ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {isAdd ? '+' : '-'}{Math.abs(tx.quantity)} <span className="text-[10px] font-semibold">{partUnit}</span>
                         </div>
-                        {(() => {
-                          if (!["issue_planned", "issue_adhoc", "issue"].includes(tx.type)) return null;
-                          let mName = tx.machineName;
-                          if (tx.machineId) {
-                            const m = machines.find(mac => mac.id === tx.machineId);
-                            if (m) mName = m.name;
-                          } else if (tx.referenceId) {
-                            if (tx.type === "issue_adhoc" || tx.type === "issue") {
-                              const t = tickets.find(tic => tic.id === tx.referenceId);
-                              if (t && t.machineId) {
-                                const m = machines.find(mac => mac.id === t.machineId);
-                                if (m) mName = m.name;
-                              }
-                            } else if (tx.type === 'issue_planned') {
-                              const s = plannedServices.find(srv => srv.id === tx.referenceId);
-                              if (s && s.machineId) {
-                                const m = machines.find(mac => mac.id === s.machineId);
-                                if (m) mName = m.name;
-                              }
-                            }
-                          }
-                          if (!mName) return null;
-                          return (
-                            <div className="text-[10px] text-blue-500 font-semibold mt-0.5 flex items-center gap-1">
-                              <i className="ph ph-gear text-xs"></i>
-                              {mName}
-                            </div>
-                          );
-                        })()}
-                        {["issue_planned", "issue_adhoc", "issue"].includes(tx.type) && tx.totalCost > 0 && (
-                          <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                            {t('parts.details.cost')} {tx.totalCost.toFixed(2)} PLN
-                          </div>
-                        )}
                       </div>
-                      <div className={`font-black ${isAdd ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {isAdd ? '+' : '-'}{Math.abs(tx.quantity)}
+                      <div className="flex justify-between items-center gap-2 text-[10px] text-slate-400 mt-0.5 leading-tight">
+                        <span className="truncate">{safeParseDate(tx.date)?.toLocaleDateString('pl-PL')} • {tx.user}</span>
+                        {isIssue && tx.totalCost > 0 && (
+                          <span className="text-slate-500 font-semibold shrink-0">
+                            {t('parts.details.cost')} {tx.totalCost.toFixed(2)} PLN
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

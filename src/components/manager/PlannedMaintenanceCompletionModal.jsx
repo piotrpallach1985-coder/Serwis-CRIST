@@ -104,7 +104,9 @@ export default function PlannedMaintenanceCompletionModal({
       let checklistSummary = [];
       if (serviceToComplete.checklist) {
         checklistSummary = serviceToComplete.checklist.map(step => ({
-          step: step.text,
+          taskName: step.taskName || step.text || '',
+          step: step.taskName || step.text || '',
+          type: step.type || 'CHECKBOX',
           answer: checklistResponses.values?.[step.id] === undefined ? (checklistResponses[step.id] === undefined ? null : checklistResponses[step.id]) : checklistResponses.values[step.id],
           note: checklistResponses.notes?.[step.id] || '',
           photos: checklistResponses.photos?.[step.id] || []
@@ -150,7 +152,8 @@ export default function PlannedMaintenanceCompletionModal({
         if (validExtraParts.length > 0) {
           const extraNote = 'Pobrano dodatkowe części (poza planem): ' + validExtraParts.map(ep => {
             const found = parts.find(p => p.id === ep.partId);
-            return (found ? found.name : ep.partId) + ' x' + ep.quantity;
+            const unitStr = found?.unit || 'szt.';
+            return (found ? found.name : ep.partId) + ' (' + ep.quantity + ' ' + unitStr + ')';
           }).join(', ');
           historyEntry.note = (historyEntry.note ? historyEntry.note + '\n' : '') + extraNote;
           historyEntry.extraParts = validExtraParts;
@@ -231,14 +234,16 @@ export default function PlannedMaintenanceCompletionModal({
               </div>
               <div className="space-y-1.5">
                 {alreadyUsedParts.map((tx, idx) => {
-                  const pName = parts.find(p => p.id === tx.partId)?.name || tx.partName || 'Część';
+                  const foundPart = parts.find(p => p.id === tx.partId);
+                  const pName = foundPart?.name || tx.partName || 'Część';
+                  const pUnit = foundPart?.unit || tx.unit || 'szt.';
                   const qty = Math.abs(Number(tx.quantity) || 1);
                   const cost = tx.totalCost ? Number(tx.totalCost).toFixed(2) : (qty * (Number(tx.price) || 0)).toFixed(2);
                   return (
                     <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-blue-100">
                       <span className="font-bold text-slate-800">{pName}</span>
                       <div className="text-slate-600 text-[11px]">
-                        <span>Pobrano: {qty} ({tx.user || 'System'})</span> | <strong className="text-blue-700">{cost} PLN</strong>
+                        <span>Pobrano: {qty} {pUnit} ({tx.user || 'System'})</span> | <strong className="text-blue-700">{cost} PLN</strong>
                       </div>
                     </div>
                   );
@@ -262,43 +267,49 @@ export default function PlannedMaintenanceCompletionModal({
             {extraParts.length === 0 && (
               <p className="text-xs text-slate-400 italic">Brak dodatkowych części</p>
             )}
-            {extraParts.map((ep, idx) => (
-              <div key={idx} className="flex gap-2 items-center mb-2">
-                <select
-                  value={ep.partId}
-                  onChange={e => {
-                    const updated = [...extraParts];
-                    updated[idx].partId = e.target.value;
-                    setExtraParts(updated);
-                  }}
-                  className="flex-1 p-1.5 border border-slate-200 rounded text-xs bg-white outline-none"
-                >
-                  <option value="">-- Wybierz część --</option>
-                  {parts.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} (Stan: {p.stock})</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  value={ep.quantity}
-                  onChange={e => {
-                    const updated = [...extraParts];
-                    updated[idx].quantity = e.target.value;
-                    setExtraParts(updated);
-                  }}
-                  className="w-16 p-1.5 border border-slate-200 rounded text-xs outline-none"
-                  placeholder="Szt."
-                />
-                <button
-                  type="button"
-                  onClick={() => setExtraParts(prev => prev.filter((_, i) => i !== idx))}
-                  className="text-red-400 hover:text-red-600"
-                >
-                  <i className="ph ph-trash"></i>
-                </button>
-              </div>
-            ))}
+            {extraParts.map((ep, idx) => {
+              const selPart = parts.find(p => p.id === ep.partId);
+              const epUnit = selPart?.unit || 'szt.';
+              return (
+                <div key={idx} className="flex gap-2 items-center mb-2">
+                  <select
+                    value={ep.partId}
+                    onChange={e => {
+                      const updated = [...extraParts];
+                      updated[idx].partId = e.target.value;
+                      setExtraParts(updated);
+                    }}
+                    className="flex-1 min-w-0 p-1.5 border border-slate-200 rounded text-xs bg-white outline-none"
+                  >
+                    <option value="">-- Wybierz część --</option>
+                    {parts.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} (Stan: {p.stock} {p.unit || 'szt.'})</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="any"
+                    value={ep.quantity}
+                    onChange={e => {
+                      const updated = [...extraParts];
+                      updated[idx].quantity = e.target.value;
+                      setExtraParts(updated);
+                    }}
+                    className="w-16 p-1.5 border border-slate-200 rounded text-xs text-center outline-none"
+                    placeholder={epUnit}
+                  />
+                  <span className="text-[11px] font-bold text-slate-500 shrink-0">{epUnit}</span>
+                  <button
+                    type="button"
+                    onClick={() => setExtraParts(prev => prev.filter((_, i) => i !== idx))}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <i className="ph ph-trash"></i>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 

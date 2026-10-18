@@ -87,15 +87,18 @@ export default function PlannedMaintenanceInfo({ srv, machine, parts, actualPart
               <div className="mb-4">
                 <h4 className="text-xs font-bold text-slate-500 mb-2">PLANOWANE ZUŻYCIE</h4>
                 <ul className="space-y-2">
-                  {srv.requiredParts.map((part, idx) => (
-                    <li key={idx} className="flex justify-between items-center text-sm bg-white p-2 border border-slate-100 rounded">
-                      <span className="font-bold text-slate-800">{part.name || '-'}</span>
-                      <div className="flex gap-4 text-xs text-slate-500 font-medium">
-                        <span>Ilość: {part.quantity || 1}</span>
-                        <span>Koszt plan.: {part.unitCost ? (part.quantity * part.unitCost).toFixed(2) + ' PLN' : '-'}</span>
-                      </div>
-                    </li>
-                  ))}
+                  {srv.requiredParts.map((part, idx) => {
+                    const partUnit = parts.find(p => p.id === part.partId)?.unit || part.unit || 'szt.';
+                    return (
+                      <li key={idx} className="flex justify-between items-center text-sm bg-white p-2 border border-slate-100 rounded">
+                        <span className="font-bold text-slate-800">{part.name || '-'}</span>
+                        <div className="flex gap-4 text-xs text-slate-500 font-medium">
+                          <span>Ilość: {part.quantity || 1} {partUnit}</span>
+                          <span>Koszt plan.: {part.unitCost ? (part.quantity * part.unitCost).toFixed(2) + ' PLN' : '-'}</span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : (
@@ -107,12 +110,14 @@ export default function PlannedMaintenanceInfo({ srv, machine, parts, actualPart
                 <h4 className="text-xs font-bold text-blue-600 mb-2 mt-4 pt-4 border-t border-slate-200">FAKTYCZNIE POBRANE</h4>
                 <ul className="space-y-2">
                   {actualPartsUsed.map((tx, idx) => {
-                    const pName = parts.find(p => p.id === tx.partId)?.name || 'Nieznana część';
+                    const foundPart = parts.find(p => p.id === tx.partId);
+                    const pName = foundPart?.name || 'Nieznana część';
+                    const pUnit = foundPart?.unit || tx.unit || 'szt.';
                     return (
                       <li key={idx} className="flex justify-between items-center text-sm bg-blue-50/50 p-2 border border-blue-100 rounded">
                         <span className="font-bold text-slate-800">{pName}</span>
                         <div className="flex gap-4 text-xs text-slate-600 font-medium">
-                          <span>Pobrano: {Math.abs(tx.quantity)} ({tx.user || t('planned.system')})</span>
+                          <span>Pobrano: {Math.abs(tx.quantity)} {pUnit} ({tx.user || t('planned.system')})</span>
                           <span>Koszt: {tx.totalCost ? tx.totalCost.toFixed(2) + ' PLN' : (Math.abs(tx.quantity) * tx.price).toFixed(2) + ' PLN'}</span>
                         </div>
                       </li>

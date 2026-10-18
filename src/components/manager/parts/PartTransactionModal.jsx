@@ -55,12 +55,12 @@ export default function PartTransactionModal({ part, mode, onClose }) {
           <div className="mb-6">
             <div className="text-sm font-bold text-slate-500 uppercase">Część</div>
             <div className="text-lg font-black text-slate-800">{part.name}</div>
-            <div className="text-xs text-slate-400">Aktualny stan: {part.stock}</div>
+            <div className="text-xs text-slate-400">Aktualny stan: {part.stock} {part.unit || 'szt.'}</div>
           </div>
           <form id="tx-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ilość sztuk *</label>
-              <input type="number" min="1" step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center font-black text-xl" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ilość ({part.unit || 'szt.'}) *</label>
+              <input type="number" min="0.1" step="any" required value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center font-black text-xl" />
             </div>
             {mode === 'receive' && (
               <>

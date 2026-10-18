@@ -207,7 +207,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
 
       <div className="w-full flex-1">
         {/* MOBILE VIEW */}
-        <div className="md:hidden flex flex-col gap-3">
+        <div className="md:hidden flex flex-col gap-2 p-2">
           {currentData.length === 0 ? (
             <div className="p-8 text-center text-gray-500 italic">{t('parts.tx_list.no_tx')}</div>
           ) : (
@@ -240,7 +240,7 @@ export default function PartsTransactionsList({ onManualIssue }) {
               }
 
               return (
-                <div key={tx.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <div key={tx.id} className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${bg}`}>

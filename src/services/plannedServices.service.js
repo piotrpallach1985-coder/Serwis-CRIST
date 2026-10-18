@@ -68,20 +68,36 @@ export const deletePlannedService = async (serviceId) => {
  * @param {Object} [actionItemData=null] Opcjonalne dodatkowe zadanie do realizacji (Action Item)
  * @returns {Promise<void>}
  */
+// Rekurencyjnie zamienia wartości undefined na null, aby Firestore (szczególnie arrayUnion) nigdy nie wyrzucił błędu Unsupported field value: undefined
+const sanitizeForFirestore = (val) => {
+  if (val === undefined) return null;
+  if (val === null || typeof val !== 'object') return val;
+  if (val instanceof Date) return val;
+  if (typeof val.toDate === 'function' || typeof val._methodName === 'string') return val;
+  if (Array.isArray(val)) return val.map(sanitizeForFirestore);
+  const out = {};
+  for (const [k, v] of Object.entries(val)) {
+    out[k] = sanitizeForFirestore(v);
+  }
+  return out;
+};
+
 export const markServiceCompleted = async (serviceId, completionData, nextPlanData = null, actionItemData = null) => {
   const tenantId = getCurrentTenant();
   const batch = writeBatch(db);
   const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceId);
+  const safeCompletion = sanitizeForFirestore(completionData || {});
+  const historyEntry = safeCompletion.historyEntry;
+  delete safeCompletion.historyEntry;
   
   const payload = {
     status: SERVICE_STATUS.COMPLETED,
     completedAt: serverTimestamp(),
-    completionDetails: completionData
+    completionDetails: safeCompletion
   };
   
-  if (completionData.historyEntry) {
-    payload.history = arrayUnion(completionData.historyEntry);
-    delete payload.completionDetails.historyEntry;
+  if (historyEntry) {
+    payload.history = arrayUnion(historyEntry);
   }
   
   batch.update(serviceRef, payload);
@@ -431,25 +447,28 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
     }
 
     // Aktualizacja statusu serwisu
+    const safeCompletion = sanitizeForFirestore(completionData || {});
+    const safeHistoryEntry = safeCompletion.historyEntry;
+    delete safeCompletion.historyEntry;
+
     const payload = {
       status: SERVICE_STATUS.COMPLETED,
       completedAt: serverTimestamp(),
-      completionDetails: completionData
+      completionDetails: safeCompletion
     };
     
-    if (completionData.historyEntry) {
-      payload.history = arrayUnion(completionData.historyEntry);
-      delete payload.completionDetails.historyEntry;
+    if (safeHistoryEntry) {
+      payload.history = arrayUnion(safeHistoryEntry);
     }
     transaction.update(serviceRef, payload);
 
     // Wygenerowanie następnego cyklu
     if (nextPlanData) {
-      const nextDataObj = {
+      const nextDataObj = sanitizeForFirestore({
         ...nextPlanData,
         status: SERVICE_STATUS.PENDING,
         createdAt: serverTimestamp()
-      };
+      });
       const nextDateRaw = nextDataObj.nextDate;
       if (nextDateRaw && typeof nextDateRaw.toISOString === 'function') {
         nextDataObj.nextDate = nextDateRaw.toISOString();
@@ -461,7 +480,7 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
     // Wygenerowanie tematu do realizacji
     if (actionItemData) {
       const newActionItemRef = doc(collection(db, 'tenants', tenantId, 'action_items'));
-      transaction.set(newActionItemRef, actionItemData);
+      transaction.set(newActionItemRef, sanitizeForFirestore(actionItemData));
     }
   });
 

@@ -20,12 +20,14 @@ export default function TicketMainColumnContent({
             </h4>
             <ul className="space-y-2">
               {actualPartsUsed.map((tx, idx) => {
-                const pName = parts.find(p => p.id === tx.partId)?.name || t('tickets.details.unknown_part');
+                const foundPart = parts.find(p => p.id === tx.partId);
+                const pName = foundPart?.name || t('tickets.details.unknown_part');
+                const pUnit = foundPart?.unit || tx.unit || 'szt.';
                 return (
                   <li key={idx} className="flex justify-between items-center text-sm bg-blue-50/50 p-3 border border-blue-100 rounded-lg">
                     <span className="font-bold text-slate-800">{pName}</span>
                     <div className="flex gap-4 text-xs text-slate-600 font-medium">
-                      <span>{t('tickets.details.taken')}{Math.abs(tx.quantity)} ({tx.user || 'System'})</span>
+                      <span>{t('tickets.details.taken')}{Math.abs(tx.quantity)} {pUnit} ({tx.user || 'System'})</span>
                       <span>{t('tickets.details.cost')}{tx.totalCost ? tx.totalCost.toFixed(2) + ' PLN' : (Math.abs(tx.quantity) * tx.price).toFixed(2) + ' PLN'}</span>
                     </div>
                   </li>

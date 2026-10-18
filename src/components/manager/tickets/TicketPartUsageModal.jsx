@@ -116,13 +116,15 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
         });
       });
 
-      alert(`Pobrano ${qtyNum} sztuk: ${selectedPart.name}`);
+      const partUnit = selectedPart.unit || 'szt.';
+      alert(`Pobrano ${qtyNum} ${partUnit}: ${selectedPart.name}`);
       const costText = finalCost > 0 ? ` (Wartość: ${finalCost.toLocaleString('pl-PL')} PLN)` : '';
-      const message = `Pobrano z magazynu: ${selectedPart.name} (${qtyNum} szt.)${costText}`;
+      const message = `Pobrano z magazynu: ${selectedPart.name} (${qtyNum} ${partUnit})${costText}`;
       
       const txData = {
         partId: selectedPart.id,
         partName: selectedPart.name,
+        unit: partUnit,
         quantity: qtyNum,
         unitPrice: finalCost > 0 ? (finalCost / qtyNum) : 0,
         totalCost: finalCost,
@@ -195,7 +197,7 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
                               </div>
                               <div className="text-[10px] text-gray-400">KOD: {p.code || '-'}</div>
                             </div>
-                            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-black">Stan: {p.stock}</span>
+                            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-black">Stan: {p.stock} {p.unit || 'szt.'}</span>
                           </button>
                         ))
                       )}
@@ -208,13 +210,13 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
                 <i className="ph ph-nut"></i>
               </div>
               <h4 className="font-black text-lg text-slate-800 leading-tight">{selectedPart.name}</h4>
-              <p className="text-xs font-bold text-slate-400 uppercase">Aktualny stan: {selectedPart.stock} szt.</p>
+              <p className="text-xs font-bold text-slate-400 uppercase">Aktualny stan: {selectedPart.stock} {selectedPart.unit || 'szt.'}</p>
               
               <div className="pt-4">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ilość do pobrania</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ilość do pobrania ({selectedPart.unit || 'szt.'})</label>
                 <div className="flex items-center justify-center gap-4">
                   <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xl flex items-center justify-center">-</button>
-                  <input type="number" min="1" step="1" required value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-20 text-center text-2xl font-black text-slate-800 bg-transparent border-b-2 border-blue-600 outline-none" />
+                  <input type="number" min="0.1" step="any" required value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-20 text-center text-2xl font-black text-slate-800 bg-transparent border-b-2 border-blue-600 outline-none" />
                   <button type="button" onClick={() => setQuantity(quantity + 1)} className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xl flex items-center justify-center">+</button>
                 </div>
               </div>

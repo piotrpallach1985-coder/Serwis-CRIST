@@ -140,9 +140,10 @@ export default function PlannedMaintenanceDetails({
         ticketId={srv.id}
         onPartUsed={(msgOrTx, maybeTx) => {
           const tx = (typeof msgOrTx === 'object' && msgOrTx !== null) ? msgOrTx : (maybeTx || {});
+          const txUnit = tx.unit || parts.find(p => p.id === tx.partId)?.unit || 'szt.';
           const noteText = typeof msgOrTx === 'string' && msgOrTx.startsWith('Pobrano')
             ? msgOrTx
-            : (tx.partName ? `Pobrano z magazynu: ${tx.partName} (${tx.quantity || 1} szt.)` : 'Pobrano część z magazynu');
+            : (tx.partName ? `Pobrano z magazynu: ${tx.partName} (${tx.quantity || 1} ${txUnit})` : 'Pobrano część z magazynu');
           if (tx.partId) {
             setPartTransactions(prev => [...prev, tx]);
           }

@@ -132,7 +132,7 @@ export default function PartsIssueReceive({ onComplete }) {
                       <div className="text-xs text-slate-400">{t('parts.details.code')} {p.code || '-'}</div>
                     </div>
                     <div className="text-xs font-black text-slate-400 bg-white px-2 py-1 rounded shadow-sm border border-slate-100">
-                      {t('parts.issue_receive.in_stock')} {p.stock}
+                      {t('parts.issue_receive.in_stock')} {p.stock} {p.unit || 'szt.'}
                     </div>
                   </div>
                 ))
@@ -153,7 +153,7 @@ export default function PartsIssueReceive({ onComplete }) {
             </div>
             <div>
               <h3 className="text-2xl font-black text-slate-800 leading-tight">{selectedPart.name}</h3>
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{t('parts.issue_receive.current_stock')} <span className="text-blue-600">{selectedPart.stock} szt.</span></p>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{t('parts.issue_receive.current_stock')} <span className="text-blue-600">{selectedPart.stock} {selectedPart.unit || 'szt.'}</span></p>
             </div>
           </div>
 
@@ -167,9 +167,9 @@ export default function PartsIssueReceive({ onComplete }) {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.qty')}</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('parts.issue_receive.qty')} ({selectedPart.unit || 'szt.'})</label>
                 <input 
-                  type="number" min="1" step="1" required 
+                  type="number" min="0.1" step="any" required 
                   value={quantity} onChange={e => setQuantity(e.target.value)} 
                   className="w-full p-4 text-2xl font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center" 
                 />
