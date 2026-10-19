@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import { getAllowedColStarts } from '../../hooks/useTileLayout';
 
 const COL_SPAN_CLASSES = {
   3: 'lg:col-span-3',
@@ -41,6 +42,33 @@ function snapRatioToColSpan(ratio) {
     }
   }
   return best;
+}
+
+function getAutoCandidateCols0(span) {
+  switch (span) {
+    case 3:
+      return [0, 3, 6, 9];
+    case 4:
+      return [0, 4, 8];
+    case 6:
+      return [0, 6];
+    case 8:
+      return [0, 4];
+    case 9:
+      return [0, 3];
+    case 12:
+    default:
+      return [0];
+  }
+}
+
+function snapRelXToColStart(relX, colSpan) {
+  const slots = getAllowedColStarts(colSpan);
+  if (slots.length <= 1) return 1;
+  // Map relX (0..1) across available slots
+  const clamped = Math.max(0, Math.min(0.999, relX));
+  const idx = Math.floor(clamped * slots.length);
+  return slots[Math.min(slots.length - 1, Math.max(0, idx))];
 }
 
 export function TileLayoutButton({ isEditing, setIsEditing, resetLayout, compact = false }) {
@@ -87,6 +115,7 @@ TileLayoutButton.propTypes = {
 
 function MasonryGridItem({
   tileItem,
+  placement,
   isDesktop,
   colSpanClass,
   isBeingDragged,
@@ -94,6 +123,7 @@ function MasonryGridItem({
   isEditing,
   resizingState,
   onRegisterRef,
+  onRowSpanChange,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -102,13 +132,9 @@ function MasonryGridItem({
   children,
 }) {
   const innerRef = useRef(null);
-  const [rowSpan, setRowSpan] = useState(null);
 
   useEffect(() => {
-    if (!isDesktop) {
-      setRowSpan(null);
-      return;
-    }
+    if (!isDesktop) return;
     const el = innerRef.current;
     if (!el) return;
 
@@ -116,7 +142,7 @@ function MasonryGridItem({
       const h = el.getBoundingClientRect().height;
       if (h > 0) {
         const nextSpan = Math.max(1, Math.ceil(h / ROW_UNIT_PX));
-        setRowSpan(prev => (prev !== nextSpan ? nextSpan : prev));
+        onRowSpanChange(tileItem.id, nextSpan);
       }
     };
 
@@ -127,27 +153,31 @@ function MasonryGridItem({
       ro.observe(el);
       return () => ro.disconnect();
     }
-  }, [isDesktop, tileItem.collapsed, tileItem.height, tileItem.colSpan, isEditing]);
+  }, [isDesktop, tileItem.id, tileItem.collapsed, tileItem.height, tileItem.colSpan, isEditing, onRowSpanChange]);
+
+  const desktopGridStyle =
+    isDesktop && placement
+      ? {
+          gridColumn: `${placement.colStart} / span ${placement.colSpan}`,
+          gridRow: `${placement.rowStart} / span ${placement.rowSpan}`,
+        }
+      : undefined;
 
   return (
     <div
       ref={el => {
         onRegisterRef(tileItem.id, el);
       }}
-      style={
-        isDesktop && rowSpan
-          ? { gridRowEnd: `span ${rowSpan}` }
-          : undefined
-      }
+      style={desktopGridStyle}
       draggable={isEditing && !resizingState}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`col-span-1 ${colSpanClass} min-w-0 relative ${
+      className={`col-span-1 ${colSpanClass} min-w-0 relative transition-all duration-150 ${
         tileItem.hidden ? 'opacity-50' : ''
-      } ${isBeingDragged ? 'opacity-40 scale-[0.99]' : ''}`}
+      } ${isBeingDragged ? 'opacity-60 scale-[0.99] z-30' : ''}`}
     >
       <div ref={innerRef} className="pb-4 sm:pb-5">
         <div
@@ -177,6 +207,8 @@ export default function CustomizableTileGrid({
     isEditing,
     setIsEditing,
     moveTile,
+    moveTileHorizontal,
+    setTileColStart,
     reorderTiles,
     setTileColSpan,
     setTileHeight,
@@ -191,6 +223,11 @@ export default function CustomizableTileGrid({
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [resizingState, setResizingState] = useState(null);
+  const [rowSpansById, setRowSpansById] = useState({});
+
+  const handleRowSpanChange = useCallback((id, nextSpan) => {
+    setRowSpansById(prev => (prev[id] === nextSpan ? prev : { ...prev, [id]: nextSpan }));
+  }, []);
 
   const tilesMap = new Map(tiles.map(t => [t.id, t]));
 
@@ -204,6 +241,94 @@ export default function CustomizableTileGrid({
   const hiddenTiles = layout
     .filter(item => item.hidden && tilesMap.has(item.id))
     .map(item => tilesMap.get(item.id));
+
+  // Oblicz dokładne położenie 2D (kolumna + wiersz) każdego kafelka w 12-kolumnowej siatce
+  const placementsById = useMemo(() => {
+    const colHeights = new Array(12).fill(0);
+    const result = {};
+
+    for (const tileItem of visibleLayout) {
+      const span = Math.min(12, Math.max(3, tileItem.colSpan || 12));
+      const rSpan = rowSpansById[tileItem.id] || (tileItem.collapsed ? 6 : 22);
+
+      let bestStart0 = 0;
+
+      if (tileItem.colStart != null && Number.isFinite(Number(tileItem.colStart))) {
+        bestStart0 = Math.min(12 - span, Math.max(0, Number(tileItem.colStart) - 1));
+      } else {
+        const candidates = getAutoCandidateCols0(span);
+        let minTop = Infinity;
+        for (const c of candidates) {
+          let maxH = 0;
+          for (let k = c; k < c + span; k++) {
+            if (colHeights[k] > maxH) maxH = colHeights[k];
+          }
+          if (maxH < minTop) {
+            minTop = maxH;
+            bestStart0 = c;
+          }
+        }
+
+        // Dla kafelków >= 50% (6, 8, 9 kolumn): preferuj wyrównanie do lewej krawędzi (kolumna 0),
+        // jeśli różnica wysokości względem prawej strony jest niewielka (<= 18 wierszy = 144px).
+        if (span >= 6 && bestStart0 !== 0) {
+          let leftTop = 0;
+          for (let k = 0; k < span; k++) {
+            if (colHeights[k] > leftTop) leftTop = colHeights[k];
+          }
+          if (leftTop - minTop <= 18) {
+            bestStart0 = 0;
+          }
+        }
+      }
+
+      let startRow0 = 0;
+      for (let k = bestStart0; k < bestStart0 + span; k++) {
+        if (colHeights[k] > startRow0) startRow0 = colHeights[k];
+      }
+
+      const endRow0 = startRow0 + rSpan;
+      for (let k = bestStart0; k < bestStart0 + span; k++) {
+        colHeights[k] = endRow0;
+      }
+
+      result[tileItem.id] = {
+        colStart: bestStart0 + 1,
+        colSpan: span,
+        rowStart: startRow0 + 1,
+        rowSpan: rSpan,
+      };
+    }
+
+    return result;
+  }, [visibleLayout, rowSpansById]);
+
+  const computeColStartFromEvent = (e, tileSpan) => {
+    const gridEl = gridRef.current;
+    if (!gridEl || !isDesktop) return undefined;
+    const rect = gridEl.getBoundingClientRect();
+    if (!rect.width) return undefined;
+    const relX = (e.clientX - rect.left) / rect.width;
+    return snapRelXToColStart(relX, tileSpan || 12);
+  };
+
+  const findNearestVerticalTargetId = (clientY, excludeId) => {
+    let bestId = null;
+    let bestDist = Infinity;
+    for (const item of visibleLayout) {
+      if (item.id === excludeId) continue;
+      const el = tileRefs.current[item.id];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const centerY = r.top + r.height / 2;
+      const dist = Math.abs(clientY - centerY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = item.id;
+      }
+    }
+    return bestId;
+  };
 
   const startResize = (e, tileItem, mode) => {
     e.preventDefault();
@@ -290,7 +415,7 @@ export default function CustomizableTileGrid({
                   Tryb dostosowywania okienek (Układ + Rozmiar)
                 </div>
                 <div className="text-[11px] sm:text-xs text-blue-800">
-                  Przeciągaj okienka za pasek lub użyj strzałek <span className="font-bold">↑ ↓</span>. Na PC zmieniaj szerokość przyciskami (<span className="font-bold">25%–100%</span>) lub rozciągaj za <span className="font-bold">prawy dolny róg / krawędzie</span>. Okienka automatycznie dosuwają się w pionie i poziomie bez pustych luk.
+                  Przeciągaj okienka za pasek (również w puste miejsca po lewej/prawej) lub użyj strzałek <span className="font-bold">← → ↑ ↓</span>. Na PC zmieniaj szerokość przyciskami (<span className="font-bold">25%–100%</span>) lub rozciągaj za <span className="font-bold">prawy dolny róg / krawędzie</span>.
                 </div>
               </div>
             </div>
@@ -330,7 +455,7 @@ export default function CustomizableTileGrid({
         </div>
       )}
 
-      {/* SIATKA 12-KOLUMNOWA Z KOMPAKTOWYM PAKOWANIEM WIERSZY (MASONRY DENSE) */}
+      {/* SIATKA 12-KOLUMNOWA Z PŁYNNYM POZYCJONOWANIEM 2D */}
       <div
         ref={gridRef}
         style={
@@ -338,7 +463,31 @@ export default function CustomizableTileGrid({
             ? { gridAutoRows: `${ROW_UNIT_PX}px`, gridAutoFlow: 'row dense' }
             : undefined
         }
-        className="grid grid-cols-1 lg:grid-cols-12 gap-x-4 sm:gap-x-5 items-start"
+        onDragOver={e => {
+          if (!isEditing || !draggedId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const draggedItem = visibleLayout.find(it => it.id === draggedId);
+          if (draggedItem && setTileColStart) {
+            const nextColStart = computeColStartFromEvent(e, draggedItem.colSpan);
+            if (nextColStart && draggedItem.colStart !== nextColStart) {
+              setTileColStart(draggedId, nextColStart);
+            }
+          }
+        }}
+        onDrop={e => {
+          if (!isEditing) return;
+          e.preventDefault();
+          const src = draggedId || e.dataTransfer.getData('text/plain');
+          if (!src) return;
+          const draggedItem = visibleLayout.find(it => it.id === src);
+          const targetColStart = draggedItem ? computeColStartFromEvent(e, draggedItem.colSpan) : undefined;
+          const targetId = dragOverId || findNearestVerticalTargetId(e.clientY, src);
+          reorderTiles(src, targetId, targetColStart);
+          setDraggedId(null);
+          setDragOverId(null);
+        }}
+        className="grid grid-cols-1 lg:grid-cols-12 gap-x-4 sm:gap-x-5 items-start min-h-[120px]"
       >
         {visibleLayout.map((tileItem, idx) => {
           const def = tilesMap.get(tileItem.id);
@@ -349,11 +498,17 @@ export default function CustomizableTileGrid({
           const isDragTarget = dragOverId === tileItem.id && draggedId !== tileItem.id;
           const isResizingThis = resizingState?.id === tileItem.id;
           const pctLabel = WIDTH_OPTIONS.find(w => w.span === tileItem.colSpan)?.label || '100%';
+          const placement = placementsById[tileItem.id];
+          const resolvedColStart = placement?.colStart || tileItem.colStart || 1;
+          const allowedSlots = getAllowedColStarts(tileItem.colSpan || 12);
+          const canMoveLeft = isDesktop && (tileItem.colSpan || 12) < 12 && resolvedColStart > allowedSlots[0];
+          const canMoveRight = isDesktop && (tileItem.colSpan || 12) < 12 && resolvedColStart < allowedSlots[allowedSlots.length - 1];
 
           return (
             <MasonryGridItem
               key={tileItem.id}
               tileItem={tileItem}
+              placement={placement}
               isDesktop={isDesktop}
               colSpanClass={colSpanClass}
               isBeingDragged={isBeingDragged}
@@ -363,6 +518,7 @@ export default function CustomizableTileGrid({
               onRegisterRef={(id, el) => {
                 tileRefs.current[id] = el;
               }}
+              onRowSpanChange={handleRowSpanChange}
               onDragStart={e => {
                 if (!isEditing) return;
                 setDraggedId(tileItem.id);
@@ -383,8 +539,11 @@ export default function CustomizableTileGrid({
               onDrop={e => {
                 if (!isEditing) return;
                 e.preventDefault();
+                e.stopPropagation();
                 const src = draggedId || e.dataTransfer.getData('text/plain');
-                reorderTiles(src, tileItem.id);
+                const draggedItem = visibleLayout.find(it => it.id === src);
+                const targetColStart = draggedItem ? computeColStartFromEvent(e, draggedItem.colSpan) : undefined;
+                reorderTiles(src, tileItem.id, targetColStart);
                 setDraggedId(null);
                 setDragOverId(null);
               }}
@@ -435,6 +594,30 @@ export default function CustomizableTileGrid({
                 <div className="flex flex-wrap items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                   {isEditing ? (
                     <>
+                      {/* Strzałki Lewo / Prawo (Desktop, gdy szerokość < 100%) */}
+                      {isDesktop && (tileItem.colSpan || 12) < 12 && moveTileHorizontal && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => moveTileHorizontal(tileItem.id, 'left', resolvedColStart)}
+                            disabled={!canMoveLeft}
+                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
+                            title="Przesuń do lewej"
+                          >
+                            <i className="ph ph-arrow-left text-xs"></i>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveTileHorizontal(tileItem.id, 'right', resolvedColStart)}
+                            disabled={!canMoveRight}
+                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
+                            title="Przesuń do prawej"
+                          >
+                            <i className="ph ph-arrow-right text-xs"></i>
+                          </button>
+                        </>
+                      )}
+
                       {/* Strzałki Góra / Dół */}
                       <button
                         type="button"
@@ -570,7 +753,6 @@ export default function CustomizableTileGrid({
                     onTouchStart={e => startResize(e, tileItem, 'height')}
                     onDoubleClick={() => setTileHeight(tileItem.id, null)}
                     className="absolute left-0 right-6 bottom-0 h-2.5 cursor-ns-resize flex items-center justify-center group z-30 hover:bg-blue-500/20 rounded-b"
-                    title="Przeciągnij w pionie, aby ustawić wysokość (dwuklik = Auto)"
                   >
                     <div className="w-10 h-1 rounded-full bg-blue-400 group-hover:bg-blue-600 transition-colors"></div>
                   </div>

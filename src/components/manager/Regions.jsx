@@ -42,10 +42,55 @@ export default function Regions() {
     return descendants;
   };
 
+  const buildRegionHierarchy = (list) => {
+    const byId = new Map(list.map(r => [r.id, r]));
+    const childrenMap = new Map();
+    const roots = [];
+
+    const sorted = [...list].sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', 'pl', { numeric: true })
+    );
+
+    sorted.forEach(r => {
+      if (r.parentId && byId.has(r.parentId) && r.parentId !== r.id) {
+        if (!childrenMap.has(r.parentId)) childrenMap.set(r.parentId, []);
+        childrenMap.get(r.parentId).push(r);
+      } else {
+        roots.push(r);
+      }
+    });
+
+    const result = [];
+    const visited = new Set();
+
+    const traverse = (node, depth = 0, ancestorPath = []) => {
+      if (visited.has(node.id)) return;
+      visited.add(node.id);
+      result.push({
+        ...node,
+        depth,
+        ancestorPath,
+      });
+      const children = childrenMap.get(node.id) || [];
+      children.forEach(child => traverse(child, depth + 1, [...ancestorPath, node.name]));
+    };
+
+    roots.forEach(root => traverse(root, 0, []));
+    sorted.forEach(r => {
+      if (!visited.has(r.id)) traverse(r, 0, []);
+    });
+
+    return result;
+  };
+
+  const hierarchicalRegions = buildRegionHierarchy(
+    regions.filter(r => (showDeleted ? true : !r.isDeleted))
+  );
+
   useEffect(() => {
     const unsubRegions = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'regions'), (snapshot) => {
       const fetchedRegions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedRegions.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      fetchedRegions.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl', { numeric: true }));
       setRegions(fetchedRegions);
     }, (error) => { console.debug('Regions listener closed:', error.message); });
     const unsubMachines = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'machines'), (snapshot) => {
@@ -237,13 +282,14 @@ export default function Regions() {
                 {(() => {
                   const forbiddenIds = editingId ? getDescendantIds(editingId) : new Set();
                   if (editingId) forbiddenIds.add(editingId);
-                  return regions
+                  return hierarchicalRegions
                     .filter(r => !r.isDeleted && !forbiddenIds.has(r.id))
                     .map(r => {
-                      const parentObj = r.parentId ? regions.find(p => p.id === r.parentId) : null;
+                      const indentPrefix = r.depth > 0 ? `${'— '.repeat(r.depth)}↳ ` : '';
+                      const pathSuffix = r.ancestorPath?.length ? ` (${r.ancestorPath.join(' ➔ ')})` : '';
                       return (
                         <option key={r.id} value={r.id}>
-                          {parentObj ? `${parentObj.name} ➔ ${r.name}` : r.name}
+                          {indentPrefix}{r.name}{pathSuffix}
                         </option>
                       );
                     });
@@ -364,19 +410,28 @@ export default function Regions() {
 
         <div className="overflow-x-auto">
 <div className="lg:hidden flex flex-col gap-1.5 p-2">
-    {regions.length === 0 ? (
+    {hierarchicalRegions.length === 0 ? (
       <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.regions.no_data")}</div>
     ) : (
-      regions.filter(r => showDeleted ? true : !r.isDeleted).map(item => {
+      hierarchicalRegions.map(item => {
         const parentRegion = item.parentId ? regions.find(p => p.id === item.parentId) : null;
         return (
-<div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col ${item.isDeleted ? "opacity-50" : ""}`}>
+<div
+  key={item.id}
+  style={{ marginLeft: item.depth > 0 ? `${Math.min(item.depth * 16, 64)}px` : undefined }}
+  className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col ${
+    item.depth > 0 ? 'border-l-4 border-l-indigo-400 border-slate-200 bg-slate-50/50' : 'border-slate-200'
+  } ${item.isDeleted ? "opacity-50" : ""}`}
+>
   <div className="flex justify-between items-start mb-2">
     <div>
-      <h4 className="font-bold text-[#002b5e] text-lg">{item.name || t('admin.regions.without_name')}</h4>
+      <h4 className="font-bold text-[#002b5e] text-lg flex items-center gap-1.5">
+        {item.depth > 0 && <i className="ph ph-arrow-bend-down-right text-indigo-500"></i>}
+        <span>{item.name || t('admin.regions.without_name')}</span>
+      </h4>
       {parentRegion && (
         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-0.5">
-          <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {parentRegion.name}
+          <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {item.ancestorPath?.length ? item.ancestorPath.join(' ➔ ') : parentRegion.name}
         </span>
       )}
     </div>
@@ -421,24 +476,41 @@ export default function Regions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {regions.filter(r => showDeleted ? true : !r.isDeleted).map(r => {
+              {hierarchicalRegions.map(r => {
                 const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted && !m.parentId);
                 const parentRegion = r.parentId ? regions.find(p => p.id === r.parentId) : null;
                 const childRegions = regions.filter(c => c.parentId === r.id && !c.isDeleted);
                 return (
-                  <tr key={r.id} className={`hover:bg-gray-50 ${r.isDeleted ? "opacity-50" : ""}`}>
+                  <tr
+                    key={r.id}
+                    className={`hover:bg-gray-50 ${
+                      r.depth === 0 ? 'bg-white' : r.depth === 1 ? 'bg-slate-50/50' : 'bg-indigo-50/20'
+                    } ${r.isDeleted ? "opacity-50" : ""}`}
+                  >
                     <td className="px-6 py-4">
-                      <div className="font-bold text-gray-800">{r.name || t('admin.regions.without_name')}</div>
-                      {parentRegion && (
-                        <div className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-1">
-                          <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {parentRegion.name}
+                      <div
+                        style={{ paddingLeft: r.depth > 0 ? `${r.depth * 28}px` : undefined }}
+                        className="flex flex-col items-start"
+                      >
+                        <div className="font-bold text-gray-800 flex items-center gap-1.5">
+                          {r.depth > 0 && (
+                            <span className="text-indigo-500 font-normal flex items-center">
+                              <i className="ph ph-arrow-bend-down-right text-base"></i>
+                            </span>
+                          )}
+                          <span>{r.name || t('admin.regions.without_name')}</span>
                         </div>
-                      )}
-                      {childRegions.length > 0 && (
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          Podrejony ({childRegions.length}): {childRegions.map(c => c.name).join(', ')}
-                        </div>
-                      )}
+                        {parentRegion && (
+                          <div className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-1">
+                            <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {r.ancestorPath?.length ? r.ancestorPath.join(' ➔ ') : parentRegion.name}
+                          </div>
+                        )}
+                        {childRegions.length > 0 && (
+                          <div className="text-[11px] text-slate-500 mt-1">
+                            Podrejony ({childRegions.length}): {childRegions.map(c => c.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{r.description || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">

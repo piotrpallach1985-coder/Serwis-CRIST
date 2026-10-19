@@ -7,6 +7,32 @@ function getDeviceMode() {
   return window.innerWidth < 1024 ? 'mobile' : 'desktop';
 }
 
+export function getAllowedColStarts(colSpan) {
+  switch (colSpan) {
+    case 3:
+      return [1, 4, 7, 10];
+    case 4:
+      return [1, 5, 9];
+    case 6:
+      return [1, 4, 7];
+    case 8:
+      return [1, 5];
+    case 9:
+      return [1, 4];
+    case 12:
+    default:
+      return [1];
+  }
+}
+
+function normalizeColStart(colStart, colSpan) {
+  if (colStart === null || colStart === undefined) return null;
+  const num = Number(colStart);
+  if (!Number.isFinite(num)) return null;
+  const maxStart = Math.max(1, 13 - (colSpan || 12));
+  return Math.min(maxStart, Math.max(1, Math.round(num)));
+}
+
 function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}${layoutId}_${deviceMode}`);
@@ -20,9 +46,11 @@ function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
     for (const savedItem of parsed) {
       const def = defaultTiles.find(d => d.id === savedItem.id);
       if (def) {
+        const colSpan = savedItem.colSpan || def.defaultColSpan || 12;
         ordered.push({
           id: def.id,
-          colSpan: savedItem.colSpan || def.defaultColSpan || 12,
+          colSpan,
+          colStart: normalizeColStart(savedItem.colStart, colSpan),
           height: typeof savedItem.height === 'number' ? savedItem.height : (def.defaultHeight || null),
           collapsed: typeof savedItem.collapsed === 'boolean' ? savedItem.collapsed : Boolean(def.defaultCollapsed),
           hidden: typeof savedItem.hidden === 'boolean' ? savedItem.hidden : false,
@@ -32,9 +60,11 @@ function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
 
     for (const def of defaultTiles) {
       if (!mapById.has(def.id)) {
+        const colSpan = def.defaultColSpan || 12;
         ordered.push({
           id: def.id,
-          colSpan: def.defaultColSpan || 12,
+          colSpan,
+          colStart: normalizeColStart(def.defaultColStart, colSpan),
           height: def.defaultHeight || null,
           collapsed: Boolean(def.defaultCollapsed),
           hidden: false,
@@ -50,13 +80,17 @@ function loadSavedLayout(layoutId, deviceMode, defaultTiles) {
 }
 
 function buildDefaultState(defaultTiles) {
-  return defaultTiles.map(def => ({
-    id: def.id,
-    colSpan: def.defaultColSpan || 12,
-    height: def.defaultHeight || null,
-    collapsed: Boolean(def.defaultCollapsed),
-    hidden: false,
-  }));
+  return defaultTiles.map(def => {
+    const colSpan = def.defaultColSpan || 12;
+    return {
+      id: def.id,
+      colSpan,
+      colStart: normalizeColStart(def.defaultColStart, colSpan),
+      height: def.defaultHeight || null,
+      collapsed: Boolean(def.defaultCollapsed),
+      hidden: false,
+    };
+  });
 }
 
 export function useTileLayout(layoutId, defaultTiles) {
@@ -118,16 +152,70 @@ export function useTileLayout(layoutId, defaultTiles) {
     [persistLayout]
   );
 
+  const moveTileHorizontal = useCallback(
+    (id, direction, currentResolvedColStart = 1) => {
+      persistLayout(prev => {
+        const idx = prev.findIndex(item => item.id === id);
+        if (idx === -1) return prev;
+        const item = prev[idx];
+        const span = item.colSpan || 12;
+        if (span >= 12) return prev;
+
+        const slots = getAllowedColStarts(span);
+        const currentStart = item.colStart || currentResolvedColStart || 1;
+        let nextStart = currentStart;
+
+        if (direction === 'left') {
+          const leftCandidates = slots.filter(s => s < currentStart);
+          nextStart = leftCandidates.length > 0 ? leftCandidates[leftCandidates.length - 1] : slots[0];
+        } else {
+          const rightCandidates = slots.filter(s => s > currentStart);
+          nextStart = rightCandidates.length > 0 ? rightCandidates[0] : slots[slots.length - 1];
+        }
+
+        return prev.map((it, i) => (i === idx ? { ...it, colStart: nextStart } : it));
+      });
+    },
+    [persistLayout]
+  );
+
+  const setTileColStart = useCallback(
+    (id, colStart) => {
+      persistLayout(prev =>
+        prev.map(item =>
+          item.id === id
+            ? { ...item, colStart: normalizeColStart(colStart, item.colSpan) }
+            : item
+        )
+      );
+    },
+    [persistLayout]
+  );
+
   const reorderTiles = useCallback(
-    (sourceId, targetId) => {
-      if (!sourceId || !targetId || sourceId === targetId) return;
+    (sourceId, targetId, targetColStart = undefined) => {
+      if (!sourceId) return;
       persistLayout(prev => {
         const srcIdx = prev.findIndex(item => item.id === sourceId);
-        const tgtIdx = prev.findIndex(item => item.id === targetId);
-        if (srcIdx === -1 || tgtIdx === -1) return prev;
+        if (srcIdx === -1) return prev;
         const copy = [...prev];
         const [moved] = copy.splice(srcIdx, 1);
-        copy.splice(tgtIdx, 0, moved);
+        const updatedMoved =
+          targetColStart !== undefined
+            ? { ...moved, colStart: normalizeColStart(targetColStart, moved.colSpan) }
+            : moved;
+
+        if (!targetId || sourceId === targetId) {
+          copy.splice(srcIdx, 0, updatedMoved);
+          return copy;
+        }
+
+        const tgtIdx = prev.findIndex(item => item.id === targetId);
+        if (tgtIdx === -1) {
+          copy.push(updatedMoved);
+          return copy;
+        }
+        copy.splice(tgtIdx, 0, updatedMoved);
         return copy;
       });
     },
@@ -141,7 +229,15 @@ export function useTileLayout(layoutId, defaultTiles) {
       persistLayout(prev => {
         const idx = prev.findIndex(item => item.id === id);
         if (idx === -1) return prev;
-        const copy = prev.map(item => (item.id === id ? { ...item, colSpan: normalized } : { ...item }));
+        const copy = prev.map(item =>
+          item.id === id
+            ? {
+                ...item,
+                colSpan: normalized,
+                colStart: normalizeColStart(item.colStart, normalized),
+              }
+            : { ...item }
+        );
 
         // Gdy użytkownik ustawia kafelek (np. Historię) na 33% (4 kol.), wszystkie kafelki 75% (9 kol.)
         // przekraczałyby 12 kolumn (9 + 4 = 13 > 12) i spychały kafelek 33% do nowego rzędu po lewej.
@@ -150,17 +246,18 @@ export function useTileLayout(layoutId, defaultTiles) {
           copy.forEach((item, i) => {
             if (i !== idx && item.colSpan === 9) {
               item.colSpan = 8;
+              item.colStart = normalizeColStart(item.colStart, 8);
             }
           });
         } else if (normalized === 9) {
-          // Analogicznie: gdy użytkownik ustawia kafelek na 75% (9 kol.), sąsiedni kafelek 33% (4 kol.)
-          // dopasowujemy do 25% (3 kol.), aby zmieściły się w jednym wierszu (9 + 3 = 12).
           const prevNeighbor = idx > 0 ? copy[idx - 1] : null;
           const nextNeighbor = idx < copy.length - 1 ? copy[idx + 1] : null;
           if (nextNeighbor && nextNeighbor.colSpan === 4) {
             nextNeighbor.colSpan = 3;
+            nextNeighbor.colStart = normalizeColStart(nextNeighbor.colStart, 3);
           } else if (prevNeighbor && prevNeighbor.colSpan === 4) {
             prevNeighbor.colSpan = 3;
+            prevNeighbor.colStart = normalizeColStart(prevNeighbor.colStart, 3);
           }
         }
 
@@ -216,6 +313,8 @@ export function useTileLayout(layoutId, defaultTiles) {
     isEditing,
     setIsEditing,
     moveTile,
+    moveTileHorizontal,
+    setTileColStart,
     reorderTiles,
     setTileColSpan,
     setTileHeight,
