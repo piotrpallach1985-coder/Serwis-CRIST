@@ -18,11 +18,33 @@ export default function MapEditModal({
 
   if (!isModalOpen) return null;
 
+  const getAncestorAndSelfIds = (startId) => {
+    const ids = new Set();
+    let currId = startId;
+    while (currId && !ids.has(currId)) {
+      ids.add(currId);
+      const reg = regions.find(r => r.id === currId);
+      currId = reg?.parentId || null;
+    }
+    return ids;
+  };
+
   const getUnpinnedItems = () => {
     if (editingType === 'region') {
-      return regions.filter(r => r.xPercent == null || r.yPercent == null);
+      const activeRegions = regions.filter(r => !r.isDeleted);
+      if (currentSubmapId === null) {
+        return activeRegions.filter(r => !r.parentId && (r.xPercent == null || r.yPercent == null));
+      } else {
+        const forbiddenIds = getAncestorAndSelfIds(currentSubmapId);
+        return activeRegions.filter(
+          r =>
+            !forbiddenIds.has(r.id) &&
+            (r.xPercent == null || r.yPercent == null) &&
+            (r.parentId === currentSubmapId || !r.parentId)
+        );
+      }
     } else {
-      const mainMachines = machines.filter(m => !m.parentId || m.parentId === '');
+      const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
       if (currentSubmapId !== null) {
         return mainMachines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
       }
@@ -44,15 +66,15 @@ export default function MapEditModal({
         </div>
 
         <form onSubmit={onSave} className="p-6 space-y-5">
-          {/* Typ: Rejon / Maszyna */}
+          {/* Typ: Rejon / Podmapa vs Maszyna */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
-              disabled={currentSubmapId !== null}
               onClick={() => { setEditingType('region'); setEditingId(''); }}
-              style={{ opacity: currentSubmapId !== null ? 0.3 : 1 }}
               className={`flex-1 py-2 text-[10px] md:text-sm font-bold rounded-md transition-all ${editingType === 'region' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >{t('map_component.region_hall')}</button>
+            >
+              {currentSubmapId !== null ? 'Podrejon / Podmapa' : t('map_component.region_hall')}
+            </button>
             <button
               type="button"
               onClick={() => { setEditingType('machine'); setEditingId(''); }}
@@ -77,9 +99,11 @@ export default function MapEditModal({
             {unpinnedItems.length === 0 && (
               <p className="text-[11px] text-amber-600 mt-2 font-semibold">
                 <i className="ph ph-check-circle mr-1"></i>
-                {currentSubmapId !== null
-                  ? t('map_component.all_machines_pinned')
-                  : t('map_component.no_objects_to_pin')}
+                {editingType === 'region'
+                  ? 'Brak wolnych rejonów/podmap do przypięcia (dodaj nowy rejon w Słownikach -> Rejony).'
+                  : currentSubmapId !== null
+                    ? t('map_component.all_machines_pinned')
+                    : t('map_component.no_objects_to_pin')}
               </p>
             )}
           </div>

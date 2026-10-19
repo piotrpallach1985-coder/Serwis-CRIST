@@ -8,7 +8,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSummaryParser';
 
 export default function PlannedMaintenanceCompletionModal({
-  isOpen, onClose, serviceToComplete }) {
+  isOpen, onClose, onCompleted, serviceToComplete }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
@@ -166,6 +166,19 @@ export default function PlannedMaintenanceCompletionModal({
           actionItemDataObj, 
           validExtraParts
         );
+
+        if (onCompleted) {
+          onCompleted({
+            ...serviceToComplete,
+            status: 'completed',
+            currentStep: 5,
+            completedAt: historyEntry.date,
+            completedBy: completionData.completedBy,
+            completionNotes,
+            checklistResponses,
+            history: [...(serviceToComplete.history || []), historyEntry]
+          });
+        }
 
         setCompletionNotes('');
       setCreateNewPlan(true);

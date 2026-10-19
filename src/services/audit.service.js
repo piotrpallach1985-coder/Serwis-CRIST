@@ -5,11 +5,11 @@ import { useManagerStore } from '../store/managerStore';
 
 const TICKET_STATUS_MAP = {
   '0': 'Nowe',
-  '1': 'W przypisaniu',
-  '2': 'W toku (Rozpoczęto)',
-  '3': 'Wstrzymane',
-  '4': 'Zakończone',
-  '5': 'Zarchiwizowane'
+  '1': 'Przyjęcie zgłoszenia',
+  '2': 'Wybór wykonawcy',
+  '3': 'Rozpoczęcie naprawy',
+  '4': 'Naprawa w trakcie',
+  '5': 'Zakończone'
 };
 
 const PLANNED_SERVICE_STATUS_MAP = {
@@ -21,19 +21,65 @@ const PLANNED_SERVICE_STATUS_MAP = {
 const FIELD_TRANSLATION_MAP = {
   status: 'Status',
   priority: 'Priorytet',
-  assignedTo: 'Przypisany',
+  assignedTo: 'Wykonawca',
+  assignedService: 'Wykonawca',
+  assignedAt: 'Data przypisania',
+  inProgressAt: 'Rozpoczęto naprawę',
+  currentStep: 'Etap realizacji',
   machineId: 'Maszyna',
+  machineName: 'Maszyna',
+  regionId: 'Rejon',
+  parentId: 'Urządzenie nadrzędne',
+  internalId: 'Nr wewnętrzny',
+  bay: 'Hala/Przelot',
   name: 'Nazwa',
   description: 'Opis',
-  etr: 'ETR',
-  isManuallyArchived: 'Archiwizacja',
+  topic: 'Temat',
+  reportedBy: 'Zgłaszający',
+  etr: 'Planowany czas zakończenia (ETR)',
+  isManuallyArchived: 'Przeniesiono do archiwum',
   targetWorkHours: 'RBG Docelowe',
+  currentWorkHours: 'Licznik RBG',
   nextDate: 'Następna Data',
   category: 'Kategoria',
-  triggerType: 'Typ'
+  triggerType: 'Typ wyzwalacza',
+  stock: 'Stan magazynowy',
+  minStock: 'Stan minimalny',
+  unit: 'Jednostka',
+  dtrFiles: 'Pliki DTR',
+  techNotes: 'Notatki techniczne',
+  checklistResponses: 'Checklista',
+  completionNotes: 'Notatka końcowa',
+  problem: 'Problem',
+  dueDate: 'Termin realizacji'
 };
 
-const formatDetails = (details, action, entityType) => {
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;
+
+const formatIsoString = (valStr) => {
+  if (!ISO_DATE_REGEX.test(valStr)) return valStr;
+  const d = new Date(valStr);
+  if (isNaN(d.getTime())) return valStr;
+  return d.toLocaleString('pl-PL', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const getStoreState = () => (typeof useManagerStore?.getState === 'function' ? (useManagerStore.getState() || {}) : {});
+
+const resolveMachineNameFromState = (machineId, fallbackName, customState = null) => {
+  if (fallbackName && fallbackName !== 'Nieznana') return fallbackName;
+  if (!machineId) return fallbackName || '';
+  const state = customState || getStoreState();
+  const found = (state.machines || []).find(m => m.id === machineId);
+  return found?.name || fallbackName || '';
+};
+
+export const formatDetails = (details, action, entityType, customState = null) => {
   if (typeof details === 'string') return details;
   if (!details || typeof details !== 'object') return '';
   
@@ -41,44 +87,122 @@ const formatDetails = (details, action, entityType) => {
   if (action === 'UPDATE') {
     prefix = 'Aktualizacja: ';
   } else if (action === 'CREATE') {
-    prefix = 'Utworzono z: ';
+    prefix = 'Utworzono: ';
+  } else if (action === 'DELETE') {
+    prefix = 'Usunięto: ';
   }
 
+  const state = customState || getStoreState();
   const parts = [];
-  const skipKeys = ['updatedAt', 'createdAt', 'history', 'timestamp', 'deletedAt', 'isDeleted', 'lastActive', 'closedAt', 'completedBy'];
+  const skipKeys = [
+    'updatedAt', 'createdAt', 'history', 'timestamp', 'deletedAt',
+    'isDeleted', 'lastActive', 'closedAt', 'completedBy', 'batches'
+  ];
   
   for (const [key, value] of Object.entries(details)) {
     if (skipKeys.includes(key)) continue;
+    if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+
     let valStr = '';
-    if (value === null) valStr = 'Brak';
-    else if (typeof value === 'object') {
-      if (Array.isArray(value)) valStr = `[${value.length} elem.]`;
-      else if (value && typeof value.toDate === 'function') valStr = value.toDate().toISOString().slice(0, 16).replace('T', ' ');
-      else valStr = '{Obiekt}';
+    if (typeof value === 'boolean') {
+      valStr = value ? 'Tak' : 'Nie';
+    } else if (typeof value === 'object') {
+      if (Array.isArray(value)) valStr = `${value.length} poz.`;
+      else if (value && typeof value.toDate === 'function') {
+        valStr = formatIsoString(value.toDate().toISOString());
+      } else {
+        continue;
+      }
     } else {
-      valStr = String(value);
+      valStr = String(value).trim();
+      if (!valStr) continue;
     }
 
-    // Decode statuses for TICKET
-    if (entityType === 'TICKET' && key === 'status') {
+    if (key === 'machineId') {
+      const mName = resolveMachineNameFromState(valStr, '', state);
+      if (mName) valStr = mName;
+    } else if (key === 'regionId') {
+      const reg = (state.regions || []).find(r => r.id === valStr);
+      if (reg?.name) valStr = reg.name;
+    } else if (key === 'parentId') {
+      const parentMach = (state.machines || []).find(m => m.id === valStr);
+      if (parentMach?.name) valStr = parentMach.name;
+    } else if (entityType === 'TICKET' && key === 'status') {
       if (TICKET_STATUS_MAP[valStr]) valStr = TICKET_STATUS_MAP[valStr];
+    } else if (entityType === 'PLANNED_SERVICE' && key === 'status') {
+      if (PLANNED_SERVICE_STATUS_MAP[valStr]) valStr = PLANNED_SERVICE_STATUS_MAP[valStr];
+    } else {
+      valStr = formatIsoString(valStr);
     }
-    
-    // Decode status for PLANNED_SERVICE
-    if (entityType === 'PLANNED_SERVICE' && key === 'status') {
-       if (PLANNED_SERVICE_STATUS_MAP[valStr]) valStr = PLANNED_SERVICE_STATUS_MAP[valStr];
-    }
-    
-    // Polish translation for common keys to make it more readable
-    let keyName = key;
-    if (FIELD_TRANSLATION_MAP[key]) keyName = FIELD_TRANSLATION_MAP[key];
 
-    if (valStr.length > 50) valStr = valStr.substring(0, 50) + '...';
+    const keyName = FIELD_TRANSLATION_MAP[key] || key;
+    if (valStr.length > 60) valStr = valStr.substring(0, 60) + '...';
     parts.push(`${keyName}: ${valStr}`);
   }
   
-  if (parts.length === 0) return prefix + 'Drobne zmiany systemowe';
+  if (parts.length === 0) return prefix + 'Zmiana statusu / danych systemowych';
   return prefix + parts.join(', ');
+};
+
+/**
+ * Normalizuje zapisane wcześniej w bazie (historyczne) opisy logów audytowych,
+ * tłumacząc surowe pola techniczne (np. inProgressAt, puste ETR:) oraz rozwiązując
+ * nazwę maszyny z pamięci podręcznej jeśli w logu zapisano "[Maszyna: Nieznana]".
+ */
+export const normalizeAuditLogDetails = (log, storeState = null) => {
+  if (!log || !log.details) return '-';
+  let text = String(log.details);
+  const state = storeState || getStoreState();
+
+  // 1. Rozwiąż "[Maszyna: Nieznana]" lub ", Maszyna: Nieznana]" na podstawie entityId
+  if (text.includes('Maszyna: Nieznana') && log.entityId) {
+    let resolvedMachineName = '';
+    if (log.entityType === 'MACHINE') {
+      resolvedMachineName = (state.machines || []).find(m => m.id === log.entityId)?.name || '';
+    } else if (log.entityType === 'TICKET') {
+      const t = (state.tickets || []).find(item => item.id === log.entityId);
+      if (t) resolvedMachineName = t.machineName || (state.machines || []).find(m => m.id === t.machineId)?.name || '';
+    } else if (log.entityType === 'PLANNED_SERVICE') {
+      const s = (state.plannedServices || []).find(item => item.id === log.entityId);
+      if (s) resolvedMachineName = s.machineName || (state.machines || []).find(m => m.id === s.machineId)?.name || '';
+    } else if (log.entityType === 'ACTION_ITEM') {
+      const a = (state.actionItems || []).find(item => item.id === log.entityId);
+      if (a) resolvedMachineName = a.machineName || (state.machines || []).find(m => m.id === a.machineId)?.name || '';
+    }
+
+    if (resolvedMachineName) {
+      text = text.replace(/Maszyna:\s*Nieznana/g, `Maszyna: ${resolvedMachineName}`);
+    } else {
+      text = text
+        .replace(/\[Maszyna:\s*Nieznana\]\s*/g, '')
+        .replace(/,\s*Maszyna:\s*Nieznana/g, '');
+    }
+  }
+
+  // 2. Napraw historyczny błąd mapowania statusu 4 ("Status: Zakończone, inProgressAt:")
+  if (text.includes('Status: Zakończone') && text.includes('inProgressAt:')) {
+    text = text.replace('Status: Zakończone', 'Status: Naprawa w trakcie');
+  }
+
+  // 3. Przetłumacz surowe klucze z historycznych logów
+  text = text
+    .replace(/\binProgressAt:\s*/g, 'Rozpoczęto naprawę: ')
+    .replace(/\bassignedAt:\s*/g, 'Data przypisania: ')
+    .replace(/\bassignedService:\s*/g, 'Wykonawca: ')
+    .replace(/\bcurrentStep:\s*/g, 'Etap realizacji: ')
+    .replace(/\bcurrentWorkHours:\s*/g, 'Licznik RBG: ');
+
+  // 4. Sformatuj surowe daty ISO wewnątrz tekstu
+  text = text.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?/g, (match) => formatIsoString(match));
+
+  // 5. Usuń puste pola na końcu lub w środku (np. ", ETR:", ", ETR: Brak")
+  text = text
+    .replace(/,\s*ETR:\s*(?=,|$)/g, '')
+    .replace(/\bETR:\s*,\s*/g, '')
+    .replace(/,\s*Planowany czas zakończenia \(ETR\):\s*(?=,|$)/g, '');
+
+  return text.trim() || '-';
 };
 
 export const logAudit = async (action, entityType, entityId, details = '') => {
@@ -86,7 +210,6 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
     const tenantId = getCurrentTenant();
     if (!tenantId) return;
 
-    // Fetch entity context
     let contextStr = '';
     if (entityId) {
       let collectionName = '';
@@ -98,7 +221,7 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
 
       if (collectionName) {
         try {
-          const state = useManagerStore.getState();
+          const state = getStoreState();
           let data = null;
           
           if (entityType === 'TICKET' && state.tickets) data = state.tickets.find(t => t.id === entityId);
@@ -107,24 +230,36 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
           else if (entityType === 'PLANNED_SERVICE' && state.plannedServices) data = state.plannedServices.find(s => s.id === entityId);
           else if (entityType === 'ACTION_ITEM' && state.actionItems) data = state.actionItems.find(a => a.id === entityId);
 
-          // Fallback to Firestore read ONLY if not found in memory
+          if (!data && typeof details === 'object' && details !== null) {
+            data = details;
+          }
+
           if (!data) {
             const docSnap = await getDoc(doc(db, 'tenants', tenantId, collectionName, entityId));
             if (docSnap.exists()) data = docSnap.data();
           }
 
           if (data) {
+            const resolvedMachine = resolveMachineNameFromState(
+              data.machineId || (typeof details === 'object' ? details?.machineId : null),
+              data.machineName
+            );
+
             if (entityType === 'TICKET') {
-              contextStr = `[Maszyna: ${data.machineName || 'Nieznana'}] `;
+              contextStr = resolvedMachine ? `[Maszyna: ${resolvedMachine}] ` : '';
             } else if (entityType === 'MACHINE') {
-              contextStr = `[Maszyna: ${data.name || 'Nieznana'}] `;
+              const mName = data.name || resolveMachineNameFromState(entityId);
+              contextStr = mName ? `[Maszyna: ${mName}] ` : '';
             } else if (entityType === 'PART') {
-              contextStr = `[Cz: ${data.name || 'Nieznana'}] `;
+              contextStr = data.name ? `[Część: ${data.name}] ` : '';
             } else if (entityType === 'PLANNED_SERVICE') {
-              contextStr = `[Serwis: ${data.name || 'Nieznany'}, Maszyna: ${data.machineName || 'Nieznana'}] `;
+              const srvName = data.name || 'Serwis';
+              contextStr = resolvedMachine
+                ? `[Serwis: ${srvName}, Maszyna: ${resolvedMachine}] `
+                : `[Serwis: ${srvName}] `;
             } else if (entityType === 'ACTION_ITEM') {
-               const mName = data.machineName ? `Maszyna: ${data.machineName}` : '';
-               contextStr = `[Temat: ${data.problem ? data.problem.substring(0, 20) : '...'} ${mName}] `;
+              const mNamePart = resolvedMachine ? `, Maszyna: ${resolvedMachine}` : '';
+              contextStr = `[Temat: ${data.problem ? data.problem.substring(0, 25) : '...'}${mNamePart}] `;
             }
           }
         } catch (e) {
@@ -138,8 +273,7 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
       ? details 
       : formatDetails(details, action, entityType);
       
-    // Always prepend contextStr if it exists and isn't already inside the string
-    if (contextStr && !finalDetails.includes(contextStr)) {
+    if (contextStr && !finalDetails.includes(contextStr.trim())) {
       finalDetails = contextStr + finalDetails;
     }
 

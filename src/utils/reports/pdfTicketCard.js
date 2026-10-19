@@ -1,6 +1,9 @@
 import { savePdfWithPrompt } from '../pdfHelper';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64, getImageDimensions } from './pdfHelpers';
+import { useManagerStore } from '../../store/managerStore';
+import { getCurrentTenant } from '../tenantHelper';
+import { fetchTransactionsForReference } from '../../hooks/usePartTransactions';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -10,10 +13,10 @@ const n = (text) => {
 };
 
 const STATUSES = {
-  1: 'Otwarte',
-  2: 'W trakcie',
-  3: 'Oczekuje na czesci',
-  4: 'Serwis Zewnetrzny',
+  1: 'Przyjecie zgloszenia',
+  2: 'Wybor wykonawcy',
+  3: 'Rozpoczecie naprawy',
+  4: 'Naprawa w trakcie',
   5: 'Zakonczone'
 };
 
@@ -29,7 +32,7 @@ const fetchPhotoData = async (url) => {
         const canvas = document.createElement('canvas');
         let w = img.width;
         let h = img.height;
-        const MAX = 800; // Zmniejszamy rozdzielczość dla mniejszego PDF i usuwamy metadane EXIF
+        const MAX = 800;
         if (w > h && w > MAX) { h = (h / w) * MAX; w = MAX; }
         else if (h > w && h > MAX) { w = (w / h) * MAX; h = MAX; }
         canvas.width = w;
@@ -54,6 +57,31 @@ export const generateTicketPDF = async (ticket) => {
   if (!ticket) return;
 
   try {
+    const state = useManagerStore.getState();
+    const allParts = state.parts || [];
+    const allMachines = state.machines || [];
+    const allRegions = state.regions || [];
+
+    const machineObj = allMachines.find(m => m.id === ticket.machineId);
+    const regionObj = allRegions.find(r => r.id === (ticket.regionId || machineObj?.regionId));
+    const machineName = ticket.machineName || machineObj?.name || 'Nieznana';
+    const regionName = ticket.regionName || regionObj?.name || 'Brak';
+
+    let ticketTransactions = [];
+    try {
+      const txs = await fetchTransactionsForReference(getCurrentTenant(), ticket.id);
+      ticketTransactions = (txs || []).filter(
+        tx => tx.referenceId === ticket.id && ['issue_adhoc', 'issue', 'issue_planned'].includes(tx.type)
+      );
+    } catch (e) {
+      console.warn('Nie udalo sie pobrac czesci dla zgloszenia PDF:', e);
+    }
+
+    const totalTicketPartsCost = ticketTransactions.reduce(
+      (sum, tx) => sum + Number(tx.totalCost || Math.abs(Number(tx.quantity || 0)) * Number(tx.price || 0) || 0),
+      0
+    );
+
     const doc = new jsPDF();
     const logoBase64 = await getBrandingLogoBase64();
 
@@ -80,33 +108,38 @@ export const generateTicketPDF = async (ticket) => {
     
     doc.setFontSize(14);
     doc.setTextColor(200, 50, 50);
-    doc.text(`T${ticket.id?.slice(0, 4).toUpperCase() || '1'} - ${n(STATUSES[ticket.status] || 'Nieznany')}`, 14, 30);
+    doc.text(`T${ticket.id?.slice(0, 4).toUpperCase() || '1'} - ${n(STATUSES[Number(ticket.status)] || STATUSES[ticket.status] || 'Nieznany')}`, 14, 30);
 
     let currentY = 45;
 
     autoTable(doc, {
       startY: currentY,
-      head: [[n('Informacje o Zgloszeniu'), '']],
+      head: [[n('Informacje o Zgloszeniu i Realizacji'), '']],
       body: [
-        [n('Maszyna:'), n(ticket.machineName || 'Nieznana')],
-        [n('Lokalizacja:'), n(`${ticket.regionName || 'Brak'} ${ticket.bay ? '/ ' + ticket.bay : ''}`)],
+        [n('Maszyna:'), n(`${machineName}${machineObj?.internalId ? ' (' + machineObj.internalId + ')' : ''}`)],
+        [n('Lokalizacja:'), n(`${regionName} ${ticket.bay || machineObj?.bay ? '/ ' + (ticket.bay || machineObj?.bay) : ''}`)],
         [n('Zglaszajacy:'), n(`${ticket.reportedBy || 'Nieznany'} ${ticket.reporterPhone ? '(' + ticket.reporterPhone + ')' : ''}`)],
         [n('Data Zgloszenia:'), safeParseDate(ticket.createdAt)?.toLocaleString('pl-PL') || '-'],
         [n('Priorytet:'), n(ticket.isCritical ? 'Krytyczny (Wysoki)' : 'Standardowy')],
+        [n('Wyznaczony Wykonawca:'), n(ticket.assignedTo || '-')],
+        [n('Data Przypisania:'), ticket.assignedAt ? safeParseDate(ticket.assignedAt)?.toLocaleString('pl-PL') : '-'],
+        [n('Rozpoczecie Naprawy:'), ticket.inProgressAt ? safeParseDate(ticket.inProgressAt)?.toLocaleString('pl-PL') : '-'],
+        [n('Planowany Czas Zakonczenia (ETR):'), ticket.etr ? safeParseDate(ticket.etr)?.toLocaleString('pl-PL') : '-'],
         [n('Data Zamkniecia:'), ticket.closedAt ? safeParseDate(ticket.closedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Wykonawca (Zamykajacy):'), n(ticket.completedBy || ticket.assignedTo || '-')],
+        [n('Zakonczone przez:'), n(ticket.completedBy || ticket.assignedTo || '-')],
+        [n('Koszt Zuzytych Czesci:'), n(`${totalTicketPartsCost.toFixed(2)} PLN`)]
       ],
       theme: 'grid',
       headStyles: { fillColor: [60, 100, 180] },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
     });
 
-    currentY = doc.lastAutoTable.finalY + 15;
+    currentY = doc.lastAutoTable.finalY + 12;
 
     doc.setFontSize(14);
     doc.setTextColor(40, 40, 40);
     doc.text(n('Temat: ' + (ticket.topic || 'Brak')), 14, currentY);
-    currentY += 8;
+    currentY += 7;
 
     doc.setFontSize(11);
     doc.setTextColor(60, 60, 60);
@@ -114,6 +147,40 @@ export const generateTicketPDF = async (ticket) => {
     doc.text(splitDescription, 14, currentY);
     
     currentY += splitDescription.length * 5 + 10;
+
+    // ----- Zużyte części zamienne w zgłoszeniu -----
+    if (ticketTransactions.length > 0) {
+      if (currentY > 245) { doc.addPage(); currentY = 20; }
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text(n(`Pobrane Czesci Zamienne (${ticketTransactions.length})`), 14, currentY);
+      currentY += 4;
+
+      const partRows = ticketTransactions.map(tx => {
+        const partObj = allParts.find(p => p.id === tx.partId);
+        const unit = partObj?.unit || tx.unit || 'szt.';
+        const qty = Math.abs(Number(tx.quantity || 0));
+        const cost = Number(tx.totalCost || qty * Number(tx.price || 0) || 0);
+        return [
+          safeParseDate(tx.date)?.toLocaleString('pl-PL') || '-',
+          n(tx.partName || partObj?.name || 'Nieznana czesc'),
+          n(`${qty} ${unit}`),
+          n(tx.user || '-'),
+          n(`${cost.toFixed(2)} PLN`)
+        ];
+      });
+
+      partRows.push(['', n('LACZNY KOSZT CZESCI:'), '', '', n(`${totalTicketPartsCost.toFixed(2)} PLN`)]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Data'), n('Nazwa Czesci'), n('Ilosc'), n('Pobral(a)'), n('Koszt (PLN)')]],
+        body: partRows,
+        styles: { fontSize: 8.5 },
+        headStyles: { fillColor: [16, 120, 80] }
+      });
+      currentY = doc.lastAutoTable.finalY + 12;
+    }
 
     // Zbierz wszystkie zdjęcia z notatek
     const historyPhotos = new Set();
@@ -125,10 +192,8 @@ export const generateTicketPDF = async (ticket) => {
       });
     }
 
-    // Główne zdjęcia to te z ticket.photos, które NIE występują w notatkach
     const mainPhotos = (ticket.photos || []).filter(p => !historyPhotos.has(p));
 
-    // Zdjęcia z awarii (główne zgłoszenie)
     if (mainPhotos.length > 0) {
       if (currentY > 250) { doc.addPage(); currentY = 20; }
       doc.setFontSize(14);
@@ -148,7 +213,7 @@ export const generateTicketPDF = async (ticket) => {
         
         const photoData = await fetchPhotoData(photoUrl);
         if (photoData) {
-          let pw = 60; // Średnia wielkość
+          let pw = 60;
           let ph = (photoData.h / photoData.w) * pw;
           if (ph > 80) { ph = 80; pw = (photoData.w / photoData.h) * ph; }
           
@@ -193,7 +258,6 @@ export const generateTicketPDF = async (ticket) => {
       
       currentY = doc.lastAutoTable.finalY + 15;
       
-      // Zdjęcia w historii
       for (const h of [...ticket.history].reverse()) {
          if (h.photos && h.photos.length > 0) {
             if (currentY > 240) { doc.addPage(); currentY = 20; }
@@ -220,16 +284,21 @@ export const generateTicketPDF = async (ticket) => {
                 doc.addImage(photoData.b64, 'JPEG', xOffset, currentY, pw, ph, '', 'FAST');
                 xOffset += pw + 10;
                 if (ph > maxHeightInRow) maxHeightInRow = ph;
+              } else {
+                doc.setFontSize(9);
+                doc.text(n('[Zdjecie niedostepne - blokada CORS]'), xOffset, currentY + 10);
+                xOffset += 60;
+                if (20 > maxHeightInRow) maxHeightInRow = 20;
               }
             }
-            currentY += maxHeightInRow + 10;
+            currentY += maxHeightInRow + 15;
          }
       }
     }
 
-    await savePdfWithPrompt(doc, n(`Karta_Awarii_PDF_${(ticket.machineName || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`));
+    await savePdfWithPrompt(doc, n(`Zgłoszenie_T${ticket.id?.slice(0, 4).toUpperCase() || '1'}.pdf`));
   } catch (error) {
     console.error('Błąd generowania PDF zgłoszenia:', error);
-    alert('Wystąpił błąd podczas generowania dokumentu.');
+    alert('Wystąpił błąd podczas generowania raportu PDF.');
   }
 };

@@ -237,6 +237,7 @@ export default function PlannedMaintenance({
 
   // --- Nawigacja ---
   const [selectedServiceId, setSelectedServiceId] = useState(initialServiceId || null);
+  const [recentlyCompletedService, setRecentlyCompletedService] = useState(null);
 
   useEffect(() => {
     if (selectedServiceId && selectedServiceId !== initialServiceId) { window.history.pushState({ ...window.history.state, internalDetails: true }, ''); }
@@ -334,7 +335,7 @@ export default function PlannedMaintenance({
         [t('planned.excel_date')]: targetDate ? targetDate.toLocaleDateString('pl-PL') : '-',
         [t('planned.excel_rbg')]: s.targetWorkHours || '-',
         [t('planned.excel_status')]: s.status === 'completed' ? t('planned.status_completed') : (s.status === 'in_progress' ? t('planned.status_in_progress') : t('planned.status_pending')),
-        [t('planned.excel_history')]: (s.history || []).map(h => `[${new Date(h.date).toLocaleDateString()}] ${h.user}: ${h.action}`).join(' | ')
+        [t('planned.excel_history')]: (s.history || []).map(h => `[${new Date(h.date).toLocaleDateString()}] ${h.user}: ${h.action}`).join('\r\n')
       };
     });
     exportToExcel(dataToExport, isArchive ? 'Archiwum_Serwisow' : 'Planowane_Serwisy');
@@ -342,7 +343,7 @@ export default function PlannedMaintenance({
 
   // --- Widok szczegółowy ---
   if (selectedServiceId) {
-    const srv = services.find(s => s.id === selectedServiceId);
+    const srv = services.find(s => s.id === selectedServiceId) || (recentlyCompletedService?.id === selectedServiceId ? recentlyCompletedService : null);
     if (!srv) { setSelectedServiceId(null); return null; }
     const machine = getMachine(srv.machineId);
     return (
@@ -351,7 +352,8 @@ export default function PlannedMaintenance({
         srv={srv} machine={machine} isArchive={isArchive} allowTicketDeletion={allowTicketDeletion}
         canEditPlanned={canEditPlanned} canDeletePlanned={canDeletePlanned}
         getMachineRegionName={getMachineRegionName} machines={machines} regions={regions}
-        onBack={() => window.history.back()}
+        onBack={() => { setRecentlyCompletedService(null); window.history.back(); }}
+        onComplete={(completedSrv) => setRecentlyCompletedService(completedSrv)}
          onAddFutureNote={handleAddFutureNote}
         onEdit={openModalForEdit}
         onAddPart={(srv) => setPartUsageModalSrv(srv)}

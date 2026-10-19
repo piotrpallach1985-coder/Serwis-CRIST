@@ -18,6 +18,8 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
   const { t } = useTranslation();
 
   const { user } = useAuth();
+  const branding = useManagerStore(state => state.branding);
+  const isDtrModuleEnabled = branding?.modules?.planned_services !== false;
   const [uploading, setUploading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatDocument, setChatDocument] = useState(null);
@@ -173,6 +175,8 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
          onDragLeave={() => setIsDragOver(false)}
          onDrop={handleDrop}
     >
+      {isDtrModuleEnabled && (
+        <>
       <div className={`p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${isDragOver ? 'bg-blue-50 border-blue-200' : 'border-slate-200'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full">
           <div className="flex flex-col">
@@ -292,6 +296,9 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
             ))}
           </div>
         )}
+      </div>
+        </>
+      )}
       {/* NOTATKI DZIAŁU TECHNICZNEGO */}
       <div className="border-t border-slate-200 mt-2">
         <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
@@ -357,7 +364,7 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
             </div>
           )}
         </div>
-        </div>
+
       </div>
     </div>
           <DTRChatModal 

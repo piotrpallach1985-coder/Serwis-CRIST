@@ -926,7 +926,7 @@ export default function PlannedMaintenanceTimeline({
                           <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-sm font-medium flex items-center gap-3">
                             <i className="ph ph-check-circle text-2xl text-emerald-600 shrink-0"></i>
                             <div>
-                              <p className="font-bold text-emerald-950">Serwis został pomyślnie zrealizowany i rozliczony w historii.</p>
+                              <p className="font-bold text-emerald-950">Serwis został pomyślnie zrealizowany i przeniesiony do historii</p>
                               {srv.completedBy && (
                                 <p className="text-xs text-emerald-700 mt-0.5">Rozliczył: <strong className="font-bold">{srv.completedBy}</strong></p>
                               )}

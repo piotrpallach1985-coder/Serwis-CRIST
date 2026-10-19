@@ -3,13 +3,30 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, orderBy, limit, getDocs, startAfter, where } from 'firebase/firestore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
-import { safeParseDate } from '../../utils/dateHelpers';
 import LoadingState from '../shared/LoadingState';
 import EmptyState from '../shared/EmptyState';
 import { exportToExcel } from '../../utils/reports/excelExport';
+import { normalizeAuditLogDetails } from '../../services/audit.service';
+import { useManagerStore } from '../../store/managerStore';
+
+const MODULE_LABELS = {
+  TICKET: 'Awarie',
+  PLANNED_SERVICE: 'Serwisy Planowane',
+  MACHINE: 'Maszyny',
+  PART: 'Magazyn Części',
+  ACTION_ITEM: 'Tematy do realizacji',
+  USER: 'Użytkownicy',
+  ROLE: 'Role i Uprawnienia',
+  REGION: 'Rejony / Mapy'
+};
 
 export default function AuditLogs() {
   const { t } = useTranslation();
+  const machines = useManagerStore(state => state.machines);
+  const tickets = useManagerStore(state => state.tickets);
+  const plannedServices = useManagerStore(state => state.plannedServices);
+  const actionItems = useManagerStore(state => state.actionItems);
+
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -79,6 +96,8 @@ export default function AuditLogs() {
     }
   };
 
+  const storeSnapshot = { machines, tickets, plannedServices, actionItems };
+
   const handleExport = () => {
     const dataForExport = logs.map(log => {
       const date = log.timestamp?.toDate ? log.timestamp.toDate() : new Date();
@@ -86,8 +105,8 @@ export default function AuditLogs() {
         'Data i czas': date.toLocaleString('pl-PL'),
         'Użytkownik': log.userName,
         'Akcja': log.action,
-        'Moduł': log.entityType,
-        'Szczegóły': log.details || '',
+        'Moduł': MODULE_LABELS[log.entityType] || log.entityType,
+        'Szczegóły': normalizeAuditLogDetails(log, storeSnapshot),
         'ID Obiektu': log.entityId || ''
       };
     });
@@ -99,32 +118,19 @@ export default function AuditLogs() {
     fetchLogs(false);
   };
 
-  const handleClearFilters = () => {
-    setDateFrom('');
-    setDateTo('');
-    // Need to trigger fetchLogs without filters after state update, but state update is async.
-    // In React, setting state and fetching right after with old values is common trap.
-    // Instead of using effect, we can just pass empty conditions conceptually, but setting state is enough if we call fetch with empty values.
-    // Easiest is to set state and let a small timeout handle it, or just use variables inside fetch.
-    setTimeout(() => {
-      // It will use the updated state if we use a ref, but actually let's just trigger it from the button.
-    }, 0);
-  };
-
-  // Safe wrapper for clear
   const executeClear = () => {
     setDateFrom('');
     setDateTo('');
-    setTimeout(() => fetchLogs(false), 50); // Hacky but works for quick clears
+    setTimeout(() => fetchLogs(false), 50);
   };
-
 
   return (
     <div className="p-6 max-w-full mx-auto 2xl:px-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <i className="ph ph-scroll text-blue-600 text-3xl"></i> {t("dashboards.audit.title")} </h1>
+            <i className="ph ph-scroll text-blue-600 text-3xl"></i> {t("dashboards.audit.title")}
+          </h1>
           <p className="text-slate-500 mt-1">Śledzenie operacji w systemie (wymóg ISO 55000).</p>
         </div>
         <div className="flex gap-2">
@@ -158,7 +164,9 @@ export default function AuditLogs() {
             />
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-bold text-sm"> {t("dashboards.audit.filter_btn")} </button>
+            <button type="submit" className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-bold text-sm">
+              {t("dashboards.audit.filter_btn")}
+            </button>
             {(dateFrom || dateTo) && (
               <button type="button" onClick={executeClear} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm">
                 Wyczyść
@@ -189,6 +197,7 @@ export default function AuditLogs() {
                 <tbody className="divide-y divide-slate-100">
                   {logs.map(log => {
                     const date = log.timestamp?.toDate ? log.timestamp.toDate() : new Date();
+                    const formattedDetails = normalizeAuditLogDetails(log, storeSnapshot);
                     return (
                       <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap">
@@ -208,11 +217,11 @@ export default function AuditLogs() {
                             {log.action}
                           </span>
                         </td>
-                        <td className="p-4 text-sm font-medium text-slate-700">
-                          {log.entityType}
+                        <td className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap">
+                          {MODULE_LABELS[log.entityType] || log.entityType}
                         </td>
-                        <td className="p-4 text-xs text-slate-500 max-w-[800px] whitespace-normal break-words">
-                          {log.details || '-'}
+                        <td className="p-4 text-xs text-slate-600 max-w-[800px] whitespace-normal break-words leading-relaxed">
+                          {formattedDetails}
                         </td>
                       </tr>
                     );

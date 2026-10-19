@@ -131,4 +131,91 @@ describe('useMapPins', () => {
     expect(result.current.unpinnedData.unpinnedCount).toBe(1);
     expect(result.current.unpinnedData.status).toBe('warning');
   });
+
+  it('supports multi-level submaps (submaps inside submaps) and recursive status aggregation', () => {
+    const hierarchicalRegions = [
+      { id: 'osiedle_1', name: 'Osiedle Słoneczne', parentId: null, xPercent: 40, yPercent: 40, mapType: 'google', googleQuery: 'Gdańsk, Słoneczna 1' },
+      { id: 'budynek_a', name: 'Budynek A', parentId: 'osiedle_1', xPercent: 25, yPercent: 35, mapType: 'google', googleQuery: 'Gdańsk, Słoneczna 1A' },
+      { id: 'klatka_1', name: 'Klatka 1', parentId: 'budynek_a', xPercent: 60, yPercent: 60, mapImageUrl: 'https://example.com/klatka1.png' }
+    ];
+
+    const machines = [
+      { id: 'winda_1', name: 'Winda osobowa K1', regionId: 'klatka_1', xPercent: 50, yPercent: 50 }
+    ];
+
+    const tickets = [
+      {
+        id: 't_deep',
+        machineId: 'winda_1',
+        machineName: 'Winda osobowa K1',
+        regionId: 'klatka_1',
+        isCritical: true,
+        status: 1
+      }
+    ];
+
+    // 1. Widok Mapy Głównej (currentSubmapId = null) -> widać tylko 'osiedle_1' zezagregowanym alarmem krytycznym z 3. poziomu!
+    const { result: mainResult } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: hierarchicalRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: null,
+        draggingPin: null
+      })
+    );
+
+    expect(mainResult.current.pinData).toHaveLength(1);
+    const osiedlePin = mainResult.current.pinData[0];
+    expect(osiedlePin.id).toBe('osiedle_1');
+    expect(osiedlePin.status).toBe('critical');
+    expect(osiedlePin.itemCount).toBe(1);
+    expect(osiedlePin.machineCount).toBe(1);
+    expect(osiedlePin.hasSubmap).toBe(true);
+    expect(osiedlePin.hasConfiguredMap).toBe(true);
+
+    // 2. Widok Podmapy 1. poziomu ('osiedle_1') -> widać pinezkę podrejonu 'budynek_a' ze zagregowanym alarmem z 'klatka_1'
+    const { result: sub1Result } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: hierarchicalRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: 'osiedle_1',
+        draggingPin: null
+      })
+    );
+
+    expect(sub1Result.current.pinData).toHaveLength(1);
+    const budynekPin = sub1Result.current.pinData[0];
+    expect(budynekPin.id).toBe('budynek_a');
+    expect(budynekPin.type).toBe('region');
+    expect(budynekPin.status).toBe('critical');
+    expect(budynekPin.itemCount).toBe(1);
+    expect(budynekPin.machineCount).toBe(1);
+
+    // 3. Widok Podmapy 3. poziomu ('klatka_1') -> widać bezpośrednio maszynę 'winda_1'
+    const { result: sub2Result } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: hierarchicalRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: 'klatka_1',
+        draggingPin: null
+      })
+    );
+
+    expect(sub2Result.current.pinData).toHaveLength(1);
+    expect(sub2Result.current.pinData[0].id).toBe('winda_1');
+    expect(sub2Result.current.pinData[0].type).toBe('machine');
+    expect(sub2Result.current.pinData[0].status).toBe('critical');
+  });
 });

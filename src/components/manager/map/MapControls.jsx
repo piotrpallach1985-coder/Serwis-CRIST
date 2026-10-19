@@ -9,6 +9,13 @@ export default function MapControls({
   setMode,
   currentSubmapId,
   setCurrentSubmapId,
+  breadcrumbPath = [],
+  activeMapType = 'image',
+  activeGoogleQuery = '',
+  activeGoogleZoom = 18,
+  activeGoogleStyle = 'k',
+  onSaveGoogleMapConfig,
+  onSwitchToImageMode,
   isFullscreen,
   toggleFullscreen,
   zoomScale,
@@ -26,32 +33,125 @@ export default function MapControls({
   setIsSettingsMinimized
 }) {
   const { t } = useTranslation();
-
   const { user } = useAuth();
+
+  const [tabType, setTabType] = React.useState(activeMapType || 'image');
+  const [gQuery, setGQuery] = React.useState(activeGoogleQuery || '');
+  const [gZoom, setGZoom] = React.useState(activeGoogleZoom || 18);
+  const [gStyle, setGStyle] = React.useState(activeGoogleStyle || 'k');
+
+  React.useEffect(() => {
+    setTabType(activeMapType || 'image');
+    setGQuery(activeGoogleQuery || '');
+    setGZoom(activeGoogleZoom || 18);
+    setGStyle(activeGoogleStyle || 'k');
+  }, [currentSubmapId, activeMapType, activeGoogleQuery, activeGoogleZoom, activeGoogleStyle]);
+
+  const parentSubmapId = breadcrumbPath.length > 1 ? breadcrumbPath[breadcrumbPath.length - 2].id : null;
+  const currentRegionName = breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1].name : 'Mapa Główna';
+
   return (
     <>
-      {/* Ustawienia mapy (upload i widok domyślny) */}
-      {mode === 'edit' && currentSubmapId === null && (
-        <div className="absolute top-14 sm:top-16 left-4 z-30 bg-white p-3 md:p-4 rounded-xl shadow-xl w-48 sm:w-72 border border-amber-200 animate-fade-in transition-all">
+      {/* Ustawienia mapy / podmapy (Obraz lub Mapa Google + widok domyślny) */}
+      {mode === 'edit' && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute top-14 sm:top-16 left-4 z-30 bg-white p-3 md:p-4 rounded-xl shadow-xl w-64 sm:w-80 border border-amber-200 animate-fade-in transition-all pointer-events-auto"
+        >
           {isSettingsMinimized ? (
-            <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(false); }} className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2">
-              <i className="ph ph-image text-amber-500"></i> Opcje Mapy
+            <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(false); }} className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2 w-full">
+              <i className="ph ph-sliders-horizontal text-amber-500 text-base"></i>
+              <span>Opcje Mapy ({currentSubmapId ? currentRegionName : 'Główna'})</span>
             </button>
           ) : (
             <>
-              <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(true); }} className="absolute top-2 right-2 text-slate-400 p-1"><i className="ph ph-minus"></i></button>
-              <h3 className="font-bold text-slate-800 text-[10px] md:text-sm mb-3 border-b pb-2 flex items-center gap-2"><i className="ph ph-image text-amber-500"></i> Ustawienia</h3>
-              <div className="mb-4">
-                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">{t('map_component.upload_new_map')}</label>
-                <div className="relative">
-                  <input type="file" accept="image/*" onChange={handleMapFileChange} disabled={uploadingMap} className="absolute inset-0 w-full h-full z-50 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
-                  <div className={'w-full border-2 border-dashed rounded-lg p-3 text-center transition-colors ' + (mapDragActive ? 'border-amber-500 bg-amber-50' : (uploadingMap ? 'bg-slate-50 border-slate-300' : 'bg-slate-50 border-blue-300 hover:bg-blue-50'))} onDragEnter={handleMapDragEnter} onDragLeave={handleMapDragLeave} onDragOver={handleMapDragOver} onDrop={handleMapDrop}>
-                    {uploadingMap ? (<><i className="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.processing')}</p></>) : (<><i className="ph ph-upload-simple text-2xl text-blue-400 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.click_or_drop')}</p></>)}
+              <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(true); }} className="absolute top-2 right-2 text-slate-400 hover:text-slate-700 p-1"><i className="ph ph-minus"></i></button>
+              <h3 className="font-bold text-slate-800 text-[10px] md:text-xs mb-2.5 border-b pb-2 flex items-center gap-1.5 pr-6 truncate">
+                <i className="ph ph-map-trifold text-amber-500 text-base"></i>
+                <span>Podkład: {currentSubmapId ? currentRegionName : 'Mapa Główna'}</span>
+              </h3>
+
+              {/* Przełącznik typu podkładu: Obraz vs Google Maps */}
+              <div className="flex bg-slate-100 p-1 rounded-lg mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTabType('image');
+                    if (activeMapType === 'google' && onSwitchToImageMode) onSwitchToImageMode();
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-md text-[10px] md:text-xs font-bold flex items-center justify-center gap-1 transition-all ${tabType === 'image' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                >
+                  <i className="ph ph-image"></i> Rzut / Plik
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTabType('google')}
+                  className={`flex-1 py-1.5 px-2 rounded-md text-[10px] md:text-xs font-bold flex items-center justify-center gap-1 transition-all ${tabType === 'google' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                >
+                  <i className="ph ph-globe-hemisphere-west"></i> Mapa Google
+                </button>
+              </div>
+
+              {tabType === 'image' ? (
+                <div className="mb-3">
+                  <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">{t('map_component.upload_new_map')}</label>
+                  <div className="relative">
+                    <input type="file" accept="image/*" onChange={handleMapFileChange} disabled={uploadingMap} className="absolute inset-0 w-full h-full z-50 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                    <div className={'w-full border-2 border-dashed rounded-lg p-3 text-center transition-colors ' + (mapDragActive ? 'border-amber-500 bg-amber-50' : (uploadingMap ? 'bg-slate-50 border-slate-300' : 'bg-slate-50 border-blue-300 hover:bg-blue-50'))} onDragEnter={handleMapDragEnter} onDragLeave={handleMapDragLeave} onDragOver={handleMapDragOver} onDrop={handleMapDrop}>
+                      {uploadingMap ? (<><i className="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.processing')}</p></>) : (<><i className="ph ph-upload-simple text-2xl text-blue-400 mb-2"></i><p className="text-[10px] md:text-xs font-bold text-slate-600">{t('map_component.click_or_drop')}</p></>)}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mb-2">
-                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">3. Ustaw domyślny widok</label>
+              ) : (
+                <div className="mb-3 space-y-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                  <div>
+                    <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Adres osiedla / budynku / GPS</label>
+                    <input
+                      type="text"
+                      value={gQuery}
+                      onChange={e => setGQuery(e.target.value)}
+                      placeholder="np. Gdańsk, ul. Słoneczna 10"
+                      className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Typ mapy</label>
+                      <select
+                        value={gStyle}
+                        onChange={e => setGStyle(e.target.value)}
+                        className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="k">Satelita / Budynki</option>
+                        <option value="m">Mapa drogowa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Przybliżenie ({gZoom})</label>
+                      <input
+                        type="number"
+                        min="12"
+                        max="20"
+                        value={gZoom}
+                        onChange={e => setGZoom(Number(e.target.value) || 18)}
+                        className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSaveGoogleMapConfig && onSaveGoogleMapConfig({ mapType: 'google', googleQuery: gQuery.trim(), googleZoom: Number(gZoom) || 18, googleMapStyle: gStyle })}
+                    disabled={!gQuery.trim()}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-[10px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <i className="ph ph-globe-hemisphere-west text-sm"></i> Zastosuj Mapę Google
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">Domyślny kadr i powiększenie</label>
                 <button onClick={saveDefaultView} className="w-full bg-slate-800 hover:bg-slate-900 text-white text-[9px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"><i className="ph ph-floppy-disk"></i> Ustaw jako domyślny kadr</button>
               </div>
             </>
@@ -59,12 +159,38 @@ export default function MapControls({
         </div>
       )}
 
-      {/* Przyciski narzędzi (górny lewy róg) */}
-      <div className="absolute top-4 left-4 z-[60] flex flex-wrap gap-2 pointer-events-auto">
+      {/* Przyciski narzędzi i ścieżka podmap (górny lewy róg) */}
+      <div className="absolute top-4 left-4 z-[60] flex flex-wrap items-center gap-2 pointer-events-auto max-w-[75%]">
         {currentSubmapId && (
-          <button onClick={() => setCurrentSubmapId(null)} className="px-3 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md border border-indigo-500 flex items-center gap-2 transition-transform hover:scale-105">
-            <i className="ph ph-arrow-left text-base sm:text-lg"></i><span className="hidden sm:inline">Powrót do Mapy Głównej</span>
-          </button>
+          <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 shadow-lg text-white">
+            <button
+              onClick={() => setCurrentSubmapId(parentSubmapId)}
+              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md text-[10px] md:text-xs flex items-center gap-1.5 transition-colors"
+              title="Cofnij poziom wyżej"
+            >
+              <i className="ph ph-arrow-left text-sm"></i>
+              <span className="hidden sm:inline">{parentSubmapId ? 'Poziom wyżej' : 'Mapa Główna'}</span>
+            </button>
+            <div className="hidden md:flex items-center gap-1 px-2 text-xs font-semibold overflow-x-auto">
+              <button
+                onClick={() => setCurrentSubmapId(null)}
+                className="text-slate-300 hover:text-white transition-colors whitespace-nowrap"
+              >
+                Mapa Główna
+              </button>
+              {breadcrumbPath.map((reg, idx) => (
+                <React.Fragment key={reg.id}>
+                  <i className="ph ph-caret-right text-slate-500 text-[10px]"></i>
+                  <button
+                    onClick={() => setCurrentSubmapId(reg.id)}
+                    className={`whitespace-nowrap transition-colors ${idx === breadcrumbPath.length - 1 ? 'text-amber-400 font-bold' : 'text-slate-300 hover:text-white'}`}
+                  >
+                    {reg.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
         )}
         {((user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN) || user?.permissions?.includes('edit_map')) && (
           <>

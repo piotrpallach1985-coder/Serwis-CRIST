@@ -1,6 +1,9 @@
 import { savePdfWithPrompt } from '../pdfHelper';
 import { safeParseDate } from '../dateHelpers';
 import { getBrandingLogoBase64, getImageDimensions } from './pdfHelpers';
+import { useManagerStore } from '../../store/managerStore';
+import { getCurrentTenant } from '../tenantHelper';
+import { fetchTransactionsForReference } from '../../hooks/usePartTransactions';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -46,6 +49,29 @@ export const generateServicePDF = async (service, machine) => {
   if (!service) return;
 
   try {
+    const state = useManagerStore.getState();
+    const allParts = state.parts || [];
+
+    let serviceTransactions = [];
+    try {
+      const txs = await fetchTransactionsForReference(getCurrentTenant(), service.id);
+      serviceTransactions = (txs || []).filter(
+        tx => tx.referenceId === service.id && ['issue_planned', 'issue_adhoc', 'issue'].includes(tx.type)
+      );
+    } catch (e) {
+      console.warn('Nie udalo sie pobrac transakcji czesci dla serwisu PDF:', e);
+    }
+
+    const totalServicePartsCost = serviceTransactions.reduce(
+      (sum, tx) => sum + Number(tx.totalCost || Math.abs(Number(tx.quantity || 0)) * Number(tx.price || 0) || 0),
+      0
+    );
+
+    const completionHistoryEntry = [...(service.history || [])]
+      .reverse()
+      .find(h => h.manHours !== undefined && h.manHours !== null);
+    const actualManHours = completionHistoryEntry?.manHours || service.actualManHours || null;
+
     const doc = new jsPDF();
     const logoBase64 = await getBrandingLogoBase64();
 
@@ -83,17 +109,22 @@ export const generateServicePDF = async (service, machine) => {
       body: [
         [n('Nazwa Serwisu:'), n(service.name || 'Brak')],
         [n('Maszyna:'), n(service.machineName || machine?.name || 'Nieznana')],
-        [n('Typ Wyzwalacza:'), n(service.triggerType === 'calendar' ? 'Czasowy (Kalendarz)' : service.triggerType === 'hours' ? 'Licznikowy (RBG)' : 'Mieszany')],
+        [n('Priorytet:'), n(service.priority || 'Standardowy')],
+        [n('Typ Wyzwalacza:'), n(service.triggerType === 'calendar' ? 'Czasowy (Kalendarz)' : service.triggerType === 'hours' ? 'Licznikowy (RBG)' : 'Mieszany (Czas + RBG)')],
         [n('Data Planowana:'), service.nextDate ? safeParseDate(service.nextDate)?.toLocaleDateString('pl-PL') : '-'],
+        [n('Docelowy Stan Licznika:'), service.targetWorkHours ? `${service.targetWorkHours} RBG` : '-'],
+        [n('Wyznaczony Wykonawca:'), n(service.assignedService || service.completionDetails?.completedBy || service.completedBy || '-')],
         [n('Wykonano Dnia:'), service.completedAt ? safeParseDate(service.completedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Wykonawca:'), n(service.completionDetails?.completedBy || service.completedBy || '-')],
+        [n('Zakonczone przez:'), n(service.completionDetails?.completedBy || service.completedBy || '-')],
+        [n('Naklad Pracy (RBG):'), n(actualManHours ? `${actualManHours} h (Plan: ${service.estimatedManHours || '-'} h)` : (service.estimatedManHours ? `Plan: ${service.estimatedManHours} h` : '-'))],
+        [n('Koszt Zuzytych Czesci:'), n(`${totalServicePartsCost.toFixed(2)} PLN`)]
       ],
       theme: 'grid',
       headStyles: { fillColor: [40, 140, 80] },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
     });
 
-    currentY = doc.lastAutoTable.finalY + 15;
+    currentY = doc.lastAutoTable.finalY + 12;
 
     // Wymagane narzędzia
     let toolsText = 'Podstawowe (skrzynka narzedziowa)';
@@ -112,35 +143,78 @@ export const generateServicePDF = async (service, machine) => {
     });
     currentY = doc.lastAutoTable.finalY + 10;
 
-    const partsRows = (service.requiredParts || []).map(p => [
-      n(`${p.name || '-'} (SN: ${p.serialNumber || '-'})`),
-      service.status === 'completed' ? '[ X ] TAK    [   ] NIE' : '[   ] TAK    [   ] NIE'
-    ]);
+    const partsRows = (service.requiredParts || []).map(p => {
+      const partObj = allParts.find(item => item.id === p.partId);
+      const unit = partObj?.unit || p.unit || 'szt.';
+      const qty = p.quantity || 1;
+      const sn = p.serialNumber || partObj?.serialNumber || partObj?.code || '-';
+      return [
+        n(`${p.name || partObj?.name || '-'} (Kod/SN: ${sn})`),
+        n(`${qty} ${unit}`),
+        service.status === 'completed' ? '[ X ] TAK    [   ] NIE' : '[   ] TAK    [   ] NIE'
+      ];
+    });
 
     if (partsRows.length > 0) {
       autoTable(doc, {
         startY: currentY,
-        head: [[n('Wymagane Czesci Zamienne'), n('Wykorzystano?')]],
+        head: [[n('Wymagane Czesci Zamienne (Wg Planu)'), n('Ilosc'), n('Wykorzystano?')]],
         body: partsRows,
         theme: 'grid',
         headStyles: { fillColor: [140, 140, 140] },
-        columnStyles: { 1: { cellWidth: 50, halign: 'center', fontStyle: 'bold' } }
+        columnStyles: {
+          1: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 50, halign: 'center', fontStyle: 'bold' }
+        }
       });
-      currentY = doc.lastAutoTable.finalY + 15;
-    } else {
-      currentY += 5;
+      currentY = doc.lastAutoTable.finalY + 12;
     }
 
+    // Faktycznie pobrane części z magazynu (w tym dodatkowe)
+    if (serviceTransactions.length > 0) {
+      if (currentY > 245) { doc.addPage(); currentY = 20; }
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text(n(`Faktycznie Pobrane Czesci z Magazynu (${serviceTransactions.length})`), 14, currentY);
+      currentY += 4;
 
-    if (service.completionDetails?.notes) {
+      const txRows = serviceTransactions.map(tx => {
+        const partObj = allParts.find(p => p.id === tx.partId);
+        const unit = partObj?.unit || tx.unit || 'szt.';
+        const qty = Math.abs(Number(tx.quantity || 0));
+        const cost = Number(tx.totalCost || qty * Number(tx.price || 0) || 0);
+        return [
+          safeParseDate(tx.date)?.toLocaleString('pl-PL') || '-',
+          n(tx.partName || partObj?.name || 'Nieznana czesc'),
+          n(`${qty} ${unit}`),
+          n(tx.user || '-'),
+          n(`${cost.toFixed(2)} PLN`)
+        ];
+      });
+
+      txRows.push(['', n('LACZNY KOSZT CZESCI SERWISU:'), '', '', n(`${totalServicePartsCost.toFixed(2)} PLN`)]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Data Wydania'), n('Nazwa Czesci'), n('Ilosc'), n('Pobral(a)'), n('Koszt (PLN)')]],
+        body: txRows,
+        styles: { fontSize: 8.5 },
+        headStyles: { fillColor: [16, 120, 80] }
+      });
+      currentY = doc.lastAutoTable.finalY + 12;
+    }
+
+    const finalCompletionNotes = service.completionNotes || service.completionDetails?.notes;
+    if (finalCompletionNotes) {
+      if (currentY > 250) { doc.addPage(); currentY = 20; }
       doc.setFontSize(14);
       doc.setTextColor(40, 40, 40);
-      doc.text(n('Uwagi Wykonawcy'), 14, currentY);
+      doc.text(n('Uwagi Wykonawcy / Podsumowanie'), 14, currentY);
       currentY += 8;
 
       doc.setFontSize(11);
       doc.setTextColor(60, 60, 60);
-      const splitNotes = doc.splitTextToSize(n(service.completionDetails.notes), doc.internal.pageSize.getWidth() - 28);
+      const splitNotes = doc.splitTextToSize(n(finalCompletionNotes), doc.internal.pageSize.getWidth() - 28);
       doc.text(splitNotes, 14, currentY);
       
       currentY += splitNotes.length * 5 + 10;
@@ -150,33 +224,35 @@ export const generateServicePDF = async (service, machine) => {
       if (currentY > 250) { doc.addPage(); currentY = 20; }
       doc.setFontSize(14);
       doc.setTextColor(30, 64, 175);
-      doc.text(n('Notatki Dzialu Technicznego'), 14, currentY);
+      doc.text(n('Notatki Dzialu Technicznego Maszyny'), 14, currentY);
       currentY += 8;
 
       doc.setFontSize(10);
       doc.setTextColor(60, 60, 60);
       machine.techNotes.forEach(note => {
         if (currentY > 270) { doc.addPage(); currentY = 20; }
-        const date = safeParseDate(note.createdAt)?.toLocaleString('pl-PL') || '-';
+        const date = safeParseDate(note.createdAt || note.date)?.toLocaleString('pl-PL') || '-';
         doc.setFont(undefined, 'bold');
-        doc.text(n(`${note.createdBy || 'Nieznany'} - ${date}`), 14, currentY);
+        doc.text(n(`${note.createdBy || note.user || 'Nieznany'} - ${date}`), 14, currentY);
         currentY += 5;
         doc.setFont(undefined, 'normal');
-        const splitNote = doc.splitTextToSize(n(note.text || ''), doc.internal.pageSize.getWidth() - 28);
+        const splitNote = doc.splitTextToSize(n(note.text || note.note || ''), doc.internal.pageSize.getWidth() - 28);
         doc.text(splitNote, 14, currentY);
         currentY += splitNote.length * 4 + 6;
       });
       currentY += 5;
     }
 
-    const allNotes = [...(service.history || []), ...(service.futureNotes || [])].sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp));
+    const allNotes = [...(service.history || []), ...(service.futureNotes || [])].sort(
+      (a, b) => new Date(a.date || a.createdAt || a.timestamp || 0) - new Date(b.date || b.createdAt || b.timestamp || 0)
+    );
     
     if (allNotes.length > 0) {
       if (currentY > 250) { doc.addPage(); currentY = 20; }
       
       doc.setFontSize(14);
       doc.setTextColor(40, 40, 40);
-      doc.text(n('Historia i Notatki'), 14, currentY);
+      doc.text(n('Historia Realizacji i Lista Kontrolna'), 14, currentY);
       currentY += 6;
 
       const historyRows = allNotes.map(h => {
@@ -186,8 +262,8 @@ export const generateServicePDF = async (service, machine) => {
         if (h.checklistSummary && h.checklistSummary.length > 0) {
           detailsStr += (detailsStr ? '\n\n' : '') + 'LISTA KONTROLNA:\n';
           h.checklistSummary.forEach(item => {
-             detailsStr += `- ${item.taskName}: `;
-             if (item.type === 'CHECKBOX') detailsStr += (item.answer ? 'Wykonano' : 'Pominięto');
+             detailsStr += `- ${item.taskName || item.step}: `;
+             if (item.type === 'CHECKBOX') detailsStr += (item.answer ? 'Wykonano' : 'Pominieto');
              else if (item.type === 'PHOTO') detailsStr += (item.answer ? 'Zdjecie dolaczone' : 'Brak zdjecia');
              else detailsStr += (item.answer || 'Brak danych');
              
@@ -247,16 +323,21 @@ export const generateServicePDF = async (service, machine) => {
                 doc.addImage(photoData.b64, 'JPEG', xOffset, currentY, pw, ph, '', 'FAST');
                 xOffset += pw + 10;
                 if (ph > maxHeightInRow) maxHeightInRow = ph;
+              } else {
+                doc.setFontSize(9);
+                doc.text(n('[Zdjecie niedostepne - blokada CORS]'), xOffset, currentY + 10);
+                xOffset += 60;
+                if (20 > maxHeightInRow) maxHeightInRow = 20;
               }
             }
-            currentY += maxHeightInRow + 10;
+            currentY += maxHeightInRow + 15;
          }
       }
     }
 
-    await savePdfWithPrompt(doc, n(`Karta_Serwisu_${(service.machineName || machine?.name || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`));
+    await savePdfWithPrompt(doc, n(`Serwis_${service.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Planowany'}.pdf`));
   } catch (error) {
     console.error('Błąd generowania PDF serwisu:', error);
-    alert('Wystąpił błąd podczas generowania dokumentu.');
+    alert('Wystąpił błąd podczas generowania raportu PDF.');
   }
 };

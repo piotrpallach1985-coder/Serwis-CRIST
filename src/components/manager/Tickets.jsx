@@ -1,10 +1,10 @@
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
-import {  useManagerStore } from '../../store/managerStore';
-import { useState, useEffect, useCallback , useMemo } from 'react';
+import { useManagerStore } from '../../store/managerStore';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { updateTicket, deleteTicket } from '../../services/tickets.service';
-import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
 import ConfirmModal from './ConfirmModal';
@@ -18,14 +18,13 @@ import TicketMobileCard from './TicketMobileCard';
 import { useTickets } from '../../hooks/useTickets';
 import { usePagination } from '../../hooks/usePagination';
 import DebouncedInput from './DebouncedInput';
-import { safe } from "../../utils/safeRender";
+import { safe } from '../../utils/safeRender';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { TICKET_STATUS } from '../../utils/constants';
 import { getTicketStatusConfig } from '../../utils/statusConfigs';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useTranslation } from 'react-i18next';
-
 
 const STATUSES = (t) => getTicketStatusConfig(t);
 
@@ -54,6 +53,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   const { filterMachine, setFilterMachine, filterStatus, setFilterStatus, filterRegion, setFilterRegion, filterMachineId, setFilterMachineId, filterTime, setFilterTime, visibleCols, toggleColumn, filteredTickets, activeTickets, loadingArchive, hasMoreArchive, fetchArchive, handleExportExcel } = ticketState;
 
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
+  const [recentlyClosedTicket, setRecentlyClosedTicket] = useState(null);
   const { currentItems, hasMore: hasMoreLocalItems, setCurrentPage, loadMore } = usePagination(filteredTickets, 30, [filterMachine, filterStatus, filterRegion, filterMachineId, filterTime]);
   const criticalTicketsCount = useMemo(() => activeTickets.filter(t => t.isCritical).length, [activeTickets]);
   const [comment, setComment] = useState('');
@@ -95,20 +95,32 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         closeConfirmModal();
         setLoading(true);
         try {
-          const currentData = activeTickets.find(t => t.id === ticketId);
+          const currentData = activeTickets.find(t => t.id === ticketId) || (recentlyClosedTicket?.id === ticketId ? recentlyClosedTicket : null);
+          const closedAtStr = currentData?.closedAt || new Date().toISOString();
+          const completedByStr = currentData?.completedBy || user.name;
+          const historyItem = {
+            date: new Date().toISOString(),
+            user: user.name,
+            action: t('tickets.history.moved_to_archive'),
+            note: t('tickets.history.closed_manually'),
+            photos: []
+          };
           await updateTicket(ticketId, {
             isManuallyArchived: true, status: 5,
-            closedAt: currentData?.closedAt || new Date().toISOString(),
-            completedBy: currentData?.completedBy || user.name,
-            history: arrayUnion({
-              date: new Date().toISOString(),
-              user: user.name,
-              action: t('tickets.history.moved_to_archive'),
-              note: t('tickets.history.closed_manually'),
-              photos: []
-            })
+            closedAt: closedAtStr,
+            completedBy: completedByStr,
+            history: arrayUnion(historyItem)
           });
-          setSelectedTicketId(null);
+          if (currentData) {
+            setRecentlyClosedTicket({
+              ...currentData,
+              isManuallyArchived: true,
+              status: 5,
+              closedAt: closedAtStr,
+              completedBy: completedByStr,
+              history: [...(currentData.history || []), historyItem]
+            });
+          }
           showToast(t('tickets.messages.archived_success'));
         } catch (err) {
           showToast(t('tickets.messages.archive_error') + err.message, 'error');
@@ -120,19 +132,20 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
 
   const handleUpdate = async (ticketId, newStatus, actionText, newEtr = null, photoUrls = [], noteText = '') => {
     setLoading(true);
-    const ticketRef = doc(db, 'tenants', getCurrentTenant(), 'tickets', ticketId);
     try {
-      const currentData = activeTickets.find(t => t.id === ticketId);
+      const currentData = activeTickets.find(t => t.id === ticketId) || (recentlyClosedTicket?.id === ticketId ? recentlyClosedTicket : null);
       if (!currentData) throw new Error(t('tickets.messages.no_ticket'));
-      
+
+      const historyItem = {
+        date: new Date().toISOString(),
+        user: user.name,
+        action: actionText,
+        note: noteText || comment || '',
+        photos: photoUrls
+      };
+
       const updateData = {
-        history: arrayUnion({
-          date: new Date().toISOString(),
-          user: user.name,
-          action: actionText,
-          note: noteText || comment || '',
-          photos: photoUrls
-        })
+        history: arrayUnion(historyItem)
       };
 
       if (photoUrls.length > 0) updateData.photos = arrayUnion(...photoUrls);
@@ -155,8 +168,17 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       setEtr('');
       showToast(t('tickets.messages.update_success'));
       if (Number(newStatus) === TICKET_STATUS.CLOSED) {
-        setSelectedTicketId(null);
-        if (onClearTicketId) onClearTicketId();
+        setRecentlyClosedTicket({
+          ...currentData,
+          status: TICKET_STATUS.CLOSED,
+          closedAt: updateData.closedAt,
+          completedBy: updateData.completedBy,
+          assignedTo: updateData.assignedTo || currentData.assignedTo,
+          history: [...(currentData.history || []), historyItem],
+          photos: photoUrls.length > 0 ? [...(currentData.photos || []), ...photoUrls] : (currentData.photos || [])
+        });
+      } else if (newStatus !== undefined && newStatus !== null) {
+        setRecentlyClosedTicket(null);
       }
     } catch (err) {
       showToast(t('tickets.messages.update_error') + err.message, 'error');
@@ -166,6 +188,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
 
   useEffect(() => {
     if (selectedTicketId && selectedTicketId !== initialTicketId) { window.history.pushState({ ...window.history.state, internalDetails: true }, ''); }
+    if (!selectedTicketId) setRecentlyClosedTicket(null);
   }, [selectedTicketId]);
 
   useEffect(() => {
@@ -181,7 +204,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
     }
   }, [initialTicketId, onClearTicketId]);
 
-  const currentTicket = activeTickets.find(t => t.id === selectedTicketId);
+  const currentTicket = activeTickets.find(t => t.id === selectedTicketId) || (recentlyClosedTicket?.id === selectedTicketId ? recentlyClosedTicket : null);
 
   const openDetails = useCallback((ticket) => {
     setSelectedTicketId(ticket.id);
@@ -191,131 +214,129 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
 
   const renderContent = () => {
     if (selectedTicketId && !currentTicket) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
-        <span className="ml-3 text-gray-500 font-medium">{t('tickets.messages.loading')}</span>
-      </div>
-    );
-  }
-
-  if (selectedTicketId && currentTicket) {
-    return (
-      <ErrorBoundary>
-        <TicketDetails
-        machines={machines}
-        currentTicket={currentTicket}
-        setSelectedTicketId={setSelectedTicketId}
-        handleUpdate={handleUpdate}
-        handleDeleteTicket={handleDeleteTicket}
-        handleArchiveTicket={handleArchiveTicket}
-        comment={comment}
-        setComment={setComment}
-        selectedService={selectedService}
-        setSelectedService={setSelectedService}
-        etr={etr}
-        setEtr={setEtr}
-        loading={loading}
-        allowTicketDeletion={allowTicketDeletion}
-        showToast={showToast}
-        showConfirm={showConfirm}
-        STATUSES={STATUSES(t)}
-        isArchive={isArchive}
-      />
-      </ErrorBoundary>
-    );
-  }
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {!isArchive && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 max-w-2xl">
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
-              <i className="ph ph-warning-circle"></i>
-            </div>
-            <div>
-              <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{safe(activeTickets.length)}</div>
-              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.active_tickets_count')}</div>
-            </div>
-          </div>
-          <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
-              <i className="ph ph-siren"></i>
-            </div>
-            <div>
-              <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{criticalTicketsCount}</div>
-              <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.critical_tickets_count')}</div>
-            </div>
-          </div>
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
+          <span className="ml-3 text-gray-500 font-medium">{t('tickets.messages.loading')}</span>
         </div>
-      )}
+      );
+    }
 
-      <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
-        <TicketFilters
-          filterMachine={filterMachine} setFilterMachine={setFilterMachine}
-          filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-          filterRegion={filterRegion} setFilterRegion={setFilterRegion}
-          filterMachineId={filterMachineId} setFilterMachineId={setFilterMachineId}
-          filterTime={filterTime} setFilterTime={setFilterTime}
-          isArchive={isArchive}
-          regions={regions}
-          machines={machines}
-          onClearSearchQuery={onClearSearchQuery}
-        />
-        
-        <div className="flex gap-2 w-full lg:w-auto">
-          <div className="relative w-full lg:w-auto hidden lg:block">
+    if (selectedTicketId && currentTicket) {
+      return (
+        <ErrorBoundary>
+          <TicketDetails
+            machines={machines}
+            currentTicket={currentTicket}
+            setSelectedTicketId={setSelectedTicketId}
+            handleUpdate={handleUpdate}
+            handleDeleteTicket={handleDeleteTicket}
+            handleArchiveTicket={handleArchiveTicket}
+            comment={comment}
+            setComment={setComment}
+            selectedService={selectedService}
+            setSelectedService={setSelectedService}
+            etr={etr}
+            setEtr={setEtr}
+            loading={loading}
+            allowTicketDeletion={allowTicketDeletion}
+            showToast={showToast}
+            showConfirm={showConfirm}
+            STATUSES={STATUSES(t)}
+            isArchive={isArchive}
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        {!isArchive && (
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 max-w-2xl">
+            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                <i className="ph ph-warning-circle"></i>
+              </div>
+              <div>
+                <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{safe(activeTickets.length)}</div>
+                <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.active_tickets_count')}</div>
+              </div>
+            </div>
+            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                <i className="ph ph-siren"></i>
+              </div>
+              <div>
+                <div className="text-xl sm:text-3xl font-bold text-gray-800 leading-none">{criticalTicketsCount}</div>
+                <div className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{t('tickets.critical_tickets_count')}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
+          <TicketFilters
+            filterMachine={filterMachine} setFilterMachine={setFilterMachine}
+            filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+            filterRegion={filterRegion} setFilterRegion={setFilterRegion}
+            filterMachineId={filterMachineId} setFilterMachineId={setFilterMachineId}
+            filterTime={filterTime} setFilterTime={setFilterTime}
+            isArchive={isArchive}
+            regions={regions}
+            machines={machines}
+            onClearSearchQuery={onClearSearchQuery}
+          />
+
+          <div className="flex gap-2 w-full lg:w-auto">
+            <div className="relative w-full lg:w-auto hidden lg:block">
               <button onClick={() => setShowColumnPicker(!showColumnPicker)} className="w-full lg:w-auto bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
                 <i className="ph ph-columns text-lg"></i> {t('tickets.view')}
-            </button>
-            {showColumnPicker && (
-              <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] p-4">
-                <div className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">{t('tickets.customize_columns')}</div>
-                <div className="space-y-2">
-                  {Object.keys(visibleCols).map(key => {
-                    const COL_LABELS = {
-                      date: isArchive ? t('tickets.cols.date_archive') : t('tickets.cols.date_active'),
-                      region: t('tickets.cols.region'),
-                      machine: t('tickets.cols.machine'),
-                      bay: t('tickets.cols.bay'),
-                      topic: t('tickets.cols.topic'),
-                      reporter: t('tickets.cols.reporter'),
-                      status: t('tickets.cols.status'),
-                      service: t('tickets.cols.service'),
-                      duration: t('tickets.cols.duration')
-                    };
-                    return (
-                      <label key={key} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
-                        <input type="checkbox" checked={visibleCols[key]} onChange={() => toggleColumn(key)} className="rounded text-blue-600" />
-                        {COL_LABELS[key] || key}
-                      </label>
-                    );
-                  })}
+              </button>
+              {showColumnPicker && (
+                <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] p-4">
+                  <div className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-100 pb-2">{t('tickets.customize_columns')}</div>
+                  <div className="space-y-2">
+                    {Object.keys(visibleCols).map(key => {
+                      const COL_LABELS = {
+                        date: isArchive ? t('tickets.cols.date_archive') : t('tickets.cols.date_active'),
+                        region: t('tickets.cols.region'),
+                        machine: t('tickets.cols.machine'),
+                        bay: t('tickets.cols.bay'),
+                        topic: t('tickets.cols.topic'),
+                        reporter: t('tickets.cols.reporter'),
+                        status: t('tickets.cols.status'),
+                        service: t('tickets.cols.service'),
+                        duration: t('tickets.cols.duration')
+                      };
+                      return (
+                        <label key={key} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
+                          <input type="checkbox" checked={visibleCols[key]} onChange={() => toggleColumn(key)} className="rounded text-blue-600" />
+                          {COL_LABELS[key] || key}
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          
         </div>
-      </div>
 
-            <TicketTable 
-        filteredTickets={filteredTickets}
-        currentItems={currentItems}
-        visibleCols={visibleCols}
-        isArchive={isArchive}
-        STATUSES={STATUSES(t)}
-        machines={machines}
-        calculateDuration={(createdAt, closedAt, t_arg) => calculateDuration(createdAt, closedAt, t_arg || t)}
-        openDetails={openDetails}
-        hasMoreLocalItems={hasMoreLocalItems}
-        setCurrentPage={setCurrentPage}
-        hasMoreArchive={hasMoreArchive}
-        fetchArchive={fetchArchive}
-        loadingArchive={loadingArchive}
-      />
-      
+        <TicketTable
+          filteredTickets={filteredTickets}
+          currentItems={currentItems}
+          visibleCols={visibleCols}
+          isArchive={isArchive}
+          STATUSES={STATUSES(t)}
+          machines={machines}
+          calculateDuration={(createdAt, closedAt, t_arg) => calculateDuration(createdAt, closedAt, t_arg || t)}
+          openDetails={openDetails}
+          hasMoreLocalItems={hasMoreLocalItems}
+          setCurrentPage={setCurrentPage}
+          hasMoreArchive={hasMoreArchive}
+          fetchArchive={fetchArchive}
+          loadingArchive={loadingArchive}
+        />
       </div>
     );
   };
@@ -329,7 +350,6 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   );
 }
 
-
 Tickets.propTypes = {
   isArchive: PropTypes.bool,
   initialTicketId: PropTypes.string,
@@ -337,4 +357,3 @@ Tickets.propTypes = {
   initialSearchQuery: PropTypes.string,
   onClearSearchQuery: PropTypes.func,
 };
-

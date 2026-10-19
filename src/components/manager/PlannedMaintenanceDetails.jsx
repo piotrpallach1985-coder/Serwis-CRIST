@@ -299,6 +299,7 @@ export default function PlannedMaintenanceDetails({
       <PlannedMaintenanceCompletionModal
         isOpen={!!serviceToComplete}
         onClose={() => setServiceToComplete(null)}
+        onCompleted={onComplete}
         serviceToComplete={serviceToComplete}
         user={user}
       />

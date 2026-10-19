@@ -14,6 +14,11 @@ export default function Regions() {
   const [machines, setMachines] = useState([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [parentId, setParentId] = useState('');
+  const [mapType, setMapType] = useState('image');
+  const [googleQuery, setGoogleQuery] = useState('');
+  const [googleZoom, setGoogleZoom] = useState(18);
+  const [googleMapStyle, setGoogleMapStyle] = useState('k');
   const [mapFile, setMapFile] = useState(null);
   const [mapImageUrl, setMapImageUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -21,6 +26,21 @@ export default function Regions() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
+
+  const getDescendantIds = (rootId) => {
+    const descendants = new Set();
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      regions.forEach(r => {
+        if (r.parentId === curr && !descendants.has(r.id)) {
+          descendants.add(r.id);
+          queue.push(r.id);
+        }
+      });
+    }
+    return descendants;
+  };
 
   useEffect(() => {
     const unsubRegions = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'regions'), (snapshot) => {
@@ -31,20 +51,33 @@ export default function Regions() {
     const unsubMachines = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'machines'), (snapshot) => {
       setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => { console.debug('Machines listener closed:', error.message); });
-    console.log('DEBUG REGIONS LENGTH:', regions.length, 'MAPPED ROWS:', regions.filter(r => showDeleted ? true : !r.isDeleted).length);
-  return () => {
+    return () => {
       unsubRegions();
       unsubMachines();
     };
   }, []);
 
-    const handleSubmit = async (e) => {
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setParentId('');
+    setMapType('image');
+    setGoogleQuery('');
+    setGoogleZoom(18);
+    setGoogleMapStyle('k');
+    setMapFile(null);
+    setMapImageUrl('');
+    setUploadProgress(0);
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       let finalImageUrl = mapImageUrl;
 
-      if (mapFile) {
+      if (mapType === 'image' && mapFile) {
         const fileRef = ref(storage, `tenants/${getCurrentTenant()}/regions_maps/${Date.now()}_${mapFile.name}`);
         const uploadTask = uploadBytesResumable(fileRef, mapFile);
         
@@ -63,26 +96,32 @@ export default function Regions() {
         });
       }
 
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        parentId: parentId || null,
+        mapType: mapType || 'image',
+        mapImageUrl: finalImageUrl || '',
+        googleQuery: googleQuery.trim(),
+        googleZoom: Number(googleZoom) || 18,
+        googleMapStyle: googleMapStyle || 'k',
+      };
+
+      // Jeśli zmieniono nadrzędny rejon przy edycji, wyzeruj współrzędne pinezki tylko gdy zmienił się rodzic
       if (editingId) {
-        await updateRegion(editingId, { 
-          name: name.trim(), 
-          description: description.trim(),
-          mapImageUrl: finalImageUrl
-        });
+        const existing = regions.find(r => r.id === editingId);
+        if (existing && (existing.parentId || null) !== (parentId || null)) {
+          payload.xPercent = null;
+          payload.yPercent = null;
+        }
+        await updateRegion(editingId, payload);
       } else {
         await addRegion({
-          name: name.trim(),
-          description: description.trim(),
-          mapImageUrl: finalImageUrl,
+          ...payload,
           createdAt: serverTimestamp()
         });
       }
-      setName('');
-      setDescription('');
-      setMapFile(null);
-      setMapImageUrl('');
-      setUploadProgress(0);
-      setEditingId(null);
+      resetForm();
       setIsFormOpen(false);
     } catch (error) {
       console.error("Błąd zapisu:", error);
@@ -92,8 +131,13 @@ export default function Regions() {
   };
 
   const handleEdit = (r) => {
-    setName(r.name);
+    setName(r.name || '');
     setDescription(r.description || '');
+    setParentId(r.parentId || '');
+    setMapType(r.mapType || (r.googleQuery ? 'google' : 'image'));
+    setGoogleQuery(r.googleQuery || '');
+    setGoogleZoom(r.googleZoom || 18);
+    setGoogleMapStyle(r.googleMapStyle || 'k');
     setEditingId(r.id);
     setMapImageUrl(r.mapImageUrl || '');
     setMapFile(null);
@@ -138,7 +182,7 @@ export default function Regions() {
             <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.regions.subtitle")}</p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => { setEditingId(null); setName(''); setDescription(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
+            <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
               <i className="ph ph-plus text-lg"></i> {t("admin.regions.add_region")}
             </button>
           </div>
@@ -166,7 +210,7 @@ export default function Regions() {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="np. Hala K3"
+                placeholder="np. Osiedle Słoneczne / Budynek A / Hala K3"
                 required
               />
             </div>
@@ -177,34 +221,129 @@ export default function Regions() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="np. Główna hala montażowa"
+                placeholder="np. Główna hala montażowa lub budynek mieszkalny"
               />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Rejon nadrzędny / Mapa nadrzędna <span className="text-xs font-normal text-gray-500">(opcjonalnie — tworzy podmapę w podmapie)</span>
+              </label>
+              <select
+                value={parentId}
+                onChange={e => setParentId(e.target.value)}
+                className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              >
+                <option value="">— Mapa Główna (Rejon główny) —</option>
+                {(() => {
+                  const forbiddenIds = editingId ? getDescendantIds(editingId) : new Set();
+                  if (editingId) forbiddenIds.add(editingId);
+                  return regions
+                    .filter(r => !r.isDeleted && !forbiddenIds.has(r.id))
+                    .map(r => {
+                      const parentObj = r.parentId ? regions.find(p => p.id === r.parentId) : null;
+                      return (
+                        <option key={r.id} value={r.id}>
+                          {parentObj ? `${parentObj.name} ➔ ${r.name}` : r.name}
+                        </option>
+                      );
+                    });
+                })()}
+              </select>
             </div>
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">{t("admin.regions.submap_optional")}</label>
-            {mapImageUrl && !mapFile && (
-              <div className="mb-2 relative w-32 h-20 rounded-md overflow-hidden border border-gray-300">
-                <img src={mapImageUrl} className="w-full h-full object-cover" alt="Podmapa" />
-                <button type="button" onClick={() => setMapImageUrl('')} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700"><i className="ph ph-x text-xs"></i></button>
+          <div className="md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <label className="block text-sm font-bold text-gray-700">{t("admin.regions.submap_optional")}</label>
+            <div className="flex bg-gray-200/80 p-1 rounded-lg max-w-md">
+              <button
+                type="button"
+                onClick={() => setMapType('image')}
+                className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${mapType === 'image' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+              >
+                <i className="ph ph-image text-sm"></i> Rzut / Obraz (Plik)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapType('google')}
+                className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${mapType === 'google' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+              >
+                <i className="ph ph-globe-hemisphere-west text-sm"></i> Mapa Google (Osiedla / Budynki)
+              </button>
+            </div>
+
+            {mapType === 'image' ? (
+              <div>
+                {mapImageUrl && !mapFile && (
+                  <div className="mb-2 relative w-32 h-20 rounded-md overflow-hidden border border-gray-300">
+                    <img src={mapImageUrl} className="w-full h-full object-cover" alt="Podmapa" />
+                    <button type="button" onClick={() => setMapImageUrl('')} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700"><i className="ph ph-x text-xs"></i></button>
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setMapFile(e.target.files[0])}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                />
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="mt-2 text-xs font-bold text-blue-600">{t("admin.regions.uploading")}{Math.round(uploadProgress)}%</div>
+                )}
               </div>
-            )}
-            <input 
-              type="file" 
-              accept="image/*"
-              onChange={(e) => setMapFile(e.target.files[0])}
-              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
-            />
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className="mt-2 text-xs font-bold text-blue-600">{t("admin.regions.uploading")}{Math.round(uploadProgress)}%</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Adres osiedla / budynku lub współrzędne GPS</label>
+                    <input
+                      type="text"
+                      value={googleQuery}
+                      onChange={e => setGoogleQuery(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                      placeholder="np. Gdańsk, ul. Słoneczna 12 lub 54.3520, 18.6466"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Widok</label>
+                      <select
+                        value={googleMapStyle}
+                        onChange={e => setGoogleMapStyle(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                      >
+                        <option value="k">Satelita</option>
+                        <option value="m">Drogowa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Zoom ({googleZoom})</label>
+                      <input
+                        type="number"
+                        min="12"
+                        max="20"
+                        value={googleZoom}
+                        onChange={e => setGoogleZoom(Number(e.target.value) || 18)}
+                        className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {googleQuery.trim() && (
+                  <div className="w-full h-44 rounded-lg overflow-hidden border border-gray-300 shadow-inner bg-slate-900">
+                    <iframe
+                      title="Podgląd Google Maps"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(googleQuery.trim())}&t=${googleMapStyle || 'k'}&z=${googleZoom || 18}&ie=UTF8&iwloc=&output=embed`}
+                      className="w-full h-full border-0 pointer-events-none"
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
             <div className="flex justify-end gap-3 pt-4 mt-2 border-t border-gray-100">
                   <button 
                     type="button" 
-                    onClick={() => { setIsFormOpen(false); setEditingId(null); setName(''); setDescription(''); }}
+                    onClick={() => { setIsFormOpen(false); resetForm(); }}
                     className="px-6 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors"
                   >
                     Anuluj
@@ -228,16 +367,28 @@ export default function Regions() {
     {regions.length === 0 ? (
       <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.regions.no_data")}</div>
     ) : (
-      regions.filter(r => showDeleted ? true : !r.isDeleted).map(item => (
-        
+      regions.filter(r => showDeleted ? true : !r.isDeleted).map(item => {
+        const parentRegion = item.parentId ? regions.find(p => p.id === item.parentId) : null;
+        return (
 <div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col ${item.isDeleted ? "opacity-50" : ""}`}>
   <div className="flex justify-between items-start mb-2">
-    <h4 className="font-bold text-[#002b5e] text-lg">{item.name || t('admin.regions.without_name')}</h4>
-    {item.mapImageUrl && (
+    <div>
+      <h4 className="font-bold text-[#002b5e] text-lg">{item.name || t('admin.regions.without_name')}</h4>
+      {parentRegion && (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-0.5">
+          <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {parentRegion.name}
+        </span>
+      )}
+    </div>
+    {item.mapType === 'google' && item.googleQuery ? (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+        <i className="ph ph-globe-hemisphere-west"></i> Google Maps
+      </span>
+    ) : item.mapImageUrl ? (
       <a href={item.mapImageUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200">
         <img src={item.mapImageUrl} alt="Podmapa" className="w-full h-full object-cover" />
       </a>
-    )}
+    ) : null}
   </div>
   <p className="text-sm text-gray-600 mb-1">{item.description || '-'}</p>
     <div className="text-xs text-gray-500 mb-2 font-bold uppercase">{t("admin.regions.machines_in_region")}</div>
@@ -255,11 +406,11 @@ export default function Regions() {
     <button onClick={() => handleDelete(item.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs"><i className="ph ph-trash text-sm"></i> {t("admin.regions.delete")}</button>
   </div>
 </div>
-
-      ))
+        );
+      })
     )}
   </div>
-          <table className="w-full text-left hidden lg:table border-collapse hidden lg:table relative">
+          <table className="w-full text-left hidden lg:table border-collapse relative">
             <thead>
               <tr className="bg-gray-50 border-y border-gray-200">
                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{t("admin.regions.region_name")}</th>
@@ -272,9 +423,23 @@ export default function Regions() {
             <tbody className="divide-y divide-gray-200">
               {regions.filter(r => showDeleted ? true : !r.isDeleted).map(r => {
                 const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted && !m.parentId);
+                const parentRegion = r.parentId ? regions.find(p => p.id === r.parentId) : null;
+                const childRegions = regions.filter(c => c.parentId === r.id && !c.isDeleted);
                 return (
                   <tr key={r.id} className={`hover:bg-gray-50 ${r.isDeleted ? "opacity-50" : ""}`}>
-                                          <td className="px-6 py-4 font-bold text-gray-800">{r.name || t('admin.regions.without_name')}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-gray-800">{r.name || t('admin.regions.without_name')}</div>
+                      {parentRegion && (
+                        <div className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 mt-1">
+                          <i className="ph ph-arrow-bend-down-right"></i> Podmapa w: {parentRegion.name}
+                        </div>
+                      )}
+                      {childRegions.length > 0 && (
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Podrejony ({childRegions.length}): {childRegions.map(c => c.name).join(', ')}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">{r.description || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {regionMachines.length > 0 ? (
@@ -290,7 +455,11 @@ export default function Regions() {
                       )}
                     </td>
                       <td className="px-6 py-4 text-center">
-                        {r.mapImageUrl ? (
+                        {r.mapType === 'google' && r.googleQuery ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold" title={r.googleQuery}>
+                            <i className="ph ph-globe-hemisphere-west text-sm"></i> Google ({r.googleQuery})
+                          </span>
+                        ) : r.mapImageUrl ? (
                           <div className="flex justify-center">
                             <a href={r.mapImageUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 w-16 h-10 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors shadow-sm relative group block" title="Kliknij by powiększyć mapę">
                               <img src={r.mapImageUrl} alt="Podmapa" className="w-full h-full object-cover" />

@@ -9,6 +9,7 @@ import { addRole, updateRole, checkRoleInUse } from '../../services/dictionary.s
 
 export default function Roles() {
   const { t } = useTranslation();
+  const branding = useManagerStore(state => state.branding);
   const [roles, setRoles] = useState([]);
   const [name, setName] = useState('');
   
@@ -17,50 +18,61 @@ export default function Roles() {
     {
       module: 'Awarie UR',
       permissions: [
-        { id: 'dashboard_tickets', label: 'Mapa Stoczni' },
+        { id: 'kpi', label: 'Analiza KPI Awarii' },
+        { id: 'dashboard_tickets', label: 'Mapa Awarii' },
         { id: 'edit_map', label: 'Edycja Mapy' },
         { id: 'tickets', label: 'Zgłoszenia Awarii' },
-        { id: 'archive', label: 'Archiwum Awarii' },
-        { id: 'kpi', label: 'Analiza' }
+        { id: 'archive', label: 'Archiwum Awarii' }
       ]
     },
     {
-      module: 'Serwis UR',
+      module: 'Panel Serwisu (DTR)',
       permissions: [
+        { id: 'planned_kpi', label: 'Analiza KPI Serwisów' },
         { id: 'dashboard_planned', label: 'Mapa Serwisów' },
         { id: 'planned_maintenance', label: 'Planowane Serwisy' },
+        { id: 'action_items', label: 'Tematy do realizacji' },
         { id: 'archive_planned', label: 'Archiwum Serwisów' },
         { id: 'edit_planned', label: 'Edycja Serwisów Planowanych' },
-        { id: 'delete_planned', label: 'Usuwanie Serwisów Planowanych' }
+        { id: 'delete_planned', label: 'Usuwanie Serwisów Planowanych' },
+        { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' }
       ]
     },
     {
-      module: 'Administracja',
+      module: 'Magazyn części zamiennych',
+      permissions: [
+        { id: 'parts_kpi', label: 'KPI Magazynu' },
+        { id: 'parts_inventory', label: 'Baza Części' },
+        { id: 'parts_transactions', label: 'Operacje Magazynowe' },
+        { id: 'parts_qr', label: 'Kody QR Części' }
+      ]
+    },
+    {
+      module: 'Administracja i Dane Bazowe',
       permissions: [
         { id: 'machines', label: 'Rejestr Urządzeń' },
-        { id: 'regions', label: 'Rejony' },
-          { id: 'delete_tech_notes', label: 'Usuwanie notatek tech.' },
+        { id: 'regions', label: 'Rejony i Mapy' },
         { id: 'services', label: 'Podwykonawcy / Serwis' },
         { id: 'topics', label: 'Tematy Zgłoszeń' },
-        { id: 'reporters', label: 'Zgłaszający' },
+        { id: 'delete_tech_notes', label: 'Usuwanie notatek technicznych' },
         { id: 'users', label: 'Użytkownicy' },
         { id: 'roles', label: t("admin.roles.title") },
         { id: 'reports', label: 'Raportowanie' },
-        { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' },
-        { id: 'delete_machine_notes', label: 'Usuwanie Notatek Tech.' }
+        { id: 'audit', label: 'Dziennik Zdarzeń (ISO 55000)' },
+        { id: 'ai_stats', label: 'Statystyki AI' }
       ]
     },
-      {
-        module: 'Powiadomienia Push',
-        permissions: [
-          { id: 'push_new_critical', label: 'Nowe Awarie Krytyczne' },
-          { id: 'push_new_all', label: 'Wszystkie Nowe Awarie' },
-          { id: 'push_status_updates', label: 'Zmiany statusów powiązanych zgłoszeń' },
-          { id: 'push_new_comments', label: 'Nowe komentarze w powiązanych zgłoszeniach' },
-          { id: 'push_planned_services', label: 'Powiadomienia o zbliżających się serwisach' }
-        ]
-      }
-    ];
+    {
+      module: 'Powiadomienia Push',
+      permissions: [
+        { id: 'push_new_critical', label: 'Nowe Awarie Krytyczne' },
+        { id: 'push_new_all', label: 'Wszystkie Nowe Awarie' },
+        { id: 'push_status_updates', label: 'Zmiany statusów powiązanych zgłoszeń' },
+        { id: 'push_new_comments', label: 'Nowe komentarze w powiązanych zgłoszeniach' },
+        { id: 'push_planned_services', label: 'Powiadomienia o zbliżających się serwisach' }
+      ]
+    }
+  ];
 
   
 
@@ -175,7 +187,8 @@ export default function Roles() {
             <div className="space-y-6">
               {availablePermissionsGrouped.filter(g => {
               if (g.module === 'Awarie UR' && !modSettings.enableTickets) return false;
-              if (g.module === 'Serwis UR' && !modSettings.enablePlanned) return false;
+              if (g.module === 'Panel Serwisu (DTR)' && (!modSettings.enablePlanned || branding?.modules?.planned_services === false)) return false;
+              if (g.module === 'Magazyn części zamiennych' && branding?.modules?.inventory === false) return false;
               return true;
             }).map(group => (
                 <div key={group.module} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">

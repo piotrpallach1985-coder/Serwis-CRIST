@@ -3,12 +3,30 @@ import { db } from '../../firebase';
 import { safeParseDate } from '../dateHelpers';
 import { TICKET_STATUS_LABELS, ACTION_ITEM_STATUS_LABELS } from '../constants';
 
+const applyWorksheetFormatting = (ws, rows) => {
+  if (!ws || !rows || rows.length === 0) return;
+  const keys = Object.keys(rows[0]);
+  ws['!cols'] = keys.map(key => {
+    const isHistoryCol = key.includes('Historia') || key.includes('Opis');
+    return { wch: isHistoryCol ? 65 : Math.max(18, key.length + 4) };
+  });
+
+  Object.keys(ws).forEach(cellRef => {
+    if (cellRef.startsWith('!')) return;
+    const cell = ws[cellRef];
+    if (cell && typeof cell === 'object') {
+      cell.s = {
+        ...(cell.s || {}),
+        alignment: { vertical: 'top', wrapText: true }
+      };
+    }
+  });
+};
+
 export const generateAuditorReport = async (tenantId) => {
   const XLSX = await import('xlsx');
 
   try {
-    const reportData = {};
-
     // Helper to fetch collection
     const fetchCol = async (colName) => {
       const snap = await getDocs(collection(db, 'tenants', tenantId, colName));
@@ -31,12 +49,14 @@ export const generateAuditorReport = async (tenantId) => {
       
       let historyStr = '';
       if (t.history && t.history.length > 0) {
-        historyStr = t.history.map(h => `[${safeParseDate(h.date)?.toLocaleString('pl-PL')}] ${h.user}: ${h.action} - ${h.note || ''}`).join(' | ');
+        historyStr = t.history
+          .map(h => `[${safeParseDate(h.date)?.toLocaleString('pl-PL') || '-'}] ${h.user || 'System'}: ${h.action || ''}${h.note ? ' - ' + h.note : ''}`)
+          .join('\r\n');
       }
 
       return {
         'ID Zgłoszenia': t.id,
-        'Maszyna (Nazwa)': machineMap[t.machineId] || 'Nieznana (Usunięta)',
+        'Maszyna (Nazwa)': machineMap[t.machineId] || t.machineName || 'Nieznana (Usunięta)',
         'Maszyna ID': t.machineId,
         'Temat': t.topic || '-',
         'Opis': t.description || '-',
@@ -59,18 +79,26 @@ export const generateAuditorReport = async (tenantId) => {
       const created = safeParseDate(p.createdAt);
       const deleted = safeParseDate(p.deletedAt);
       
-      let execStr = '';
-      if (p.executions && p.executions.length > 0) {
-        execStr = p.executions.map(e => `[${safeParseDate(e.date)?.toLocaleString('pl-PL')}] ${e.user}: ${e.note || 'Zrealizowano'}`).join(' | ');
+      const historyLines = [];
+      if (Array.isArray(p.history) && p.history.length > 0) {
+        p.history.forEach(h => {
+          historyLines.push(`[${safeParseDate(h.date)?.toLocaleString('pl-PL') || '-'}] ${h.user || 'System'}: ${h.action || ''}${h.note ? ' - ' + h.note : ''}`);
+        });
       }
+      if (Array.isArray(p.executions) && p.executions.length > 0) {
+        p.executions.forEach(e => {
+          historyLines.push(`[${safeParseDate(e.date)?.toLocaleString('pl-PL') || '-'}] ${e.user || 'System'}: ${e.note || 'Zrealizowano'}`);
+        });
+      }
+      const execStr = historyLines.join('\r\n');
 
       return {
         'ID Serwisu': p.id,
-        'Maszyna (Nazwa)': machineMap[p.machineId] || 'Nieznana (Usunięta)',
+        'Maszyna (Nazwa)': machineMap[p.machineId] || p.machineName || 'Nieznana (Usunięta)',
         'Maszyna ID': p.machineId,
         'Nazwa Serwisu': p.name || '-',
         'Typ wyzwalacza': p.triggerType || '-',
-        'Wykonawca': p.completedBy || '-',
+        'Wykonawca': p.completedBy || p.assignedService || '-',
         'Data Dodania': created ? created.toLocaleString('pl-PL') : '-',
         'Usunięte (Ciche)': isDeleted,
         'Kto usunął': p.deletedBy || '-',
@@ -79,7 +107,6 @@ export const generateAuditorReport = async (tenantId) => {
       };
     });
 
-    
     // Formatting Action Items (Uwagi/Tematy do realizacji)
     const actionRows = actions.map(a => {
       const isDeleted = a.isDeleted ? 'TAK' : 'NIE';
@@ -123,22 +150,25 @@ export const generateAuditorReport = async (tenantId) => {
     
     if (ticketRows.length > 0) {
       const wsTickets = XLSX.utils.json_to_sheet(ticketRows);
+      applyWorksheetFormatting(wsTickets, ticketRows);
       XLSX.utils.book_append_sheet(wb, wsTickets, "Awarie i Historia");
     }
     
     if (plannedRows.length > 0) {
       const wsPlanned = XLSX.utils.json_to_sheet(plannedRows);
+      applyWorksheetFormatting(wsPlanned, plannedRows);
       XLSX.utils.book_append_sheet(wb, wsPlanned, "Serwisy Planowane");
     }
     
-    
     if (actionRows.length > 0) {
       const wsActions = XLSX.utils.json_to_sheet(actionRows);
+      applyWorksheetFormatting(wsActions, actionRows);
       XLSX.utils.book_append_sheet(wb, wsActions, "Tematy do realizacji");
     }
 
     if (machineRows.length > 0) {
       const wsMachines = XLSX.utils.json_to_sheet(machineRows);
+      applyWorksheetFormatting(wsMachines, machineRows);
       XLSX.utils.book_append_sheet(wb, wsMachines, "Maszyny");
     }
 

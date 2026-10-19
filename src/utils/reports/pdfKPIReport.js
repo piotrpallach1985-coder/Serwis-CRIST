@@ -19,7 +19,7 @@ const getImageDimensions = (base64) => {
   });
 };
 
-export const generateKPIReportPDF = async (tickets, services, machines, periodTitle) => {
+export const generateKPIReportPDF = async (tickets = [], services = [], machines = [], periodTitle = '') => {
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
 
@@ -51,16 +51,27 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
     // Tytuł dokumentu
     doc.setFontSize(22);
     doc.setTextColor(30, 40, 50);
-    doc.text(n('Raport Zarzadczy UR'), 14, 22);
+    doc.text(n('Raport Zarzadczy UR (KPI)'), 14, 22);
 
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
     doc.text(n(`Okres raportowy: ${periodTitle}`), 14, 30);
     doc.text(n(`Wygenerowano: ${new Date().toLocaleDateString('pl-PL')}`), 14, 36);
 
+    const machinesMap = (machines || []).reduce((acc, m) => {
+      acc[m.id] = m;
+      return acc;
+    }, {});
+
     // --- OBLICZENIA ---
     const closedTickets = tickets.filter(t => Number(t.status) === TICKET_STATUS.CLOSED);
-    const completedServices = services.filter(s => Number(s.status) === SERVICE_STATUS.COMPLETED);
+    const criticalTicketsCount = tickets.filter(t => t.isCritical).length;
+    const completedServices = services.filter(
+      s => s.status === SERVICE_STATUS.COMPLETED || s.status === 'completed'
+    );
+    const inProgressServicesCount = services.filter(
+      s => s.status === SERVICE_STATUS.IN_PROGRESS || s.status === 'in_progress'
+    ).length;
 
     // 1. MTTR
     let totalRepairTimeMs = 0;
@@ -68,14 +79,13 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
     closedTickets.forEach(t => {
       const openD = safeParseDate(t.createdAt);
       const closeD = safeParseDate(t.closedAt);
-      if (openD && closeD) {
+      if (openD && closeD && closeD >= openD) {
         totalRepairTimeMs += (closeD.getTime() - openD.getTime());
         repairCount++;
       }
     });
-    const mttrHours = repairCount > 0 ? (totalRepairTimeMs / repairCount / (1000 * 60 * 60)).toFixed(1) : 0;
 
-    // 2. Proporcja
+    // 2. Proporcja Prewencja vs Reakcja
     const totalInterventions = repairCount + completedServices.length;
     const preventivePercent = totalInterventions > 0 ? Math.round((completedServices.length / totalInterventions) * 100) : 0;
     const reactivePercent = totalInterventions > 0 ? Math.round((repairCount / totalInterventions) * 100) : 0;
@@ -83,7 +93,7 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
     // 3. TOP 5 Awaryjnych Maszyn
     const machineFaultCounts = {};
     tickets.forEach(t => {
-      const mName = t.machineName || 'Nieznana maszyna';
+      const mName = t.machineName || machinesMap[t.machineId]?.name || 'Nieznana maszyna';
       machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
     });
     
@@ -92,26 +102,38 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // 4. TOP 5 Serwisowanych Maszyn
+    const machineServiceCounts = {};
+    services.forEach(s => {
+      const mName = s.machineName || machinesMap[s.machineId]?.name || 'Nieznana maszyna';
+      machineServiceCounts[mName] = (machineServiceCounts[mName] || 0) + 1;
+    });
+
+    const top5ServiceMachines = Object.entries(machineServiceCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     // --- WIZUALIZACJA NA PDF ---
-    let currentY = 50;
+    let currentY = 48;
     
-        const openTicketsCount = tickets.filter(t => t.status !== TICKET_STATUS.CLOSED).length;
+    const openTicketsCount = tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED).length;
     const reportedTicketsCount = tickets.length;
     const allPlannedCount = services.length;
 
     const now = new Date();
     const overdueServicesCount = services.filter(srv => {
-        if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === SERVICE_STATUS.IN_PROGRESS) return false;
-        let isOverdue = false;
-        const machine = machines.find(m => m.id === srv.machineId);
-        if (srv.nextDate) {
-          const nDate = safeParseDate(srv.nextDate);
-          if (nDate && nDate < now) isOverdue = true;
-        }
-        if (srv.targetWorkHours && machine) {
-          if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
-        }
-        return isOverdue;
+      if (srv.status === SERVICE_STATUS.COMPLETED || srv.status === 'completed' || srv.status === SERVICE_STATUS.IN_PROGRESS || srv.status === 'in_progress') return false;
+      let isOverdue = false;
+      const machine = machinesMap[srv.machineId];
+      if (srv.nextDate) {
+        const nDate = safeParseDate(srv.nextDate);
+        if (nDate && nDate < now) isOverdue = true;
+      }
+      if (srv.targetWorkHours && machine) {
+        if (machine.currentWorkHours >= srv.targetWorkHours) isOverdue = true;
+      }
+      return isOverdue;
     }).length;
 
     const formatMTTR = (totalMs, count) => {
@@ -124,44 +146,67 @@ export const generateKPIReportPDF = async (tickets, services, machines, periodTi
 
     const mttrString = formatMTTR(totalRepairTimeMs, repairCount);
 
-    // Tabela G'ƈwnych KPI
+    // Tabela Głównych KPI
     autoTable(doc, {
       startY: currentY,
       head: [[n('Wskaznik (KPI)'), n('Wynik'), n('Opis Wskaznika')]],
       body: [
         [n('MTTR (Sredni Czas Naprawy)'), mttrString, n('Sredni czas od zgloszenia do usuniecia awarii')],
-        [n('Liczba zgloszonych awarii'), `${reportedTicketsCount}`, n('Wszystkie awarie w wybranym okresie')],
-        [n('Liczba otwartych zgloszen'), `${openTicketsCount}`, n('Awarie obecnie oczekujace/w trakcie')],
+        [n('Liczba zgloszonych awarii'), `${reportedTicketsCount} (w tym kryt.: ${criticalTicketsCount})`, n('Wszystkie awarie w wybranym okresie')],
+        [n('Liczba otwartych zgloszen'), `${openTicketsCount}`, n('Awarie obecnie oczekujace / w trakcie realizacji')],
         [n('Liczba wykonanych napraw'), `${repairCount}`, n('Awarie zakonczone w wybranym okresie')],
-        [n('Liczba planowanych serwisow'), `${allPlannedCount}`, n('Wszystkie serwisy wpisane do planu')],
-        [n('Liczba wykonanych serwisow'), `${completedServices.length}`, n('Zrealizowane prace z kalendarza/RBG')],
-        [n('Liczba zaleglych serwisow'), `${overdueServicesCount}`, n('Przekroczony czas lub RBG')],
+        [n('Liczba wszystkich serwisow planowanych'), `${allPlannedCount}`, n('Wszystkie serwisy w harmonogramie i archiwum')],
+        [n('Serwisy w trakcie realizacji'), `${inProgressServicesCount}`, n('Rozpoczete przeglady planowane')],
+        [n('Liczba wykonanych serwisow'), `${completedServices.length}`, n('Zrealizowane prace prewencyjne z kalendarza / RBG')],
+        [n('Liczba zaleglych serwisow'), `${overdueServicesCount}`, n('Przekroczony termin kalendarzowy lub limit RBG')],
         [n('Stosunek Pracy (Prewencja / Reakcja)'), `${preventivePercent}% / ${reactivePercent}%`, n('Serwisy zaplanowane vs naprawy awaryjne')]
       ],
-      styles: { fontSize: 10, cellPadding: 4 },
+      styles: { fontSize: 9.5, cellPadding: 3.5 },
       headStyles: { fillColor: [40, 80, 140] },
       theme: 'grid'
     });
 
-    currentY = doc.lastAutoTable.finalY + 20;
+    currentY = doc.lastAutoTable.finalY + 15;
 
     // Tabela: Top 5 Awaryjnych Maszyn
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(30, 40, 50);
-    doc.text(n('Ranking: Top 5 Najbardziej Usterkowych Maszyn'), 14, currentY);
-    currentY += 6;
+    doc.text(n('Ranking: Top 5 Najbardziej Usterkowych Maszyn (Awarie)'), 14, currentY);
+    currentY += 5;
 
     if (top5Machines.length > 0) {
       autoTable(doc, {
         startY: currentY,
         head: [[n('Miejsce'), n('Nazwa Maszyny'), n('Ilosc Zgloszonych Awarii')]],
         body: top5Machines.map((m, i) => [i + 1, n(m.name), m.count]),
-        styles: { fontSize: 10 },
+        styles: { fontSize: 9 },
         headStyles: { fillColor: [180, 60, 60] },
       });
+      currentY = doc.lastAutoTable.finalY + 14;
     } else {
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.text(n('Brak danych o awariach w podanym okresie.'), 14, currentY + 5);
+      currentY += 14;
+    }
+
+    // Tabela: Top 5 Maszyn wg Serwisów Planowanych
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    doc.setFontSize(13);
+    doc.setTextColor(30, 40, 50);
+    doc.text(n('Zestawienie Prewencji: Top 5 Maszyn wg Serwisow Planowanych'), 14, currentY);
+    currentY += 5;
+
+    if (top5ServiceMachines.length > 0) {
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Miejsce'), n('Nazwa Maszyny'), n('Liczba Serwisow (Plan + Historia)')]],
+        body: top5ServiceMachines.map((m, i) => [i + 1, n(m.name), m.count]),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [40, 130, 90] },
+      });
+    } else {
+      doc.setFontSize(9.5);
+      doc.text(n('Brak serwisow planowanych w podanym okresie.'), 14, currentY + 5);
     }
 
     // Stopka dokumentu

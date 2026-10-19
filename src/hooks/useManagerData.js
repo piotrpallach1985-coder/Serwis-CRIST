@@ -72,14 +72,31 @@ export function useManagerData() {
     const unsubBranding = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'branding'), (snap) => {
       if (snap.exists()) {
         const brandingData = snap.data();
+        const prevBranding = useManagerStore.getState().branding || {};
         setBranding({ 
-          companyName: brandingData.companyName || tenantId.toUpperCase(),
+          companyName: brandingData.companyName || prevBranding.companyName || tenantId.toUpperCase(),
           systemSubtitle: brandingData.systemSubtitle || 'DYSPOZYTORNIA UR',
-          companyLogoUrl: brandingData.companyLogoUrl || '',
-          appLogoUrl: brandingData.appLogoUrl || useManagerStore.getState().branding.appLogoUrl || ''
+          companyLogoUrl: brandingData.companyLogoUrl || prevBranding.companyLogoUrl || '',
+          appLogoUrl: brandingData.appLogoUrl || prevBranding.appLogoUrl || '',
+          modules: brandingData.modules || prevBranding.modules || { planned_services: true, inventory: false }
         });
       }
     });
+
+    const unsubTenantRegistry = onSnapshot(doc(db, 'tenant_registry', tenantId), (snap) => {
+      if (snap.exists()) {
+        const regData = snap.data();
+        if (regData.modules) {
+          const prevBranding = useManagerStore.getState().branding || {};
+          setBranding({
+            ...prevBranding,
+            companyName: prevBranding.companyName || regData.name || tenantId.toUpperCase(),
+            companyLogoUrl: prevBranding.companyLogoUrl || regData.companyLogoUrl || '',
+            modules: regData.modules
+          });
+        }
+      }
+    }, () => {});
 
     // 2. DANE W CZASIE RZECZYWISTYM (REAL-TIME ONSNAPSHOT)
     
@@ -146,6 +163,7 @@ export function useManagerData() {
       
       unsubSettings();
       unsubBranding();
+      unsubTenantRegistry();
       unsubTickets();
       unsubParts();
       

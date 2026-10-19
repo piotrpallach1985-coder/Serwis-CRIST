@@ -33,6 +33,7 @@ import NotificationCenter from './manager/NotificationCenter';
 const InAppTicketScanner = lazy(() => import('./manager/InAppTicketScanner'));
 const SuperAdminPanel = lazy(() => import('./manager/SuperAdminPanel'));
 const AuditLogs = lazy(() => import('./manager/AuditLogs'));
+const ApiSettingsPanel = lazy(() => import('./manager/reports/ApiSettingsPanel'));
 
 import { USER_ROLES } from '../utils/constants';
 import { useAuth } from '../hooks/useAuth';
@@ -120,7 +121,7 @@ function ManagerViewInner() {
   }, [partTransactions]);
 
   // --- Uprawnienia (hook) ---
-  const { canEditPlanned, canDeletePlanned, isAdmin } = usePermissions(user, roles);
+  const { canEditPlanned, canDeletePlanned, isAdmin, canAccessTab } = usePermissions(user, roles);
 
   
 
@@ -209,6 +210,16 @@ function ManagerViewInner() {
           )}
 
         <div className="flex-1 p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
+          {!canAccessTab(activeTab) ? (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-lg mx-auto my-12 text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+                <i className="ph ph-lock-key"></i>
+              </div>
+              <h3 className="text-lg font-extrabold text-slate-800 mb-2">Brak dostępu do wybranego modułu</h3>
+              <p className="text-sm text-slate-500">Twoja rola lub licencja firmy nie obejmuje dostępu do tej zakładki.</p>
+            </div>
+          ) : (
+            <>
 
                     {/* Moduł: Awarie - mapa */}
           {activeTab === 'dashboard_tickets' && (
@@ -318,7 +329,10 @@ function ManagerViewInner() {
                     {activeTab === 'reports' && <Reports />}
           {activeTab === 'ai_stats' && <AIStats />}
           {activeTab === 'new_ticket_scanner' && <InAppTicketScanner />}
+          {activeTab === 'api_settings' && <div className="p-6 max-w-5xl mx-auto w-full"><ApiSettingsPanel /></div>}
           {activeTab.startsWith('parts_') && <PartsLayout currentTab={activeTab} setActiveTab={setActiveTab} />}
+            </>
+          )}
 
         </div>
               </Suspense>

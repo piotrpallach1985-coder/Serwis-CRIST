@@ -349,7 +349,7 @@
       "deleteFileError": "Nie udało się usunąć pliku.",
       "title": "Dokumentacja DTR",
       "subtitle": "Tylko PDF. Max 50MB. Limit: 10 plików. Powyżej 30MB może działać wolniej. Przeciągnij i puść.",
-      "chatWithDtr": "Czatuj z całą DTR",
+      "chatWithDtr": "Analizuj wszystkie pliki DTR",
       "noPermissions": "Brak uprawnień do edycji DTR",
       "uploadingFile": "Wgrywanie pliku...",
       "noDtrFiles": "Brak wgranych plików DTR dla tej maszyny.",

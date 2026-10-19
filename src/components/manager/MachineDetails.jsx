@@ -9,6 +9,7 @@ import { USER_ROLES } from '../../utils/constants';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { getOrCreateQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
 import { useTileLayout } from '../../hooks/useTileLayout';
+import { usePermissions } from '../../hooks/usePermissions';
 import CustomizableTileGrid from '../shared/CustomizableTileGrid';
 
 import MachineHeader from './machines/MachineHeader';
@@ -37,6 +38,7 @@ export default function MachineDetails({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { canManageDtr, canDeleteTechNotes } = usePermissions(user);
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
   const regionName =
     regions.find(r => r.id === machine.regionId)?.name || t('machines.details.unknownRegion');
@@ -149,16 +151,8 @@ export default function MachineDetails({
           <MachineDTR
             machine={machine}
             user={user}
-            canManage={
-              user?.role === USER_ROLES.ADMIN ||
-              user?.role === USER_ROLES.SUPERADMIN ||
-              (user?.permissions || []).includes('manage_dtr')
-            }
-            canDeleteNotes={
-              user?.role === 'admin' ||
-              user?.role === 'superadmin' ||
-              (user?.permissions || []).includes('delete_tech_notes')
-            }
+            canManage={canManageDtr}
+            canDeleteNotes={canDeleteTechNotes}
           />
         ),
       },
