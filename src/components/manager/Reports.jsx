@@ -1,7 +1,6 @@
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../store/managerStore';
-﻿
-import React, { useState, useEffect } from 'react';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
 import ApiSettingsPanel from './reports/ApiSettingsPanel';
@@ -9,18 +8,15 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
-
 export default function Reports() {
   const { t } = useTranslation();
-  const tickets = useManagerStore(state => state.tickets);
   const machines = useManagerStore(state => state.machines);
-  const plannedServices = useManagerStore(state => state.plannedServices);
 
   const [loading, setLoading] = useState(false);
   const [plannedWarningDays, setPlannedWarningDaysState] = useState(30);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'tenants', getCurrentTenant(), 'settings', "general"), (docSnap) => {
+    const unsub = onSnapshot(doc(db, 'tenants', getCurrentTenant(), 'settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.plannedWarningDays !== undefined) {
@@ -44,7 +40,7 @@ export default function Reports() {
 
   const saveWarningDays = async (val) => {
     try {
-      await setDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', "general"), {
+      await setDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', 'general'), {
         plannedWarningDays: parseInt(val, 10)
       }, { merge: true });
     } catch (e) {
@@ -53,33 +49,36 @@ export default function Reports() {
   };
 
   return (
-    <div className="p-6 animate-fade-in max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-3xl font-black text-gray-800 tracking-tight">{t("dashboards.reports_title")}</h2>
-          <p className="text-gray-500 mt-2">{t("dashboards.reports_desc")}</p>
+    <div className="p-2 sm:p-6 animate-fade-in w-full max-w-5xl min-w-0 mx-auto">
+      <div className="flex justify-between items-center mb-5 sm:mb-8">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-3xl font-black text-gray-800 tracking-tight break-words">{t("dashboards.reports_title")}</h2>
+          <p className="text-xs sm:text-base text-gray-500 mt-1 sm:mt-2 break-words">{t("dashboards.reports_desc")}</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6">
-        
+      <div className="flex flex-col gap-4 sm:gap-6 min-w-0">
         {/* Panel PDF */}
         <KPIReportPanel machines={machines} />
         <ApiSettingsPanel />
 
         {/* Raport Audytorski */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <i className="ph ph-file-xls text-blue-600 text-2xl"></i> {t("dashboards.audit_report")}</h2>
-            <p className="text-sm text-gray-500 max-w-2xl mt-1"> {t("dashboards.audit_desc")} </p>
+        <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2 break-words">
+              <i className="ph ph-file-xls text-blue-600 text-2xl shrink-0"></i>
+              <span>{t("dashboards.audit_report")}</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500 max-w-2xl mt-1 break-words leading-relaxed">
+              {t("dashboards.audit_desc")}
+            </p>
           </div>
-          
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={handleGenerateAuditorReport}
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 whitespace-nowrap text-sm"
+              className="w-full sm:w-auto justify-center bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl shadow-xs transition-colors flex items-center gap-2 whitespace-nowrap text-sm cursor-pointer"
             >
               {loading ? (
                 <>
@@ -93,19 +92,21 @@ export default function Reports() {
             </button>
           </div>
         </div>
-        
+
         {/* Ostrzeżenia Serwisu Planowanego (przeniesione z Ustawień) */}
-        <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
-              <i className="ph ph-warning-circle text-amber-600 text-2xl"></i> {t("dashboards.planned_warnings")}</h2>
-            <p className="text-sm text-amber-800 max-w-2xl mt-1">
-              Pinezki na mapie będą podświetlone na żółto, gdy zbliża się termin przeglądu. Ustaw z jakim wyprzedzeniem system ma zacząć ostrzegać.
+        <div className="bg-amber-50 p-4 sm:p-6 rounded-xl border border-amber-100 shadow-xs flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2 break-words">
+              <i className="ph ph-warning-circle text-amber-600 text-2xl shrink-0"></i>
+              <span>{t("dashboards.planned_warnings")}</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-amber-800 max-w-2xl mt-1 break-words leading-relaxed">
+              {t("dashboards.planned_desc", "Pinezki na mapie będą podświetlone na żółto, gdy zbliża się termin przeglądu. Ustaw z jakim wyprzedzeniem system ma zacząć ostrzegać.")}
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-amber-200 shadow-sm">
-            <input 
-              type="number" 
+          <div className="flex items-center justify-center sm:justify-start gap-2 bg-white px-4 py-2 rounded-xl border border-amber-200 shadow-xs w-full sm:w-auto">
+            <input
+              type="number"
               value={plannedWarningDays}
               onChange={(e) => {
                 setPlannedWarningDaysState(e.target.value);
@@ -118,9 +119,7 @@ export default function Reports() {
             <span className="text-amber-700 font-bold text-sm">{t("dashboards.days_before")}</span>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
-

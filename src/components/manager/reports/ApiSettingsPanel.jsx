@@ -87,48 +87,49 @@ export default function ApiSettingsPanel() {
   
 
   return (
-    <div className="bg-slate-900 p-6 rounded-xl shadow-lg border border-slate-800 flex flex-col gap-4 text-white">
-      <div>
-        <h2 className="text-lg font-bold flex items-center gap-2 text-white">
-          <i className="ph ph-plugs-connected text-emerald-400 text-2xl"></i>
-          Integracje API (np. BIM, ERP)
+    <div className="bg-slate-900 p-4 sm:p-6 rounded-xl shadow-lg border border-slate-800 flex flex-col gap-4 text-white w-full min-w-0 overflow-hidden">
+      <div className="min-w-0">
+        <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 text-white break-words">
+          <i className="ph ph-plugs-connected text-emerald-400 text-2xl shrink-0"></i>
+          <span>Integracje API (np. BIM, ERP)</span>
         </h2>
-        <p className="text-sm text-slate-400 mt-1 max-w-3xl">
+        <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl break-words leading-relaxed">
           Zarządzaj kluczami dostępu do API REST. Przekaż wygenerowany klucz w nagłówku <code className="text-emerald-300 bg-slate-800 px-1 py-0.5 rounded">x-api-key</code> swoim systemom zewnętrznym, aby mogły automatycznie komunikować się z aplikacją.
         </p>
       </div>
       
-      <div className="flex gap-2 items-center mt-2">
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center mt-1 w-full min-w-0">
         <input 
           type="text" 
           value={newKeyName}
           onChange={e => setNewKeyName(e.target.value)}
           placeholder="Nazwa systemu (np. BIM Zdalny)"
-          className="flex-1 bg-slate-800 border border-slate-700 p-2 rounded-lg text-white outline-none focus:border-emerald-500"
+          className="w-full sm:flex-1 min-w-0 bg-slate-800 border border-slate-700 p-2.5 rounded-lg text-sm text-white outline-none focus:border-emerald-500"
         />
         <button 
           onClick={handleCreateKey}
           disabled={loading}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+          className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors whitespace-nowrap text-sm flex items-center cursor-pointer"
         >
           {loading ? 'Przetwarzanie...' : 'Generuj nowy klucz'}
         </button>
       </div>
 
       {apiKeys.length > 0 && (
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-2 flex flex-col gap-2 min-w-0">
           <h3 className="text-xs font-bold uppercase text-slate-500 tracking-wider">Aktywne klucze</h3>
           {apiKeys.map(key => (
-            <div key={key.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-800 p-3 rounded-lg border border-slate-700 gap-3">
-              <div>
-                <div className="font-bold text-slate-200">{key.name}</div>
-                <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                  Klucz: <span className="font-mono text-emerald-400 bg-slate-900 px-2 py-0.5 rounded tracking-widest">{key.prefix || key.id.substring(0, 9)}...</span>
+            <div key={key.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-800 p-3 rounded-lg border border-slate-700 gap-3 min-w-0">
+              <div className="min-w-0 w-full sm:w-auto">
+                <div className="font-bold text-slate-200 break-words">{key.name}</div>
+                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1 mt-1">
+                  <span>Klucz:</span>
+                  <span className="font-mono text-emerald-400 bg-slate-900 px-2 py-0.5 rounded tracking-widest break-all">{key.prefix || key.id.substring(0, 9)}...</span>
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 {/* Kopiowanie wyłączone (haszowanie) */}
-                <button onClick={() => handleDeleteKey(key.id)} className="flex-1 sm:flex-none text-xs bg-red-900/50 hover:bg-red-800 text-red-200 px-3 py-1.5 rounded font-bold transition-colors">Usuń</button>
+                <button onClick={() => handleDeleteKey(key.id)} className="flex-1 sm:flex-none text-xs bg-red-900/50 hover:bg-red-800 text-red-200 px-3 py-1.5 rounded font-bold transition-colors cursor-pointer">Usuń</button>
               </div>
             </div>
           ))}

@@ -265,11 +265,11 @@ export default function KPIDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-20">
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 lg:p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black tracking-tight mb-2 flex items-center gap-3">
-            <i className="ph ph-chart-line-up text-blue-300"></i> Dashboard KPI (Awarie)
+    <div className="w-full max-w-7xl min-w-0 mx-auto space-y-6 pb-20">
+      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 sm:p-6 lg:p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight mb-1 sm:mb-2 flex items-center gap-2.5 sm:gap-3 break-words">
+            <i className="ph ph-chart-line-up text-blue-300 shrink-0"></i> Dashboard KPI (Awarie)
           </h1>
           <p className="text-blue-100 text-sm lg:text-base opacity-90">
             Statystyki awarii, czasy reakcji (MTTR) i rozkład zgłoszeń

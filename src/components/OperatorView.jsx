@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import OperatorScanner from './operator/OperatorScanner';
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, addDoc, doc, getDoc, serverTimestamp, setDoc, query, where, getDocs, limit } from 'firebase/firestore';
@@ -16,6 +17,7 @@ import { useAuth } from '../hooks/useAuth';
 
 
 export default function OperatorView({ initialMachineId, onSwitchView }) {
+  const { t, i18n } = useTranslation();
   const { user, logout: onLogout } = useAuth();
   // Odczytaj tenant z prawdziwego URL (przed hashem) – HashRouter tego nie widzi
   useEffect(() => {
@@ -223,14 +225,23 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     <div className="min-h-screen bg-gray-100 flex flex-col relative">
 
 
-      <header className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            Zgłoś Awarię
-            <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></span>
+      <header className="bg-blue-900 text-white p-3.5 sm:p-4 flex justify-between items-center shadow-md gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2 truncate">
+            <span>{t('login.report_fault_btn', 'Zgłoś Awarię')}</span>
+            <span className={`w-3 h-3 rounded-full shrink-0 ${isOnline ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></span>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => i18n.changeLanguage((i18n.language || 'pl').startsWith('pl') ? 'en' : 'pl')}
+            className="flex items-center gap-1 bg-blue-800 hover:bg-blue-700 px-2.5 py-2 rounded transition-colors text-xs sm:text-sm font-bold cursor-pointer"
+            title={t('sidebar.language', 'Język / Language')}
+          >
+            <i className="ph ph-globe text-base"></i>
+            <span>{(i18n.language || 'pl').startsWith('pl') ? 'PL' : 'EN'}</span>
+          </button>
           {onSwitchView && (
             <button 
               onClick={onSwitchView} 
@@ -238,12 +249,12 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
               title="Wróć do Dyspozytorni"
             >
               <i className="ph ph-desktop text-xl"></i>
-              <span className="hidden sm:inline">Dyspozytornia</span>
+              <span className="hidden sm:inline">{t('login.control_room', 'Dyspozytornia')}</span>
             </button>
           )}
-          <button onClick={onLogout} className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded transition-colors text-sm sm:text-base">
-            <i className="ph ph-sign-out text-xl"></i>
-            <span>Wyjdź</span>
+          <button onClick={onLogout} className="flex items-center gap-1.5 bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded transition-colors text-xs sm:text-base cursor-pointer">
+            <i className="ph ph-sign-out text-lg sm:text-xl"></i>
+            <span>{t('login.exit', 'Wyjdź')}</span>
           </button>
         </div>
       </header>

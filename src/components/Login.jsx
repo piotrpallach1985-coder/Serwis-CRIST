@@ -1,24 +1,27 @@
 import PropTypes from 'prop-types';
 import QRScannerModal from './shared/QRScannerModal';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { loginWithEmail, loginAnon, subscribeToGeneralSettings, subscribeToBranding } from '../services/auth.service';
 import { parseQrPayload } from '../services/qrAccess.service';
-
-
-import { generateAuditorReport } from '../utils/reports/auditorExport';
 
 import { USER_ROLES } from '../utils/constants';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
 
-
 export default function Login({ onLogin, currentUser }) {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [isScanning, setIsScanning] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const currentLang = (i18n.language || 'pl').startsWith('pl') ? 'pl' : 'en';
+  const toggleLanguage = () => {
+    i18n.changeLanguage(currentLang === 'pl' ? 'en' : 'pl');
+  };
 
   // Automatyczne przekierowanie gdy wejście z linku QR (bez logowania)
   useEffect(() => {
@@ -66,7 +69,6 @@ export default function Login({ onLogin, currentUser }) {
   const [modSettings, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
   const [errorMsg, setErrorMsg] = useState('');
   
-  const [dbStatus, setDbStatus] = useState('checking'); 
   const [loginModalTarget, setLoginModalTarget] = useState(null); 
 
   const tenantId = useManagerStore(state => state.tenantId);
@@ -120,31 +122,33 @@ export default function Login({ onLogin, currentUser }) {
     setErrorMsg('');
     try {
       const userData = await loginWithEmail(email.trim(), password);
-        let targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
-          let targetTab = targetModule === 'home' ? 'home' : undefined;
-          
-          if (userData.role === 'superadmin') {
-            targetModule = 'system_admin';
-            targetTab = 'superadmin';
-          }
+      let targetModule = (loginModalTarget && loginModalTarget !== 'login_only') ? loginModalTarget : 'home';
+      let targetTab = targetModule === 'home' ? 'home' : undefined;
+      
+      if (userData.role === 'superadmin') {
+        targetModule = 'system_admin';
+        targetTab = 'superadmin';
+      }
 
-          window.history.replaceState(
-            { module: targetModule, tab: targetTab }, 
-            '', 
-            `?module=${targetModule}${targetTab ? '&tab=' + targetTab : ''}`
-          );
-        onLogin({ 
-          uid: userData.uid,
-          name: userData.name || email, 
-          role: userData.role || 'brak',
-            permissions: userData.permissions || [],
-            phone: userData.phone || "",
-            tenantId: getCurrentTenant() 
-        });
-        setLoginModalTarget(null);
+      window.history.replaceState(
+        { module: targetModule, tab: targetTab }, 
+        '', 
+        `?module=${targetModule}${targetTab ? '&tab=' + targetTab : ''}`
+      );
+      onLogin({ 
+        uid: userData.uid,
+        name: userData.name || email, 
+        role: userData.role || 'brak',
+        permissions: userData.permissions || [],
+        phone: userData.phone || "",
+        tenantId: getCurrentTenant() 
+      });
+      setLoginModalTarget(null);
     } catch (err) {
       console.error(err);
-      if (err.message === 'USER_NO_ROLE') { setErrorMsg('Zalogowano, ale brak przypisanej roli.'); } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      if (err.message === 'USER_NO_ROLE') {
+        setErrorMsg('Zalogowano, ale brak przypisanej roli.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         setErrorMsg('Nieprawidłowy e-mail lub hasło.');
       } else {
         setErrorMsg('Błąd: ' + err.message);
@@ -173,61 +177,50 @@ export default function Login({ onLogin, currentUser }) {
     }
   };
 
-  const tiles = [
-    {
-      id: 'dtr_scanner',
-      title: 'Skaner QR',
-      desc: '',
-      icon: 'ph-qr-code',
-      color: 'bg-blue-600 hover:bg-blue-700',
-      iconBg: 'bg-blue-50 text-blue-600',
-      action: () => setIsScanning(true)
-    },
-    {
-      id: 'ur_panel',
-      title: 'Panel UR',
-      desc: '',
-      icon: 'ph-wrench',
-      color: 'bg-red-600 hover:bg-red-700',
-      iconBg: 'bg-red-50 text-red-600',
-      action: () => handleTileClick('tickets')
-    },
-    {
-      id: 'master_data',
-      title: 'Administrator',
-      desc: '',
-      icon: 'ph-database',
-      color: 'bg-[#111827] hover:bg-gray-800',
-      iconBg: 'bg-gray-100 text-[#111827]',
-      action: () => handleTileClick('master_data')
-    },
-    {
-      id: 'admin_program',
-      title: 'Administrator Programu',
-      desc: '',
-      icon: 'ph-gear',
-      color: 'bg-gray-600 hover:bg-gray-700',
-      iconBg: 'bg-gray-50 text-gray-600',
-      action: () => alert('Panel Administratora Programu w budowie')
-    }
-  ];
-
   return (
     <div className="min-h-[100svh] bg-[#f8f9fa] flex flex-col items-center justify-start p-2 sm:p-4 text-[#111827] relative">
       
+      {/* Top Bar / Language Switcher on Start Screen */}
+      {!currentUser && (
+        <div className="w-full max-w-4xl flex items-center justify-end px-2 pt-2 sm:pt-3 z-40">
+          <button
+            type="button"
+            onClick={toggleLanguage}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs transition-all text-xs sm:text-sm font-bold cursor-pointer"
+            title={t('sidebar.language', 'Język / Language')}
+          >
+            <i className="ph ph-globe text-base sm:text-lg text-blue-600"></i>
+            <span className={currentLang === 'pl' ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}>PL</span>
+            <span className="text-slate-300">/</span>
+            <span className={currentLang === 'en' ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}>EN</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Bar for Logged in Users */}
       {currentUser && currentUser.role !== 'operator' && (
         <div className="absolute top-0 left-0 w-full flex items-center justify-between p-4 z-50">
           <div className="flex items-center bg-white rounded-xl shadow-sm px-4 py-2">
             <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="VexoNT" className="h-6 sm:h-8 object-contain" />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs transition-all text-xs sm:text-sm font-bold cursor-pointer"
+              title={t('sidebar.language', 'Język / Language')}
+            >
+              <i className="ph ph-globe text-base text-blue-600"></i>
+              <span className={currentLang === 'pl' ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}>PL</span>
+              <span className="text-slate-300">/</span>
+              <span className={currentLang === 'en' ? 'text-blue-600 font-black' : 'text-slate-400 font-semibold'}>EN</span>
+            </button>
             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
               {currentUser.name.substring(0,2).toUpperCase()}
             </div>
-            <button onClick={() => onLogin(null)} className="flex items-center gap-1.5 bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 px-3 py-2 rounded-xl transition-colors font-bold text-sm shadow-sm">
+            <button onClick={() => onLogin(null)} className="flex items-center gap-1.5 bg-red-50 text-red-500 hover:bg-red-100 border border-red-100 px-3 py-2 rounded-xl transition-colors font-bold text-sm shadow-sm cursor-pointer">
               <i className="ph ph-sign-out text-lg"></i>
-              <span className="hidden sm:inline">Wyloguj</span>
+              <span className="hidden sm:inline">{t('login.logout', 'Wyloguj')}</span>
             </button>
           </div>
         </div>
@@ -235,14 +228,14 @@ export default function Login({ onLogin, currentUser }) {
 
       {!currentUser ? (
         <>
-          <div className="pt-12 md:pt-24 mb-6 md:mb-12 text-center animate-fade-in-up mt-8 sm:mt-0">
+          <div className="pt-4 sm:pt-12 md:pt-16 mb-5 md:mb-10 text-center animate-fade-in-up">
             <div className="flex justify-center mb-3 sm:mb-5">
               <div className="shrink-0 rounded-3xl overflow-hidden">
                 <img src={branding?.appLogoUrl || './pwa-192x192.jpg'} alt="App Logo" className="h-16 sm:h-24 object-contain rounded-3xl" />
               </div>
             </div>
-            <h1 className="font-black text-xl sm:text-2xl leading-tight tracking-wide text-blue-900 mb-6">
-              MAINTENANCE SYSTEM
+            <h1 className="font-black text-xl sm:text-2xl leading-tight tracking-wide text-blue-900 mb-2 sm:mb-4">
+              {t('login.system_title', 'MAINTENANCE SYSTEM')}
             </h1>
           </div>
 
@@ -254,10 +247,10 @@ export default function Login({ onLogin, currentUser }) {
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-4 bg-yellow-50 text-yellow-500 animate-pulse">
                 <i className="ph-fill ph-warning text-2xl md:text-3xl"></i>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">Zgłoszenie Awarii</h2>
-              <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.</p>
+              <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">{t('login.report_fault_title', 'Zgłoszenie Awarii')}</h2>
+              <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">{t('login.report_fault_desc', 'Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.')}</p>
               <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
-                Zgłoś awarię <i className="ph ph-arrow-right font-bold"></i>
+                {t('login.report_fault_btn', 'Zgłoś awarię')} <i className="ph ph-arrow-right font-bold"></i>
               </button>
             </div>
 
@@ -268,10 +261,10 @@ export default function Login({ onLogin, currentUser }) {
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-4 bg-blue-50 text-blue-600">
                 <i className="ph-fill ph-gear text-2xl md:text-3xl animate-[spin_4s_linear_infinite]"></i>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">Utrzymanie Ruchu</h2>
-              <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">Dostęp dla autoryzowanych pracowników działu Utrzymania Ruchu.</p>
+              <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">{t('login.maintenance_title', 'Utrzymanie Ruchu')}</h2>
+              <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">{t('login.maintenance_desc', 'Dostęp dla autoryzowanych pracowników działu Utrzymania Ruchu.')}</p>
               <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
-                Zaloguj się <i className="ph ph-lock-key font-bold"></i>
+                {t('login.login_btn', 'Zaloguj się')} <i className="ph ph-lock-key font-bold"></i>
               </button>
             </div>
           </div>
@@ -294,7 +287,7 @@ export default function Login({ onLogin, currentUser }) {
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-1">{branding?.companyName || 'VexoNT'}</h1>
             <h2 className="text-xs md:text-sm font-bold text-blue-600 uppercase tracking-widest mb-6">{branding?.systemSubtitle || 'DYSPOZYTORNIA UR'}</h2>
             
-            <h3 className="text-lg md:text-xl font-bold text-slate-800">Wybierz moduł do pracy</h3>
+            <h3 className="text-lg md:text-xl font-bold text-slate-800">{t('login.choose_module', 'Wybierz moduł do pracy')}</h3>
           </div>
 
           {/* Tiles Grid */}
@@ -312,7 +305,7 @@ export default function Login({ onLogin, currentUser }) {
                     <i className="ph ph-waves text-xl md:text-2xl"></i>
                   </div>
                 </div>
-                <h3 className="font-bold text-gray-900 text-sm md:text-lg">Skaner QR/NFC</h3>
+                <h3 className="font-bold text-gray-900 text-sm md:text-lg">{t('login.qr_nfc_scanner', 'Skaner QR/NFC')}</h3>
               </div>
 
               {/* Panel UR */}
@@ -323,7 +316,7 @@ export default function Login({ onLogin, currentUser }) {
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-[3px] md:border-[4px] border-[#ed6d24] text-[#ed6d24] flex items-center justify-center mb-3 md:mb-5">
                   <i className="ph ph-wrench text-3xl md:text-4xl"></i>
                 </div>
-                <h3 className="font-bold text-gray-900 text-sm md:text-lg">Panel UR</h3>
+                <h3 className="font-bold text-gray-900 text-sm md:text-lg">{t('login.ur_panel', 'Panel UR')}</h3>
               </div>
 
             </div>
@@ -340,7 +333,7 @@ export default function Login({ onLogin, currentUser }) {
                     <i className="ph-fill ph-gear absolute -bottom-1 -right-1 text-base md:text-xl text-gray-800"></i>
                   </div>
                 </div>
-                <h3 className="font-bold text-gray-900 text-sm md:text-lg">Administrator</h3>
+                <h3 className="font-bold text-gray-900 text-sm md:text-lg">{t('login.admin_panel', 'Administrator')}</h3>
               </div>
             </div>
           </div>
@@ -351,16 +344,16 @@ export default function Login({ onLogin, currentUser }) {
         isOpen={isScanning} 
         onClose={() => setIsScanning(false)} 
         onScanSuccess={handleScanSuccess} 
-        title="Skanuj kod QR maszyny"
-        subtitle="Skieruj aparat na kod QR, aby odczytać dokumenty DTR."
+        title={t('login.scan_qr_title', 'Skanuj kod QR maszyny')}
+        subtitle={t('login.scan_qr_subtitle', 'Skieruj aparat na kod QR, aby odczytać dokumenty DTR.')}
       />
 
       {loginModalTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 relative">
             <button 
               onClick={() => setLoginModalTarget(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             >
               <i className="ph ph-x text-2xl"></i>
             </button>
@@ -368,29 +361,29 @@ export default function Login({ onLogin, currentUser }) {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <i className="ph ph-lock-key text-3xl text-gray-700"></i>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">Logowanie</h2>
-              <p className="text-gray-500 text-sm mt-1">Dostęp wymaga autoryzacji do wybranego modułu.</p>
+              <h2 className="text-2xl font-bold text-gray-800">{t('login.modal_title', 'Logowanie')}</h2>
+              <p className="text-gray-500 text-sm mt-1">{t('login.modal_desc', 'Dostęp wymaga autoryzacji do wybranego modułu.')}</p>
             </div>
             
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Adres e-mail</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t('login.email_label', 'Adres e-mail')}</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#111827] outline-none font-medium bg-gray-50"
-                  placeholder="twój.email@VexoNT.pl"
+                  className="w-full p-3.5 sm:p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#111827] outline-none font-medium bg-gray-50"
+                  placeholder={t('login.email_placeholder', 'twój.email@VexoNT.pl')}
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Hasło</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t('login.password_label', 'Hasło')}</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#111827] outline-none font-medium bg-gray-50"
+                  className="w-full p-3.5 sm:p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#111827] outline-none font-medium bg-gray-50"
                   placeholder="••••••••"
                   required
                 />
@@ -399,9 +392,9 @@ export default function Login({ onLogin, currentUser }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#111827] hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-2 md:py-3 rounded-xl transition-colors mt-4 shadow-md flex items-center justify-center gap-2"
+                className="w-full bg-[#111827] hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-2.5 md:py-3 rounded-xl transition-colors mt-4 shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                {loading ? 'Logowanie...' : 'Zaloguj się i przejdź'}
+                {loading ? t('login.logging_in', 'Logowanie...') : t('login.login_submit', 'Zaloguj się i przejdź')}
               </button>
             </form>
           </div>
