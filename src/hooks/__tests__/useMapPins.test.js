@@ -218,4 +218,31 @@ describe('useMapPins', () => {
     expect(sub2Result.current.pinData[0].type).toBe('machine');
     expect(sub2Result.current.pinData[0].status).toBe('critical');
   });
+
+  it('does not show main-map machine pin when viewing a submap (e.g. SD2 without map or pinnedOnMap=main)', () => {
+    const testRegions = [
+      { id: 'sd2', name: 'SD2', xPercent: 30, yPercent: 40, mapImageUrl: '' }
+    ];
+    const machines = [
+      { id: 'm1', name: 'Maszyna przypięta na głównej', regionId: 'sd2', xPercent: 55, yPercent: 35, pinnedOnMap: 'main' },
+      { id: 'm2', name: 'Maszyna legacy bez podmapy', regionId: 'sd2', xPercent: 60, yPercent: 40 },
+      { id: 'm3', name: 'Maszyna bez pinezki', regionId: 'sd2', xPercent: null, yPercent: null }
+    ];
+
+    const { result } = renderHook(() =>
+      useMapPins({
+        tickets: [],
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: testRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: 'sd2',
+        draggingPin: null
+      })
+    );
+
+    expect(result.current.pinData).toHaveLength(0);
+    expect(result.current.unpinnedData.unpinnedMachineCount).toBe(3);
+  });
 });

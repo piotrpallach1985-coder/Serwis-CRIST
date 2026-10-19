@@ -3,6 +3,7 @@
  * Wyciągnięty z Map.jsx (linie 1225–1290).
  */
 import { useTranslation } from 'react-i18next';
+import { isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
 
 export default function MapEditModal({
   isModalOpen,
@@ -30,8 +31,8 @@ export default function MapEditModal({
   };
 
   const getUnpinnedItems = () => {
+    const activeRegions = regions.filter(r => !r.isDeleted);
     if (editingType === 'region') {
-      const activeRegions = regions.filter(r => !r.isDeleted);
       if (currentSubmapId === null) {
         return activeRegions.filter(r => !r.parentId && (r.xPercent == null || r.yPercent == null));
       } else {
@@ -46,7 +47,7 @@ export default function MapEditModal({
     } else {
       const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
       if (currentSubmapId !== null) {
-        return mainMachines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
+        return mainMachines.filter(m => m.regionId === currentSubmapId && !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions));
       }
       return mainMachines.filter(m => m.xPercent == null || m.yPercent == null);
     }

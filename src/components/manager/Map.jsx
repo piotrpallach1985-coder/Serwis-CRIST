@@ -356,6 +356,7 @@ export default function ShipyardMap({
   const handleMapClick = (e) => {
     if (mode === 'view') { setHoveredPin(null); return; }
     if (mode !== 'edit' || draggingPin) return;
+    if (!isGoogleMap && !currentMapUrl) return;
     const boundsContainer = document.getElementById('map-bounds-container');
     if (!boundsContainer) return;
     const rect = boundsContainer.getBoundingClientRect();
@@ -386,7 +387,12 @@ export default function ShipyardMap({
 
   const handleDeletePin = async (id, type) => {
     if (confirm(t('map_component.delete_pin_confirm'))) {
-      try { await updateDoc(doc(db, 'tenants', getCurrentTenant(), type === 'region' ? 'regions' : 'machines', id), { xPercent: null, yPercent: null }); }
+      try {
+        const clearFields = type === 'machine'
+          ? { xPercent: null, yPercent: null, pinnedOnMap: null }
+          : { xPercent: null, yPercent: null };
+        await updateDoc(doc(db, 'tenants', getCurrentTenant(), type === 'region' ? 'regions' : 'machines', id), clearFields);
+      }
       catch (error) { console.error('Błąd usuwania pinezki:', error); }
     }
   };
@@ -474,7 +480,7 @@ export default function ShipyardMap({
 
           {/* Pinezki */}
           <div className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center pointer-events-none" style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 100 }}>
-            {imgBounds.width > 0 && (
+            {(isGoogleMap || Boolean(currentMapUrl)) && imgBounds.width > 0 && (
               <div id="map-bounds-container" className="absolute pointer-events-none" style={{ width: `${imgBounds.width}px`, height: `${imgBounds.height}px` }}>
                 {mode === 'edit' && !draggingPin && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none flex items-center justify-center z-10">

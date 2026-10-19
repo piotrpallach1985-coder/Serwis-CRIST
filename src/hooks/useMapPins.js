@@ -65,6 +65,16 @@ function regionHasOwnMap(region, regions) {
   return false;
 }
 
+export function isMachinePinnedOnSubmap(machine, submapId, activeRegions = []) {
+  if (!machine || machine.regionId !== submapId) return false;
+  if (machine.xPercent == null || machine.yPercent == null) return false;
+  if (machine.pinnedOnMap === 'main') return false;
+  if (machine.pinnedOnMap === 'submap' || machine.pinnedOnMap === submapId) return true;
+  if (machine.pinnedOnMap && machine.pinnedOnMap !== submapId) return false;
+  const reg = activeRegions.find(r => r.id === submapId);
+  return regionHasOwnMap(reg, activeRegions);
+}
+
 /**
  * useMapPins — Hook obliczający listę pinezek do wyświetlenia na mapie.
  * Obsługuje Mapę Główną oraz wielopoziomowe podmapy (podmapy w podmapach).
@@ -223,9 +233,9 @@ export function useMapPins({
         pins.push(buildRegionPin(subRegion));
       });
 
-      // PODMAPA — Maszyny z tego rejonu
+      // PODMAPA — Maszyny przypięte bezpośrednio na tej podmapie (nie na mapie głównej)
       machines.forEach(machine => {
-        if (machine.regionId !== currentSubmapId || machine.xPercent == null || machine.yPercent == null) return;
+        if (!isMachinePinnedOnSubmap(machine, currentSubmapId, activeRegions)) return;
         pins.push(buildMachinePin(machine));
       });
     }
@@ -284,7 +294,7 @@ export function useMapPins({
       return { status, unpinnedCount, unpinnedMachineCount: unpinnedMachines.length };
     } else {
       // PODMAPA: "Bez pineski" w bieżącym rejonie
-      const unpinnedMachines = machines.filter(m => m.regionId === currentSubmapId && (m.xPercent == null || m.yPercent == null));
+      const unpinnedMachines = machines.filter(m => m.regionId === currentSubmapId && !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions));
       const unpinnedMachineIds = new Set(unpinnedMachines.map(m => m.id));
 
       if (modeType === 'tickets') {
@@ -293,7 +303,7 @@ export function useMapPins({
           const isThisRegion = t.regionId === currentSubmapId || unpinnedMachineIds.has(t.machineId);
           if (!isThisRegion) return false;
           const machObj = machines.find(m => m.id === t.machineId || matchesMachineName(t.machineName, m.name));
-          if (machObj && machObj.xPercent != null && machObj.yPercent != null) return false;
+          if (machObj && isMachinePinnedOnSubmap(machObj, currentSubmapId, activeRegions)) return false;
           return true;
         });
         if (activeTickets.length > 0) status = activeTickets.some(t => t.isCritical) ? 'critical' : 'warning';
@@ -303,7 +313,7 @@ export function useMapPins({
           if (p.status !== 'pending' && p.status !== 'in_progress') return false;
           const machObj = machines.find(m => m.id === p.machineId);
           if (!machObj || machObj.regionId !== currentSubmapId) return false;
-          return machObj.xPercent == null || machObj.yPercent == null;
+          return !isMachinePinnedOnSubmap(machObj, currentSubmapId, activeRegions);
         });
         activePlans.forEach(p => {
           const machine = machines.find(m => m.id === p.machineId);
@@ -315,7 +325,7 @@ export function useMapPins({
 
       return { status, unpinnedCount, unpinnedMachineCount: unpinnedMachines.length };
     }
-  }, [tickets, plannedServices, modeType, machines, currentSubmapId, plannedWarningDays]);
+  }, [tickets, plannedServices, modeType, machines, activeRegions, currentSubmapId, plannedWarningDays]);
 
   return { pinData, displayPins, unpinnedData };
 }
