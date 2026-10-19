@@ -33,7 +33,7 @@ service cloud.firestore {
 
     function isStaff() {
       let data = getUserData();
-      return isSignedIn() && isActiveUser() && (data.role == 'admin' || data.role == 'superadmin' || data.role == 'kierownik' || data.role == 'manager' || data.role == 'tech' || (data.role != 'operator'));
+      return isSignedIn() && isActiveUser() && ('role' in data) && (data.role is string) && data.role.size() > 0 && data.role != 'operator';
     }
 
     match /users/{userId} {

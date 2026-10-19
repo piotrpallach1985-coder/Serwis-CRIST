@@ -155,6 +155,8 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           });
 
           await batch.commit();
+          const { logAudit } = await import('../../services/audit.service');
+          logAudit('DELETE', 'MACHINE', id, { name, isDeleted: true });
 
           showToast(t('machines.toasts.machineArchived'));
           if (selectedMachine?.id === id) setSelectedMachine(null);

@@ -22,16 +22,17 @@ import { getCurrentTenant } from '../utils/tenantHelper';
 export const addPlannedService = async (serviceData) => {
   const tenantId = getCurrentTenant();
   const res = await addDoc(collection(db, 'tenants', tenantId, 'planned_services'), {
-
     ...serviceData,
     createdAt: serverTimestamp(),
     status: SERVICE_STATUS.PENDING,
     history: serviceData.history || []
   });
+  logAudit('CREATE', 'PLANNED_SERVICE', res.id, serviceData);
+  return res;
 };
 
 /**
- * Aktualizuje istniejÄ…cy plan serwisowy w bazie.
+ * Aktualizuje istniejący plan serwisowy w bazie.
  * 
  * @param {string} serviceId Identyfikator dokumentu serwisu
  * @param {Object} data Pola do zaktualizowania
@@ -45,18 +46,20 @@ export const updatePlannedService = async (serviceId, data) => {
 };
 
 /**
- * Wykonuje miÄ™kkie usuniÄ™cie (soft-delete) planu serwisowego.
+ * Wykonuje miękkie usunięcie (soft-delete) planu serwisowego.
  * 
- * @param {string} serviceId Identyfikator serwisu do usuniÄ™cia
+ * @param {string} serviceId Identyfikator serwisu do usunięcia
  * @returns {Promise<void>}
  */
 export const deletePlannedService = async (serviceId) => {
   const tenantId = getCurrentTenant();
-  return await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), { 
+  const res = await updateDoc(doc(db, 'tenants', tenantId, 'planned_services', serviceId), { 
     isDeleted: true, 
     deletedAt: serverTimestamp(), 
     deletedBy: 'System' 
   });
+  logAudit('DELETE', 'PLANNED_SERVICE', serviceId, { isDeleted: true });
+  return res;
 };
 
 /**

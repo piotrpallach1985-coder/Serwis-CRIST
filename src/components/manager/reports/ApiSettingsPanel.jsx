@@ -54,6 +54,8 @@ export default function ApiSettingsPanel() {
         active: true,
         createdAt: serverTimestamp()
       });
+      const { logAudit } = await import('../../../services/audit.service');
+      logAudit('CREATE', 'API_KEY', prefix, { name: newKeyName.trim() });
       setNewKeyName('');
       fetchApiKeys();
       alert('Twój nowy klucz API to:\n\n' + apiKey + '\n\nZapisz go teraz, ponieważ nie zostanie wyświetlony w całości ze względów bezpieczeństwa!');
@@ -70,6 +72,8 @@ export default function ApiSettingsPanel() {
       setLoading(true);
       try {
         await deleteDoc(doc(db, 'tenant_api_keys', keyId));
+        const { logAudit } = await import('../../../services/audit.service');
+        logAudit('DELETE', 'API_KEY', keyId.substring(0, 10), {});
         fetchApiKeys();
       } catch (e) {
         console.error(e);

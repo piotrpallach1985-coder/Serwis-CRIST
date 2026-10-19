@@ -4,6 +4,7 @@ import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { logAudit } from '../../services/audit.service';
 
 export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
   const { user } = useAuth();
@@ -37,6 +38,7 @@ export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
       };
 
       await updateDoc(machineRef, updateData);
+      logAudit('UPDATE', 'MACHINE', machine.id, { currentWorkHours: Number(newHours) });
       onClose();
     } catch (err) {
       console.error(err);

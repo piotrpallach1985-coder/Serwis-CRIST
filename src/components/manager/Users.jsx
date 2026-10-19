@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
@@ -76,9 +76,13 @@ export default function Users() {
         setPhone('');
       } else {
         // Tworzenie NOWEGO konta w bezpiecznym module Authentication
-        const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
-          const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), tempPassword);
+        const randomBytes = new Uint8Array(6);
+        crypto.getRandomValues(randomBytes);
+        const randomHex = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('');
+        const tempPassword = randomHex + "Aa1!";
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), tempPassword);
         const newUid = userCredential.user.uid;
+        await signOut(secondaryAuth);
 
         // Zapisanie roli i nazwy do bazy danych (BEZ HASŁA!)
         await addUser(newUid, {
@@ -95,8 +99,8 @@ export default function Users() {
         setRole(USER_ROLES.ADMIN);
         setPhone('');
           
-          alert(`Użytkownik został utworzony pomyślnie!\n\nE-mail: ${email.trim().toLowerCase()}\nTymczasowe hasło: ${tempPassword}\n\nSkopiuj to hasło i przekaż użytkownikowi.`);
-        }
+        alert(`Użytkownik został utworzony pomyślnie!\n\nE-mail: ${email.trim().toLowerCase()}\nTymczasowe hasło: ${tempPassword}\n\nSkopiuj to hasło i przekaż użytkownikowi.`);
+      }
       } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {

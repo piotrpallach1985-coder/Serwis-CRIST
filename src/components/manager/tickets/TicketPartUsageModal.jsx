@@ -116,6 +116,14 @@ export default function TicketPartUsageModal({ isOpen, onClose, ticketId, onPart
         });
       });
 
+      const { logAudit } = await import('../../../services/audit.service');
+      logAudit('ISSUE', 'PART', selectedPart.id, {
+        partName: selectedPart.name,
+        quantity: -qtyNum,
+        totalCost: finalCost,
+        referenceId: ticketId
+      });
+
       const partUnit = selectedPart.unit || 'szt.';
       alert(`Pobrano ${qtyNum} ${partUnit}: ${selectedPart.name}`);
       const costText = finalCost > 0 ? ` (Wartość: ${finalCost.toLocaleString('pl-PL')} PLN)` : '';
