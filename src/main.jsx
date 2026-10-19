@@ -6,9 +6,11 @@ import App from './App.jsx'
 import './index.css'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { initGlobalCrashReporting } from './services/crashReporter.js'
+import { initPWAInstallListener } from './utils/pwaHelper.js'
 import { AuthProvider } from './hooks/useAuth.jsx'
 
 initGlobalCrashReporting();
+initPWAInstallListener();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

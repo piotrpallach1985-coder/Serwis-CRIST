@@ -51,7 +51,13 @@
     "ai_usage_menu": "AI Usage",
     "saas_management_menu": "SaaS Management",
     "main_menu": "Main",
-    "logout_menu": "Logout"
+    "logout_menu": "Logout",
+    "install_app_pc": "Install PC App",
+    "install_app_title": "Install VexoNT on Desktop (PC)",
+    "install_app_desc": "You can run VexoNT as a standalone desktop application (with a Desktop and taskbar shortcut):",
+    "install_app_step1": "In Chrome or Edge, click the install icon (monitor with arrow) on the right side of the address bar.",
+    "install_app_step2": "Alternatively, open the browser menu (⋮) → Save and share (or Apps) → Install VexoNT.",
+    "install_app_close": "Got it"
   },
   "tickets": {
     "active_tickets_count": "Active tickets",

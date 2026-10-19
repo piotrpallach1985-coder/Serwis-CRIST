@@ -28,26 +28,37 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-192x192.jpg'],
       manifest: {
-        name: 'VexoNT System Utrzymania Ruchu',
+        id: './',
+        name: 'VexoNT - System Utrzymania Ruchu',
         short_name: 'VexoNT',
-        description: 'System zarzadzania awariami i serwisem VexoNT',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        description: 'System zarządzania awariami i serwisem VexoNT CMMS',
+        theme_color: '#1B253B',
+        background_color: '#1B253B',
         display: 'standalone',
-        scope: '/',
-        start_url: '/?source=pwa',
+        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+        orientation: 'any',
+        scope: './',
+        start_url: './?source=pwa',
         icons: [
           {
-            src: 'pwa-192x192.jpg',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/jpeg'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            src: 'pwa-512x512.jpg',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/jpeg'
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },

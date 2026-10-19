@@ -51,7 +51,13 @@
     "ai_usage_menu": "Zużycie AI",
     "saas_management_menu": "Zarządzanie SaaS",
     "main_menu": "Główny",
-    "logout_menu": "Wyloguj"
+    "logout_menu": "Wyloguj",
+    "install_app_pc": "Zainstaluj aplikację na PC",
+    "install_app_title": "Instalacja aplikacji VexoNT na komputerze (PC)",
+    "install_app_desc": "Możesz uruchamiać VexoNT jak natywną aplikację okienkową na komputerze (z ikoną na Pulpicie i pasku zadań):",
+    "install_app_step1": "W przeglądarce Chrome lub Edge kliknij ikonę instalacji (komputer ze strzałką) po prawej stronie paska adresu.",
+    "install_app_step2": "Alternatywnie otwórz menu przeglądarki (⋮) → Zapisz i udostępnij (lub Aplikacje) → Zainstaluj VexoNT.",
+    "install_app_close": "Rozumiem"
   },
   "tickets": {
     "active_tickets_count": "Aktywne awarie",

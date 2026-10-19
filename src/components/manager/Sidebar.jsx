@@ -1,4 +1,4 @@
-﻿import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 import React, { useState, useEffect } from 'react';
@@ -65,7 +65,7 @@ export default function Sidebar({
 
   return (
     <>
-      {/* TĹ‚o przyciemniajÄ…ce na mobile */}
+      {/* Tło przyciemniające na mobile */}
       <div 
         className={`fixed inset-0 bg-gray-900/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onSidebarClose}
@@ -90,7 +90,7 @@ export default function Sidebar({
           onNavigate={onNavigate}
         />
 
-        {/* GĹĂ“WNA LISTA NAWIGACYJNA (SCROLLOWANA) */}
+        {/* GŁÓWNA LISTA NAWIGACYJNA (SCROLLOWANA) */}
         <div className="flex-1 overflow-y-auto hide-scrollbar px-3 py-2 space-y-3">
           {isUrModule && (
             <SidebarNavUR 
