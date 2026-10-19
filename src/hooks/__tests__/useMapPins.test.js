@@ -219,9 +219,10 @@ describe('useMapPins', () => {
     expect(sub2Result.current.pinData[0].status).toBe('critical');
   });
 
-  it('does not show main-map machine pin when viewing a submap (e.g. SD2 without map or pinnedOnMap=main)', () => {
+  it('does not show pins on a submap that has no configured map (BRAK MAPY), even if it has child regions', () => {
     const testRegions = [
-      { id: 'sd2', name: 'SD2', xPercent: 30, yPercent: 40, mapImageUrl: '' }
+      { id: 'sd2', name: 'SD2', xPercent: 30, yPercent: 40, mapImageUrl: '' },
+      { id: 'przegroda_a', name: 'Przegroda A', parentId: 'sd2', xPercent: 25, yPercent: 25, mapImageUrl: '' }
     ];
     const machines = [
       { id: 'm1', name: 'Maszyna przypięta na głównej', regionId: 'sd2', xPercent: 55, yPercent: 35, pinnedOnMap: 'main' },

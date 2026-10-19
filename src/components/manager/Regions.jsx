@@ -6,6 +6,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addRegion, updateRegion, checkRegionInUse } from '../../services/dictionary.service';
+import InteractiveGoogleMap, { geocodeAddressQuery } from './map/InteractiveGoogleMap';
 
 
 export default function Regions() {
@@ -17,8 +18,11 @@ export default function Regions() {
   const [parentId, setParentId] = useState('');
   const [mapType, setMapType] = useState('image');
   const [googleQuery, setGoogleQuery] = useState('');
+  const [googleLat, setGoogleLat] = useState(54.5364);
+  const [googleLng, setGoogleLng] = useState(18.5469);
   const [googleZoom, setGoogleZoom] = useState(18);
   const [googleMapStyle, setGoogleMapStyle] = useState('k');
+  const [searchingGeo, setSearchingGeo] = useState(false);
   const [mapFile, setMapFile] = useState(null);
   const [mapImageUrl, setMapImageUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -108,12 +112,27 @@ export default function Regions() {
     setParentId('');
     setMapType('image');
     setGoogleQuery('');
+    setGoogleLat(54.5364);
+    setGoogleLng(18.5469);
     setGoogleZoom(18);
     setGoogleMapStyle('k');
     setMapFile(null);
     setMapImageUrl('');
     setUploadProgress(0);
     setEditingId(null);
+  };
+
+  const handleSearchRegionGeo = async () => {
+    if (!googleQuery.trim()) return;
+    setSearchingGeo(true);
+    const geo = await geocodeAddressQuery(googleQuery);
+    setSearchingGeo(false);
+    if (geo) {
+      setGoogleLat(geo.lat);
+      setGoogleLng(geo.lng);
+    } else {
+      alert('Nie znaleziono adresu — możesz przesunąć mapę ręcznie myszką.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -147,7 +166,11 @@ export default function Regions() {
         parentId: parentId || null,
         mapType: mapType || 'image',
         mapImageUrl: finalImageUrl || '',
-        googleQuery: googleQuery.trim(),
+        googleQuery: mapType === 'google'
+          ? (googleQuery.trim() || `${Number(googleLat).toFixed(5)}, ${Number(googleLng).toFixed(5)}`)
+          : googleQuery.trim(),
+        googleLat: Number(googleLat) || 54.5364,
+        googleLng: Number(googleLng) || 18.5469,
         googleZoom: Number(googleZoom) || 18,
         googleMapStyle: googleMapStyle || 'k',
       };
@@ -181,6 +204,8 @@ export default function Regions() {
     setParentId(r.parentId || '');
     setMapType(r.mapType || (r.googleQuery ? 'google' : 'image'));
     setGoogleQuery(r.googleQuery || '');
+    setGoogleLat(Number(r.googleLat) || 54.5364);
+    setGoogleLng(Number(r.googleLng) || 18.5469);
     setGoogleZoom(r.googleZoom || 18);
     setGoogleMapStyle(r.googleMapStyle || 'k');
     setEditingId(r.id);
@@ -339,14 +364,26 @@ export default function Regions() {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Adres osiedla / budynku lub współrzędne GPS</label>
-                    <input
-                      type="text"
-                      value={googleQuery}
-                      onChange={e => setGoogleQuery(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
-                      placeholder="np. Gdańsk, ul. Słoneczna 12 lub 54.3520, 18.6466"
-                    />
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Adres osiedla / budynku lub współrzędne GPS (lub przesuń mapę myszką poniżej)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={googleQuery}
+                        onChange={e => setGoogleQuery(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSearchRegionGeo(); } }}
+                        className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                        placeholder="np. Gdynia, ul. Cechowa lub Gdańsk, Słoneczna 12"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchRegionGeo}
+                        disabled={searchingGeo || !googleQuery.trim()}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold rounded flex items-center gap-1.5 shrink-0"
+                      >
+                        <i className={`ph ${searchingGeo ? 'ph-spinner-gap animate-spin' : 'ph-magnifying-glass'}`}></i>
+                        <span>Szukaj</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -356,7 +393,8 @@ export default function Regions() {
                         onChange={e => setGoogleMapStyle(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
                       >
-                        <option value="k">Satelita</option>
+                        <option value="k">Satelita + Ulice</option>
+                        <option value="s">Satelita (czysty)</option>
                         <option value="m">Drogowa</option>
                       </select>
                     </div>
@@ -364,7 +402,7 @@ export default function Regions() {
                       <label className="block text-xs font-bold text-gray-600 mb-1">Zoom ({googleZoom})</label>
                       <input
                         type="number"
-                        min="12"
+                        min="5"
                         max="20"
                         value={googleZoom}
                         onChange={e => setGoogleZoom(Number(e.target.value) || 18)}
@@ -373,15 +411,20 @@ export default function Regions() {
                     </div>
                   </div>
                 </div>
-                {googleQuery.trim() && (
-                  <div className="w-full h-44 rounded-lg overflow-hidden border border-gray-300 shadow-inner bg-slate-900">
-                    <iframe
-                      title="Podgląd Google Maps"
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(googleQuery.trim())}&t=${googleMapStyle || 'k'}&z=${googleZoom || 18}&ie=UTF8&iwloc=&output=embed`}
-                      className="w-full h-full border-0 pointer-events-none"
-                    />
-                  </div>
-                )}
+                <div className="w-full h-56 rounded-lg overflow-hidden border border-emerald-400 shadow-inner bg-slate-900">
+                  <InteractiveGoogleMap
+                    lat={googleLat}
+                    lng={googleLng}
+                    zoom={googleZoom}
+                    mapStyle={googleMapStyle}
+                    interactive={true}
+                    onViewChange={(next) => {
+                      setGoogleLat(next.lat);
+                      setGoogleLng(next.lng);
+                      setGoogleZoom(next.zoom);
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>

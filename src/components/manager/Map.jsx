@@ -3,31 +3,28 @@ import MapLegend from './map/MapLegend';
 import MapPin from './map/MapPin';
 import { useManagerStore } from '../../store/managerStore';
 import MapControls from './map/MapControls';
+import InteractiveGoogleMap, { geocodeAddressQuery } from './map/InteractiveGoogleMap';
 import { useTranslation } from 'react-i18next';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { updateMapSettings, updateRegion, updateMachineRegion, subscribeToMapSettings } from '../../services/machines.service';
 import { doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
-import { safeParseDate } from '../../utils/dateHelpers';
 
 import { useMapPins } from '../../hooks/useMapPins';
 import MapEditModal from './MapEditModal';
-import { USER_ROLES, TICKET_STATUS, SERVICE_STATUS, PIN_STATUS } from '../../utils/constants';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
-
-// Globalny cache dla obrazĂłw mapy (dziaĹ‚a do wylogowania/odĹ›wieĹĽenia)
+// Globalny cache dla obrazów mapy (działa do wylogowania/odświeżenia)
 const mapImageCache = {};
 
 export default function ShipyardMap({
-  
   modeType = 'tickets',
   onNavigateToTickets
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
+  const { tickets, machines, plannedServices, regions, plannedWarningDays } = useManagerStore();
 
   // --- Tryb widoku ---
   const [mode, setMode] = useState('view');
@@ -39,6 +36,8 @@ export default function ShipyardMap({
     url: '',
     mapType: 'image',
     googleQuery: '',
+    googleLat: 54.5364,
+    googleLng: 18.5469,
     googleZoom: 18,
     googleMapStyle: 'k',
     defaultZoom: 1,
@@ -60,6 +59,8 @@ export default function ShipyardMap({
           url: data.mapUrl || '',
           mapType: data.mapType || (data.googleQuery && !data.mapUrl ? 'google' : 'image'),
           googleQuery: data.googleQuery || '',
+          googleLat: Number.isFinite(Number(data.googleLat)) && Number(data.googleLat) !== 0 ? Number(data.googleLat) : 54.5364,
+          googleLng: Number.isFinite(Number(data.googleLng)) && Number(data.googleLng) !== 0 ? Number(data.googleLng) : 18.5469,
           googleZoom: data.googleZoom || 18,
           googleMapStyle: data.googleMapStyle || 'k',
           defaultZoom: data.defaultZoom || 1,
@@ -112,6 +113,65 @@ export default function ShipyardMap({
   // --- Upload mapy oraz konfiguracja Google Maps ---
   const [mapDragActive, setMapDragActive] = useState(false);
   const [isSettingsMinimized, setIsSettingsMinimized] = useState(true);
+  const [isFramingGoogleMap, setIsFramingGoogleMap] = useState(false);
+
+  const activeMapType = currentSubmapId
+    ? (currentRegion?.mapType || (currentRegion?.googleQuery && !currentRegion?.mapImageUrl ? 'google' : 'image'))
+    : mapConfig.mapType;
+  const activeGoogleQuery = currentSubmapId ? (currentRegion?.googleQuery || '') : (mapConfig.googleQuery || '');
+  const activeGoogleLat = currentSubmapId
+    ? (Number.isFinite(Number(currentRegion?.googleLat)) && Number(currentRegion?.googleLat) !== 0 ? Number(currentRegion.googleLat) : 54.5364)
+    : (Number.isFinite(Number(mapConfig.googleLat)) && Number(mapConfig.googleLat) !== 0 ? Number(mapConfig.googleLat) : 54.5364);
+  const activeGoogleLng = currentSubmapId
+    ? (Number.isFinite(Number(currentRegion?.googleLng)) && Number(currentRegion?.googleLng) !== 0 ? Number(currentRegion.googleLng) : 18.5469)
+    : (Number.isFinite(Number(mapConfig.googleLng)) && Number(mapConfig.googleLng) !== 0 ? Number(mapConfig.googleLng) : 18.5469);
+  const activeGoogleZoom = currentSubmapId ? (currentRegion?.googleZoom || 18) : (mapConfig.googleZoom || 18);
+  const activeGoogleStyle = currentSubmapId ? (currentRegion?.googleMapStyle || 'k') : (mapConfig.googleMapStyle || 'k');
+
+  const [draftGoogleView, setDraftGoogleView] = useState({
+    lat: activeGoogleLat,
+    lng: activeGoogleLng,
+    zoom: activeGoogleZoom,
+    style: activeGoogleStyle,
+  });
+
+  useEffect(() => {
+    setDraftGoogleView({
+      lat: activeGoogleLat,
+      lng: activeGoogleLng,
+      zoom: activeGoogleZoom,
+      style: activeGoogleStyle,
+    });
+    setIsFramingGoogleMap(false);
+  }, [currentSubmapId, activeGoogleLat, activeGoogleLng, activeGoogleZoom, activeGoogleStyle]);
+
+  // Jeśli rejon ma zapisany tekstowy googleQuery, ale nie miał jeszcze zapisanych współrzędnych googleLat/googleLng, dogeokoduj je
+  useEffect(() => {
+    const rawHasLat = currentSubmapId ? currentRegion?.googleLat != null : mapConfig.googleLat != null;
+    if (activeMapType === 'google' && activeGoogleQuery.trim() && !rawHasLat) {
+      let cancelled = false;
+      geocodeAddressQuery(activeGoogleQuery).then(geo => {
+        if (!cancelled && geo) {
+          setDraftGoogleView(prev => ({ ...prev, lat: geo.lat, lng: geo.lng }));
+        }
+      });
+      return () => { cancelled = true; };
+    }
+  }, [activeMapType, activeGoogleQuery, currentSubmapId, currentRegion?.googleLat, mapConfig.googleLat]);
+
+  useEffect(() => {
+    if (mode !== 'edit') {
+      setIsFramingGoogleMap(false);
+    }
+  }, [mode]);
+
+  // Kiedy użytkownik wchodzi w tryb kadrowania Google Maps, wyzeruj zewnętrzny zoom/pan żeby kadrował 1:1
+  useEffect(() => {
+    if (mode === 'edit' && isFramingGoogleMap) {
+      setZoomScale(1);
+      setZoomPan({ x: 0, y: 0 });
+    }
+  }, [mode, isFramingGoogleMap]);
 
   const handleMapDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setMapDragActive(true); };
   const handleMapDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setMapDragActive(false); };
@@ -140,23 +200,34 @@ export default function ShipyardMap({
     );
   };
 
-  const handleSaveGoogleMapConfig = async ({ googleQuery, googleZoom, googleMapStyle }) => {
+  const handleSaveGoogleMapConfig = async ({ googleQuery, googleLat, googleLng, googleZoom, googleMapStyle }) => {
     try {
+      const payload = {
+        mapType: 'google',
+        googleQuery: googleQuery || `${Number(googleLat || draftGoogleView.lat).toFixed(5)}, ${Number(googleLng || draftGoogleView.lng).toFixed(5)}`,
+        googleLat: Number(googleLat ?? draftGoogleView.lat) || 54.5364,
+        googleLng: Number(googleLng ?? draftGoogleView.lng) || 18.5469,
+        googleZoom: Number(googleZoom ?? draftGoogleView.zoom) || 18,
+        googleMapStyle: googleMapStyle || draftGoogleView.style || 'k'
+      };
       if (currentSubmapId !== null) {
         await updateRegion(currentSubmapId, {
-          mapType: 'google',
-          googleQuery,
-          googleZoom: Number(googleZoom) || 18,
-          googleMapStyle: googleMapStyle || 'k'
+          ...payload,
+          defaultZoom: 1,
+          defaultPanX: 0,
+          defaultPanY: 0,
         });
       } else {
         await updateMapSettings({
-          mapType: 'google',
-          googleQuery,
-          googleZoom: Number(googleZoom) || 18,
-          googleMapStyle: googleMapStyle || 'k'
+          ...payload,
+          defaultZoom: 1,
+          defaultPanX: 0,
+          defaultPanY: 0,
         });
       }
+      setZoomScale(1);
+      setZoomPan({ x: 0, y: 0 });
+      setIsFramingGoogleMap(false);
     } catch (error) {
       console.error('Błąd zapisywania mapy Google:', error);
       alert('Błąd zapisywania mapy Google: ' + error.message);
@@ -195,13 +266,11 @@ export default function ShipyardMap({
   const [imageProgress, setImageProgress] = useState(0);
   const imgRef = useRef(null);
 
-  const activeMapType = currentSubmapId
-    ? (currentRegion?.mapType || (currentRegion?.googleQuery && !currentRegion?.mapImageUrl ? 'google' : 'image'))
-    : mapConfig.mapType;
-  const activeGoogleQuery = currentSubmapId ? (currentRegion?.googleQuery || '') : (mapConfig.googleQuery || '');
-  const activeGoogleZoom = currentSubmapId ? (currentRegion?.googleZoom || 18) : (mapConfig.googleZoom || 18);
-  const activeGoogleStyle = currentSubmapId ? (currentRegion?.googleMapStyle || 'k') : (mapConfig.googleMapStyle || 'k');
-  const isGoogleMap = activeMapType === 'google' && !!activeGoogleQuery.trim();
+  const hasSavedGoogleMap = activeMapType === 'google' && (
+    Boolean(activeGoogleQuery.trim()) ||
+    Boolean(currentSubmapId ? currentRegion?.googleLat : mapConfig.googleLat)
+  );
+  const isGoogleMap = hasSavedGoogleMap || (mode === 'edit' && isFramingGoogleMap);
 
   const currentMapUrl = !isGoogleMap
     ? (currentSubmapId ? (currentRegion?.mapImageUrl || '') : mapConfig.url)
@@ -236,10 +305,15 @@ export default function ShipyardMap({
   useEffect(() => {
     const el = mapContentRef.current;
     if (!el) return;
-    const handleWheel = (e) => { e.preventDefault(); const delta = e.deltaY < 0 ? 0.15 : -0.15; setZoomScale(s => Math.min(Math.max(0.5, parseFloat((s + delta).toFixed(2))), 5)); };
+    const handleWheel = (e) => {
+      if (mode === 'edit' && isFramingGoogleMap) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      setZoomScale(s => Math.min(Math.max(0.5, parseFloat((s + delta).toFixed(2))), 5));
+    };
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [mode, isFramingGoogleMap]);
 
   const [imgBounds, setImgBounds] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
@@ -283,15 +357,15 @@ export default function ShipyardMap({
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       if (hoveredPin !== pinId && e?.currentTarget) {
         const rect = e.currentTarget.getBoundingClientRect();
-          let containerRect = { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
-          if (mapContainerRef.current) {
-            containerRect = mapContainerRef.current.getBoundingClientRect();
-          }
-          setTooltipPos({ 
-            isNearTop: (rect.top - containerRect.top) < 200, 
-            isNearLeft: (rect.left - containerRect.left) < 250, 
-            isNearRight: (containerRect.right - rect.right) < 250 
-          });
+        let containerRect = { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
+        if (mapContainerRef.current) {
+          containerRect = mapContainerRef.current.getBoundingClientRect();
+        }
+        setTooltipPos({ 
+          isNearTop: (rect.top - containerRect.top) < 200, 
+          isNearLeft: (rect.left - containerRect.left) < 250, 
+          isNearRight: (containerRect.right - rect.right) < 250 
+        });
       }
       setHoveredPin(pinId);
     }
@@ -342,7 +416,7 @@ export default function ShipyardMap({
       pointerDownPosRef.current = null;
     }
     if (isPanningMap) setIsPanningMap(false);
-    if (isTap && (e.target.tagName.toLowerCase() === 'img' || e.target.closest('div.bg-slate-800') || e.target.closest('[data-map-canvas="true"]'))) handleMapClick(e);
+    if (isTap && !(mode === 'edit' && isFramingGoogleMap) && (e.target.tagName.toLowerCase() === 'img' || e.target.closest('div.bg-slate-800') || e.target.closest('[data-map-canvas="true"]'))) handleMapClick(e);
     if (mode !== 'edit' || !draggingPin) return;
     const { id, type, xPercent, yPercent } = draggingPin;
     setDraggingPin(null);
@@ -355,8 +429,8 @@ export default function ShipyardMap({
 
   const handleMapClick = (e) => {
     if (mode === 'view') { setHoveredPin(null); return; }
-    if (mode !== 'edit' || draggingPin) return;
-    if (!isGoogleMap && !currentMapUrl) return;
+    if (mode !== 'edit' || draggingPin || isFramingGoogleMap) return;
+    if (!hasSavedGoogleMap && !currentMapUrl) return;
     const boundsContainer = document.getElementById('map-bounds-container');
     if (!boundsContainer) return;
     const rect = boundsContainer.getBoundingClientRect();
@@ -397,7 +471,6 @@ export default function ShipyardMap({
     }
   };
 
-
   // --- Render ---
   return (
     <div className={`flex flex-col animate-fade-in relative ${isFullscreen ? 'h-screen w-screen bg-slate-900 p-2 sm:p-4' : 'flex-1 w-full space-y-2'}`} ref={isFullscreen ? null : mapContainerRef}>
@@ -410,6 +483,7 @@ export default function ShipyardMap({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
         onPointerDown={(e) => {
+          if (mode === 'edit' && isFramingGoogleMap) return;
           pointerDownPosRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
           if (!e.target.closest('.group\\/pin') && !e.target.closest('button')) {
             setIsPanningMap(true);
@@ -418,8 +492,8 @@ export default function ShipyardMap({
         }}
       >
         <div ref={mapContentRef} className="relative w-full h-full flex items-center justify-center p-2 overflow-hidden touch-none"
-          onTouchStart={(e) => { if (e.touches.length >= 2) { setIsPanningMap(false); const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); touchDistRef.current = dist; initialScaleRef.current = zoomScale; } }}
-          onTouchMove={(e) => { if (e.touches.length === 2 && touchDistRef.current) { const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); setZoomScale(s => Math.min(Math.max(0.5, s * (dist / touchDistRef.current)), 5)); touchDistRef.current = dist; } }}
+          onTouchStart={(e) => { if (mode === 'edit' && isFramingGoogleMap) return; if (e.touches.length >= 2) { setIsPanningMap(false); const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); touchDistRef.current = dist; initialScaleRef.current = zoomScale; } }}
+          onTouchMove={(e) => { if (mode === 'edit' && isFramingGoogleMap) return; if (e.touches.length === 2 && touchDistRef.current) { const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); setZoomScale(s => Math.min(Math.max(0.5, s * (dist / touchDistRef.current)), 5)); touchDistRef.current = dist; } }}
           onTouchEnd={() => { touchDistRef.current = null; }}
         >
           {/* Transform Wrapper */}
@@ -427,19 +501,21 @@ export default function ShipyardMap({
             {isGoogleMap ? (
               <div
                 data-map-canvas="true"
-                onClick={handleMapClick}
                 style={{
                   width: imgBounds.width ? `${imgBounds.width}px` : '100%',
                   height: imgBounds.height ? `${imgBounds.height}px` : '100%'
                 }}
-                className={`relative rounded-lg overflow-hidden shadow-2xl border border-slate-700/80 bg-slate-900 transition-opacity duration-300 ${mode === 'edit' ? 'opacity-90' : 'opacity-100'} cursor-${mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
+                className={`relative rounded-lg overflow-hidden shadow-2xl border ${mode === 'edit' && isFramingGoogleMap ? 'border-emerald-500 ring-2 ring-emerald-500/40' : 'border-slate-700/80'} bg-slate-900 transition-opacity duration-300 ${mode === 'edit' && !isFramingGoogleMap ? 'opacity-90' : 'opacity-100'} cursor-${mode === 'edit' ? (isFramingGoogleMap ? 'grab' : draggingPin ? 'grabbing' : 'crosshair') : (isPanningMap ? 'grabbing' : 'grab')}`}
               >
-                <iframe
-                  title="Mapa Google"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(activeGoogleQuery.trim())}&t=${activeGoogleStyle || 'k'}&z=${activeGoogleZoom || 18}&ie=UTF8&iwloc=&output=embed`}
-                  className="w-full h-full border-0 pointer-events-none select-none"
+                <InteractiveGoogleMap
+                  lat={mode === 'edit' && isFramingGoogleMap ? draftGoogleView.lat : activeGoogleLat}
+                  lng={mode === 'edit' && isFramingGoogleMap ? draftGoogleView.lng : activeGoogleLng}
+                  zoom={mode === 'edit' && isFramingGoogleMap ? draftGoogleView.zoom : activeGoogleZoom}
+                  mapStyle={mode === 'edit' && isFramingGoogleMap ? draftGoogleView.style : activeGoogleStyle}
+                  interactive={mode === 'edit' && isFramingGoogleMap}
+                  onViewChange={(next) => setDraftGoogleView(prev => ({ ...prev, ...next }))}
+                  onClickCanvas={!isFramingGoogleMap ? handleMapClick : undefined}
                 />
-                <div data-map-canvas="true" className="absolute inset-0 bg-transparent" onClick={handleMapClick} />
               </div>
             ) : currentMapUrl ? (
               <img
@@ -468,6 +544,36 @@ export default function ShipyardMap({
             )}
           </div>
 
+          {/* Pływający pasek zapisu kadrowania Mapy Google */}
+          {mode === 'edit' && isFramingGoogleMap && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[150] bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 px-4 py-2.5 rounded-xl shadow-2xl flex flex-wrap items-center gap-3 text-white pointer-events-auto"
+            >
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                <i className="ph ph-hand-grabbing text-lg animate-bounce"></i>
+                <span>Przesuń mapę myszką i przybliż rolką w wybrane miejsce</span>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSaveGoogleMapConfig({
+                    googleQuery: activeGoogleQuery,
+                    googleLat: draftGoogleView.lat,
+                    googleLng: draftGoogleView.lng,
+                    googleZoom: draftGoogleView.zoom,
+                    googleMapStyle: draftGoogleView.style,
+                  })
+                }
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <i className="ph ph-floppy-disk text-sm"></i>
+                <span>Wgraj ustawiony widok mapy</span>
+              </button>
+            </div>
+          )}
+
           {/* Loader */}
           {(!isGoogleMap && currentMapUrl && isImageLoading && !mapImageCache[currentMapUrl]) && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm text-white">
@@ -478,14 +584,29 @@ export default function ShipyardMap({
             </div>
           )}
 
-          {/* Pinezki */}
+          {/* Pinezki (ukryte podczas kadrowania Mapy Google lub gdy brak podkładu) */}
           <div className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center pointer-events-none" style={{ transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 100 }}>
-            {(isGoogleMap || Boolean(currentMapUrl)) && imgBounds.width > 0 && (
+            {(hasSavedGoogleMap || Boolean(currentMapUrl)) && !isFramingGoogleMap && imgBounds.width > 0 && (
               <div id="map-bounds-container" className="absolute pointer-events-none" style={{ width: `${imgBounds.width}px`, height: `${imgBounds.height}px` }}>
                 {mode === 'edit' && !draggingPin && (
-                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none flex items-center justify-center z-10">
-                    <div className="bg-amber-500/90 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse text-[10px] md:text-sm whitespace-nowrap">
-                      {t('map_component.pin_hint')}</div>
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-auto flex items-center gap-2 justify-center z-10">
+                    <div className="bg-amber-500/90 backdrop-blur text-white px-5 py-2 rounded-full font-bold shadow-xl animate-pulse text-[10px] md:text-sm whitespace-nowrap">
+                      {t('map_component.pin_hint')}
+                    </div>
+                    {hasSavedGoogleMap && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFramingGoogleMap(true);
+                          setIsSettingsMinimized(false);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <i className="ph ph-arrows-out-cardinal text-sm"></i>
+                        <span>Przesuń Mapę Google</span>
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -538,8 +659,14 @@ export default function ShipyardMap({
             breadcrumbPath={breadcrumbPath}
             activeMapType={activeMapType}
             activeGoogleQuery={activeGoogleQuery}
+            activeGoogleLat={activeGoogleLat}
+            activeGoogleLng={activeGoogleLng}
             activeGoogleZoom={activeGoogleZoom}
             activeGoogleStyle={activeGoogleStyle}
+            isFramingGoogleMap={isFramingGoogleMap}
+            setIsFramingGoogleMap={setIsFramingGoogleMap}
+            draftGoogleView={draftGoogleView}
+            setDraftGoogleView={setDraftGoogleView}
             onSaveGoogleMapConfig={handleSaveGoogleMapConfig}
             onSwitchToImageMode={handleSwitchToImageMode}
             user={user}
@@ -574,5 +701,3 @@ export default function ShipyardMap({
     </div>
   );
 }
-
-

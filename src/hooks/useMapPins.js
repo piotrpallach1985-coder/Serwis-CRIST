@@ -57,11 +57,10 @@ function getRegionTreeIds(rootRegionId, regions) {
   return result;
 }
 
-function regionHasOwnMap(region, regions) {
+function regionHasOwnMap(region) {
   if (!region) return false;
   if (region.mapImageUrl) return true;
-  if (region.mapType === 'google' && region.googleQuery) return true;
-  if (regions.some(r => !r.isDeleted && r.parentId === region.id)) return true;
+  if (region.mapType === 'google' && (region.googleQuery || (region.googleLat != null && region.googleLng != null))) return true;
   return false;
 }
 
@@ -72,7 +71,7 @@ export function isMachinePinnedOnSubmap(machine, submapId, activeRegions = []) {
   if (machine.pinnedOnMap === 'submap' || machine.pinnedOnMap === submapId) return true;
   if (machine.pinnedOnMap && machine.pinnedOnMap !== submapId) return false;
   const reg = activeRegions.find(r => r.id === submapId);
-  return regionHasOwnMap(reg, activeRegions);
+  return regionHasOwnMap(reg);
 }
 
 /**
@@ -226,18 +225,21 @@ export function useMapPins({
         pins.push(buildMachinePin(machine));
       });
     } else {
-      // PODMAPA — Podrejony przypisane do bieżącej podmapy (podmapy w podmapach)
-      activeRegions.forEach(subRegion => {
-        if (subRegion.parentId !== currentSubmapId) return;
-        if (subRegion.xPercent == null || subRegion.yPercent == null) return;
-        pins.push(buildRegionPin(subRegion));
-      });
+      const currentSubmapRegion = activeRegions.find(r => r.id === currentSubmapId);
+      if (regionHasOwnMap(currentSubmapRegion)) {
+        // PODMAPA — Podrejony przypisane do bieżącej podmapy (podmapy w podmapach)
+        activeRegions.forEach(subRegion => {
+          if (subRegion.parentId !== currentSubmapId) return;
+          if (subRegion.xPercent == null || subRegion.yPercent == null) return;
+          pins.push(buildRegionPin(subRegion));
+        });
 
-      // PODMAPA — Maszyny przypięte bezpośrednio na tej podmapie (nie na mapie głównej)
-      machines.forEach(machine => {
-        if (!isMachinePinnedOnSubmap(machine, currentSubmapId, activeRegions)) return;
-        pins.push(buildMachinePin(machine));
-      });
+        // PODMAPA — Maszyny przypięte bezpośrednio na tej podmapie (nie na mapie głównej)
+        machines.forEach(machine => {
+          if (!isMachinePinnedOnSubmap(machine, currentSubmapId, activeRegions)) return;
+          pins.push(buildMachinePin(machine));
+        });
+      }
     }
 
     return pins;

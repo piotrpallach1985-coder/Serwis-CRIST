@@ -115,11 +115,13 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
     expect(setCurrentSubmapId).toHaveBeenCalledWith('osiedle_1');
 
     // Weryfikacja zapisu Mapy Google
-    const applyBtn = screen.getByText(/Zastosuj Mapę Google/i);
+    const applyBtn = screen.getByText(/Wgraj ustawiony widok mapy/i);
     fireEvent.click(applyBtn);
     expect(onSaveGoogleMapConfig).toHaveBeenCalledWith({
       mapType: 'google',
       googleQuery: 'Gdańsk, ul. Słoneczna 10',
+      googleLat: 54.5364,
+      googleLng: 18.5469,
       googleZoom: 18,
       googleMapStyle: 'k'
     });

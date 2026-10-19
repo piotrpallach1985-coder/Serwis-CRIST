@@ -1,8 +1,8 @@
 import { useAuth } from '../../../hooks/useAuth';
-import React from 'react';
+import React, { useState } from 'react';
 import { USER_ROLES } from '../../../utils/constants';
-
 import { useTranslation } from 'react-i18next';
+import { geocodeAddressQuery } from './InteractiveGoogleMap';
 
 export default function MapControls({
   mode,
@@ -12,8 +12,14 @@ export default function MapControls({
   breadcrumbPath = [],
   activeMapType = 'image',
   activeGoogleQuery = '',
+  activeGoogleLat = 54.5364,
+  activeGoogleLng = 18.5469,
   activeGoogleZoom = 18,
   activeGoogleStyle = 'k',
+  isFramingGoogleMap = false,
+  setIsFramingGoogleMap,
+  draftGoogleView,
+  setDraftGoogleView,
   onSaveGoogleMapConfig,
   onSwitchToImageMode,
   isFullscreen,
@@ -35,29 +41,63 @@ export default function MapControls({
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const [tabType, setTabType] = React.useState(activeMapType || 'image');
-  const [gQuery, setGQuery] = React.useState(activeGoogleQuery || '');
-  const [gZoom, setGZoom] = React.useState(activeGoogleZoom || 18);
-  const [gStyle, setGStyle] = React.useState(activeGoogleStyle || 'k');
+  const [tabType, setTabType] = useState(activeMapType || 'image');
+  const [gQuery, setGQuery] = useState(activeGoogleQuery || '');
+  const [searchingGeo, setSearchingGeo] = useState(false);
 
   React.useEffect(() => {
     setTabType(activeMapType || 'image');
     setGQuery(activeGoogleQuery || '');
-    setGZoom(activeGoogleZoom || 18);
-    setGStyle(activeGoogleStyle || 'k');
-  }, [currentSubmapId, activeMapType, activeGoogleQuery, activeGoogleZoom, activeGoogleStyle]);
+  }, [currentSubmapId, activeMapType, activeGoogleQuery]);
 
   const parentSubmapId = breadcrumbPath.length > 1 ? breadcrumbPath[breadcrumbPath.length - 2].id : null;
   const currentRegionName = breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1].name : 'Mapa Główna';
 
+  const currentLat = draftGoogleView?.lat ?? activeGoogleLat ?? 54.5364;
+  const currentLng = draftGoogleView?.lng ?? activeGoogleLng ?? 18.5469;
+  const currentZoom = draftGoogleView?.zoom ?? activeGoogleZoom ?? 18;
+  const currentStyle = draftGoogleView?.style ?? activeGoogleStyle ?? 'k';
+
+  const handleSearchAddress = async (e) => {
+    if (e) e.preventDefault();
+    if (!gQuery.trim()) return;
+    setSearchingGeo(true);
+    const geo = await geocodeAddressQuery(gQuery);
+    setSearchingGeo(false);
+    if (geo && setDraftGoogleView) {
+      setDraftGoogleView(prev => ({
+        ...prev,
+        lat: geo.lat,
+        lng: geo.lng,
+        zoom: prev?.zoom || 18,
+      }));
+      if (setIsFramingGoogleMap) setIsFramingGoogleMap(true);
+    } else {
+      alert('Nie znaleziono podanego adresu. Możesz przesunąć mapę ręcznie myszką w wybrane miejsce.');
+    }
+  };
+
+  const handleSaveCurrentGoogleView = () => {
+    if (!onSaveGoogleMapConfig) return;
+    onSaveGoogleMapConfig({
+      mapType: 'google',
+      googleQuery: gQuery.trim() || `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`,
+      googleLat: currentLat,
+      googleLng: currentLng,
+      googleZoom: Number(currentZoom) || 18,
+      googleMapStyle: currentStyle || 'k',
+    });
+    if (setIsFramingGoogleMap) setIsFramingGoogleMap(false);
+  };
+
   return (
     <>
-      {/* Ustawienia mapy / podmapy (Obraz lub Mapa Google + widok domyślny) */}
+      {/* Ustawienia mapy / podmapy (z-[150] aby żadna pinezka nie prześwitywała przez menu) */}
       {mode === 'edit' && (
         <div
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute top-14 sm:top-16 left-4 z-30 bg-white p-3 md:p-4 rounded-xl shadow-xl w-64 sm:w-80 border border-amber-200 animate-fade-in transition-all pointer-events-auto"
+          className="absolute top-14 sm:top-16 left-4 z-[150] bg-white p-3 md:p-4 rounded-xl shadow-2xl w-68 sm:w-84 border border-amber-200 animate-fade-in transition-all pointer-events-auto"
         >
           {isSettingsMinimized ? (
             <button onClick={(e) => { e.stopPropagation(); setIsSettingsMinimized(false); }} className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2 w-full">
@@ -78,6 +118,7 @@ export default function MapControls({
                   type="button"
                   onClick={() => {
                     setTabType('image');
+                    if (setIsFramingGoogleMap) setIsFramingGoogleMap(false);
                     if (activeMapType === 'google' && onSwitchToImageMode) onSwitchToImageMode();
                   }}
                   className={`flex-1 py-1.5 px-2 rounded-md text-[10px] md:text-xs font-bold flex items-center justify-center gap-1 transition-all ${tabType === 'image' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
@@ -86,7 +127,10 @@ export default function MapControls({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTabType('google')}
+                  onClick={() => {
+                    setTabType('google');
+                    if (setIsFramingGoogleMap) setIsFramingGoogleMap(true);
+                  }}
                   className={`flex-1 py-1.5 px-2 rounded-md text-[10px] md:text-xs font-bold flex items-center justify-center gap-1 transition-all ${tabType === 'google' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
                 >
                   <i className="ph ph-globe-hemisphere-west"></i> Mapa Google
@@ -104,63 +148,113 @@ export default function MapControls({
                   </div>
                 </div>
               ) : (
-                <div className="mb-3 space-y-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                <div className="mb-3 space-y-2.5 bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
                   <div>
-                    <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Adres osiedla / budynku / GPS</label>
-                    <input
-                      type="text"
-                      value={gQuery}
-                      onChange={e => setGQuery(e.target.value)}
-                      placeholder="np. Gdańsk, ul. Słoneczna 10"
-                      className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                    <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">
+                      1. Wyszukaj lokalizację lub przesuń mapę myszką
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={gQuery}
+                        onChange={e => setGQuery(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSearchAddress(e); }}
+                        placeholder="np. Gdynia, Cechowa / Gdańsk..."
+                        className="flex-1 p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchAddress}
+                        disabled={searchingGeo || !gQuery.trim()}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold rounded flex items-center gap-1 shrink-0"
+                        title="Wyszukaj adres na mapie"
+                      >
+                        <i className={`ph ${searchingGeo ? 'ph-spinner-gap animate-spin' : 'ph-magnifying-glass'}`}></i>
+                        <span>Szukaj</span>
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Przełącznik: Przesuwanie mapy myszką vs Przypinanie pinezek */}
+                  <div className="flex bg-white p-1 rounded-lg border border-emerald-200">
+                    <button
+                      type="button"
+                      onClick={() => setIsFramingGoogleMap && setIsFramingGoogleMap(true)}
+                      className={`flex-1 py-1 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                        isFramingGoogleMap
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <i className="ph ph-hand-grabbing"></i> Przesuwaj mapę
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsFramingGoogleMap && setIsFramingGoogleMap(false)}
+                      className={`flex-1 py-1 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                        !isFramingGoogleMap
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <i className="ph ph-push-pin"></i> Przypinaj pinezki
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Typ mapy</label>
                       <select
-                        value={gStyle}
-                        onChange={e => setGStyle(e.target.value)}
+                        value={currentStyle}
+                        onChange={e => setDraftGoogleView && setDraftGoogleView(prev => ({ ...prev, style: e.target.value }))}
                         className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
-                        <option value="k">Satelita / Budynki</option>
+                        <option value="k">Satelita + Ulice</option>
+                        <option value="s">Satelita (czysty)</option>
                         <option value="m">Mapa drogowa</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Przybliżenie ({gZoom})</label>
+                      <label className="block text-[9px] md:text-[11px] font-bold text-slate-700 mb-1">Zoom ({currentZoom})</label>
                       <input
                         type="number"
-                        min="12"
+                        min="5"
                         max="20"
-                        value={gZoom}
-                        onChange={e => setGZoom(Number(e.target.value) || 18)}
+                        value={currentZoom}
+                        onChange={e => setDraftGoogleView && setDraftGoogleView(prev => ({ ...prev, zoom: Number(e.target.value) || 18 }))}
                         className="w-full p-1.5 text-xs border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
                   </div>
+
+                  <div className="text-[10px] text-emerald-800 bg-emerald-100/70 px-2 py-1 rounded flex items-center justify-between font-mono">
+                    <span>Pozycja: {Number(currentLat).toFixed(4)}, {Number(currentLng).toFixed(4)}</span>
+                    <span>Zoom: {currentZoom}</span>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => onSaveGoogleMapConfig && onSaveGoogleMapConfig({ mapType: 'google', googleQuery: gQuery.trim(), googleZoom: Number(gZoom) || 18, googleMapStyle: gStyle })}
-                    disabled={!gQuery.trim()}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-[10px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    onClick={handleSaveCurrentGoogleView}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                   >
-                    <i className="ph ph-globe-hemisphere-west text-sm"></i> Zastosuj Mapę Google
+                    <i className="ph ph-floppy-disk text-sm"></i> Wgraj ustawiony widok mapy
                   </button>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">Domyślny kadr i powiększenie</label>
-                <button onClick={saveDefaultView} className="w-full bg-slate-800 hover:bg-slate-900 text-white text-[9px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"><i className="ph ph-floppy-disk"></i> Ustaw jako domyślny kadr</button>
-              </div>
+              {tabType === 'image' && (
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="block text-[9px] md:text-xs font-bold text-slate-500 mb-1">Domyślny kadr i powiększenie</label>
+                  <button onClick={saveDefaultView} className="w-full bg-slate-800 hover:bg-slate-900 text-white text-[9px] md:text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"><i className="ph ph-floppy-disk"></i> Ustaw jako domyślny kadr</button>
+                </div>
+              )}
             </>
           )}
         </div>
       )}
 
-      {/* Przyciski narzędzi i ścieżka podmap (górny lewy róg) */}
-      <div className="absolute top-4 left-4 z-[60] flex flex-wrap items-center gap-2 pointer-events-auto max-w-[75%]">
+      {/* Przyciski narzędzi i ścieżka podmap (górny lewy róg - z-[150] nad pinezkami) */}
+      <div className="absolute top-4 left-4 z-[150] flex flex-wrap items-center gap-2 pointer-events-auto max-w-[75%]">
         {currentSubmapId && (
           <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 shadow-lg text-white">
             <button
@@ -203,10 +297,16 @@ export default function MapControls({
         </button>
       </div>
 
-      {/* Kontrolki powiększenia (prawy dolny róg) */}
-      <div className="absolute bottom-[90px] lg:bottom-4 right-4 z-30 flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl pointer-events-auto">
+      {/* Kontrolki powiększenia (prawy dolny róg - z-[150] nad pinezkami) */}
+      <div className="absolute bottom-[90px] lg:bottom-4 right-4 z-[150] flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl pointer-events-auto">
         <button 
-          onClick={() => setZoomScale(s => Math.min(parseFloat((s + 0.25).toFixed(2)), 4))} 
+          onClick={() => {
+            if (mode === 'edit' && isFramingGoogleMap && setDraftGoogleView) {
+              setDraftGoogleView(prev => ({ ...prev, zoom: Math.min(20, (prev.zoom || 18) + 1) }));
+            } else {
+              setZoomScale(s => Math.min(parseFloat((s + 0.25).toFixed(2)), 4));
+            }
+          }} 
           className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors" 
           title={t('map_component.zoom_in')}
         >
@@ -220,7 +320,13 @@ export default function MapControls({
           {Math.round(zoomScale * 100)}%
         </button>
         <button 
-          onClick={() => setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 0.5))} 
+          onClick={() => {
+            if (mode === 'edit' && isFramingGoogleMap && setDraftGoogleView) {
+              setDraftGoogleView(prev => ({ ...prev, zoom: Math.max(5, (prev.zoom || 18) - 1) }));
+            } else {
+              setZoomScale(s => Math.max(parseFloat((s - 0.25).toFixed(2)), 0.5));
+            }
+          }} 
           className="w-9 h-9 flex items-center justify-center text-white bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg font-extrabold text-base md:text-xl shadow-sm transition-colors" 
           title="Pomniejsz (-)"
         >
