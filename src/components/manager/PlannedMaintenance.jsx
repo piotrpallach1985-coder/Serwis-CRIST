@@ -165,7 +165,8 @@ export default function PlannedMaintenance({
         }
         if (srv.targetWorkHours && machine) {
           const rbgThreshold = (filterTime === '30' ? 30 : 90) * 8;
-          if (srv.targetWorkHours <= rbgThreshold) isWithinTime = true;
+          const remainingHours = srv.targetWorkHours - (machine.currentWorkHours || 0);
+          if (remainingHours <= rbgThreshold) isWithinTime = true;
         }
         if (!isWithinTime) return false;
       }

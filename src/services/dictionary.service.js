@@ -57,7 +57,11 @@ export const updateRole = async (id, roleData) => {
 };
 
 export const checkRoleInUse = async (id) => {
-  const usersQuery = query(collection(db, 'tenants', getCurrentTenant(), 'users'), where('roleId', '==', id));
+  const usersQuery = query(
+    collection(db, 'users'),
+    where('tenantId', '==', getCurrentTenant()),
+    where('role', '==', id)
+  );
   const usersSnapshot = await getDocs(usersQuery);
   return {
     inUse: !usersSnapshot.empty,

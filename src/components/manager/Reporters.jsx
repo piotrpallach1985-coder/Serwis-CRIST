@@ -196,7 +196,7 @@ export default function Reporters() {
         </div>
         <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
           <button onClick={() => handleEdit(item)} className="p-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg flex-1 font-bold text-xs flex items-center justify-center gap-1"><i className="ph ph-pencil-simple"></i> {t("admin.reporters.edit")}</button>
-          <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs w-10 flex items-center justify-center"><i className="ph ph-trash"></i></button>
+          <button onClick={() => handleDelete(item.id, item.name)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-xs w-10 flex items-center justify-center"><i className="ph ph-trash"></i></button>
         </div>
       </div>
       );

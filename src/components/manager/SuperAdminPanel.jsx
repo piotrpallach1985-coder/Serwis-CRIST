@@ -111,7 +111,7 @@ export default function SuperAdminPanel({ onNavigate }) {
       }
     });
 
-    return () => { unsub(); unsubGlobal(); };
+    return () => { unsub(); unsubGlobal(); if (unsubSecrets) unsubSecrets(); };
   }, [user]);
 
   // MIGRATION: Initialize missing costs

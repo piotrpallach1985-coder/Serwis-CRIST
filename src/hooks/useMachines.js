@@ -33,14 +33,30 @@ export function useMachines(machines = [], regions = []) {
       return (a.name || '').localeCompare(b.name || '');
     };
 
-    const buildTree = (all, parentId = null, depth = 0) => {
-      const children = all
-        .filter(m => parentId ? m.parentId === parentId : (!m.parentId || m.parentId === ''))
-        .sort(sortFn);
-      
-      return children.map(m => {
-        return { ...m, depth, children: buildTree(all, m.id, depth + 1) };
-      });
+    const byId = new Set(activeMachines.map(m => m.id));
+    const childrenByParent = new Map();
+    activeMachines.forEach(m => {
+      const pKey = (m.parentId && byId.has(m.parentId) && m.parentId !== m.id) ? m.parentId : '__root__';
+      if (!childrenByParent.has(pKey)) childrenByParent.set(pKey, []);
+      childrenByParent.get(pKey).push(m);
+    });
+    childrenByParent.forEach(list => list.sort(sortFn));
+
+    const visited = new Set();
+    const buildTree = (parentId = null, depth = 0) => {
+      const pKey = parentId || '__root__';
+      const children = childrenByParent.get(pKey) || [];
+      const result = [];
+      for (const m of children) {
+        if (visited.has(m.id)) continue;
+        visited.add(m.id);
+        result.push({
+          ...m,
+          depth,
+          children: buildTree(m.id, depth + 1)
+        });
+      }
+      return result;
     };
 
     const flattenTree = (nodes) => {
@@ -63,7 +79,7 @@ export function useMachines(machines = [], regions = []) {
       return flat;
     };
 
-    let flatMachines = flattenTree(buildTree(activeMachines));
+    let flatMachines = flattenTree(buildTree(null, 0));
 
     return flatMachines.filter(m => {
         const queryLower = searchQuery.toLowerCase().trim();

@@ -54,10 +54,10 @@ service cloud.firestore {
     }
 
     match /tenant_api_keys/{keyId} {
-      allow read: if isStaff() && (resource == null || isTenantUser(resource.data.tenantId));
-      allow create: if isStaff() && isTenantUser(request.resource.data.tenantId)
+      allow read: if isAdmin() && (resource == null || isTenantUser(resource.data.tenantId));
+      allow create: if isAdmin() && isTenantUser(request.resource.data.tenantId)
         && request.resource.data.keys().hasOnly(['prefix', 'tenantId', 'name', 'active', 'createdAt']);
-      allow delete: if isStaff() && isTenantUser(resource.data.tenantId);
+      allow delete: if isAdmin() && isTenantUser(resource.data.tenantId);
       allow update: if false;
     }
 
@@ -164,11 +164,13 @@ service cloud.firestore {
               && request.resource.data.name.size() < 200
               && request.resource.data.name.matches('.*[(]DO WERYFIKACJI[)]$')
               && request.resource.data.isDeleted == false);
-        allow update, delete: if isTenantUser(tenantId);
+        allow update: if isTenantUser(tenantId);
+        allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 
       match /tickets/{ticketId} {
-        allow read, update, delete: if isTenantUser(tenantId);
+        allow read, update: if isTenantUser(tenantId);
+        allow delete: if isTenantUser(tenantId) && isAdmin();
         allow create: if isTenantUser(tenantId)
           || (isAnonymousInTenant(tenantId) && isValidAnonTicket(tenantId, ticketId));
         // Anonim: dopięcie JEDNEGO zdjęcia do WŁASNEGO zgłoszenia (synchronizacja offline, arrayUnion)
@@ -249,18 +251,22 @@ service cloud.firestore {
       }
       
       match /planned_services/{document=**} {
-        allow read, write: if isTenantUser(tenantId);
+        allow read, create, update: if isTenantUser(tenantId);
+        allow delete: if isTenantUser(tenantId) && isAdmin();
       }
       
       match /parts/{document=**} {
-        allow read, write: if isTenantUser(tenantId);
+        allow read, create, update: if isTenantUser(tenantId);
+        allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 
       match /part_transactions/{document=**} {
-        allow read, write: if isTenantUser(tenantId);
+        allow read, create, update: if isTenantUser(tenantId);
+        allow delete: if isSuperAdmin();
       }
       match /action_items/{document=**} {
-        allow read, write: if isTenantUser(tenantId);
+        allow read, create, update: if isTenantUser(tenantId);
+        allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 
       match /audit_logs/{document=**} {

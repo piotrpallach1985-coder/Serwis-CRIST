@@ -80,19 +80,6 @@ export default function DTRChatModal({ isOpen, onClose, document, allDocuments, 
 
       const responseText = response.data.text;
       setMessages(prev => [...prev, { role: "model", text: responseText }]);
-
-      // Log AI Usage
-      let geminiTokens = response.data.tokens || 0;
-      if (geminiTokens === 0) {
-        geminiTokens = (docsToAnalyze.length * 1500) + Math.ceil(userMessage.length / 4) + Math.ceil(responseText.length / 4);
-      }
-      if (geminiTokens > 0) {
-        const tenantId = getCurrentTenant();
-        if (tenantId) {
-          const logAIUsage = httpsCallable(functions, "logAIUsage");
-          logAIUsage({ tenantId, geminiTokens }).catch(err => console.error("Cloud Function token tracking error:", err));
-        }
-      }
     } catch (error) {
       console.error('Błąd Gemini:', error);
       let errorMsg = 'Wystąpił błąd podczas analizy. Upewnij się, że usługa Vertex AI jest włączona w konsoli Firebase.';

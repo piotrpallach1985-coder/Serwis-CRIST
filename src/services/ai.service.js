@@ -11,11 +11,15 @@ import { httpsCallable } from 'firebase/functions';
  */
 export async function extractServiceDataWithAI(rawText) {
   try {
-    const extractServiceDataFn = httpsCallable(functions, 'extractServiceData');
-    const result = await extractServiceDataFn({ rawText });
-    return result.data;
+    const processDictationFn = httpsCallable(functions, 'processDictationText');
+    const result = await processDictationFn({
+      rawText,
+      mode: 'smart',
+      tenantId: getCurrentTenant()
+    });
+    return result.data?.result || result.data;
   } catch (error) {
-    console.error('Błąd wywoływania Cloud Function extractServiceData:', error);
+    console.error('Błąd wywoływania Cloud Function processDictationText:', error);
     throw new Error('Nie udało się przeanalizować tekstu. Funkcja sieciowa zwróciła błąd.');
   }
 }

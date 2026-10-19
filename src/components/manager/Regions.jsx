@@ -4,6 +4,7 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimest
 import { db, storage } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useManagerStore } from '../../store/managerStore';
+import { useAuth } from '../../hooks/useAuth';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addRegion, updateRegion, checkRegionInUse } from '../../services/dictionary.service';
 import InteractiveGoogleMap, { geocodeAddressQuery } from './map/InteractiveGoogleMap';
@@ -11,8 +12,9 @@ import InteractiveGoogleMap, { geocodeAddressQuery } from './map/InteractiveGoog
 
 export default function Regions() {
   const { t } = useTranslation();
-  const [regions, setRegions] = useState([]);
-  const [machines, setMachines] = useState([]);
+  const { user } = useAuth();
+  const regions = useManagerStore(state => state.regions) || [];
+  const machines = useManagerStore(state => state.machines) || [];
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState('');
@@ -90,21 +92,6 @@ export default function Regions() {
   const hierarchicalRegions = buildRegionHierarchy(
     regions.filter(r => (showDeleted ? true : !r.isDeleted))
   );
-
-  useEffect(() => {
-    const unsubRegions = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'regions'), (snapshot) => {
-      const fetchedRegions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedRegions.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl', { numeric: true }));
-      setRegions(fetchedRegions);
-    }, (error) => { console.debug('Regions listener closed:', error.message); });
-    const unsubMachines = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'machines'), (snapshot) => {
-      setMachines(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => { console.debug('Machines listener closed:', error.message); });
-    return () => {
-      unsubRegions();
-      unsubMachines();
-    };
-  }, []);
 
   const resetForm = () => {
     setName('');

@@ -63,6 +63,7 @@ export const computeClientKPIStats = async (period = 'all', machinesList = []) =
     startDate.setDate(now.getDate() - parseInt(period, 10));
   }
 
+  const machineMap = new Map((machinesList || []).map(m => [m.id, m]));
   let totalTickets = 0;
   let closedTicketsCount = 0;
   let criticalTicketsCount = 0;
@@ -95,7 +96,7 @@ export const computeClientKPIStats = async (period = 'all', machinesList = []) =
       }
     }
 
-    const machineObj = machinesList.find(m => m.id === t.machineId);
+    const machineObj = machineMap.get(t.machineId);
     const mName = machineObj?.name || t.machineName || 'Nieznana maszyna';
     machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
 
@@ -161,12 +162,13 @@ export const computeClientPlannedKPIStats = async (
   let onTimeCount = 0;
   let totalDelayDays = 0;
 
+  const machineMap = new Map((machinesList || []).map(m => [m.id, m]));
   const machineServiceCounts = {};
   const typeCounts = { calendar: 0, hours: 0, mixed: 0 };
   const trendMap = {};
 
   allServices.forEach(s => {
-    const machineObj = machinesList.find(m => m.id === s.machineId);
+    const machineObj = machineMap.get(s.machineId);
     const mName = machineObj?.name || s.machineName || 'Nieznana maszyna';
     const isCompletedDoc = s.status === 'completed' || Number(s.status) === 5;
 

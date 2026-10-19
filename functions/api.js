@@ -62,7 +62,7 @@ const ticketSchema = Joi.object({
 });
 
 const stockSchema = Joi.object({
-  quantity: Joi.number().required(),
+  quantity: Joi.number().min(0).required(),
   type: Joi.string().valid('add', 'subtract', 'set').required(),
   userId: Joi.string().optional(),
   userName: Joi.string().optional()
@@ -103,9 +103,14 @@ app.post('/v1/tickets', async (req, res) => {
     if (error) return res.status(400).json({ error: error.details[0].message });
     
     const { machineId, topic, description, priority, reporterName } = value;
+
+    const machineSnap = await db.collection('tenants').doc(req.tenantId).collection('machines').doc(machineId).get();
+    const machineData = machineSnap.exists ? machineSnap.data() : null;
     
     const newTicket = {
       machineId,
+      machineName: machineData?.name || '',
+      regionId: machineData?.regionId || '',
       topic,
       description: description || '',
       priority: priority || 'normal',
@@ -155,29 +160,65 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
     
     await db.runTransaction(async (t) => {
       const partDoc = await t.get(partRef);
-      if (!partDoc.exists) throw new Error('Część nie istnieje');
+      if (!partDoc.exists) throw new Error('NOT_FOUND:Część nie istnieje');
       
-      let newStock = partDoc.data().stock || 0;
+      const partData = partDoc.data();
+      let newStock = Number(partData.stock || 0);
       let diff = 0;
+      const qtyNum = Number(quantity);
       
       if (type === 'add') {
-         newStock += Number(quantity);
-         diff = Number(quantity);
+        newStock += qtyNum;
+        diff = qtyNum;
       } else if (type === 'subtract') {
-         newStock -= Number(quantity);
-         diff = -Number(quantity);
+        newStock -= qtyNum;
+        diff = -qtyNum;
       } else if (type === 'set') {
-         diff = Number(quantity) - newStock;
-         newStock = Number(quantity);
+        diff = qtyNum - newStock;
+        newStock = qtyNum;
       }
 
-      t.update(partRef, { stock: newStock, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      if (newStock < 0) {
+        throw new Error('BAD_REQUEST:Niewystarczający stan magazynowy (stan nie może spaść poniżej 0)');
+      }
+
+      const unitPrice = Number(partData.unitPrice || partData.price || 0);
+      let batches = Array.isArray(partData.batches)
+        ? partData.batches.map(b => ({
+            ...b,
+            qty: Number(b.qty !== undefined ? b.qty : (b.quantity || 0)),
+            price: Number(b.price !== undefined ? b.price : (b.unitPrice || unitPrice))
+          }))
+        : [];
+
+      if (diff > 0) {
+        batches.push({
+          id: `api_${Date.now()}`,
+          qty: diff,
+          price: unitPrice,
+          date: new Date().toISOString()
+        });
+      } else if (diff < 0) {
+        let toRemove = Math.abs(diff);
+        for (const batch of batches) {
+          if (toRemove <= 0) break;
+          const take = Math.min(batch.qty, toRemove);
+          batch.qty -= take;
+          toRemove -= take;
+        }
+        batches = batches.filter(b => b.qty > 0);
+      }
+
+      t.update(partRef, {
+        stock: newStock,
+        batches,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
 
       const txRef = db.collection('tenants').doc(req.tenantId).collection('part_transactions').doc();
-      const unitPrice = Number(partDoc.data().unitPrice || partDoc.data().price || 0);
       t.set(txRef, {
         partId: req.params.id,
-        partName: partDoc.data().name,
+        partName: partData.name,
         type: (type === 'add' || diff > 0) ? 'receive' : 'issue_adhoc',
         quantity: diff,
         price: unitPrice,
@@ -191,6 +232,12 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Stan magazynowy zaktualizowany' });
   } catch (err) {
+    if (err.message?.startsWith('NOT_FOUND:')) {
+      return res.status(404).json({ error: err.message.replace('NOT_FOUND:', '') });
+    }
+    if (err.message?.startsWith('BAD_REQUEST:')) {
+      return res.status(400).json({ error: err.message.replace('BAD_REQUEST:', '') });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -206,6 +253,11 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
     const { workHours, status, lastReading } = value;
     
     const machineRef = db.collection('tenants').doc(req.tenantId).collection('machines').doc(req.params.id);
+    const machineSnap = await machineRef.get();
+    if (!machineSnap.exists) {
+      return res.status(404).json({ error: 'Maszyna nie istnieje' });
+    }
+
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     
     if (workHours !== undefined) updates.currentWorkHours = Number(workHours);

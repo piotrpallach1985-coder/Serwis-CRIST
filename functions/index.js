@@ -85,11 +85,11 @@ async function getTokensForPermission(tenantId, permissionId) {
   if (validRoleIds.length === 0) return [];
 
   // Pobieramy użytkowników z tymi rolami należących do danego tenanta
-  const usersSnap = await db.collection('users').where('roleId', 'in', validRoleIds.slice(0, 10)).get();
+  const usersSnap = await db.collection('users').where('tenantId', '==', tenantId).get();
   usersSnap.forEach(doc => {
     const data = doc.data();
-    const userTenant = data.tenantId || 'crist';
-    if (!data.isDeleted && userTenant === tenantId && data.fcmTokens && Array.isArray(data.fcmTokens)) {
+    const userRole = data.role || data.roleId;
+    if (!data.isDeleted && validRoleIds.includes(userRole) && data.fcmTokens && Array.isArray(data.fcmTokens)) {
       data.fcmTokens.forEach(t => tokens.add(t));
     }
   });
@@ -364,7 +364,8 @@ Surowy tekst od mechanika: "${rawText}"`;
       resp = await generativeModel.generateContent(prompt);
       let jsonText = resp.response.candidates[0].content.parts[0].text;
       jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "").trim();
-      result = JSON.parse(jsonText);
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      result = JSON.parse(jsonMatch ? jsonMatch[0] : jsonText);
     } else {
       const language = lang || "polski";
       const prompt = `Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
@@ -404,6 +405,12 @@ exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, 
   const { HttpsError } = functions.https;
   const tenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: false });
   if (!tenantId) throw new HttpsError("invalid-argument", "Missing tenantId.");
+
+  const callerSnap = await db.collection("users").doc(context.auth.uid).get();
+  const callerRole = callerSnap.exists ? callerSnap.data().role : null;
+  if (callerRole !== "admin" && callerRole !== "superadmin") {
+    throw new HttpsError("permission-denied", "Only admins can manually log AI usage.");
+  }
 
   const { geminiTokens } = data || {};
   if (!geminiTokens || geminiTokens <= 0) return { success: true };

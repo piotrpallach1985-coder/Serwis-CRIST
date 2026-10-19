@@ -243,9 +243,14 @@ export const generateServicePDF = async (service, machine) => {
       currentY += 5;
     }
 
-    const allNotes = [...(service.history || []), ...(service.futureNotes || [])].sort(
-      (a, b) => new Date(a.date || a.createdAt || a.timestamp || 0) - new Date(b.date || b.createdAt || b.timestamp || 0)
-    );
+    const allNotes = [...(service.history || []), ...(service.futureNotes || [])]
+      .map(entry => ({
+        ...entry,
+        photos: Array.isArray(entry.photos) ? [...entry.photos] : []
+      }))
+      .sort(
+        (a, b) => new Date(a.date || a.createdAt || a.timestamp || 0) - new Date(b.date || b.createdAt || b.timestamp || 0)
+      );
     
     if (allNotes.length > 0) {
       if (currentY > 250) { doc.addPage(); currentY = 20; }

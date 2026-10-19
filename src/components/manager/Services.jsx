@@ -185,7 +185,7 @@ export default function Services() {
                   <button onClick={() => handleEdit(s)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs">
                     <i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}
                   </button>
-                  <button onClick={() => handleDelete(s.id)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs">
+                  <button onClick={() => handleDelete(s.id, s.name)} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs">
                     <i className="ph ph-trash"></i> {t("admin.users.delete")}
                   </button>
                 </div>

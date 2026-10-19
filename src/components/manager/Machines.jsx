@@ -20,6 +20,7 @@ import QRScannerModal from '../shared/QRScannerModal';
 import NFCScannerModal from '../shared/NFCScannerModal';
 import Toast from './Toast';
 import { useMachines } from '../../hooks/useMachines';
+import { updateMachine } from '../../services/machines.service';
 import { fetchMachineTickets } from '../../services/tickets.service';
 import { fetchMachineServices } from '../../services/plannedServices.service';
 import { usePagination } from '../../hooks/usePagination';
@@ -332,9 +333,8 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
       
       const fetchPrevHistory = async () => {
         try {
-          const { fetchMachineTickets, fetchMachineServices } = await import('../../services/machines.service');
           let machineTickets = await fetchMachineTickets(prevMachine.id, prevMachine.name);
-          let machineServices = await fetchMachineServices(prevMachine.id, prevMachine.name);
+          let machineServices = await fetchMachineServices(prevMachine.id);
           setMachineHistory({ tickets: machineTickets, services: machineServices });
         } catch (error) {
           const tickets = useManagerStore.getState().tickets || [];
@@ -396,34 +396,13 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         />
       ) : (
         <>
-
-
-                    <MachineFilters
+          <MachineFilters
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             filterRegion={filterRegion}
             setFilterRegion={setFilterRegion}
             regions={regions}
-            
             onAddMachine={() => { setEditingId(null); setFormInitialParentId(selectedMachine ? selectedMachine.id : null); setIsFormOpen(true); }}
-          />
-          <MachineForm 
-            isOpen={isFormOpen} 
-            onClose={() => setIsFormOpen(false)} 
-            editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
-        initialParentId={formInitialParentId}
-            regions={regions}
-            onSaved={(msg, newMachineId) => {
-    showToast(msg, 'success');
-    if (newMachineId) {
-      setTimeout(() => {
-        const machinesList = useManagerStore.getState().machines;
-        const newM = machinesList.find(m => m.id === newMachineId);
-        if (newM && !formInitialParentId) handleViewMachine(newM, false, true);
-      }, 600);
-    }
-  }}
-            onError={(err) => showToast(err, 'error')}
           />
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
             <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
