@@ -66,6 +66,12 @@ export function useManagerData() {
         if (data.allowTicketDeletion !== undefined) setAllowTicketDeletion(data.allowTicketDeletion);
         if (data.plannedWarningDays !== undefined) setPlannedWarningDays(data.plannedWarningDays);
         if (data.limits !== undefined) setLimits(data.limits);
+        if (data.industryProfile) {
+          const prevBranding = useManagerStore.getState().branding || {};
+          if (prevBranding.industryProfile !== data.industryProfile) {
+            setBranding({ ...prevBranding, industryProfile: data.industryProfile });
+          }
+        }
       }
     });
 
@@ -75,8 +81,10 @@ export function useManagerData() {
         const prevBranding = useManagerStore.getState().branding || {};
         setBranding({ 
           companyName: brandingData.companyName || prevBranding.companyName || tenantId.toUpperCase(),
-          systemSubtitle: brandingData.systemSubtitle || 'DYSPOZYTORNIA UR',
+          systemSubtitle: brandingData.systemSubtitle || prevBranding.systemSubtitle || 'DYSPOZYTORNIA UR',
+          industryProfile: brandingData.industryProfile || prevBranding.industryProfile || 'industrial',
           companyLogoUrl: brandingData.companyLogoUrl || prevBranding.companyLogoUrl || '',
+          companyLogoBase64: brandingData.companyLogoBase64 || prevBranding.companyLogoBase64 || '',
           appLogoUrl: brandingData.appLogoUrl || prevBranding.appLogoUrl || '',
           modules: brandingData.modules || prevBranding.modules || { planned_services: true, inventory: false }
         });
@@ -86,15 +94,14 @@ export function useManagerData() {
     const unsubTenantRegistry = onSnapshot(doc(db, 'tenant_registry', tenantId), (snap) => {
       if (snap.exists()) {
         const regData = snap.data();
-        if (regData.modules) {
-          const prevBranding = useManagerStore.getState().branding || {};
-          setBranding({
-            ...prevBranding,
-            companyName: prevBranding.companyName || regData.name || tenantId.toUpperCase(),
-            companyLogoUrl: prevBranding.companyLogoUrl || regData.companyLogoUrl || '',
-            modules: regData.modules
-          });
-        }
+        const prevBranding = useManagerStore.getState().branding || {};
+        setBranding({
+          ...prevBranding,
+          companyName: prevBranding.companyName || regData.name || tenantId.toUpperCase(),
+          companyLogoUrl: prevBranding.companyLogoUrl || regData.companyLogoUrl || '',
+          industryProfile: regData.industryProfile || prevBranding.industryProfile || 'industrial',
+          modules: regData.modules || prevBranding.modules
+        });
       }
     }, () => {});
 

@@ -8,6 +8,8 @@ import {
   formatFGasSummary,
   formatGpsCheckIn,
   getCkobCategoryLabel,
+  getIndustryProfileConfig,
+  calculateCo2Equivalent,
 } from '../fieldServiceHelpers';
 
 const n = (text) => {
@@ -56,6 +58,8 @@ export const generateServicePDF = async (service, machine) => {
   try {
     const state = useManagerStore.getState();
     const allParts = state.parts || [];
+    const industryProfile = state.branding?.industryProfile || 'industrial';
+    const profileConfig = getIndustryProfileConfig(industryProfile);
 
     let serviceTransactions = [];
     try {
@@ -95,11 +99,11 @@ export const generateServicePDF = async (service, machine) => {
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(n('System Utrzymania Ruchu VexoNT'), doc.internal.pageSize.getWidth() - 14, 38, { align: 'right' });
+    doc.text(n(`VexoNT - ${profileConfig.shortName}`), doc.internal.pageSize.getWidth() - 14, 38, { align: 'right' });
 
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setTextColor(40, 40, 40);
-    doc.text(n('Karta Serwisu Planowanego'), 14, 22);
+    doc.text(n(profileConfig.servicePdfTitle), 14, 22);
     
     doc.setFontSize(14);
     const isCompleted = service.status === 'completed';
@@ -109,15 +113,15 @@ export const generateServicePDF = async (service, machine) => {
     let currentY = 45;
 
     const serviceInfoRows = [
-      [n('Nazwa Serwisu:'), n(service.name || 'Brak')],
-      [n('Maszyna:'), n(service.machineName || machine?.name || 'Nieznana')],
+      [n('Nazwa Serwisu / Przegladu:'), n(service.name || 'Brak')],
+      [n(`${profileConfig.machineLabel}:`), n(service.machineName || machine?.name || 'Nieznana')],
     ];
     const addrStr = machine?.address || machine?.mapAddress;
     if (addrStr) {
       serviceInfoRows.push([n('Adres Obiektu / GPS:'), n(addrStr)]);
     }
     const ckobStr = getCkobCategoryLabel(machine?.inspectionCategory);
-    if (ckobStr) {
+    if (ckobStr && industryProfile !== 'industrial') {
       serviceInfoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
     }
     serviceInfoRows.push(
@@ -135,30 +139,94 @@ export const generateServicePDF = async (service, machine) => {
     if (gpsStr) {
       serviceInfoRows.push([n('Potwierdzenie GPS:'), n(gpsStr)]);
     }
-    const fGasStr = formatFGasSummary(
+    const rawFGas =
       service.fGasProtocol ||
-        service.completionDetails?.fGasProtocol ||
-        (machine?.refrigerantType
-          ? {
-              refrigerantType: machine.refrigerantType,
-              refrigerantChargeKg: machine.refrigerantChargeKg,
-            }
-          : null)
-    );
-    if (fGasStr) {
+      service.completionDetails?.fGasProtocol ||
+      (machine?.refrigerantType
+        ? {
+            refrigerantType: machine.refrigerantType,
+            refrigerantChargeKg: machine.refrigerantChargeKg,
+          }
+        : null);
+    const fGasStr = formatFGasSummary(rawFGas);
+    if (fGasStr && (industryProfile === 'hvac' || machine?.refrigerantType)) {
       serviceInfoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
     }
 
+    const headerColor =
+      industryProfile === 'facility'
+        ? [180, 83, 9]
+        : industryProfile === 'hvac'
+        ? [14, 116, 144]
+        : [40, 140, 80];
+
     autoTable(doc, {
       startY: currentY,
-      head: [[n('Informacje o Serwisie'), '']],
+      head: [[n('Informacje o Serwisie / Przegladzie'), '']],
       body: serviceInfoRows,
       theme: 'grid',
-      headStyles: { fillColor: [40, 140, 80] },
+      headStyles: { fillColor: headerColor },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
     });
 
-    currentY = doc.lastAutoTable.finalY + 12;
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    // Dedykowana sekcja branżowa na karcie serwisu PDF
+    if (industryProfile === 'industrial') {
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Parametry Prewencji Utrzymania Ruchu (Przemysl / UR)'), '']],
+        body: [
+          [n('Aktualny licznik maszyny (RBG):'), n(`${machine?.operatingHours ?? 0} RBG`)],
+          [n('Interwal odnawiania:'), n(`${service.intervalDays ? 'Co ' + service.intervalDays + ' dni' : ''} ${service.intervalHours ? '/ Co ' + service.intervalHours + ' RBG' : ''}`.trim() || 'Wg DTR')],
+          [n('Planowany czas przestoju:'), n(`${service.estimatedDowntimeHours || 0} h`)],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    } else if (industryProfile === 'facility') {
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Protokol Przegladu Okresowego Obiektu Budowlanego (c-KOB art. 62)'), '']],
+        body: [
+          [n('Kategoria przegladu c-KOB:'), n(ckobStr || 'Przeglad okresowy instalacji budynku (art. 62 PB)')],
+          [n('Zarzadca / Kontakt / Domofon:'), n(`${machine?.contactPerson || 'Administracja obiektu'} ${machine?.accessNotes ? '(' + machine.accessNotes + ')' : ''}`)],
+          [n('Orzeczenie techniczne c-KOB:'), n(isCompleted ? 'DOPUSZCZONO DO DALSZEJ EKSPLOATACJI' : 'W TRAKCIE PRZEGLADU')],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [217, 119, 6] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    } else if (industryProfile === 'hvac') {
+      const fGas = rawFGas || {};
+      const co2 = calculateCo2Equivalent(
+        fGas.refrigerantType || machine?.refrigerantType,
+        fGas.refrigerantChargeKg || machine?.refrigerantChargeKg
+      );
+      const leakLabel =
+        fGas.leakTestResult === 'positive'
+          ? 'POZYTYWNY (Uklad szczelny)'
+          : fGas.leakTestResult === 'negative'
+          ? 'NEGATYWNY (Wykryto nieszczelnosc!)'
+          : 'Nie wykonywano / Nie dotyczy';
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Protokol F-Gaz i Kontrola Szczelnosci (Rozp. UE 2024/573 & CRO)'), '']],
+        body: [
+          [n('Czynnik chlodniczy i napelnienie:'), n(co2.refrigerantType ? `${co2.refrigerantType} (${co2.chargeKg} kg, GWP: ${co2.gwp})` : 'Brak danych')],
+          [n('Ekwiwalent CO2e / Obowiazek CRO:'), n(`${co2.co2EquivalentTons} t CO2e (${co2.requiresCroCard ? 'Wymagana Karta CRO >= 5 t CO2e' : 'Ponizej progu CRO'})`)],
+          [n('Wynik proby szczelnosci:'), n(leakLabel)],
+          [n('Bilans czynnika (Dodano / Odzyskano):'), n(`+${Number(fGas.refrigerantAddedKg || 0).toFixed(2)} kg / -${Number(fGas.refrigerantRecoveredKg || 0).toFixed(2)} kg`)],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [8, 145, 178] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    }
 
     // Wymagane narzędzia
     let toolsText = 'Podstawowe (skrzynka narzedziowa)';
@@ -404,9 +472,9 @@ export const generateServicePDF = async (service, machine) => {
 
     doc.setFontSize(9);
     doc.setTextColor(90, 90, 90);
-    doc.text(n(`Podpis Wykonawcy (${execName})`), 14, currentY + 27);
+    doc.text(n(`${profileConfig.techSignatureLabel} (${execName})`), 14, currentY + 27);
     doc.text(
-      n(`Podpis Odbierajacego / Klienta${clientSigner ? ' (' + clientSigner + ')' : ''}`),
+      n(`${profileConfig.clientSignatureLabel}${clientSigner ? ' (' + clientSigner + ')' : ''}`),
       115,
       currentY + 27
     );

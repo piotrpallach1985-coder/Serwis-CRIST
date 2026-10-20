@@ -13,9 +13,15 @@ import {
   filterMachinesForFieldTechnician,
   checkQrSubmissionCooldown,
   recordQrSubmissionTimestamp,
+  getIndustryProfileConfig,
 } from '../fieldServiceHelpers';
 import SignaturePad from '../../components/shared/SignaturePad';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
+import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
+import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
+import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
+import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
+import { useManagerStore } from '../../store/managerStore';
 import { formatDetails } from '../../services/audit.service';
 
 vi.mock('react-i18next', () => ({
@@ -316,6 +322,227 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(fGasBadge.textContent).toContain('6.075 t CO2e');
       expect(fGasBadge.textContent).toContain('Wymagana Karta CRO');
       expect(screen.getByText(/Kod domofonu: 15#9999/)).toBeTruthy();
+    });
+  });
+
+  describe('7. Profile branżowe firm (industrial / facility / hvac), karty serwisu/awarii i blokada F-Gaz na nieaktywnym etapie', () => {
+    it('pozwala wybrać rodzaj firmy (industrial / facility / hvac) w oknie tworzenia i edycji firmy (SuperAdminTenantModal)', () => {
+      const setFormData = vi.fn();
+      const formData = {
+        id: 'klima',
+        name: 'Serwis Klima Sp. z o.o.',
+        industryProfile: 'industrial',
+        maxUsers: 10,
+        maxMachines: 50,
+        modules: { planned_services: true, inventory: true },
+      };
+
+      render(
+        <SuperAdminTenantModal
+          isModalOpen={true}
+          setIsModalOpen={vi.fn()}
+          isEditing={false}
+          formData={formData}
+          setFormData={setFormData}
+          handleSave={vi.fn(e => e.preventDefault())}
+          fileInputRef={{ current: null }}
+          processCompanyLogo={vi.fn()}
+          uploadingLogo={false}
+        />
+      );
+
+      const hvacBtn = screen.getByTestId('industry-profile-option-hvac');
+      fireEvent.click(hvacBtn);
+      expect(setFormData).toHaveBeenCalledWith(
+        expect.objectContaining({ industryProfile: 'hvac' })
+      );
+
+      const facilityBtn = screen.getByTestId('industry-profile-option-facility');
+      fireEvent.click(facilityBtn);
+      expect(setFormData).toHaveBeenCalledWith(
+        expect.objectContaining({ industryProfile: 'facility' })
+      );
+    });
+
+    it('renderuje różne Karty Awarii oraz Karty Serwisu dla każdego rodzaju firmy (industrial, facility, hvac)', () => {
+      const sampleTicket = {
+        id: 't100',
+        topic: 'Przegląd i usterka',
+        machineId: 'm1',
+        machineName: 'Obiekt Testowy 1',
+        regionName: 'Lokalizacja A',
+        status: 2,
+        isCritical: true,
+        reportedBy: 'Jan Testowy',
+      };
+      const sampleMachine = {
+        id: 'm1',
+        name: 'Obiekt Testowy 1',
+        regionId: 'r1',
+        operatingHours: 1450,
+        inspectionCategory: 'gazowa_1r',
+        refrigerantType: 'R32',
+        refrigerantChargeKg: 8,
+        contactPerson: 'Wspólnota Mieszkaniowa',
+        accessNotes: 'Kod domofonu 12#3456',
+      };
+      const sampleService = {
+        id: 's100',
+        name: 'Przegląd roczny',
+        machineId: 'm1',
+        machineName: 'Obiekt Testowy 1',
+        triggerType: 'calendar',
+        intervalDays: 365,
+        status: 'pending',
+      };
+
+      // 1. INDUSTRIAL
+      useManagerStore.getState().setBranding({
+        companyName: 'Stocznia',
+        industryProfile: 'industrial',
+      });
+      const { unmount: u1 } = render(
+        <>
+          <TicketMainColumnHeader
+            currentTicket={sampleTicket}
+            STATUSES={{ 2: { label: 'W toku', color: '' } }}
+            machines={[sampleMachine]}
+            regions={[{ id: 'r1', name: 'Hala H-1' }]}
+          />
+          <PlannedMaintenanceInfo
+            srv={sampleService}
+            machine={sampleMachine}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Hala H-1'}
+            regions={[{ id: 'r1', name: 'Hala H-1' }]}
+          />
+        </>
+      );
+      expect(screen.getByTestId('ticket-domain-industrial')).toBeTruthy();
+      expect(screen.getByTestId('service-domain-industrial')).toBeTruthy();
+      expect(screen.getByTestId('ticket-profile-banner').textContent).toContain(
+        getIndustryProfileConfig('industrial').ticketCardTitle
+      );
+      u1();
+
+      // 2. FACILITY (Osiedla / c-KOB)
+      useManagerStore.getState().setBranding({
+        companyName: 'Osiedle Zielone',
+        industryProfile: 'facility',
+      });
+      const { unmount: u2 } = render(
+        <>
+          <TicketMainColumnHeader
+            currentTicket={sampleTicket}
+            STATUSES={{ 2: { label: 'W toku', color: '' } }}
+            machines={[sampleMachine]}
+            regions={[{ id: 'r1', name: 'Budynek B' }]}
+          />
+          <PlannedMaintenanceInfo
+            srv={sampleService}
+            machine={sampleMachine}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Budynek B'}
+            regions={[{ id: 'r1', name: 'Budynek B' }]}
+          />
+        </>
+      );
+      expect(screen.getByTestId('ticket-domain-facility')).toBeTruthy();
+      expect(screen.getByTestId('service-domain-facility')).toBeTruthy();
+      expect(screen.getByTestId('ticket-profile-banner').textContent).toContain(
+        getIndustryProfileConfig('facility').ticketCardTitle
+      );
+      u2();
+
+      // 3. HVAC (Serwis mobilny / F-Gazy)
+      useManagerStore.getState().setBranding({
+        companyName: 'Klima-Serwis',
+        industryProfile: 'hvac',
+      });
+      const { unmount: u3 } = render(
+        <>
+          <TicketMainColumnHeader
+            currentTicket={sampleTicket}
+            STATUSES={{ 2: { label: 'W toku', color: '' } }}
+            machines={[sampleMachine]}
+            regions={[{ id: 'r1', name: 'Dom Klienta' }]}
+          />
+          <PlannedMaintenanceInfo
+            srv={sampleService}
+            machine={sampleMachine}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Dom Klienta'}
+            regions={[{ id: 'r1', name: 'Dom Klienta' }]}
+          />
+        </>
+      );
+      expect(screen.getByTestId('ticket-domain-hvac')).toBeTruthy();
+      expect(screen.getByTestId('service-domain-hvac')).toBeTruthy();
+      expect(screen.getByTestId('ticket-profile-banner').textContent).toContain(
+        getIndustryProfileConfig('hvac').ticketCardTitle
+      );
+      u3();
+    });
+
+    it('blokuje możliwość wybrania lub rozwinięcia F-Gazów gdy etap 4 jest nieaktywny (podgląd innego etapu)', () => {
+      useManagerStore.getState().setBranding({
+        companyName: 'Klima-Serwis',
+        industryProfile: 'hvac',
+      });
+      useManagerStore.getState().setMachines([
+        {
+          id: 'm-hvac',
+          name: 'Pompa ciepła R32',
+          refrigerantType: 'R32',
+          refrigerantChargeKg: 8,
+        },
+      ]);
+
+      // Zgłoszenie jest na etapie 1 (Przyjęcie zgłoszenia), więc etap 4 jest NIEAKTYWNY
+      const ticketInStep1 = {
+        id: 't-step1',
+        machineId: 'm-hvac',
+        status: 1,
+      };
+
+      render(
+        <TicketMainColumnStepper
+          currentTicket={ticketInStep1}
+          user={{ role: 'admin', name: 'Admin' }}
+          loading={false}
+          isArchive={false}
+          selectedService=""
+          setSelectedService={vi.fn()}
+          services={[]}
+          etr={null}
+          comment=""
+          setComment={vi.fn()}
+          handleUpdate={vi.fn()}
+          handleArchiveTicket={vi.fn()}
+          handleDeleteTicket={vi.fn()}
+          allowTicketDeletion={false}
+          uploadedPhotos={[]}
+          setUploadedPhotos={vi.fn()}
+          uploadError={null}
+          branding={{ industryProfile: 'hvac' }}
+          setIsPartModalOpen={vi.fn()}
+          isUploading={false}
+          uploadProgress=""
+        />
+      );
+
+      // Klikamy nagłówek kroku 4 (podgląd nieaktywnego etapu)
+      const step4Circle = screen.getByRole('button', { name: '4' });
+      fireEvent.click(step4Circle);
+
+      // Przycisk sekcji F-Gaz musi być disabled i pola F-Gaz nie mogą być rozwinięte/aktywne
+      const fGasToggleBtn = screen.getByTestId('ticket-fgas-toggle-btn');
+      expect(fGasToggleBtn.disabled).toBe(true);
+      fireEvent.click(fGasToggleBtn);
+      expect(screen.queryByText('Wynik próby szczelności układu')).toBeNull();
     });
   });
 });

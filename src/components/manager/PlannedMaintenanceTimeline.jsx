@@ -18,6 +18,7 @@ import {
   LEAK_TEST_RESULTS,
   buildFGasServiceEntry,
   captureCurrentGpsPosition,
+  getIndustryProfileConfig,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceTimeline({
@@ -41,6 +42,9 @@ export default function PlannedMaintenanceTimeline({
   const services = useManagerStore(state => state.services || []);
   const machines = useManagerStore(state => state.machines || []);
   const parts = useManagerStore(state => state.parts || []);
+  const branding = useManagerStore(state => state.branding || {});
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const [loadedPartsUsed, setLoadedPartsUsed] = useState([]);
   useEffect(() => {
@@ -85,6 +89,8 @@ export default function PlannedMaintenanceTimeline({
   const [isCompletingService, setIsCompletingService] = useState(false);
 
   const currentMachine = machines.find(m => m.id === srv.machineId) || null;
+  const canShowFGasSection =
+    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType);
   const [completedGps, setCompletedGps] = useState(
     srv.completedGps || srv.completionDetails?.completedGps || null
   );
@@ -94,7 +100,9 @@ export default function PlannedMaintenanceTimeline({
   const [refrigerantType, setRefrigerantType] = useState(currentMachine?.refrigerantType || '');
   const [addedRefrigerantKg, setAddedRefrigerantKg] = useState('');
   const [recoveredRefrigerantKg, setRecoveredRefrigerantKg] = useState('');
-  const [showFGasSection, setShowFGasSection] = useState(Boolean(currentMachine?.refrigerantType));
+  const [showFGasSection, setShowFGasSection] = useState(
+    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType)
+  );
   const [clientSignature, setClientSignature] = useState('');
   const [clientSignerName, setClientSignerName] = useState(currentMachine?.contactPerson || '');
 
@@ -103,12 +111,16 @@ export default function PlannedMaintenanceTimeline({
       if (currentMachine.refrigerantType) {
         setRefrigerantType(currentMachine.refrigerantType);
         setShowFGasSection(true);
+      } else if (industryProfile === 'hvac') {
+        setShowFGasSection(true);
+      } else {
+        setShowFGasSection(false);
       }
       if (currentMachine.contactPerson && !clientSignerName) {
         setClientSignerName(currentMachine.contactPerson);
       }
     }
-  }, [srv.machineId, currentMachine]);
+  }, [srv.machineId, currentMachine, industryProfile]);
 
   const handleCaptureGps = async () => {
     setGpsLoading(true);
@@ -1159,100 +1171,116 @@ export default function PlannedMaintenanceTimeline({
                             </button>
                           </div>
 
-                          {/* Sekcja F-Gazy (HVAC / Pompy ciepła / Klimatyzacja) */}
-                          <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setShowFGasSection(prev => !prev)}
-                              className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-cyan-50 transition-colors cursor-pointer"
-                            >
-                              <span className="text-xs font-bold text-cyan-900 flex items-center gap-1.5">
-                                <i className="ph ph-snowflake text-base text-cyan-600"></i>
-                                Protokół F-Gaz / Próba szczelności (HVAC / CRO)
-                              </span>
-                              <span className="text-[11px] font-bold text-cyan-700 flex items-center gap-1">
-                                {showFGasSection ? 'Ukryj' : 'Rozwiń'}
-                                <i
-                                  className={`ph ${
-                                    showFGasSection ? 'ph-caret-up' : 'ph-caret-down'
-                                  }`}
-                                ></i>
-                              </span>
-                            </button>
-                            {showFGasSection && (
-                              <div className="p-3.5 pt-2 bg-white border-t border-cyan-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                    Wynik próby szczelności
-                                  </label>
-                                  <select
-                                    disabled={!isActualStatus}
-                                    value={leakTestResult}
-                                    onChange={e => setLeakTestResult(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none"
-                                  >
-                                    {LEAK_TEST_RESULTS.map(res => (
-                                      <option key={res.id} value={res.id}>
-                                        {res.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                          {/* Sekcja F-Gazy (HVAC / Pompy ciepła / Klimatyzacja) — widoczna dla profilu HVAC lub maszyn z czynnikiem, aktywna WYŁĄCZNIE gdy Krok 4 jest aktywnym etapem */}
+                          {canShowFGasSection && (
+                            <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">
+                              <button
+                                type="button"
+                                disabled={!isActualStatus || isCompleted}
+                                onClick={() => {
+                                  if (!isActualStatus || isCompleted) return;
+                                  setShowFGasSection(prev => !prev);
+                                }}
+                                data-testid="service-fgas-toggle-btn"
+                                className={`w-full px-3.5 py-2.5 flex items-center justify-between text-left transition-colors ${
+                                  isActualStatus && !isCompleted
+                                    ? 'hover:bg-cyan-50 cursor-pointer'
+                                    : 'opacity-50 cursor-not-allowed'
+                                }`}
+                              >
+                                <span className="text-xs font-bold text-cyan-900 flex items-center gap-1.5">
+                                  <i className="ph ph-snowflake text-base text-cyan-600"></i>
+                                  Protokół F-Gaz / Próba szczelności (HVAC / CRO)
+                                </span>
+                                <span className="text-[11px] font-bold text-cyan-700 flex items-center gap-1">
+                                  {showFGasSection && isActualStatus && !isCompleted
+                                    ? 'Ukryj'
+                                    : 'Rozwiń'}
+                                  <i
+                                    className={`ph ${
+                                      showFGasSection && isActualStatus && !isCompleted
+                                        ? 'ph-caret-up'
+                                        : 'ph-caret-down'
+                                    }`}
+                                  ></i>
+                                </span>
+                              </button>
+                              {showFGasSection && isActualStatus && !isCompleted && (
+                                <div className="p-3.5 pt-2 bg-white border-t border-cyan-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Wynik próby szczelności
+                                    </label>
+                                    <select
+                                      disabled={!isActualStatus || isCompleted}
+                                      value={leakTestResult}
+                                      onChange={e => setLeakTestResult(e.target.value)}
+                                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none disabled:bg-slate-100 disabled:opacity-60"
+                                    >
+                                      {LEAK_TEST_RESULTS.map(res => (
+                                        <option key={res.id} value={res.id}>
+                                          {res.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Rodzaj czynnika chłodniczego
+                                    </label>
+                                    <select
+                                      disabled={!isActualStatus || isCompleted}
+                                      value={refrigerantType}
+                                      onChange={e => setRefrigerantType(e.target.value)}
+                                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none disabled:bg-slate-100 disabled:opacity-60"
+                                    >
+                                      <option value="">-- Brak (Nie dotyczy) --</option>
+                                      {Object.values(REFRIGERANT_TYPES).map(ref => (
+                                        <option key={ref.code} value={ref.code}>
+                                          {ref.name} (GWP: {ref.gwp})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Uzupełniono czynnik (kg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      disabled={!isActualStatus || isCompleted}
+                                      value={addedRefrigerantKg}
+                                      onChange={e => setAddedRefrigerantKg(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none disabled:bg-slate-100 disabled:opacity-60"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Odzyskano czynnik (kg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      disabled={!isActualStatus || isCompleted}
+                                      value={recoveredRefrigerantKg}
+                                      onChange={e => setRecoveredRefrigerantKg(e.target.value)}
+                                      placeholder="0.00"
+                                      className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none disabled:bg-slate-100 disabled:opacity-60"
+                                    />
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                    Rodzaj czynnika chłodniczego
-                                  </label>
-                                  <select
-                                    disabled={!isActualStatus}
-                                    value={refrigerantType}
-                                    onChange={e => setRefrigerantType(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none"
-                                  >
-                                    <option value="">-- Brak (Nie dotyczy) --</option>
-                                    {Object.values(REFRIGERANT_TYPES).map(ref => (
-                                      <option key={ref.code} value={ref.code}>
-                                        {ref.name} (GWP: {ref.gwp})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                    Uzupełniono czynnik (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    disabled={!isActualStatus}
-                                    value={addedRefrigerantKg}
-                                    onChange={e => setAddedRefrigerantKg(e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                    Odzyskano czynnik (kg)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    disabled={!isActualStatus}
-                                    value={recoveredRefrigerantKg}
-                                    onChange={e => setRecoveredRefrigerantKg(e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* Podpis cyfrowy klienta / odbierającego */}
                           <SignaturePad
-                            disabled={!isActualStatus}
+                            label={profileConfig.clientSignatureLabel}
+                            disabled={!isActualStatus || isCompleted}
                             value={clientSignature}
                             signerName={clientSignerName}
                             onSignerNameChange={setClientSignerName}

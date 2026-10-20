@@ -2,12 +2,15 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { safeParseDate } from '../../utils/dateHelpers';
+import { useManagerStore } from '../../store/managerStore';
 import {
   resolveMachineGeoLocation,
   buildGoogleMapsNavigationUrl,
   formatGpsCheckIn,
   formatFGasSummary,
   getCkobCategoryLabel,
+  getIndustryProfileConfig,
+  calculateCo2Equivalent,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceInfo({
@@ -20,6 +23,9 @@ export default function PlannedMaintenanceInfo({
   section = 'all',
 }) {
   const { t } = useTranslation();
+  const branding = useManagerStore(state => state.branding || {});
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const showParams = section === 'all' || section === 'params';
   const showResources = section === 'all' || section === 'resources';
@@ -31,15 +37,19 @@ export default function PlannedMaintenanceInfo({
   const completedGpsStr = formatGpsCheckIn(
     srv.completedGps || srv.completionDetails?.completedGps
   );
-  const fGasSummaryStr = formatFGasSummary(
+  const rawFGas =
     srv.fGasProtocol ||
-      srv.completionDetails?.fGasProtocol ||
-      (machine?.refrigerantType
-        ? {
-            refrigerantType: machine.refrigerantType,
-            refrigerantChargeKg: machine.refrigerantChargeKg,
-          }
-        : null)
+    srv.completionDetails?.fGasProtocol ||
+    (machine?.refrigerantType
+      ? {
+          refrigerantType: machine.refrigerantType,
+          refrigerantChargeKg: machine.refrigerantChargeKg,
+        }
+      : null);
+  const fGasSummaryStr = formatFGasSummary(rawFGas);
+  const co2Info = calculateCo2Equivalent(
+    rawFGas?.refrigerantType || machine?.refrigerantType,
+    rawFGas?.refrigerantChargeKg || machine?.refrigerantChargeKg
   );
   const clientSignature =
     srv.clientSignature || srv.completionDetails?.clientSignature || null;
@@ -48,6 +58,20 @@ export default function PlannedMaintenanceInfo({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {showParams && (
+        <div
+          data-testid="service-profile-banner"
+          className={`px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b ${profileConfig.bannerClass}`}
+        >
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold tracking-wide">
+            <i className={`ph ${profileConfig.icon} text-base sm:text-lg`}></i>
+            <span>{profileConfig.serviceCardTitle}</span>
+          </div>
+          <span className="text-[10px] sm:text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-white/15 text-white border border-white/20">
+            {profileConfig.shortName}
+          </span>
+        </div>
+      )}
       <div className="p-4 sm:p-5 space-y-5">
         {showParams && (
           <div>
@@ -57,6 +81,9 @@ export default function PlannedMaintenanceInfo({
                 <h2 className="text-base sm:text-2xl font-black text-slate-800">{srv.name}</h2>
                 <div className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-wider flex items-center gap-2 flex-wrap">
                   <i className="ph ph-engine text-lg text-slate-400"></i>
+                  <span className="text-xs font-semibold text-slate-400 normal-case">
+                    {profileConfig.machineLabel}:
+                  </span>
                   {machine?.name || (
                     <>
                       {srv.machineName || t('machines.unknownMachine', 'Nieznana maszyna')}{' '}
@@ -65,7 +92,7 @@ export default function PlannedMaintenanceInfo({
                       </span>
                     </>
                   )}{' '}
-                  ({getMachineRegionName(machine?.regionId)})
+                  ({profileConfig.regionLabel}: {getMachineRegionName(machine?.regionId)})
                   {(regions || []).find(r => r.id === machine?.regionId)?.mapImageUrl && (
                     <a
                       href={(regions || []).find(r => r.id === machine?.regionId).mapImageUrl}
@@ -221,12 +248,145 @@ export default function PlannedMaintenanceInfo({
               </div>
             </div>
 
+            {/* DEDYKOWANA SEKCJA BRANŻOWA NA KARCIE SERWISU (INDUSTRIAL / FACILITY / HVAC) */}
+            {industryProfile === 'industrial' && (
+              <div
+                data-testid="service-domain-industrial"
+                className="mt-4 bg-slate-50/90 border border-slate-200 rounded-xl p-3.5"
+              >
+                <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2.5">
+                  <i className="ph ph-factory text-slate-700 text-base"></i>
+                  <span>Karta Techniczna Prewencji UR (Przemysł / Stocznia)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-400 font-bold uppercase block text-[10px]">
+                      Licznik Maszyny (RBG)
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {machine?.operatingHours ?? 0} RBG
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-400 font-bold uppercase block text-[10px]">
+                      Cykl odnawiania prewencji
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {srv.intervalDays ? `Co ${srv.intervalDays} dni` : ''}
+                      {srv.intervalDays && srv.intervalHours ? ' / ' : ''}
+                      {srv.intervalHours ? `Co ${srv.intervalHours} RBG` : ''}
+                      {!srv.intervalDays && !srv.intervalHours ? 'Wg harmonogramu DTR' : ''}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-400 font-bold uppercase block text-[10px]">
+                      Roboczogodziny UR (Wykonanie)
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {srv.manHours ?? srv.completionDetails?.manHours
+                        ? `${srv.manHours ?? srv.completionDetails?.manHours} RBG`
+                        : 'W trakcie rozliczania'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {industryProfile === 'facility' && (
+              <div
+                data-testid="service-domain-facility"
+                className="mt-4 bg-amber-50/50 border border-amber-200 rounded-xl p-3.5"
+              >
+                <div className="flex items-center gap-2 text-xs font-extrabold text-amber-900 uppercase tracking-wider mb-2.5">
+                  <i className="ph ph-buildings text-amber-700 text-base"></i>
+                  <span>Protokół Przeglądu Okresowego Obiektu Budowlanego (c-KOB art. 62)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200/80">
+                    <span className="text-amber-700/70 font-bold uppercase block text-[10px]">
+                      Kategoria Przeglądu c-KOB
+                    </span>
+                    <span className="font-bold text-slate-800 mt-0.5 block">
+                      {ckobLabel || 'Przegląd okresowy instalacji budynku (art. 62 PB)'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200/80">
+                    <span className="text-amber-700/70 font-bold uppercase block text-[10px]">
+                      Zarządca / Kontakt / Domofon
+                    </span>
+                    <span className="font-bold text-slate-800 mt-0.5 block">
+                      {machine?.contactPerson || 'Administracja osiedla'}
+                      {machine?.accessNotes ? ` · ${machine.accessNotes}` : ''}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200/80">
+                    <span className="text-amber-700/70 font-bold uppercase block text-[10px]">
+                      Orzeczenie techniczne c-KOB
+                    </span>
+                    <span className="font-extrabold text-emerald-700 mt-0.5 block">
+                      {srv.status === 'completed'
+                        ? 'DOPUSZCZONO DO EKSPLOATACJI'
+                        : 'OCZEKUJE NA ODBIÓR INSPEKTORA'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {industryProfile === 'hvac' && (
+              <div
+                data-testid="service-domain-hvac"
+                className="mt-4 bg-cyan-50/50 border border-cyan-200 rounded-xl p-3.5"
+              >
+                <div className="flex items-center gap-2 text-xs font-extrabold text-cyan-900 uppercase tracking-wider mb-2.5">
+                  <i className="ph ph-snowflake text-cyan-700 text-base"></i>
+                  <span>Protokół Szczelności i Przeglądu HVAC / F-Gaz (Rozp. UE 2024/573 & CRO)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-cyan-200/80">
+                    <span className="text-cyan-700/80 font-bold uppercase block text-[10px]">
+                      Czynnik chłodniczy i GWP
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {co2Info.refrigerantType
+                        ? `${co2Info.refrigerantType} (${co2Info.chargeKg} kg · GWP ${co2Info.gwp})`
+                        : 'Uzupełnij w Kroku 4 (Podsumowanie)'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-cyan-200/80">
+                    <span className="text-cyan-700/80 font-bold uppercase block text-[10px]">
+                      Ekwiwalent CO2e / Rejestr CRO
+                    </span>
+                    <span
+                      className={`font-extrabold mt-0.5 block ${
+                        co2Info.requiresCroCard ? 'text-amber-700' : 'text-emerald-700'
+                      }`}
+                    >
+                      {co2Info.co2EquivalentTons > 0
+                        ? `${co2Info.co2EquivalentTons} t CO2e (${
+                            co2Info.requiresCroCard ? 'Wymagana Karta CRO' : 'Poniżej 5 t CO2e'
+                          })`
+                        : '0.000 t CO2e'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-cyan-200/80">
+                    <span className="text-cyan-700/80 font-bold uppercase block text-[10px]">
+                      Próba szczelności i bilans czynnika
+                    </span>
+                    <span className="font-bold text-slate-800 mt-0.5 block">
+                      {fGasSummaryStr || 'Wykonać próbę szczelności przy zamknięciu serwisu'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {clientSignature && (
               <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="text-xs">
                   <div className="font-bold text-slate-700 flex items-center gap-1">
                     <i className="ph ph-signature text-blue-600 text-base"></i>
-                    Podpis potwierdzający odbiór prac
+                    {profileConfig.clientSignatureLabel}
                   </div>
                   {clientSignerName && (
                     <div className="text-slate-600 mt-0.5">

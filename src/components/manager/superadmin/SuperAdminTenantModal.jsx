@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sliders } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { INDUSTRY_PROFILES } from '../../../utils/fieldServiceHelpers';
 
 export default function SuperAdminTenantModal({
   isModalOpen,
@@ -15,6 +16,34 @@ export default function SuperAdminTenantModal({
 }) {
   const { t } = useTranslation();
   if (!isModalOpen) return null;
+
+  const selectedProfile = formData.industryProfile || 'industrial';
+  const profileOptions = [
+    {
+      id: 'industrial',
+      icon: 'ph-factory',
+      title: t('dashboards.superadmin.profile_industrial_title', INDUSTRY_PROFILES.industrial.name),
+      desc: t('dashboards.superadmin.profile_industrial_desc', INDUSTRY_PROFILES.industrial.description),
+      activeColor: 'border-slate-800 bg-slate-50 ring-2 ring-slate-800/20',
+      iconColor: 'text-slate-700 bg-slate-200/70'
+    },
+    {
+      id: 'facility',
+      icon: 'ph-buildings',
+      title: t('dashboards.superadmin.profile_facility_title', INDUSTRY_PROFILES.facility.name),
+      desc: t('dashboards.superadmin.profile_facility_desc', INDUSTRY_PROFILES.facility.description),
+      activeColor: 'border-amber-600 bg-amber-50/60 ring-2 ring-amber-500/20',
+      iconColor: 'text-amber-700 bg-amber-100'
+    },
+    {
+      id: 'hvac',
+      icon: 'ph-snowflake',
+      title: t('dashboards.superadmin.profile_hvac_title', INDUSTRY_PROFILES.hvac.name),
+      desc: t('dashboards.superadmin.profile_hvac_desc', INDUSTRY_PROFILES.hvac.description),
+      activeColor: 'border-cyan-600 bg-cyan-50/60 ring-2 ring-cyan-500/20',
+      iconColor: 'text-cyan-700 bg-cyan-100'
+    }
+  ];
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[999] p-4">
@@ -86,6 +115,49 @@ export default function SuperAdminTenantModal({
                 placeholder={t("dashboards.superadmin.full_name_placeholder", "np. VexoNT")}
                 required 
               />
+            </div>
+          </div>
+
+          <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
+            <h4 className="font-bold text-slate-800 mb-1 text-sm flex items-center gap-2">
+              <i className="ph ph-briefcase text-blue-600 text-base"></i>
+              {t("dashboards.superadmin.industry_profile_label", "Rodzaj Firmy / Profil Branżowy *")}
+            </h4>
+            <p className="text-[11px] text-slate-500 mb-3">
+              {t("dashboards.superadmin.industry_profile_hint", "Wybór profilu dostosowuje nazewnictwo obiektów oraz wygląd Kart Serwisu, Kart Awarii i protokołów PDF (UR / c-KOB / F-Gazy CRO).")}
+            </p>
+            <div className="grid grid-cols-1 gap-2.5" role="radiogroup" aria-label={t("dashboards.superadmin.industry_profile_label", "Rodzaj Firmy / Profil Branżowy")}>
+              {profileOptions.map(opt => {
+                const isSelected = selectedProfile === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    data-testid={`industry-profile-option-${opt.id}`}
+                    onClick={() => setFormData({ ...formData, industryProfile: opt.id })}
+                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
+                      isSelected
+                        ? opt.activeColor
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${opt.iconColor}`}>
+                      <i className={`ph ${opt.icon} text-lg`}></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">{opt.title}</span>
+                        <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
+                        }`}>
+                          {isSelected && <i className="ph ph-check text-[10px] font-bold"></i>}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">{opt.desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

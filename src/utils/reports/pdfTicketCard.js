@@ -8,6 +8,8 @@ import {
   formatFGasSummary,
   formatGpsCheckIn,
   getCkobCategoryLabel,
+  getIndustryProfileConfig,
+  calculateCo2Equivalent,
 } from '../fieldServiceHelpers';
 
 const n = (text) => {
@@ -66,6 +68,8 @@ export const generateTicketPDF = async (ticket) => {
     const allParts = state.parts || [];
     const allMachines = state.machines || [];
     const allRegions = state.regions || [];
+    const industryProfile = state.branding?.industryProfile || 'industrial';
+    const profileConfig = getIndustryProfileConfig(industryProfile);
 
     const machineObj = allMachines.find(m => m.id === ticket.machineId);
     const regionObj = allRegions.find(r => r.id === (ticket.regionId || machineObj?.regionId));
@@ -105,11 +109,11 @@ export const generateTicketPDF = async (ticket) => {
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(n('System Utrzymania Ruchu VexoNT'), doc.internal.pageSize.getWidth() - 14, 38, { align: 'right' });
+    doc.text(n(`VexoNT - ${profileConfig.shortName}`), doc.internal.pageSize.getWidth() - 14, 38, { align: 'right' });
 
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setTextColor(40, 40, 40);
-    doc.text(n('Karta Zgloszenia Awarii'), 14, 22);
+    doc.text(n(profileConfig.ticketPdfTitle), 14, 22);
     
     doc.setFontSize(14);
     doc.setTextColor(200, 50, 50);
@@ -118,15 +122,15 @@ export const generateTicketPDF = async (ticket) => {
     let currentY = 45;
 
     const infoRows = [
-      [n('Maszyna:'), n(`${machineName}${machineObj?.internalId ? ' (' + machineObj.internalId + ')' : ''}`)],
-      [n('Lokalizacja:'), n(`${regionName} ${ticket.bay || machineObj?.bay ? '/ ' + (ticket.bay || machineObj?.bay) : ''}`)],
+      [n(`${profileConfig.machineLabel}:`), n(`${machineName}${machineObj?.internalId ? ' (' + machineObj.internalId + ')' : ''}`)],
+      [n(`${profileConfig.regionLabel} / ${profileConfig.bayLabel}:`), n(`${regionName} ${ticket.bay || machineObj?.bay ? '/ ' + (ticket.bay || machineObj?.bay) : ''}`)],
     ];
     const addrStr = ticket.address || machineObj?.address || machineObj?.mapAddress || regionObj?.address || regionObj?.mapAddress;
     if (addrStr) {
       infoRows.push([n('Adres GPS:'), n(addrStr)]);
     }
     const ckobStr = getCkobCategoryLabel(machineObj?.inspectionCategory);
-    if (ckobStr) {
+    if (ckobStr && industryProfile !== 'industrial') {
       infoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
     }
     infoRows.push(
@@ -146,20 +150,84 @@ export const generateTicketPDF = async (ticket) => {
       infoRows.push([n('Potwierdzenie GPS:'), n(gpsStr)]);
     }
     const fGasStr = formatFGasSummary(ticket.fGasProtocol);
-    if (fGasStr) {
+    if (fGasStr && (industryProfile === 'hvac' || machineObj?.refrigerantType)) {
       infoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
     }
+
+    const headerColor =
+      industryProfile === 'facility'
+        ? [180, 83, 9]
+        : industryProfile === 'hvac'
+        ? [14, 116, 144]
+        : [30, 41, 59];
 
     autoTable(doc, {
       startY: currentY,
       head: [[n('Informacje o Zgloszeniu i Realizacji'), '']],
       body: infoRows,
       theme: 'grid',
-      headStyles: { fillColor: [60, 100, 180] },
+      headStyles: { fillColor: headerColor },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
     });
 
-    currentY = doc.lastAutoTable.finalY + 12;
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    // Dedykowana sekcja branżowa w PDF (Industrial / Facility c-KOB / HVAC F-Gaz)
+    if (industryProfile === 'industrial') {
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Parametry Techniczne Utrzymania Ruchu (Przemysl / UR)'), '']],
+        body: [
+          [n('Status Ruchu Maszyny:'), n(ticket.isCritical ? 'POSTOJ AWARYJNY (STOP)' : 'PRACA Z OGRANICZENIEM')],
+          [n('Stan Licznika (RBG):'), n(`${machineObj?.operatingHours ?? 0} RBG`)],
+          [n('Kategoria / Zespol UR:'), n(ticket.assignedTo || machineObj?.category || 'Utrzymanie Ruchu')],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    } else if (industryProfile === 'facility') {
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Dane Administracyjne Obiektu i Lokalu (Facility / c-KOB)'), '']],
+        body: [
+          [n('Kategoria c-KOB (art. 62 PB):'), n(ckobStr || 'Instalacja / czesc wspolna budynku')],
+          [n('Lokator / Administrator:'), n(`${machineObj?.contactPerson || ticket.reportedBy || '-'} ${machineObj?.contactPhone || ticket.reporterPhone ? '(' + (machineObj?.contactPhone || ticket.reporterPhone) + ')' : ''}`)],
+          [n('Kod domofonu / Dostep:'), n(machineObj?.accessNotes || 'Dostep wg administracji obiektu')],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [217, 119, 6] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    } else if (industryProfile === 'hvac') {
+      const fGas = ticket.fGasProtocol || {};
+      const co2 = calculateCo2Equivalent(
+        fGas.refrigerantType || machineObj?.refrigerantType,
+        fGas.refrigerantChargeKg || machineObj?.refrigerantChargeKg
+      );
+      const leakLabel =
+        fGas.leakTestResult === 'positive'
+          ? 'POZYTYWNY (Uklad szczelny)'
+          : fGas.leakTestResult === 'negative'
+          ? 'NEGATYWNY (Stwierdzono wyciek)'
+          : 'Nie wykonywano / Nie dotyczy';
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Protokol F-Gaz / Kontrola Szczelnosci (Rozp. UE 2024/573 & CRO)'), '']],
+        body: [
+          [n('Czynnik chlodniczy i napelnienie:'), n(co2.refrigerantType ? `${co2.refrigerantType} (${co2.chargeKg} kg, GWP: ${co2.gwp})` : 'Brak danych')],
+          [n('Ekwiwalent CO2e / Rejestr CRO:'), n(`${co2.co2EquivalentTons} t CO2e (${co2.requiresCroCard ? 'Wymagana Karta CRO >= 5 t CO2e' : 'Ponizej progu CRO'})`)],
+          [n('Wynik proby szczelnosci:'), n(leakLabel)],
+          [n('Uzupelniono / Odzyskano czynnik:'), n(`+${Number(fGas.refrigerantAddedKg || 0).toFixed(2)} kg / -${Number(fGas.refrigerantRecoveredKg || 0).toFixed(2)} kg`)],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [8, 145, 178] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 10;
+    }
 
     doc.setFontSize(14);
     doc.setTextColor(40, 40, 40);
@@ -344,13 +412,13 @@ export const generateTicketPDF = async (ticket) => {
     doc.setFontSize(9);
     doc.setTextColor(90, 90, 90);
     doc.text(
-      n(`Podpis Wykonawcy (${ticket.completedBy || ticket.assignedTo || 'Serwis'})`),
+      n(`${profileConfig.techSignatureLabel} (${ticket.completedBy || ticket.assignedTo || 'Serwis'})`),
       14,
       currentY + 27
     );
     doc.text(
       n(
-        `Podpis Odbierajacego / Klienta${
+        `${profileConfig.clientSignatureLabel}${
           ticket.clientSignerName ? ' (' + ticket.clientSignerName + ')' : ''
         }`
       ),

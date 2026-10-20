@@ -1018,7 +1018,18 @@
       "delete_confirm": "WARNING! Do you want to remove company {{id}} from the registry? This will immediately revoke access for its employees.",
       "company_deleted": "Company removed from registry.",
       "delete_error": "Error deleting: ",
-      "no_permission": "Access denied. This panel is restricted to the Super Administrator (SaaS Owner)."
+      "no_permission": "Access denied. This panel is restricted to the Super Administrator (SaaS Owner).",
+      "industry_profile_label": "Company Type / Industry Profile *",
+      "industry_profile_hint": "Selecting a profile customizes asset terminology and the layout of Service Cards, Breakdown Cards, and PDF protocols (Industrial / Facility c-KOB / HVAC F-Gas CRO).",
+      "profile_industrial_title": "Industry / Manufacturing / Shipyard",
+      "profile_industrial_desc": "Manufacturing plants, shipyards and halls: machinery, operating hours (RBG), downtime, and maintenance warehouse.",
+      "profile_facility_title": "Facility Management / Residential Estates (c-KOB)",
+      "profile_facility_desc": "Housing communities, office buildings and estates: buildings, staircases/units, c-KOB building inspections (Art. 62), intercom access.",
+      "profile_hvac_title": "Mobile HVAC Service / Heat Pumps (Field Service)",
+      "profile_hvac_desc": "Installers and field service: heat pumps, air conditioners, boiler rooms, F-Gas leak test protocols (CRO), GPS client navigation.",
+      "profile_short_industrial": "Industrial / Maintenance",
+      "profile_short_facility": "Facility / Estates (c-KOB)",
+      "profile_short_hvac": "HVAC Service (F-Gas / CRO)"
     }
   },
   "superadmin": {},

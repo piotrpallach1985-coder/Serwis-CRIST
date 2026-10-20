@@ -6,7 +6,11 @@ import DictationButton from '../shared/DictationButton';
 import SignaturePad from '../shared/SignaturePad';
 import { useManagerStore } from '../../store/managerStore';
 import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSummaryParser';
-import { formatFGasSummary, formatGpsCheckIn } from '../../utils/fieldServiceHelpers';
+import {
+  formatFGasSummary,
+  formatGpsCheckIn,
+  getIndustryProfileConfig,
+} from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceCompletionModal({
   isOpen,
@@ -17,6 +21,9 @@ export default function PlannedMaintenanceCompletionModal({
   const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
+  const branding = useManagerStore(state => state.branding || {});
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const [completionNotes, setCompletionNotes] = useState('');
   const [createNewPlan, setCreateNewPlan] = useState(true);
@@ -44,9 +51,11 @@ export default function PlannedMaintenanceCompletionModal({
   const currentMachine = serviceToComplete?.machineId
     ? machines.find(m => m.id === serviceToComplete.machineId)
     : null;
+  const canShowFGasSection =
+    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType);
 
   useEffect(() => {
-    if (currentMachine?.refrigerantType) {
+    if (currentMachine?.refrigerantType || industryProfile === 'hvac') {
       setShowFGasSection(true);
     } else {
       setShowFGasSection(false);
@@ -54,7 +63,7 @@ export default function PlannedMaintenanceCompletionModal({
     if (currentMachine?.contactPerson && !clientSignerName) {
       setClientSignerName(currentMachine.contactPerson);
     }
-  }, [currentMachine?.id, currentMachine?.refrigerantType]);
+  }, [currentMachine?.id, currentMachine?.refrigerantType, industryProfile]);
 
   useEffect(() => {
     if (serviceToComplete?.id) {
@@ -536,80 +545,83 @@ export default function PlannedMaintenanceCompletionModal({
             </button>
           </div>
 
-          {/* Protokół F-Gaz / Próba szczelności */}
-          <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowFGasSection(prev => !prev)}
-              className="w-full px-3 py-2 flex items-center justify-between text-xs font-bold text-cyan-900 hover:bg-cyan-50 cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5">
-                <i className="ph ph-snowflake text-cyan-600 text-base"></i>
-                Protokół F-Gaz / Próba szczelności (HVAC / CRO)
-                {currentMachine?.refrigerantType && (
-                  <span className="bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded text-[10px]">
-                    {currentMachine.refrigerantType}
-                  </span>
-                )}
-              </span>
-              <i className={`ph ${showFGasSection ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
-            </button>
+          {/* Protokół F-Gaz / Próba szczelności (widoczny dla branży HVAC lub urządzeń z czynnikiem) */}
+          {canShowFGasSection && (
+            <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowFGasSection(prev => !prev)}
+                className="w-full px-3 py-2 flex items-center justify-between text-xs font-bold text-cyan-900 hover:bg-cyan-50 cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <i className="ph ph-snowflake text-cyan-600 text-base"></i>
+                  Protokół F-Gaz / Próba szczelności (HVAC / CRO)
+                  {currentMachine?.refrigerantType && (
+                    <span className="bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded text-[10px]">
+                      {currentMachine.refrigerantType}
+                    </span>
+                  )}
+                </span>
+                <i className={`ph ${showFGasSection ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
+              </button>
 
-            {showFGasSection && (
-              <div className="p-3 bg-white border-t border-cyan-100 space-y-2.5 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Wynik próby szczelności układu
-                  </label>
-                  <select
-                    value={leakTestResult}
-                    onChange={e => setLeakTestResult(e.target.value)}
-                    data-testid="fgas-leak-test-select"
-                    className="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-cyan-500"
-                  >
-                    <option value="">-- Nie wykonywano / Nie dotyczy --</option>
-                    <option value="positive">POZYTYWNY (Układ szczelny)</option>
-                    <option value="negative">NEGATYWNY (Stwierdzono wyciek - do naprawy)</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+              {showFGasSection && (
+                <div className="p-3 bg-white border-t border-cyan-100 space-y-2.5 text-xs">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">
-                      Uzupełniono czynnik (kg)
+                      Wynik próby szczelności układu
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={refrigerantAddedKg}
-                      onChange={e => setRefrigerantAddedKg(e.target.value)}
-                      placeholder="np. 0.35"
-                      data-testid="fgas-added-input"
-                      className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
+                    <select
+                      value={leakTestResult}
+                      onChange={e => setLeakTestResult(e.target.value)}
+                      data-testid="fgas-leak-test-select"
+                      className="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="">-- Nie wykonywano / Nie dotyczy --</option>
+                      <option value="positive">POZYTYWNY (Układ szczelny)</option>
+                      <option value="negative">NEGATYWNY (Stwierdzono wyciek - do naprawy)</option>
+                    </select>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">
-                      Odzyskano czynnik (kg)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={refrigerantRecoveredKg}
-                      onChange={e => setRefrigerantRecoveredKg(e.target.value)}
-                      placeholder="np. 0.00"
-                      data-testid="fgas-recovered-input"
-                      className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Uzupełniono czynnik (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={refrigerantAddedKg}
+                        onChange={e => setRefrigerantAddedKg(e.target.value)}
+                        placeholder="np. 0.35"
+                        data-testid="fgas-added-input"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Odzyskano czynnik (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={refrigerantRecoveredKg}
+                        onChange={e => setRefrigerantRecoveredKg(e.target.value)}
+                        placeholder="np. 0.00"
+                        data-testid="fgas-recovered-input"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Podpis cyfrowy klienta / odbierającego na ekranie */}
           <SignaturePad
+            label={profileConfig.clientSignatureLabel}
             value={clientSignature}
             signerName={clientSignerName}
             onSignerNameChange={setClientSignerName}

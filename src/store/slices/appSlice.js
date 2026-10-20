@@ -11,6 +11,7 @@ export const createAppSlice = (set) => ({
   branding: {
     companyName: '',
     systemSubtitle: 'DYSPOZYTORNIA UR',
+    industryProfile: 'industrial',
     companyLogoUrl: '',
     appLogoUrl: ''
   },

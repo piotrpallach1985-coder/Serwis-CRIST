@@ -41,6 +41,7 @@ export default function SuperAdminPanel({ onNavigate }) {
     id: '',
     name: '',
     contactEmail: '',
+    industryProfile: 'industrial',
     maxUsers: 10,
     maxMachines: 50,
     groqApiKey: '',
@@ -239,6 +240,7 @@ export default function SuperAdminPanel({ onNavigate }) {
       id: tenant.id,
       name: tenant.name || '',
       contactEmail: tenant.contactEmail || '',
+      industryProfile: tenant.industryProfile || 'industrial',
       maxUsers: tenant.limits?.maxUsers || 10,
       maxMachines: tenant.limits?.maxMachines || 50,
       groqApiKey: tenant.groqApiKey || '',
@@ -264,6 +266,16 @@ export default function SuperAdminPanel({ onNavigate }) {
     try {
       const { saveTenant } = await import('../../services/admin.service');
       await saveTenant(formData, isEditing);
+      const currentTenantId = useManagerStore.getState().tenantId;
+      if (currentTenantId === formData.id) {
+        const prevBranding = useManagerStore.getState().branding || {};
+        useManagerStore.getState().setBranding({
+          ...prevBranding,
+          companyName: formData.name,
+          industryProfile: formData.industryProfile || 'industrial',
+          modules: formData.modules
+        });
+      }
       showToast(isEditing ? t('dashboards.superadmin.company_updated', 'Dane firmy zostały zaktualizowane.') : t('dashboards.superadmin.company_added', 'Firma została pomyślnie dodana!'), 'success');
       setIsModalOpen(false);
     } catch (err) {

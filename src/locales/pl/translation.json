@@ -1018,7 +1018,18 @@
       "delete_confirm": "UWAGA! Chcesz usunąć firmę {{id}} z rejestru? To natychmiast odetnie dostęp jej pracownikom.",
       "company_deleted": "Firma usunięta z rejestru.",
       "delete_error": "Błąd usuwania: ",
-      "no_permission": "Brak uprawnień. Ten panel jest tylko dla Super Administratora (Właściciela SaaS)."
+      "no_permission": "Brak uprawnień. Ten panel jest tylko dla Super Administratora (Właściciela SaaS).",
+      "industry_profile_label": "Rodzaj Firmy / Profil Branżowy *",
+      "industry_profile_hint": "Wybór profilu dostosowuje nazewnictwo obiektów oraz wygląd Kart Serwisu, Kart Awarii i protokołów PDF (UR / c-KOB / F-Gazy CRO).",
+      "profile_industrial_title": "Przemysł / Produkcja / Stocznia",
+      "profile_industrial_desc": "Zakłady produkcyjne, stocznie i hale: maszyny, liczniki RBG, przestoje i magazyn części UR.",
+      "profile_facility_title": "Zarządzanie Nieruchomościami / Osiedla (c-KOB)",
+      "profile_facility_desc": "Wspólnoty mieszkaniowe, biurowce i osiedla: budynki, klatki/lokale, przeglądy budowlane c-KOB (art. 62), domofony.",
+      "profile_hvac_title": "Serwis Mobilny HVAC / Pompy Ciepła (Field Service)",
+      "profile_hvac_desc": "Instalatorzy i serwis mobilny: pompy ciepła, klimatyzatory, kotłownie, protokoły F-Gaz (CRO), nawigacja GPS do klienta.",
+      "profile_short_industrial": "Przemysł / UR",
+      "profile_short_facility": "Facility / Osiedla (c-KOB)",
+      "profile_short_hvac": "Serwis HVAC (F-Gazy / CRO)"
     }
   },
   "superadmin": {},

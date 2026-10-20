@@ -1,6 +1,7 @@
 import React from 'react';
 import { Crown, Plus, CheckCircle, Trash } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getIndustryProfileConfig } from '../../../utils/fieldServiceHelpers';
 
 export default function SuperAdminTenantTable({
   tenantsWithTokens,
@@ -86,6 +87,17 @@ export default function SuperAdminTenantTable({
                       </td>
                       <td className="py-2 px-3 w-48">
                         <div className="font-bold text-slate-800 text-sm leading-tight truncate">{tenant.name}</div>
+                        {(() => {
+                          const prof = getIndustryProfileConfig(tenant.industryProfile);
+                          return (
+                            <span
+                              className={`mt-1 px-2 py-0.5 border rounded text-[10px] font-bold inline-flex items-center gap-1 ${prof.badgeClass}`}
+                            >
+                              <i className={`ph ${prof.icon}`}></i>
+                              {t(`dashboards.superadmin.profile_short_${prof.id}`, prof.shortName)}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-2 px-3">
                         <div className="flex flex-wrap items-center gap-1.5">

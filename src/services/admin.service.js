@@ -60,15 +60,23 @@ export const saveGlobalAppLogo = async (downloadURL, base64Data, tenants) => {
 
 export const saveTenant = async (formData, isEditing) => {
   const tenantRef = doc(db, 'tenant_registry', formData.id);
+  const industryProfile = formData.industryProfile || 'industrial';
+  const defaultSubtitles = {
+    industrial: 'DYSPOZYTORNIA UR',
+    facility: 'ZARZĄDZANIE NIERUCHOMOŚCIAMI (c-KOB)',
+    hvac: 'SERWIS MOBILNY HVAC / F-GAZ',
+  };
+  const systemSubtitle = defaultSubtitles[industryProfile] || 'DYSPOZYTORNIA UR';
+
   const data = {
     name: formData.name.trim(),
-    contactEmail: formData.contactEmail.trim(),
+    contactEmail: (formData.contactEmail || '').trim(),
+    industryProfile,
     limits: {
       maxUsers: parseInt(formData.maxUsers) || 10,
       maxMachines: parseInt(formData.maxMachines) || 50
     },
     companyLogoUrl: formData.companyLogoUrl,
-    
     companyLogoBase64: formData.companyLogoBase64,
     modules: formData.modules
   };
@@ -82,14 +90,15 @@ export const saveTenant = async (formData, isEditing) => {
   }
 
   await setDoc(doc(db, 'tenants', formData.id, 'settings', 'general'), {
-    limits: data.limits
+    limits: data.limits,
+    industryProfile
   }, { merge: true });
 
   await setDoc(doc(db, 'tenants', formData.id, 'settings', 'branding'), {
     companyName: data.name,
-    systemSubtitle: 'DYSPOZYTORNIA UR',
+    systemSubtitle,
+    industryProfile,
     companyLogoUrl: data.companyLogoUrl,
-    
     companyLogoBase64: data.companyLogoBase64,
     modules: data.modules
   }, { merge: true });

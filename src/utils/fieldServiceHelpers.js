@@ -39,25 +39,81 @@ export const INDUSTRY_PROFILES = {
   industrial: {
     id: 'industrial',
     name: 'Przemysł / Produkcja / Stocznia',
+    shortName: 'Przemysł / UR',
+    description: 'Zakłady produkcyjne, stocznie i hale: maszyny, liczniki RBG, przestoje i magazyn części UR.',
+    icon: 'ph-factory',
+    badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
+    bannerClass: 'bg-slate-900 text-white border-slate-800',
     machineLabel: 'Maszyna / Urządzenie',
     regionLabel: 'Rejon / Hala',
     bayLabel: 'Przelot / Stanowisko',
+    ticketCardTitle: 'Karta Zgłoszenia Awarii Maszyny (UR)',
+    ticketPdfTitle: 'Karta Zgłoszenia Awarii (UR)',
+    serviceCardTitle: 'Karta Serwisu Planowanego (Prewencja UR)',
+    servicePdfTitle: 'Karta Serwisu Planowanego (UR)',
+    clientSignatureLabel: 'Podpis Odbierającego (Mistrz zmiany / Operator UR)',
+    techSignatureLabel: 'Podpis Wykonawcy / Mechanika UR',
+    showFGasByDefault: false,
+    showCkobSection: false,
+    showIndustrialRbgSection: true,
+    showHvacCustomerSection: false,
   },
   facility: {
     id: 'facility',
     name: 'Zarządzanie Nieruchomościami / Osiedla (c-KOB)',
-    machineLabel: 'Urządzenie / Instalacja',
+    shortName: 'Facility / Osiedla (c-KOB)',
+    description: 'Wspólnoty mieszkaniowe, biurowce i osiedla: budynki, klatki/lokale, przeglądy budowlane c-KOB (art. 62), domofony.',
+    icon: 'ph-buildings',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-300',
+    bannerClass: 'bg-amber-900 text-white border-amber-800',
+    machineLabel: 'Urządzenie / Instalacja Budynku',
     regionLabel: 'Budynek / Obiekt',
     bayLabel: 'Klatka / Piętro / Lokal',
+    ticketCardTitle: 'Karta Zgłoszenia Usterki Obiektu (Facility / c-KOB)',
+    ticketPdfTitle: 'Karta Usterki Obiektu (Facility / c-KOB)',
+    serviceCardTitle: 'Protokół Przeglądu Okresowego Obiektu (c-KOB art. 62)',
+    servicePdfTitle: 'Protokół Przeglądu Technicznego Obiektu (c-KOB)',
+    clientSignatureLabel: 'Podpis Zarządcy Nieruchomości / Odbierającego',
+    techSignatureLabel: 'Podpis Inspektora / Konserwatora Obiektu',
+    showFGasByDefault: false,
+    showCkobSection: true,
+    showIndustrialRbgSection: false,
+    showHvacCustomerSection: false,
   },
   hvac: {
     id: 'hvac',
     name: 'Serwis Mobilny HVAC / Pompy Ciepła (Field Service)',
+    shortName: 'Serwis HVAC (F-Gazy / CRO)',
+    description: 'Instalatorzy i serwis mobilny: pompy ciepła, klimatyzatory, kotłownie, protokoły F-Gaz (CRO), nawigacja GPS do klienta.',
+    icon: 'ph-snowflake',
+    badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-300',
+    bannerClass: 'bg-cyan-900 text-white border-cyan-800',
     machineLabel: 'Urządzenie HVAC / Kocioł',
     regionLabel: 'Lokalizacja / Klient',
     bayLabel: 'Pomieszczenie / Adres',
+    ticketCardTitle: 'Karta Naprawy Serwisowej HVAC / F-Gaz',
+    ticketPdfTitle: 'Protokół Naprawy Serwisowej HVAC / F-Gaz',
+    serviceCardTitle: 'Protokół Przeglądu i Szczelności HVAC / F-Gaz (CRO)',
+    servicePdfTitle: 'Protokół Serwisowy HVAC / F-Gaz (CRO)',
+    clientSignatureLabel: 'Podpis Klienta / Inwestora (Potwierdzenie gwarancji)',
+    techSignatureLabel: 'Podpis Uprawnionego Serwisanta F-Gaz',
+    showFGasByDefault: true,
+    showCkobSection: false,
+    showIndustrialRbgSection: false,
+    showHvacCustomerSection: true,
   },
 };
+
+/**
+ * Zwraca konfigurację profilu branżowego firmy (domyślnie 'industrial').
+ * @param {string} profileId 'industrial' | 'facility' | 'hvac'
+ */
+export function getIndustryProfileConfig(profileId) {
+  if (profileId && INDUSTRY_PROFILES[profileId]) {
+    return INDUSTRY_PROFILES[profileId];
+  }
+  return INDUSTRY_PROFILES.industrial;
+}
 
 /**
  * Oblicza ekwiwalent CO2 (t CO2e) oraz wymogi CRO / prób szczelności wg Rozporządzenia UE 2024/573.
