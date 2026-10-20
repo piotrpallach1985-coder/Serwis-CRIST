@@ -78,7 +78,7 @@ export default function PlannedMaintenanceDetails({
     const list = [
       {
         id: 'info_params',
-        title: 'Dane i parametry serwisu',
+        title: t('planned.details.tile_params', 'Dane i parametry serwisu'),
         icon: 'ph-sliders-horizontal',
         defaultColSpan: 8,
         render: () => (
@@ -95,7 +95,7 @@ export default function PlannedMaintenanceDetails({
       },
       {
         id: 'history',
-        title: 'Historia zdarzeń',
+        title: t('planned.details.tile_history', 'Historia zdarzeń'),
         icon: 'ph-clock-counter-clockwise',
         defaultColSpan: 4,
         render: () => (
@@ -104,7 +104,7 @@ export default function PlannedMaintenanceDetails({
       },
       {
         id: 'info_resources',
-        title: 'Wymagane narzędzia i części',
+        title: t('planned.details.tile_resources', 'Wymagane narzędzia i części'),
         icon: 'ph-wrench',
         defaultColSpan: 4,
         render: () => (
@@ -121,7 +121,7 @@ export default function PlannedMaintenanceDetails({
       },
       {
         id: 'info_checklist',
-        title: 'Zakres prac do wykonania',
+        title: t('planned.details.tile_checklist', 'Zakres prac do wykonania'),
         icon: 'ph-list-checks',
         defaultColSpan: 4,
         render: () => (
@@ -138,7 +138,7 @@ export default function PlannedMaintenanceDetails({
       },
       {
         id: 'timeline',
-        title: 'Kroki realizacji serwisu (1–5)',
+        title: t('planned.details.tile_timeline', 'Kroki realizacji serwisu (1–5)'),
         icon: 'ph-list-numbers',
         defaultColSpan: 12,
         render: () => (
@@ -150,6 +150,7 @@ export default function PlannedMaintenanceDetails({
             setServicePendingAction={setServicePendingAction}
             onAddFutureNote={onAddFutureNote}
             setServiceToComplete={setServiceToComplete}
+            onComplete={onComplete}
             onEdit={onEdit}
             onDelete={deletePlannedServiceAction}
             onOpenPartModal={() => setIsPartUsageModalOpen(true)}
@@ -167,7 +168,7 @@ export default function PlannedMaintenanceDetails({
     if (targetMachine) {
       list.push({
         id: 'dtr',
-        title: 'Dokumentacja DTR i notatki techniczne',
+        title: t('planned.details.tile_dtr', 'Dokumentacja DTR i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (
@@ -203,6 +204,7 @@ export default function PlannedMaintenanceDetails({
     canDeletePlanned,
     isArchive,
     allowTicketDeletion,
+    t,
   ]);
 
   // Wspólny klucz 'service_details' dla aktywnych serwisów oraz archiwum serwisów
@@ -222,12 +224,12 @@ export default function PlannedMaintenanceDetails({
               }
             }}
             className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm shrink-0"
-            title="Powrót"
+            title={t('common.back', 'Powrót')}
           >
-            <i className="ph ph-arrow-left text-lg"></i> <span className="hidden sm:inline">Powrót</span>
+            <i className="ph ph-arrow-left text-lg"></i> <span className="hidden sm:inline">{t('common.back', 'Powrót')}</span>
           </button>
           <h2 className="text-base md:text-xl font-bold text-gray-800 shrink-0 truncate max-w-[200px] sm:max-w-md">
-            {isArchive ? 'Szczegóły Serwisu (Archiwum)' : 'Szczegóły Serwisu'}
+            {isArchive ? t('planned.details.title_archive', 'Szczegóły Serwisu (Archiwum)') : t('planned.details.title', 'Szczegóły Serwisu')}
           </h2>
         </div>
 
@@ -243,10 +245,10 @@ export default function PlannedMaintenanceDetails({
               import('../../utils/reports/pdfServiceCard').then(m => m.generateServicePDF(srv, targetMachine))
             }
             className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0"
-            title="Raport PDF"
+            title={t('planned.details.pdf_report', 'Raport PDF')}
           >
             <i className="ph ph-file-pdf text-xl md:text-base"></i>
-            <span className="hidden md:inline">Raport PDF</span>
+            <span className="hidden md:inline">{t('planned.details.pdf_report', 'Raport PDF')}</span>
           </button>
         </div>
       </div>

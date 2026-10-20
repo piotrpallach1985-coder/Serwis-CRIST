@@ -95,7 +95,14 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
   
   const payload = {
     status: SERVICE_STATUS.COMPLETED,
+    currentStep: 5,
     completedAt: serverTimestamp(),
+    completedBy: safeCompletion.completedBy || 'System',
+    completionNotes: safeCompletion.notes || '',
+    completedGps: safeCompletion.completedGps || null,
+    fGasProtocol: safeCompletion.fGasProtocol || null,
+    clientSignature: safeCompletion.clientSignature || null,
+    clientSignerName: safeCompletion.clientSignerName || null,
     completionDetails: safeCompletion
   };
   
@@ -456,7 +463,14 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
 
     const payload = {
       status: SERVICE_STATUS.COMPLETED,
+      currentStep: 5,
       completedAt: serverTimestamp(),
+      completedBy: safeCompletion.completedBy || 'System',
+      completionNotes: safeCompletion.notes || '',
+      completedGps: safeCompletion.completedGps || null,
+      fGasProtocol: safeCompletion.fGasProtocol || null,
+      clientSignature: safeCompletion.clientSignature || null,
+      clientSignerName: safeCompletion.clientSignerName || null,
       completionDetails: safeCompletion
     };
     

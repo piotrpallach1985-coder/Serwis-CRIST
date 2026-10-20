@@ -1,5 +1,6 @@
 import { useManagerStore } from '../../store/managerStore';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { computeClientKPIStats, fetchServerKPIStats } from '../../services/kpi.service';
 import { getTicketStatusConfig } from '../../utils/statusConfigs';
@@ -7,6 +8,7 @@ import { useTileLayout } from '../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTileGrid';
 
 export default function KPIDashboard() {
+  const { t } = useTranslation();
   const machines = useManagerStore(state => state.machines || []);
   const [period, setPeriod] = useState('30');
   const [kpiStats, setKpiStats] = useState(null);
@@ -18,10 +20,8 @@ export default function KPIDashboard() {
     const fetchKPIs = async () => {
       setLoadingHistory(true);
       try {
-        // Najpierw obliczamy dokładne statystyki bezpośrednio z kolekcji Firestore (z cache + serwer)
         let data = await computeClientKPIStats(period, machines);
 
-        // Jeśli w domyślnym okresie 30 dni nie ma zgłoszeń, a w bazie istnieją starsze zgłoszenia, przełącz na 'all'
         if (
           active &&
           !didAutoFallbackRef.current &&
@@ -61,10 +61,10 @@ export default function KPIDashboard() {
 
   const topMachinesData = kpiStats?.topMachines || [];
 
-  const ticketStatuses = getTicketStatusConfig();
+  const ticketStatuses = getTicketStatusConfig(t);
   const statusData = Object.entries(kpiStats?.statusCounts || {})
     .map(([status, count]) => {
-      const config = ticketStatuses[status] || { label: 'Inne', hex: '#ccc' };
+      const config = ticketStatuses[status] || { label: t('machines.details.other', 'Inne'), hex: '#ccc' };
       return {
         name: config.label,
         value: count,
@@ -79,7 +79,7 @@ export default function KPIDashboard() {
     () => [
       {
         id: 'kpi_summary',
-        title: 'Podsumowanie wskaźników KPI',
+        title: t('kpi_tickets.summary_tile', 'Podsumowanie wskaźników KPI'),
         icon: 'ph-gauge',
         defaultColSpan: 12,
         render: () => (
@@ -92,7 +92,7 @@ export default function KPIDashboard() {
                 <div>
                   <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{totalTickets}</div>
                   <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">
-                    Ilość zgłoszeń
+                    {t('kpi_tickets.total_tickets', 'Ilość zgłoszeń')}
                   </div>
                 </div>
               </div>
@@ -104,7 +104,7 @@ export default function KPIDashboard() {
                 <div>
                   <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{criticalTicketsCount}</div>
                   <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">
-                    Awarii krytycznych
+                    {t('kpi_tickets.critical_tickets', 'Awarii krytycznych')}
                   </div>
                 </div>
               </div>
@@ -116,7 +116,7 @@ export default function KPIDashboard() {
                 <div>
                   <div className="text-lg lg:text-3xl font-bold text-gray-800 leading-tight">{closedTicketsCount}</div>
                   <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">
-                    Zgłoszeń zamkniętych
+                    {t('kpi_tickets.closed_tickets', 'Zgłoszeń zamkniętych')}
                   </div>
                 </div>
               </div>
@@ -127,10 +127,10 @@ export default function KPIDashboard() {
                 </div>
                 <div>
                   <div className="text-base lg:text-2xl font-bold text-gray-800 leading-tight">
-                    {avgHours}g {avgMins}m
+                    {avgHours}h {avgMins}m
                   </div>
                   <div className="text-[9px] lg:text-sm font-medium text-gray-500 uppercase tracking-wider lg:tracking-wide leading-tight">
-                    Średni czas (MTTR)
+                    {t('kpi_tickets.mttr', 'Średni czas (MTTR)')}
                   </div>
                 </div>
               </div>
@@ -140,14 +140,14 @@ export default function KPIDashboard() {
       },
       {
         id: 'kpi_top_machines',
-        title: 'Top 5 Najbardziej Awaryjnych Maszyn',
+        title: t('kpi_tickets.top_machines', 'Top 5 Najbardziej Awaryjnych Maszyn'),
         icon: 'ph-chart-bar',
         defaultColSpan: 6,
         render: () => (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4">
             <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
               <i className="ph ph-chart-bar text-lg text-blue-600"></i>
-              Top 5 Najbardziej Awaryjnych Maszyn
+              {t('kpi_tickets.top_machines', 'Top 5 Najbardziej Awaryjnych Maszyn')}
             </h3>
             <div className="h-64 w-full">
               {topMachinesData.length > 0 ? (
@@ -160,12 +160,14 @@ export default function KPIDashboard() {
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" allowDecimals={false} />
                     <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={value => [value, 'Awarie']} />
+                    <Tooltip formatter={value => [value, t('kpi_tickets.breakdowns_label', 'Awarie')]} />
                     <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">Brak danych</div>
+                <div className="h-full flex items-center justify-center text-gray-500">
+                  {t('planned.dashboard.noData', 'Brak danych')}
+                </div>
               )}
             </div>
           </div>
@@ -173,14 +175,14 @@ export default function KPIDashboard() {
       },
       {
         id: 'kpi_status_pie',
-        title: 'Status Zgłoszeń',
+        title: t('kpi_tickets.status_chart', 'Status Zgłoszeń'),
         icon: 'ph-chart-pie-slice',
         defaultColSpan: 6,
         render: () => (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4">
             <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
               <i className="ph ph-chart-pie-slice text-lg text-blue-600"></i>
-              Status Zgłoszeń
+              {t('kpi_tickets.status_chart', 'Status Zgłoszeń')}
             </h3>
             <div className="h-64 w-full">
               {statusData.length > 0 ? (
@@ -205,7 +207,9 @@ export default function KPIDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">Brak danych</div>
+                <div className="h-full flex items-center justify-center text-gray-500">
+                  {t('planned.dashboard.noData', 'Brak danych')}
+                </div>
               )}
             </div>
           </div>
@@ -213,14 +217,14 @@ export default function KPIDashboard() {
       },
       {
         id: 'kpi_trend',
-        title: 'Trend Zgłoszeń (Ilość awarii w czasie)',
+        title: t('kpi_tickets.trend_chart', 'Trend Zgłoszeń (Ilość awarii w czasie)'),
         icon: 'ph-chart-line-up',
         defaultColSpan: 12,
         render: () => (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4">
             <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
               <i className="ph ph-chart-line-up text-lg text-blue-600"></i>
-              Trend Zgłoszeń (Ilość awarii w czasie)
+              {t('kpi_tickets.trend_chart', 'Trend Zgłoszeń (Ilość awarii w czasie)')}
             </h3>
             <div className="h-64 w-full">
               {trendData.length > 0 ? (
@@ -229,7 +233,7 @@ export default function KPIDashboard() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                     <YAxis allowDecimals={false} />
-                    <Tooltip formatter={value => [value, 'Awarie']} />
+                    <Tooltip formatter={value => [value, t('kpi_tickets.breakdowns_label', 'Awarie')]} />
                     <Line
                       type="monotone"
                       dataKey="count"
@@ -242,7 +246,7 @@ export default function KPIDashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-500">
-                  Brak danych w wybranym okresie
+                  {t('planned.dashboard.noDataPeriod', 'Brak danych w wybranym okresie')}
                 </div>
               )}
             </div>
@@ -251,7 +255,7 @@ export default function KPIDashboard() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [totalTickets, criticalTicketsCount, closedTicketsCount, avgHours, avgMins, topMachinesData, statusData, trendData]
+    [totalTickets, criticalTicketsCount, closedTicketsCount, avgHours, avgMins, topMachinesData, statusData, trendData, t]
   );
 
   const tileLayout = useTileLayout('kpi_tickets', tiles);
@@ -269,10 +273,11 @@ export default function KPIDashboard() {
       <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 sm:p-6 lg:p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight mb-1 sm:mb-2 flex items-center gap-2.5 sm:gap-3 break-words">
-            <i className="ph ph-chart-line-up text-blue-300 shrink-0"></i> Dashboard KPI (Awarie)
+            <i className="ph ph-chart-line-up text-blue-300 shrink-0"></i>{' '}
+            {t('kpi_tickets.title', 'Dashboard KPI (Awarie)')}
           </h1>
           <p className="text-blue-100 text-sm lg:text-base opacity-90">
-            Statystyki awarii, czasy reakcji (MTTR) i rozkład zgłoszeń
+            {t('kpi_tickets.subtitle', 'Statystyki awarii, czasy reakcji (MTTR) i rozkład zgłoszeń')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -289,10 +294,10 @@ export default function KPIDashboard() {
             }}
             className="bg-white/10 border border-white/20 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto cursor-pointer text-sm font-semibold"
           >
-            <option value="7" className="text-gray-800">Ostatnie 7 dni</option>
-            <option value="30" className="text-gray-800">Ostatnie 30 dni</option>
-            <option value="90" className="text-gray-800">Ostatnie 90 dni</option>
-            <option value="all" className="text-gray-800">Od początku</option>
+            <option value="7" className="text-gray-800">{t('planned.dashboard.periods.7days', 'Ostatnie 7 dni')}</option>
+            <option value="30" className="text-gray-800">{t('planned.dashboard.periods.30days', 'Ostatnie 30 dni')}</option>
+            <option value="90" className="text-gray-800">{t('planned.dashboard.periods.90days', 'Ostatnie 90 dni')}</option>
+            <option value="all" className="text-gray-800">{t('planned.dashboard.periods.all', 'Od początku')}</option>
           </select>
         </div>
       </div>

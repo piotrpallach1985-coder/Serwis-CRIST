@@ -5,6 +5,7 @@ import { TICKET_STATUS } from '../constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../tenantHelper';
 import { fetchTransactionsForMachine } from '../../hooks/usePartTransactions';
+import { CKOB_CATEGORIES, REFRIGERANT_TYPES } from '../fieldServiceHelpers';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -104,18 +105,55 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
     let currentY = 34;
 
     // ----- 1. Dane podstawowe urządzenia -----
+    const ckobLabel = machine.inspectionCategory
+      ? CKOB_CATEGORIES.find(c => c.id === machine.inspectionCategory)?.label || machine.inspectionCategory
+      : null;
+    const refLabel = machine.refrigerantType
+      ? REFRIGERANT_TYPES[machine.refrigerantType]?.name || machine.refrigerantType
+      : null;
+    const baseInfoRows = [
+      [n('Nazwa Maszyny:'), n(machine.name || 'Brak')],
+      [n('Numer Wewnetrzny / ID QR:'), n(`${machine.internalId || '-'} / ${machine.qrCode || machine.id || '-'}`)],
+      [n('Rejon / Hala / Przelot:'), n(`${regionLabel}${machine.bay ? ' / ' + machine.bay : ''}`)],
+      [n('Urzadzenie Nadrzedne (ISO 55000):'), n(parentMachine ? `${parentMachine.name} (${parentMachine.internalId || parentMachine.id})` : 'Brak (Urzadzenie glowne)')],
+      [n('Aktualny Stan Licznika:'), n(`${machine.currentWorkHours || 0} RBG`)],
+      [n('Laczny Koszt Zuzytych Czesci (TCO):'), n(`${totalPartsCost.toFixed(2)} PLN`)],
+      [n('Dodatkowy Opis:'), n(machine.additionalDescription || machine.description || '-')],
+    ];
+    if (machine.address || machine.mapAddress || (machine.gpsLat && machine.gpsLng)) {
+      const gpsSuffix =
+        machine.gpsLat && machine.gpsLng
+          ? ` (GPS: ${Number(machine.gpsLat).toFixed(5)}, ${Number(machine.gpsLng).toFixed(5)})`
+          : '';
+      baseInfoRows.push([
+        n('Adres Lokalizacji / GPS:'),
+        n(`${machine.address || machine.mapAddress || '-'}${gpsSuffix}`),
+      ]);
+    }
+    if (machine.contactPerson || machine.contactPhone || machine.accessNotes) {
+      const contactParts = [
+        machine.contactPerson,
+        machine.contactPhone ? `Tel: ${machine.contactPhone}` : null,
+        machine.accessNotes ? `Dostep: ${machine.accessNotes}` : null,
+      ].filter(Boolean);
+      baseInfoRows.push([n('Klient / Kontakt / Dostep:'), n(contactParts.join(' | '))]);
+    }
+    if (ckobLabel) {
+      baseInfoRows.push([n('Kategoria Obiektu (c-KOB):'), n(ckobLabel)]);
+    }
+    if (refLabel) {
+      const fGasSummary = `${refLabel}${
+        machine.refrigerantChargeKg ? ` | Ilosc: ${machine.refrigerantChargeKg} kg` : ''
+      }${
+        machine.co2EquivalentTons ? ` | CO2e: ${machine.co2EquivalentTons} t` : ''
+      } | ${machine.requiresCroCard ? 'Wymagana karta CRO (>= 5 t CO2e)' : 'Ponizej progu CRO'}`;
+      baseInfoRows.push([n('Parametry F-Gaz (UE 2024/573 & CRO):'), n(fGasSummary)]);
+    }
+
     autoTable(doc, {
       startY: currentY,
       head: [[n('Dane Podstawowe Urzadzenia'), '']],
-      body: [
-        [n('Nazwa Maszyny:'), n(machine.name || 'Brak')],
-        [n('Numer Wewnetrzny / ID QR:'), n(`${machine.internalId || '-'} / ${machine.qrCode || machine.id || '-'}`)],
-        [n('Rejon / Hala / Przelot:'), n(`${regionLabel}${machine.bay ? ' / ' + machine.bay : ''}`)],
-        [n('Urzadzenie Nadrzedne (ISO 55000):'), n(parentMachine ? `${parentMachine.name} (${parentMachine.internalId || parentMachine.id})` : 'Brak (Urzadzenie glowne)')],
-        [n('Aktualny Stan Licznika:'), n(`${machine.currentWorkHours || 0} RBG`)],
-        [n('Laczny Koszt Zuzytych Czesci (TCO):'), n(`${totalPartsCost.toFixed(2)} PLN`)],
-        [n('Dodatkowy Opis:'), n(machine.description || '-')],
-      ],
+      body: baseInfoRows,
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [30, 64, 175] },

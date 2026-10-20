@@ -63,8 +63,8 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
     setLoading(true);
     setUploadProgress('Sprawdzanie poprzednich zgłoszeń...');
 
-    // 1. Zabezpieczenie przed duplikowaniem (2 godziny)
-    if (selectedMachine.id !== 'manual') {
+    // 1. Zabezpieczenie przed duplikowaniem (2 godziny) - wyłącznie dla zalogowanych użytkowników (anonim nie ma odczytu do kolekcji tickets)
+    if (selectedMachine.id !== 'manual' && !auth?.currentUser?.isAnonymous) {
       try {
         const q = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', selectedMachine.id));
         const snap = await getDocs(q);

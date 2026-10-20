@@ -9,8 +9,9 @@ vi.mock('firebase/messaging', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key) => key,
+    t: (key, defaultVal) => (typeof defaultVal === 'string' ? defaultVal : key),
     i18n: {
+      language: 'pl',
       changeLanguage: () => new Promise(() => {}),
     },
   }),

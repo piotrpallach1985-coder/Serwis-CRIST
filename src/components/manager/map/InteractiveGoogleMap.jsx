@@ -1,8 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-const DEFAULT_LAT = 54.5364; // Gdynia / Trójmiasto domyślnie
-const DEFAULT_LNG = 18.5469;
-const DEFAULT_ZOOM = 17;
+export const DEFAULT_LAT = 54.5364; // Gdynia / Trójmiasto domyślnie
+export const DEFAULT_LNG = 18.5469;
+export const DEFAULT_ZOOM = 17;
+
+export function clampZoom(z) {
+  const num = Number(z);
+  if (!Number.isFinite(num)) return DEFAULT_ZOOM;
+  return Math.min(20, Math.max(5, Math.round(num * 100) / 100));
+}
 
 export function lngToWorldX(lng, zoom) {
   const scale = 256 * Math.pow(2, zoom);
@@ -27,42 +33,178 @@ export function worldYToLat(wy, zoom) {
   return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 }
 
-export async function geocodeAddressQuery(queryStr) {
-  const trimmed = (queryStr || '').trim();
-  if (!trimmed) return null;
+export function projectLatLngToViewportPercent(
+  lat,
+  lng,
+  centerLat,
+  centerLng,
+  zoom,
+  widthPx = 1000,
+  heightPx = 700
+) {
+  const numLat = Number(lat);
+  const numLng = Number(lng);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLng)) return null;
+  const cLat = Number.isFinite(Number(centerLat)) && Number(centerLat) !== 0 ? Number(centerLat) : DEFAULT_LAT;
+  const cLng = Number.isFinite(Number(centerLng)) && Number(centerLng) !== 0 ? Number(centerLng) : DEFAULT_LNG;
+  const z = clampZoom(zoom);
+  const w = widthPx > 0 ? widthPx : 1000;
+  const h = heightPx > 0 ? heightPx : 700;
 
-  // Sprawdź czy użytkownik wpisał współrzędne GPS np. "54.5189, 18.5305"
+  const centerWx = lngToWorldX(cLng, z);
+  const centerWy = latToWorldY(cLat, z);
+  const ptWx = lngToWorldX(numLng, z);
+  const ptWy = latToWorldY(numLat, z);
+
+  const xPx = w / 2 + (ptWx - centerWx);
+  const yPx = h / 2 + (ptWy - centerWy);
+
+  return {
+    xPercent: (xPx / w) * 100,
+    yPercent: (yPx / h) * 100,
+  };
+}
+
+export function unprojectViewportPercentToLatLng(
+  xPercent,
+  yPercent,
+  centerLat,
+  centerLng,
+  zoom,
+  widthPx = 1000,
+  heightPx = 700
+) {
+  const xp = Number(xPercent);
+  const yp = Number(yPercent);
+  if (!Number.isFinite(xp) || !Number.isFinite(yp)) return null;
+  const cLat = Number.isFinite(Number(centerLat)) && Number(centerLat) !== 0 ? Number(centerLat) : DEFAULT_LAT;
+  const cLng = Number.isFinite(Number(centerLng)) && Number(centerLng) !== 0 ? Number(centerLng) : DEFAULT_LNG;
+  const z = clampZoom(zoom);
+  const w = widthPx > 0 ? widthPx : 1000;
+  const h = heightPx > 0 ? heightPx : 700;
+
+  const centerWx = lngToWorldX(cLng, z);
+  const centerWy = latToWorldY(cLat, z);
+  const ptWx = centerWx + (xp / 100 - 0.5) * w;
+  const ptWy = centerWy + (yp / 100 - 0.5) * h;
+
+  const lat = Math.max(-85, Math.min(85, worldYToLat(ptWy, z)));
+  const lng = Math.max(-180, Math.min(180, worldXToLng(ptWx, z)));
+  return { lat, lng };
+}
+
+export function computeGoogleFitView(points = [], fallbackCenter = {}, widthPx = 1000, heightPx = 700) {
+  const valid = (points || [])
+    .map(p => ({ lat: Number(p?.lat), lng: Number(p?.lng) }))
+    .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng) && (p.lat !== 0 || p.lng !== 0));
+
+  const fbLat = Number.isFinite(Number(fallbackCenter?.lat)) && Number(fallbackCenter?.lat) !== 0
+    ? Number(fallbackCenter.lat)
+    : DEFAULT_LAT;
+  const fbLng = Number.isFinite(Number(fallbackCenter?.lng)) && Number(fallbackCenter?.lng) !== 0
+    ? Number(fallbackCenter.lng)
+    : DEFAULT_LNG;
+  const fbZoom = clampZoom(fallbackCenter?.zoom ?? DEFAULT_ZOOM);
+
+  if (valid.length === 0) {
+    return { lat: fbLat, lng: fbLng, zoom: fbZoom };
+  }
+
+  if (valid.length === 1) {
+    return {
+      lat: valid[0].lat,
+      lng: valid[0].lng,
+      zoom: clampZoom(Math.min(17.5, Math.max(15.5, fbZoom))),
+    };
+  }
+
+  let minWx0 = Infinity;
+  let maxWx0 = -Infinity;
+  let minWy0 = Infinity;
+  let maxWy0 = -Infinity;
+
+  valid.forEach(p => {
+    const wx = lngToWorldX(p.lng, 0);
+    const wy = latToWorldY(p.lat, 0);
+    if (wx < minWx0) minWx0 = wx;
+    if (wx > maxWx0) maxWx0 = wx;
+    if (wy < minWy0) minWy0 = wy;
+    if (wy > maxWy0) maxWy0 = wy;
+  });
+
+  const centerWx0 = (minWx0 + maxWx0) / 2;
+  const centerWy0 = (minWy0 + maxWy0) / 2;
+  const centerLat = Math.max(-85, Math.min(85, worldYToLat(centerWy0, 0)));
+  const centerLng = Math.max(-180, Math.min(180, worldXToLng(centerWx0, 0)));
+
+  const spanWx0 = maxWx0 - minWx0;
+  const spanWy0 = maxWy0 - minWy0;
+
+  if (spanWx0 < 1e-7 && spanWy0 < 1e-7) {
+    return { lat: centerLat, lng: centerLng, zoom: 17.5 };
+  }
+
+  const usableW = Math.max(240, (widthPx > 0 ? widthPx : 1000) * 0.72);
+  const usableH = Math.max(200, (heightPx > 0 ? heightPx : 700) * 0.70);
+
+  const scaleX = usableW / Math.max(spanWx0, 1e-9);
+  const scaleY = usableH / Math.max(spanWy0, 1e-9);
+  const rawZoom = Math.log2(Math.min(scaleX, scaleY));
+
+  return {
+    lat: centerLat,
+    lng: centerLng,
+    zoom: Math.min(18.2, Math.max(5.5, clampZoom(rawZoom))),
+  };
+}
+
+export async function searchAddressSuggestions(queryStr) {
+  const trimmed = (queryStr || '').trim();
+  if (!trimmed) return [];
+
   const coordMatch = trimmed.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
   if (coordMatch) {
     const lat = parseFloat(coordMatch[1]);
     const lng = parseFloat(coordMatch[2]);
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng };
+      return [{ lat, lng, displayName: `${lat.toFixed(5)}, ${lng.toFixed(5)}` }];
     }
   }
 
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`;
-    const res = await fetch(url, {
-      headers: { 'Accept-Language': 'pl,en' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        return { lat, lng, displayName: data[0].display_name };
+  const normalized = trimmed.replace(/\b(ul\.|ulica|al\.|aleja|os\.|osiedle|pl\.|plac)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+  const queriesToTry = normalized && normalized !== trimmed ? [trimmed, normalized] : [trimmed];
+
+  for (const q of queriesToTry) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, {
+        headers: { 'Accept-Language': 'pl,en' },
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = data
+          .map(item => ({
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            displayName: item.display_name || q,
+          }))
+          .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+        if (mapped.length > 0) return mapped;
       }
+    } catch (e) {
+      console.warn('Geocoding error:', e);
     }
-  } catch (e) {
-    console.warn('Geocoding error:', e);
   }
-  return null;
+  return [];
+}
+
+export async function geocodeAddressQuery(queryStr) {
+  const results = await searchAddressSuggestions(queryStr);
+  return results.length > 0 ? results[0] : null;
 }
 
 function resolveGoogleLyrs(style) {
-  // 'k' lub 'y' -> Satelita z nazwami ulic i budynków (Hybryda), 's' -> Satelita bez opisów, 'm' -> Drogowa
   if (style === 'm') return 'm';
   if (style === 's') return 's';
   return 'y';
@@ -73,17 +215,19 @@ export default function InteractiveGoogleMap({
   lng,
   zoom = DEFAULT_ZOOM,
   mapStyle = 'k',
-  interactive = false,
+  interactive = true,
+  showHintBar = false,
   onViewChange,
   onClickCanvas,
   className = '',
 }) {
   const containerRef = useRef(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [size, setSize] = useState({ width: 1000, height: 700 });
+  const [isDragging, setIsDragging] = useState(false);
   const [view, setView] = useState({
     lat: Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : DEFAULT_LAT,
     lng: Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : DEFAULT_LNG,
-    zoom: Math.min(20, Math.max(5, Math.round(Number(zoom) || DEFAULT_ZOOM))),
+    zoom: clampZoom(zoom),
   });
 
   const dragRef = useRef(null);
@@ -91,7 +235,7 @@ export default function InteractiveGoogleMap({
   useEffect(() => {
     const nextLat = Number(lat);
     const nextLng = Number(lng);
-    const nextZoom = Math.min(20, Math.max(5, Math.round(Number(zoom) || DEFAULT_ZOOM)));
+    const nextZoom = clampZoom(zoom);
     if (Number.isFinite(nextLat) && Number.isFinite(nextLng) && (nextLat !== 0 || nextLng !== 0)) {
       setView({ lat: nextLat, lng: nextLng, zoom: nextZoom });
     } else {
@@ -121,11 +265,30 @@ export default function InteractiveGoogleMap({
       if (!interactive) return;
       e.preventDefault();
       e.stopPropagation();
-      const delta = e.deltaY < 0 ? 1 : -1;
+      const rawStep = -e.deltaY * 0.0025;
+      const step = Math.abs(rawStep) > 0.02 ? Math.max(-0.4, Math.min(0.4, rawStep)) : (e.deltaY < 0 ? 0.25 : -0.25);
       setView(prev => {
-        const nextZoom = Math.min(20, Math.max(5, prev.zoom + delta));
+        const nextZoom = clampZoom(prev.zoom + step);
         if (nextZoom === prev.zoom) return prev;
-        const next = { ...prev, zoom: nextZoom };
+
+        // Przybliżaj płynnie w kierunku kursora myszy
+        const rect = containerRef.current?.getBoundingClientRect();
+        let nextLat = prev.lat;
+        let nextLng = prev.lng;
+        if (rect && rect.width > 0 && rect.height > 0) {
+          const offsetX = e.clientX - rect.left - rect.width / 2;
+          const offsetY = e.clientY - rect.top - rect.height / 2;
+          const ptWxBefore = lngToWorldX(prev.lng, prev.zoom) + offsetX;
+          const ptWyBefore = latToWorldY(prev.lat, prev.zoom) + offsetY;
+          const cursorLat = worldYToLat(ptWyBefore, prev.zoom);
+          const cursorLng = worldXToLng(ptWxBefore, prev.zoom);
+          const newCenterWx = lngToWorldX(cursorLng, nextZoom) - offsetX;
+          const newCenterWy = latToWorldY(cursorLat, nextZoom) - offsetY;
+          nextLat = Math.max(-85, Math.min(85, worldYToLat(newCenterWy, nextZoom)));
+          nextLng = Math.max(-180, Math.min(180, worldXToLng(newCenterWx, nextZoom)));
+        }
+
+        const next = { lat: nextLat, lng: nextLng, zoom: nextZoom };
         if (onViewChange) onViewChange(next);
         return next;
       });
@@ -144,7 +307,6 @@ export default function InteractiveGoogleMap({
     if (!interactive) return;
     if (e.button !== undefined && e.button !== 0) return;
     e.stopPropagation();
-    e.preventDefault();
     const startWx = lngToWorldX(view.lng, view.zoom);
     const startWy = latToWorldY(view.lat, view.zoom);
     dragRef.current = {
@@ -153,6 +315,7 @@ export default function InteractiveGoogleMap({
       startWx,
       startWy,
       zoom: view.zoom,
+      moved: false,
     };
     if (e.currentTarget.setPointerCapture && e.pointerId !== undefined) {
       try {
@@ -164,9 +327,11 @@ export default function InteractiveGoogleMap({
   const handlePointerMove = (e) => {
     if (!interactive || !dragRef.current) return;
     e.stopPropagation();
-    e.preventDefault();
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
+    if (!dragRef.current.moved && Math.hypot(dx, dy) < 5) return;
+    dragRef.current.moved = true;
+    setIsDragging(true);
     const nextWx = dragRef.current.startWx - dx;
     const nextWy = dragRef.current.startWy - dy;
     const nextLat = Math.max(-85, Math.min(85, worldYToLat(nextWy, dragRef.current.zoom)));
@@ -177,22 +342,31 @@ export default function InteractiveGoogleMap({
   };
 
   const handlePointerUp = (e) => {
-    if (!interactive || !dragRef.current) return;
+    if (!dragRef.current) return;
     e.stopPropagation();
+    const wasMoved = dragRef.current.moved;
     dragRef.current = null;
+    setIsDragging(false);
+    if (!wasMoved && onClickCanvas) {
+      onClickCanvas(e);
+    }
   };
 
-  const z = view.zoom;
-  const maxTileIdx = Math.pow(2, z);
-  const centerWx = lngToWorldX(view.lng, z);
-  const centerWy = latToWorldY(view.lat, z);
-  const topLeftWx = centerWx - size.width / 2;
-  const topLeftWy = centerWy - size.height / 2;
+  const z = clampZoom(view.zoom);
+  const tileZ = Math.max(5, Math.min(20, Math.floor(z)));
+  const fracScale = Math.pow(2, z - tileZ);
 
-  const minTx = Math.floor(topLeftWx / 256);
-  const maxTx = Math.floor((topLeftWx + size.width) / 256);
-  const minTy = Math.floor(topLeftWy / 256);
-  const maxTy = Math.floor((topLeftWy + size.height) / 256);
+  const maxTileIdx = Math.pow(2, tileZ);
+  const centerWx = lngToWorldX(view.lng, tileZ);
+  const centerWy = latToWorldY(view.lat, tileZ);
+
+  const effectiveWidth = size.width / fracScale;
+  const effectiveHeight = size.height / fracScale;
+
+  const minTx = Math.floor((centerWx - effectiveWidth / 2) / 256) - 1;
+  const maxTx = Math.floor((centerWx + effectiveWidth / 2) / 256) + 1;
+  const minTy = Math.floor((centerWy - effectiveHeight / 2) / 256) - 1;
+  const maxTy = Math.floor((centerWy + effectiveHeight / 2) / 256) + 1;
 
   const lyrs = resolveGoogleLyrs(mapStyle);
   const tiles = [];
@@ -202,12 +376,12 @@ export default function InteractiveGoogleMap({
       if (ty < 0 || ty >= maxTileIdx) continue;
       const wrappedTx = ((tx % maxTileIdx) + maxTileIdx) % maxTileIdx;
       const serverIdx = Math.abs(tx + ty) % 4;
-      const left = Math.round(tx * 256 - topLeftWx);
-      const top = Math.round(ty * 256 - topLeftWy);
-      const src = `https://mt${serverIdx}.google.com/vt/lyrs=${lyrs}&x=${wrappedTx}&y=${ty}&z=${z}&hl=pl`;
+      const left = size.width / 2 + (tx * 256 - centerWx);
+      const top = size.height / 2 + (ty * 256 - centerWy);
+      const src = `https://mt${serverIdx}.google.com/vt/lyrs=${lyrs}&x=${wrappedTx}&y=${ty}&z=${tileZ}&hl=pl`;
       tiles.push(
         <img
-          key={`${z}-${tx}-${ty}-${lyrs}`}
+          key={`${tileZ}-${tx}-${ty}-${lyrs}`}
           src={src}
           alt=""
           draggable={false}
@@ -222,20 +396,28 @@ export default function InteractiveGoogleMap({
     <div
       ref={containerRef}
       data-map-canvas="true"
-      onClick={onClickCanvas}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       className={`relative w-full h-full overflow-hidden bg-slate-900 select-none ${
-        interactive ? 'cursor-grab active:cursor-grabbing' : ''
+        interactive ? (isDragging ? 'cursor-grabbing' : onClickCanvas ? 'cursor-crosshair' : 'cursor-grab') : ''
       } ${className}`}
     >
-      {tiles}
-      {interactive && (
+      <div
+        className={`absolute inset-0 pointer-events-none origin-center ${
+          isDragging ? '' : 'transition-transform duration-150 ease-out'
+        }`}
+        style={{ transform: `scale(${fracScale})` }}
+      >
+        {tiles}
+      </div>
+      {showHintBar && (
         <div className="absolute bottom-2 left-2 z-20 bg-slate-900/85 backdrop-blur px-2.5 py-1 rounded-md border border-emerald-500/50 text-[10px] font-mono text-emerald-300 pointer-events-none flex items-center gap-2 shadow">
           <i className="ph ph-arrows-out-cardinal text-xs"></i>
-          <span>Przeciągnij mapę myszką / rolką • {view.lat.toFixed(5)}, {view.lng.toFixed(5)} (Zoom {view.zoom})</span>
+          <span>
+            Przeciągnij mapę myszką / rolką • {view.lat.toFixed(5)}, {view.lng.toFixed(5)} (Zoom {z.toFixed(2)})
+          </span>
         </div>
       )}
     </div>

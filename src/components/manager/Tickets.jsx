@@ -17,6 +17,11 @@ import TicketTable from './TicketTable';
 import TicketMobileCard from './TicketMobileCard';
 import { useTickets } from '../../hooks/useTickets';
 import { usePagination } from '../../hooks/usePagination';
+import { usePermissions } from '../../hooks/usePermissions';
+import {
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+} from '../../utils/fieldServiceHelpers';
 import DebouncedInput from './DebouncedInput';
 import { safe } from '../../utils/safeRender';
 import { useToast } from '../../hooks/useToast';
@@ -48,8 +53,33 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
   const { t } = useTranslation();
   const { user } = useAuth();
   const { tickets, machines, reporters, services, plannedServices, notifications, actionItems, roles, regions, allowTicketDeletion, plannedWarningDays, branding } = useManagerStore();
+  const { onlyAssignedTasks } = usePermissions(user, roles);
 
-  const ticketState = useTickets({ tickets, machines, regions, isArchive, initialSearchQuery });
+  const scopedTickets = useMemo(
+    () => filterTasksForFieldTechnician(tickets, user, onlyAssignedTasks),
+    [tickets, user, onlyAssignedTasks]
+  );
+  const scopedMachines = useMemo(
+    () =>
+      filterMachinesForFieldTechnician(
+        machines,
+        tickets,
+        plannedServices,
+        user,
+        onlyAssignedTasks
+      ),
+    [machines, tickets, plannedServices, user, onlyAssignedTasks]
+  );
+
+  const ticketState = useTickets({
+    tickets: scopedTickets,
+    machines: scopedMachines,
+    regions,
+    isArchive,
+    initialSearchQuery,
+    user,
+    onlyAssignedTasks,
+  });
   const { filterMachine, setFilterMachine, filterStatus, setFilterStatus, filterRegion, setFilterRegion, filterMachineId, setFilterMachineId, filterTime, setFilterTime, visibleCols, toggleColumn, filteredTickets, activeTickets, loadingArchive, hasMoreArchive, fetchArchive, handleExportExcel } = ticketState;
 
   const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId || null);
@@ -130,7 +160,15 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
     });
   };
 
-  const handleUpdate = async (ticketId, newStatus, actionText, newEtr = null, photoUrls = [], noteText = '') => {
+  const handleUpdate = async (
+    ticketId,
+    newStatus,
+    actionText,
+    newEtr = null,
+    photoUrls = [],
+    noteText = '',
+    extraData = null
+  ) => {
     setLoading(true);
     try {
       const currentData = activeTickets.find(t => t.id === ticketId) || (recentlyClosedTicket?.id === ticketId ? recentlyClosedTicket : null);
@@ -141,12 +179,24 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         user: user.name,
         action: actionText,
         note: noteText || comment || '',
-        photos: photoUrls
+        photos: photoUrls,
+        ...(extraData?.fGasProtocol ? { fGasProtocol: extraData.fGasProtocol } : {}),
+        ...(extraData?.completedGps ? { completedGps: extraData.completedGps } : {}),
+        ...(extraData?.clientSignerName ? { clientSignerName: extraData.clientSignerName } : {}),
       };
 
       const updateData = {
         history: arrayUnion(historyItem)
       };
+
+      if (extraData && typeof extraData === 'object') {
+        if (extraData.completedGps !== undefined) updateData.completedGps = extraData.completedGps;
+        if (extraData.fGasProtocol !== undefined) updateData.fGasProtocol = extraData.fGasProtocol;
+        if (extraData.clientSignature !== undefined)
+          updateData.clientSignature = extraData.clientSignature;
+        if (extraData.clientSignerName !== undefined)
+          updateData.clientSignerName = extraData.clientSignerName;
+      }
 
       if (photoUrls.length > 0) updateData.photos = arrayUnion(...photoUrls);
       if (newStatus !== undefined && newStatus !== null) updateData.status = newStatus;
@@ -170,6 +220,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       if (Number(newStatus) === TICKET_STATUS.CLOSED) {
         setRecentlyClosedTicket({
           ...currentData,
+          ...(extraData || {}),
           status: TICKET_STATUS.CLOSED,
           closedAt: updateData.closedAt,
           completedBy: updateData.completedBy,
@@ -226,7 +277,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       return (
         <ErrorBoundary>
           <TicketDetails
-            machines={machines}
+            machines={scopedMachines}
             currentTicket={currentTicket}
             setSelectedTicketId={setSelectedTicketId}
             handleUpdate={handleUpdate}
@@ -283,7 +334,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
             filterTime={filterTime} setFilterTime={setFilterTime}
             isArchive={isArchive}
             regions={regions}
-            machines={machines}
+            machines={scopedMachines}
             onClearSearchQuery={onClearSearchQuery}
           />
 
@@ -328,7 +379,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
           visibleCols={visibleCols}
           isArchive={isArchive}
           STATUSES={STATUSES(t)}
-          machines={machines}
+          machines={scopedMachines}
           calculateDuration={(createdAt, closedAt, t_arg) => calculateDuration(createdAt, closedAt, t_arg || t)}
           openDetails={openDetails}
           hasMoreLocalItems={hasMoreLocalItems}

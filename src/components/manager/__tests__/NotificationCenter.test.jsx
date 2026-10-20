@@ -14,7 +14,10 @@ vi.mock('../../../hooks/useAuth', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({
+    t: (key, defaultVal) => (typeof defaultVal === 'string' ? defaultVal : key),
+    i18n: { language: 'pl' },
+  }),
 }));
 
 vi.mock('../../../utils/logicHelpers', () => ({

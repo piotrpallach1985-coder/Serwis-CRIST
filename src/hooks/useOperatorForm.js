@@ -2,6 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useToast } from './useToast';
 import { useTicketSubmit } from './useTicketSubmit';
 import { compressImage } from '../utils/imageCompressor';
+import {
+  checkQrSubmissionCooldown,
+  recordQrSubmissionTimestamp,
+} from '../utils/fieldServiceHelpers';
 
 // Spójne z limitem w firestore.rules (anonimowe zgłoszenia)
 export const MAX_TICKET_PHOTOS = 10;
@@ -56,6 +60,16 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isInternal) {
+      const cooldown = checkQrSubmissionCooldown();
+      if (!cooldown.allowed) {
+        const msg = `Ochrona antyspamowa: odczekaj ${cooldown.remainingSeconds} s przed wysłaniem kolejnego zgłoszenia.`;
+        setErrorMsg(msg);
+        showToast(msg, 'warning');
+        return;
+      }
+    }
     
     let machineToSubmit = { ...selectedMachine };
     
@@ -68,12 +82,12 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       }
     }
     
-    await submitTicket({
+    const ok = await submitTicket({
       selectedMachine: machineToSubmit,
       topic,
       description,
       reporterName: isInternal ? (user?.name || 'Pracownik (Wewnętrzny)') : 'Szybkie Zgłoszenie',
-        reporterPhone: isInternal ? (user?.phone || '') : reporterPhone,
+      reporterPhone: isInternal ? (user?.phone || '') : reporterPhone,
       isCritical,
       pendingPhotos,
       acceptedRodo,
@@ -82,6 +96,10 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       timeoutRef,
       setTopicMode
     });
+
+    if (ok && !isInternal) {
+      recordQrSubmissionTimestamp();
+    }
   };
 
   const handleFilesSelected = async (e) => {

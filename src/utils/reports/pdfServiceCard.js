@@ -4,6 +4,11 @@ import { getBrandingLogoBase64, getImageDimensions } from './pdfHelpers';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../tenantHelper';
 import { fetchTransactionsForReference } from '../../hooks/usePartTransactions';
+import {
+  formatFGasSummary,
+  formatGpsCheckIn,
+  getCkobCategoryLabel,
+} from '../fieldServiceHelpers';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -103,22 +108,51 @@ export const generateServicePDF = async (service, machine) => {
 
     let currentY = 45;
 
+    const serviceInfoRows = [
+      [n('Nazwa Serwisu:'), n(service.name || 'Brak')],
+      [n('Maszyna:'), n(service.machineName || machine?.name || 'Nieznana')],
+    ];
+    const addrStr = machine?.address || machine?.mapAddress;
+    if (addrStr) {
+      serviceInfoRows.push([n('Adres Obiektu / GPS:'), n(addrStr)]);
+    }
+    const ckobStr = getCkobCategoryLabel(machine?.inspectionCategory);
+    if (ckobStr) {
+      serviceInfoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
+    }
+    serviceInfoRows.push(
+      [n('Priorytet:'), n(service.priority || 'Standardowy')],
+      [n('Typ Wyzwalacza:'), n(service.triggerType === 'calendar' ? 'Czasowy (Kalendarz)' : service.triggerType === 'hours' ? 'Licznikowy (RBG)' : 'Mieszany (Czas + RBG)')],
+      [n('Data Planowana:'), service.nextDate ? safeParseDate(service.nextDate)?.toLocaleDateString('pl-PL') : '-'],
+      [n('Docelowy Stan Licznika:'), service.targetWorkHours ? `${service.targetWorkHours} RBG` : '-'],
+      [n('Wyznaczony Wykonawca:'), n(service.assignedService || service.completionDetails?.completedBy || service.completedBy || '-')],
+      [n('Wykonano Dnia:'), service.completedAt ? safeParseDate(service.completedAt)?.toLocaleString('pl-PL') : '-'],
+      [n('Zakonczone przez:'), n(service.completionDetails?.completedBy || service.completedBy || '-')],
+      [n('Naklad Pracy (RBG):'), n(actualManHours ? `${actualManHours} h (Plan: ${service.estimatedManHours || '-'} h)` : (service.estimatedManHours ? `Plan: ${service.estimatedManHours} h` : '-'))],
+      [n('Koszt Zuzytych Czesci:'), n(`${totalServicePartsCost.toFixed(2)} PLN`)]
+    );
+    const gpsStr = formatGpsCheckIn(service.completedGps || service.completionDetails?.completedGps);
+    if (gpsStr) {
+      serviceInfoRows.push([n('Potwierdzenie GPS:'), n(gpsStr)]);
+    }
+    const fGasStr = formatFGasSummary(
+      service.fGasProtocol ||
+        service.completionDetails?.fGasProtocol ||
+        (machine?.refrigerantType
+          ? {
+              refrigerantType: machine.refrigerantType,
+              refrigerantChargeKg: machine.refrigerantChargeKg,
+            }
+          : null)
+    );
+    if (fGasStr) {
+      serviceInfoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
+    }
+
     autoTable(doc, {
       startY: currentY,
       head: [[n('Informacje o Serwisie'), '']],
-      body: [
-        [n('Nazwa Serwisu:'), n(service.name || 'Brak')],
-        [n('Maszyna:'), n(service.machineName || machine?.name || 'Nieznana')],
-        [n('Priorytet:'), n(service.priority || 'Standardowy')],
-        [n('Typ Wyzwalacza:'), n(service.triggerType === 'calendar' ? 'Czasowy (Kalendarz)' : service.triggerType === 'hours' ? 'Licznikowy (RBG)' : 'Mieszany (Czas + RBG)')],
-        [n('Data Planowana:'), service.nextDate ? safeParseDate(service.nextDate)?.toLocaleDateString('pl-PL') : '-'],
-        [n('Docelowy Stan Licznika:'), service.targetWorkHours ? `${service.targetWorkHours} RBG` : '-'],
-        [n('Wyznaczony Wykonawca:'), n(service.assignedService || service.completionDetails?.completedBy || service.completedBy || '-')],
-        [n('Wykonano Dnia:'), service.completedAt ? safeParseDate(service.completedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Zakonczone przez:'), n(service.completionDetails?.completedBy || service.completedBy || '-')],
-        [n('Naklad Pracy (RBG):'), n(actualManHours ? `${actualManHours} h (Plan: ${service.estimatedManHours || '-'} h)` : (service.estimatedManHours ? `Plan: ${service.estimatedManHours} h` : '-'))],
-        [n('Koszt Zuzytych Czesci:'), n(`${totalServicePartsCost.toFixed(2)} PLN`)]
-      ],
+      body: serviceInfoRows,
       theme: 'grid',
       headStyles: { fillColor: [40, 140, 80] },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
@@ -339,6 +373,43 @@ export const generateServicePDF = async (service, machine) => {
          }
       }
     }
+
+    // Sekcja podpisu odbioru (wraz z podpisem cyfrowym na ekranie telefonu, jeśli złożono)
+    if (currentY > 235) {
+      doc.addPage();
+      currentY = 25;
+    } else {
+      currentY += 8;
+    }
+
+    const clientSig = service.clientSignature || service.completionDetails?.clientSignature;
+    const clientSigner = service.clientSignerName || service.completionDetails?.clientSignerName;
+    const execName =
+      service.completionDetails?.completedBy ||
+      service.completedBy ||
+      service.assignedService ||
+      'Serwis';
+
+    doc.setDrawColor(180, 180, 180);
+    doc.line(14, currentY + 22, 90, currentY + 22);
+    doc.line(115, currentY + 22, 195, currentY + 22);
+
+    if (clientSig && typeof clientSig === 'string' && clientSig.startsWith('data:image')) {
+      try {
+        doc.addImage(clientSig, 'PNG', 120, currentY + 2, 65, 18, '', 'FAST');
+      } catch (sigErr) {
+        console.warn('Blad osadzania podpisu w PDF serwisu:', sigErr);
+      }
+    }
+
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text(n(`Podpis Wykonawcy (${execName})`), 14, currentY + 27);
+    doc.text(
+      n(`Podpis Odbierajacego / Klienta${clientSigner ? ' (' + clientSigner + ')' : ''}`),
+      115,
+      currentY + 27
+    );
 
     await savePdfWithPrompt(doc, n(`Serwis_${service.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Planowany'}.pdf`));
   } catch (error) {

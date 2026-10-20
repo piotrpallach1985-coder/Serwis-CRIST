@@ -89,7 +89,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const showTicketsSection = ['kpi', 'dashboard_tickets', 'tickets', 'archive'].some(canAccessTab);
   const showServicesSection = isPlannedServicesModuleEnabled && ['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'action_items', 'archive_planned'].some(canAccessTab);
   const showInventorySection = isInventoryModuleEnabled && (branding?.modules?.inventory !== false) && ['parts_kpi', 'parts_inventory', 'parts_transactions', 'parts_qr'].some(canAccessTab);
-  const showMasterDataSection = ['machines', 'regions', 'services', 'topics'].some(canAccessTab);
+  const showMasterDataSection = ['machines', 'machines_qr', 'regions', 'services', 'topics'].some(canAccessTab);
 
   return (
     <>
@@ -290,7 +290,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
       {showMasterDataSection && (
         <div className="space-y-1 pt-2 border-t border-gray-800/80">
           <div className="px-3 py-1.5 text-[11px] font-bold text-blue-400 uppercase tracking-wider">
-            Dane Bazowe
+            {t("sidebar.master_data_section", "Dane Bazowe")}
           </div>
 
           {canAccessTab('machines') && (
@@ -307,6 +307,16 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
                   {unverifiedMachinesCount}
                 </span>
               )}
+            </button>
+          )}
+
+          {canAccessTab('machines_qr') && (
+            <button
+              onClick={() => handleItemClick('machines_qr')}
+              className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'machines_qr' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+            >
+              <i className="ph ph-qr-code text-lg shrink-0"></i>
+              <span className="text-[13px] truncate">{t("sidebar.machines_qr_menu", "Kody QR Maszyn")}</span>
             </button>
           )}
 

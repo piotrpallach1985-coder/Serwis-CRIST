@@ -1,20 +1,30 @@
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
-import {  useManagerStore } from '../../store/managerStore';
-import { useState, useEffect , useMemo } from 'react';
+import { useManagerStore } from '../../store/managerStore';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { usePermissions } from '../../hooks/usePermissions';
+import { filterMachinesForFieldTechnician } from '../../utils/fieldServiceHelpers';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
-import { collection, query, where, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, writeBatch, arrayUnion } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  writeBatch,
+  arrayUnion,
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../../utils/dateHelpers';
-import { QRCodeSVG } from 'qrcode.react';
 
 import MachineDetails from './MachineDetails';
 import MachineFilters from './MachineFilters';
 import MachineTable from './MachineTable';
 import MachineForm from './MachineForm';
-import MachineCard from './MachineCard';
 import ConfirmModal from './ConfirmModal';
 import QRScannerModal from '../shared/QRScannerModal';
 import NFCScannerModal from '../shared/NFCScannerModal';
@@ -24,14 +34,25 @@ import { updateMachine } from '../../services/machines.service';
 import { fetchMachineTickets } from '../../services/tickets.service';
 import { fetchMachineServices } from '../../services/plannedServices.service';
 import { usePagination } from '../../hooks/usePagination';
-import DebouncedInput from './DebouncedInput';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import { getCurrentTenant } from '../../utils/tenantHelper';
-import { getOrCreateQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
+import {
+  getOrCreateQrKey,
+  buildMachineQrValue,
+  resolveTenantDisplayName,
+  formatQrDate,
+  parseQrPayload,
+  PART_QR_IN_MACHINE_SCANNER_MSG,
+} from '../../services/qrAccess.service';
 
-
-export default function Machines({ onOpenTicket, onOpenService, initialMachineId, onClearMachineId }) {
+export default function Machines({
+  onOpenTicket,
+  onOpenService,
+  initialMachineId,
+  onClearMachineId,
+  onOpenMachinesQR,
+}) {
   const { t } = useTranslation();
 
   const { user } = useAuth();
@@ -39,23 +60,37 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
 
   const tickets = useManagerStore(state => state.tickets);
   const machines = useManagerStore(state => state.machines);
-  const reporters = useManagerStore(state => state.reporters);
-  const services = useManagerStore(state => state.services);
   const plannedServices = useManagerStore(state => state.plannedServices);
-  const notifications = useManagerStore(state => state.notifications);
-  const actionItems = useManagerStore(state => state.actionItems);
-  const roles = useManagerStore(state => state.roles);
   const regions = useManagerStore(state => state.regions);
-  const allowTicketDeletion = useManagerStore(state => state.allowTicketDeletion);
-  const plannedWarningDays = useManagerStore(state => state.plannedWarningDays);
+  const roles = useManagerStore(state => state.roles);
   const branding = useManagerStore(state => state.branding);
+  const { onlyAssignedTasks } = usePermissions(user, roles);
+
+  const visibleMachines = useMemo(
+    () =>
+      filterMachinesForFieldTechnician(
+        machines,
+        tickets,
+        plannedServices,
+        user,
+        onlyAssignedTasks
+      ),
+    [machines, tickets, plannedServices, user, onlyAssignedTasks]
+  );
 
   const [editingId, setEditingId] = useState(null);
-  
-  const { searchQuery, setSearchQuery, filterRegion, setFilterRegion, filteredMachines, handleExportExcel, toggleNode } = useMachines(machines, regions);
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    filterRegion,
+    setFilterRegion,
+    filteredMachines,
+    handleExportExcel,
+    toggleNode,
+  } = useMachines(visibleMachines, regions);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formInitialParentId, setFormInitialParentId] = useState(null);
-  const [qrModalMachine, setQrModalMachine] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [machineHistoryStack, setMachineHistoryStack] = useState([]);
   const [isFromQRScan, setIsFromQRScan] = useState(false);
@@ -63,11 +98,19 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isNfcScanning, setIsNfcScanning] = useState(false);
-  
+
   const { toastConfig, showToast, hideToast } = useToast();
-  const { confirmConfig: confirmModalConfig, showConfirm, hideConfirm: closeConfirmModal, setConfirmConfig: setConfirmModalConfig } = useConfirmModal();
+  const {
+    confirmConfig: confirmModalConfig,
+    hideConfirm: closeConfirmModal,
+    setConfirmConfig: setConfirmModalConfig,
+  } = useConfirmModal();
   const [initialOpenProcessed, setInitialOpenProcessed] = useState(false);
-  const { currentItems, hasMore: hasMoreLocalItems, setCurrentPage, loadMore } = usePagination(filteredMachines, 50, [searchQuery, filterRegion]);
+  const {
+    currentItems,
+    hasMore: hasMoreLocalItems,
+    loadMore,
+  } = usePagination(filteredMachines, 50, [searchQuery, filterRegion]);
 
   useEffect(() => {
     if (initialMachineId && machines.length > 0) {
@@ -77,35 +120,38 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         if (onClearMachineId) onClearMachineId();
       }
     }
-  }, [initialMachineId, machines, onClearMachineId]);  useEffect(() => {
+  }, [initialMachineId, machines, onClearMachineId]);
+
+  useEffect(() => {
     if (!initialOpenProcessed && machines.length > 0) {
-      
       const openMachineId = searchParams.get('openMachine');
       if (openMachineId) {
-        const targetMachine = machines.find(m => 
-          m.id === openMachineId || 
-          (m.qrCode && m.qrCode === openMachineId) || 
-          (m.internalId && m.internalId.toLowerCase() === openMachineId.toLowerCase())
+        const targetMachine = machines.find(
+          m =>
+            m.id === openMachineId ||
+            (m.qrCode && m.qrCode === openMachineId) ||
+            (m.internalId && m.internalId.toLowerCase() === openMachineId.toLowerCase())
         );
-        
+
         if (targetMachine) {
           handleViewMachine(targetMachine, true);
         } else {
           alert(t('machines.alerts.notFoundScanned'));
         }
-        
-        setSearchParams(prev => {
-          const newParams = new URLSearchParams(prev);
-          newParams.delete('openMachine');
-          return newParams;
-        }, { replace: true });
+
+        setSearchParams(
+          prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete('openMachine');
+            return newParams;
+          },
+          { replace: true }
+        );
       }
 
       setInitialOpenProcessed(true);
     }
   }, [machines, initialOpenProcessed]);
-
-
 
   const handleDeleteMachine = (id, name) => {
     setConfirmModalConfig({
@@ -117,40 +163,56 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         try {
           const tenantId = getCurrentTenant();
           const batch = writeBatch(db);
-          
+
           // 1. Maszyna
           const machineRef = doc(db, 'tenants', tenantId, 'machines', id);
           batch.update(machineRef, { isDeleted: true, deletedAt: serverTimestamp() });
-          
+
           // 1a. Dzieci maszyny (Drzewo aktywów)
           const childMachines = machines.filter(m => m.parentId === id);
           childMachines.forEach(child => {
             const childRef = doc(db, 'tenants', tenantId, 'machines', child.id);
             batch.update(childRef, { parentId: null });
           });
-          
+
           // 2. Aktywne zgłoszenia
-          const ticketsQ = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineId', '==', id));
+          const ticketsQ = query(
+            collection(db, 'tenants', tenantId, 'tickets'),
+            where('machineId', '==', id)
+          );
           const ticketsSnapshot = await getDocs(ticketsQ);
           ticketsSnapshot.forEach(docSnap => {
-              const status = docSnap.data().status;
-              if (status == 5 || status == 'closed') return;
-            batch.update(docSnap.ref, { 
+            const status = docSnap.data().status;
+            if (status == 5 || status == 'closed') return;
+            batch.update(docSnap.ref, {
               status: 5, // Zamknięte/Zarchiwizowane
               closedAt: new Date().toISOString(),
-              history: arrayUnion({ action: t('machines.history.autoClose'), date: new Date().toISOString(), user: t('machines.history.system'), note: t('machines.history.machineDeleted') })
+              history: arrayUnion({
+                action: t('machines.history.autoClose'),
+                date: new Date().toISOString(),
+                user: t('machines.history.system'),
+                note: t('machines.history.machineDeleted'),
+              }),
             });
           });
 
           // 3. Aktywne serwisy
-          const servicesQ = query(collection(db, 'tenants', tenantId, 'planned_services'), where('machineId', '==', id));
+          const servicesQ = query(
+            collection(db, 'tenants', tenantId, 'planned_services'),
+            where('machineId', '==', id)
+          );
           const servicesSnapshot = await getDocs(servicesQ);
           servicesSnapshot.forEach(docSnap => {
-              if (docSnap.data().status !== 'pending') return;
-            batch.update(docSnap.ref, { 
+            if (docSnap.data().status !== 'pending') return;
+            batch.update(docSnap.ref, {
               status: 'completed',
               completedAt: new Date().toISOString(),
-              history: arrayUnion({ action: t('machines.history.autoClose'), date: new Date().toISOString(), user: t('machines.history.system'), note: t('machines.history.machineDeleted') })
+              history: arrayUnion({
+                action: t('machines.history.autoClose'),
+                date: new Date().toISOString(),
+                user: t('machines.history.system'),
+                note: t('machines.history.machineDeleted'),
+              }),
             });
           });
 
@@ -165,37 +227,29 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         } finally {
           closeConfirmModal();
         }
-      }
+      },
     });
   };
 
-  const handleVerifyMachine = async (id, name) => {
-    try {
-      const cleanName = name.replace('(DO WERYFIKACJI)', '').trim();
-      await updateMachine(id, { name: cleanName });
-      showToast(t('machines.toasts.machineVerified'));
-    } catch (err) {
-      showToast(t('machines.toasts.error') + err.message, 'error');
-    }
-  };
+  const handlePrint = machine => {
+    const id = machine.id;
+    const name = machine.name;
 
-    const handlePrint = (machine) => {
-      const id = machine.id;
-      const name = machine.name;
-      
-      const escapeHtml = (unsafe) => {
-        return (unsafe || '')
-          .toString()
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
-      };
+    const escapeHtml = unsafe => {
+      return (unsafe || '')
+        .toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
 
     const svgElement = document.getElementById(`qr-svg-${id}`);
     if (!svgElement) return;
     const svgData = new XMLSerializer().serializeToString(svgElement);
+    const tenantDisplayName = resolveTenantDisplayName(getCurrentTenant(), branding);
+    const qrDateFormatted = formatQrDate(machine, machines, '-');
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <html>
@@ -204,62 +258,84 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           <style>
               body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
               .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
-              h2 { margin: 10px 0 5px; font-size: 24px; }
-              p { margin: 0; color: #555; font-size: 14px; }
+              .tenant { font-size: 11px; font-weight: 800; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+              h2 { margin: 10px 0 5px; font-size: 22px; }
+              p { margin: 2px 0; color: #555; font-size: 13px; }
             </style>
           </head>
           <body>
             <div class="qr-container">
+              <div class="tenant">${escapeHtml(tenantDisplayName)}</div>
               ${svgData}
               <h2>${escapeHtml(name)}</h2>
-              <p>${escapeHtml(t('machines.print.date'))}${(() => {
-                try {
-                  const d = safeParseDate(machine.updatedAt || machine.qrCreatedAt || machine.createdAt) || new Date();
-                  return escapeHtml(d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }));
-                } catch(e) { return escapeHtml(t('machines.print.noData')); }
-              })()}</p>
+              <p>${escapeHtml(t('machines.print.date'))}${escapeHtml(qrDateFormatted)}</p>
             </div>
             <script>window.onload = function() { window.print(); window.close(); }</script>
           </body>
         </html>
       `);
-      printWindow.document.close();
-    };
+    printWindow.document.close();
+  };
 
-    
-    const handleCopyNfc = async (machine) => {
-      const currentTenantId = getCurrentTenant();
-      try {
-        const key = await getOrCreateQrKey(currentTenantId);
-        await navigator.clipboard.writeText(buildMachineQrValue(currentTenantId, machine.id, key));
-        showToast(t('machines.toasts.copiedNfc'), 'success');
-      } catch (e) {
-        showToast(t('machines.toasts.copyNfcError'), 'error');
-      }
-    };
+  const handleCopyNfc = async machine => {
+    const currentTenantId = getCurrentTenant();
+    try {
+      const key = await getOrCreateQrKey(currentTenantId);
+      await navigator.clipboard.writeText(
+        buildMachineQrValue(machine, currentTenantId, key, { allMachines: machines, branding })
+      );
+      showToast(t('machines.toasts.copiedNfc'), 'success');
+    } catch {
+      showToast(t('machines.toasts.copyNfcError'), 'error');
+    }
+  };
 
-    const handleGenerateNewQR = async (machineId) => {
-      try {
-        const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
-        await updateDoc(machineRef, { qrCreatedAt: serverTimestamp() });
-        showToast(t('machines.toasts.newQrGenerated'), 'success');
-      } catch (error) {
-        showToast(t('machines.toasts.newQrError'), 'error');
-      }
-    };
+  const handleGenerateNewQR = async machineId => {
+    try {
+      const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
+      await updateDoc(machineRef, { qrCreatedAt: serverTimestamp() });
+      showToast(t('machines.toasts.newQrGenerated'), 'success');
+    } catch {
+      showToast(t('machines.toasts.newQrError'), 'error');
+    }
+  };
 
-    const handleViewMachine = async (m, fromQR = false, pushToHistory = false) => {
+  const handleViewMachine = async (m, fromQR = false, pushToHistory = false) => {
     if (pushToHistory && selectedMachine) {
       setMachineHistoryStack(prev => [...prev, selectedMachine]);
     } else if (!pushToHistory) {
       setMachineHistoryStack([]);
     }
+
+    // Synchroniczna pre-populacja z pamięci store zapobiega mignięciu ramek przy otwarciu detali
+    const localTickets = (tickets || [])
+      .filter(
+        tk =>
+          tk.machineId === m.id ||
+          (tk.machineName && m.name && tk.machineName.toLowerCase().includes(m.name.toLowerCase()))
+      )
+      .slice()
+      .sort((a, b) => {
+        const dA = safeParseDate(a.createdAt)?.getTime() || 0;
+        const dB = safeParseDate(b.createdAt)?.getTime() || 0;
+        return dB - dA;
+      });
+    const localServices = (plannedServices || [])
+      .filter(s => s.machineId === m.id)
+      .slice()
+      .sort((a, b) => {
+        const dA = safeParseDate(a.completedAt || a.nextDate || a.createdAt)?.getTime() || 0;
+        const dB = safeParseDate(b.completedAt || b.nextDate || b.createdAt)?.getTime() || 0;
+        return dB - dA;
+      });
+
+    setMachineHistory({ tickets: localTickets, services: localServices });
     setSelectedMachine(m);
     setIsFromQRScan(fromQR);
-    setLoadingHistory(true);
+    setLoadingHistory(false);
     try {
       let machineTickets = await fetchMachineTickets(m.id, m.name);
-      
+
       // Sortuj zgloszenia od najnowszych
       machineTickets.sort((a, b) => {
         const dA = safeParseDate(a.createdAt)?.getTime() || 0;
@@ -269,7 +345,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
 
       // 2. Pobierz wszystkie serwisy
       let machineServices = await fetchMachineServices(m.id);
-      
+
       // Sortuj serwisy od najnowszych
       machineServices.sort((a, b) => {
         const dA = safeParseDate(a.completedAt || a.nextDate || a.createdAt)?.getTime() || 0;
@@ -279,41 +355,53 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
 
       setMachineHistory({ tickets: machineTickets, services: machineServices });
     } catch (err) {
-      console.error("Błąd pobierania historii maszyny z Firestore:", err);
-      // Fallback do danych lokalnych z kontekstu
-      const relatedTickets = tickets.filter(t => t.machineId === m.id || (t.machineName && m.name && t.machineName.toLowerCase().includes(m.name.toLowerCase())));
-      setMachineHistory({ tickets: relatedTickets, services: plannedServices.filter(s => s.machineId === m.id) });
-    } finally {
-      setLoadingHistory(false);
+      console.error('Błąd pobierania historii maszyny z Firestore:', err);
     }
   };
 
   const handleScanSuccess = (decoded, rawQr) => {
     setIsScanning(false);
     if (!decoded) {
-      showToast(t("machines.toasts.qrReadError"), "error");
+      showToast(t('machines.toasts.qrReadError'), 'error');
       return;
     }
 
-    let machineId = typeof decoded === "string" ? decoded.trim() : String(decoded);
+    const rawText = rawQr || (typeof decoded === 'string' ? decoded.trim() : String(decoded));
+    const parsed = parseQrPayload(rawText);
+    const storeParts = useManagerStore.getState().parts || [];
+    const candidatePartId = parsed.partId || parsed.machineId || String(decoded).trim();
+    const matchedPart = storeParts.find(
+      p => p.id === candidatePartId || (p.code && p.code === candidatePartId)
+    );
+    if (parsed.isPartQr || matchedPart) {
+      showToast(
+        t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG),
+        'error'
+      );
+      return;
+    }
+
+    let machineId =
+      parsed.machineId || (typeof decoded === 'string' ? decoded.trim() : String(decoded));
     const originalRaw = rawQr || machineId;
-    let tenantFromQr = null;
-    
-    const tMatch = decoded.match(/tenant=([^&#]+)/);
-    if (tMatch) tenantFromQr = tMatch[1];
-    
-    const mMatch = decoded.match(/machine=([^&#]+)/);
+    let tenantFromQr = parsed.tenantId;
+
+    const tMatch = String(decoded).match(/tenant=([^&#]+)/);
+    if (tMatch && !tenantFromQr) tenantFromQr = tMatch[1];
+
+    const mMatch = String(decoded).match(/machine=([^&#]+)/);
     if (mMatch) machineId = mMatch[1];
 
-    if (tenantFromQr && tenantFromQr !== getCurrentTenant() && user?.role !== "superadmin") {
-      showToast("Ta maszyna należy do innej firmy!", "error");
+    if (tenantFromQr && tenantFromQr !== getCurrentTenant() && user?.role !== 'superadmin') {
+      showToast('Ta maszyna należy do innej firmy!', 'error');
       return;
     }
 
-    const found = machines.find(m =>
-      m.id === machineId ||
-      (m.qrCode && (m.qrCode === machineId || m.qrCode === originalRaw)) ||
-      (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
+    const found = machines.find(
+      m =>
+        m.id === machineId ||
+        (m.qrCode && (m.qrCode === machineId || m.qrCode === originalRaw)) ||
+        (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
     );
 
     if (found) {
@@ -328,28 +416,7 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
     if (machineHistoryStack.length > 0) {
       const prevMachine = machineHistoryStack[machineHistoryStack.length - 1];
       setMachineHistoryStack(prev => prev.slice(0, -1));
-      
-      setSelectedMachine(prevMachine);
-      setIsFromQRScan(false);
-      setLoadingHistory(true);
-      
-      const fetchPrevHistory = async () => {
-        try {
-          let machineTickets = await fetchMachineTickets(prevMachine.id, prevMachine.name);
-          let machineServices = await fetchMachineServices(prevMachine.id);
-          setMachineHistory({ tickets: machineTickets, services: machineServices });
-        } catch (error) {
-          const tickets = useManagerStore.getState().tickets || [];
-          const plannedServices = useManagerStore.getState().plannedServices || [];
-          setMachineHistory({
-            tickets: tickets.filter(t => t.machineId === prevMachine.id),
-            services: plannedServices.filter(s => s.machineId === prevMachine.id)
-          });
-        } finally {
-          setLoadingHistory(false);
-        }
-      };
-      fetchPrevHistory();
+      handleViewMachine(prevMachine, false, false);
     } else {
       setSelectedMachine(null);
       setIsFromQRScan(false);
@@ -366,15 +433,15 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         title={t('machines.scanner.qrTitle')}
         subtitle={t('machines.scanner.qrSubtitle')}
       />
-        <NFCScannerModal
-          isOpen={isNfcScanning}
-          onClose={() => setIsNfcScanning(false)}
-          onScanSuccess={(decoded) => {
-            setIsNfcScanning(false);
-            handleScanSuccess(decoded);
-          }}
-          title={t('machines.scanner.nfcTitle')}
-        />
+      <NFCScannerModal
+        isOpen={isNfcScanning}
+        onClose={() => setIsNfcScanning(false)}
+        onScanSuccess={decoded => {
+          setIsNfcScanning(false);
+          handleScanSuccess(decoded);
+        }}
+        title={t('machines.scanner.nfcTitle')}
+      />
 
       {selectedMachine ? (
         <MachineDetails
@@ -385,15 +452,31 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
           onScanNext={() => setIsScanning(true)}
           onNfcNext={() => setIsNfcScanning(true)}
           onBack={handleBackMachine}
-            onViewRelatedMachine={(m) => handleViewMachine(m, false, true)}
-            onAddChildMachine={(pid) => { setEditingId(null); setFormInitialParentId(pid); setIsFormOpen(true); }}
+          onViewRelatedMachine={m => handleViewMachine(m, false, true)}
+          onAddChildMachine={pid => {
+            setEditingId(null);
+            setFormInitialParentId(pid);
+            setIsFormOpen(true);
+          }}
           onPrint={handlePrint}
-          onGeneratePDF={() => generateMachineHistoryPDF({...selectedMachine, regionName: regions.find(r => r.id === selectedMachine.regionId)?.name}, machineHistory.tickets, machineHistory.services)}
-            onGenerateNewQR={() => handleGenerateNewQR(selectedMachine.id)}
+          onGeneratePDF={() =>
+            generateMachineHistoryPDF(
+              {
+                ...selectedMachine,
+                regionName: regions.find(r => r.id === selectedMachine.regionId)?.name,
+              },
+              machineHistory.tickets,
+              machineHistory.services
+            )
+          }
+          onGenerateNewQR={() => handleGenerateNewQR(selectedMachine.id)}
           regions={regions}
           onOpenTicket={onOpenTicket}
           onOpenService={onOpenService}
-          onEdit={() => { setEditingId(selectedMachine.id); setIsFormOpen(true); }}
+          onEdit={() => {
+            setEditingId(selectedMachine.id);
+            setIsFormOpen(true);
+          }}
           onDelete={() => handleDeleteMachine(selectedMachine.id, selectedMachine.name)}
         />
       ) : (
@@ -404,36 +487,59 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
             filterRegion={filterRegion}
             setFilterRegion={setFilterRegion}
             regions={regions}
-            onAddMachine={() => { setEditingId(null); setFormInitialParentId(selectedMachine ? selectedMachine.id : null); setIsFormOpen(true); }}
+            onAddMachine={() => {
+              setEditingId(null);
+              setFormInitialParentId(selectedMachine ? selectedMachine.id : null);
+              setIsFormOpen(true);
+            }}
           />
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
             <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="flex gap-2 w-full md:w-auto">
-                <button onClick={() => setIsScanning(true)} className="flex-1 md:flex-none bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                <button
+                  onClick={() => setIsScanning(true)}
+                  className="flex-1 md:flex-none bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                >
                   <i className="ph ph-qr-code text-lg"></i> {t('machines.buttons.scan')}
                 </button>
-                  <button onClick={() => setIsNfcScanning(true)} className="flex-1 md:flex-none bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                    <i className="ph ph-waves text-lg"></i> {t('machines.buttons.nfc')}
-                  </button>
+                <button
+                  onClick={() => setIsNfcScanning(true)}
+                  className="flex-1 md:flex-none bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                >
+                  <i className="ph ph-waves text-lg"></i> {t('machines.buttons.nfc')}
+                </button>
 
-                <button onClick={handleExportExcel} className="flex-1 md:flex-none bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
+                <button
+                  onClick={handleExportExcel}
+                  className="flex-1 md:flex-none bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                >
                   <i className="ph ph-file-xls text-lg"></i> {t('machines.buttons.excel')}
                 </button>
+
+                {onOpenMachinesQR && (
+                  <button
+                    onClick={onOpenMachinesQR}
+                    className="flex-1 md:flex-none bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                  >
+                    <i className="ph ph-printer text-lg"></i>{' '}
+                    {t('machines.buttons.qrList', 'Lista kodów QR')}
+                  </button>
+                )}
               </div>
             </div>
             <MachineTable
               filteredMachines={filteredMachines}
-                toggleNode={toggleNode}
+              toggleNode={toggleNode}
               currentItems={currentItems}
               regions={regions}
               handleViewMachine={handleViewMachine}
-                handleCopyNfc={handleCopyNfc}
+              handleCopyNfc={handleCopyNfc}
             />
             {hasMoreLocalItems && (
               <div className="p-4 flex justify-center border-t border-slate-200">
-                <button 
-                  onClick={loadMore} 
-                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-lg font-bold shadow-sm transition-all"
+                <button
+                  onClick={loadMore}
+                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-lg font-bold shadow-sm transition-all cursor-pointer"
                 >
                   {t('machines.buttons.loadMore', 'Wczytaj więcej')}
                 </button>
@@ -443,26 +549,35 @@ export default function Machines({ onOpenTicket, onOpenService, initialMachineId
         </>
       )}
 
-      {toastConfig.show && <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />}
-      <MachineForm 
-        isOpen={isFormOpen} 
-        onClose={() => setIsFormOpen(false)} 
+      {toastConfig.show && (
+        <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />
+      )}
+      <MachineForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
         editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
         initialParentId={formInitialParentId}
         regions={regions}
         onSaved={(msg, newMachineId) => {
-    showToast(msg, 'success');
-    if (newMachineId) {
-      setTimeout(() => {
-        const machinesList = useManagerStore.getState().machines;
-        const newM = machinesList.find(m => m.id === newMachineId);
-        if (newM && !formInitialParentId) handleViewMachine(newM, false, true);
-      }, 600);
-    }
-  }}
-        onError={(err) => showToast(err, 'error')}
+          showToast(msg, 'success');
+          if (newMachineId) {
+            setTimeout(() => {
+              const machinesList = useManagerStore.getState().machines;
+              const newM = machinesList.find(m => m.id === newMachineId);
+              if (newM && !formInitialParentId) handleViewMachine(newM, false, true);
+            }, 600);
+          }
+        }}
+        onError={err => showToast(err, 'error')}
       />
-      <ConfirmModal isOpen={confirmModalConfig.isOpen} title={confirmModalConfig.title} message={confirmModalConfig.message} onConfirm={confirmModalConfig.onConfirm} onCancel={closeConfirmModal} confirmText={confirmModalConfig.confirmText} />
+      <ConfirmModal
+        isOpen={confirmModalConfig.isOpen}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={closeConfirmModal}
+        confirmText={confirmModalConfig.confirmText}
+      />
     </div>
   );
 }
@@ -472,4 +587,5 @@ Machines.propTypes = {
   onOpenService: PropTypes.func,
   initialMachineId: PropTypes.string,
   onClearMachineId: PropTypes.func,
+  onOpenMachinesQR: PropTypes.func,
 };

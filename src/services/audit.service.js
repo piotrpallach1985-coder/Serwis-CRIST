@@ -51,7 +51,19 @@ const FIELD_TRANSLATION_MAP = {
   checklistResponses: 'Checklista',
   completionNotes: 'Notatka końcowa',
   problem: 'Problem',
-  dueDate: 'Termin realizacji'
+  dueDate: 'Termin realizacji',
+  clientSignerName: 'Podpisał (Klient)',
+  address: 'Adres GPS',
+  contactPerson: 'Klient / Kontakt',
+  contactPhone: 'Telefon klienta',
+  accessNotes: 'Dostęp / Kod domofonu',
+  inspectionCategory: 'Kategoria c-KOB',
+  refrigerantType: 'Czynnik chłodniczy',
+  refrigerantChargeKg: 'Ilość czynnika (kg)',
+  co2EquivalentTons: 'Ekwiwalent CO2 (t)',
+  requiresCroCard: 'Wymóg karty CRO',
+  gpsLat: 'Szerokość GPS',
+  gpsLng: 'Długość GPS'
 };
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;
@@ -96,7 +108,8 @@ export const formatDetails = (details, action, entityType, customState = null) =
   const parts = [];
   const skipKeys = [
     'updatedAt', 'createdAt', 'history', 'timestamp', 'deletedAt',
-    'isDeleted', 'lastActive', 'closedAt', 'completedBy', 'batches'
+    'isDeleted', 'lastActive', 'closedAt', 'completedBy', 'batches',
+    'clientSignature', 'completionDetails'
   ];
   
   for (const [key, value] of Object.entries(details)) {
@@ -208,7 +221,7 @@ export const normalizeAuditLogDetails = (log, storeState = null) => {
 export const logAudit = async (action, entityType, entityId, details = '') => {
   try {
     const tenantId = getCurrentTenant();
-    if (!tenantId) return;
+    if (!tenantId || auth?.currentUser?.isAnonymous) return;
 
     let contextStr = '';
     if (entityId) {

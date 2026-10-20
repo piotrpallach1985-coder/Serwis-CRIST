@@ -36,11 +36,11 @@ export default function QRScannerModal({
               let machineId = decodedText;
               let tenantFromQr = null;
               
-              if (decodedText.includes('tenant=') && decodedText.includes('machine=')) {
+              if (decodedText.includes('tenant=') && (decodedText.includes('machine=') || decodedText.includes('part='))) {
                 try {
                   const qs = decodedText.includes('?') ? decodedText.split('?')[1] : decodedText;
                   const urlParams = new URLSearchParams(qs);
-                  machineId = urlParams.get('machine') || machineId;
+                  machineId = urlParams.get('machine') || urlParams.get('part') || machineId;
                   tenantFromQr = urlParams.get('tenant');
                 } catch (e) {}
               }
@@ -99,11 +99,11 @@ export default function QRScannerModal({
               
               let machineId = decodedText;
               let tenantFromQr = null;
-              if (decodedText.includes('tenant=') && decodedText.includes('machine=')) {
+              if (decodedText.includes('tenant=') && (decodedText.includes('machine=') || decodedText.includes('part='))) {
                 try {
                   const qs = decodedText.includes('?') ? decodedText.split('?')[1] : decodedText;
                   const urlParams = new URLSearchParams(qs);
-                  machineId = urlParams.get('machine') || machineId;
+                  machineId = urlParams.get('machine') || urlParams.get('part') || machineId;
                   tenantFromQr = urlParams.get('tenant');
                 } catch (e) {}
               }

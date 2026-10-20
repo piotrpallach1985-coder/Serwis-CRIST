@@ -4,7 +4,8 @@ import { renderHook, act } from '@testing-library/react';
 
 vi.mock('../../firebase', () => ({
   db: {},
-  storage: {}
+  storage: {},
+  auth: { currentUser: null }
 }));
 
 vi.mock('../../utils/offlineStorage', () => ({

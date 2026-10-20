@@ -9,23 +9,24 @@ import { exportToExcel } from '../../utils/reports/excelExport';
 import { normalizeAuditLogDetails } from '../../services/audit.service';
 import { useManagerStore } from '../../store/managerStore';
 
-const MODULE_LABELS = {
-  TICKET: 'Awarie',
-  PLANNED_SERVICE: 'Serwisy Planowane',
-  MACHINE: 'Maszyny',
-  PART: 'Magazyn Części',
-  ACTION_ITEM: 'Tematy do realizacji',
-  USER: 'Użytkownicy',
-  ROLE: 'Role i Uprawnienia',
-  REGION: 'Rejony / Mapy'
-};
-
 export default function AuditLogs() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'en' ? 'en-US' : 'pl-PL';
   const machines = useManagerStore(state => state.machines);
   const tickets = useManagerStore(state => state.tickets);
   const plannedServices = useManagerStore(state => state.plannedServices);
   const actionItems = useManagerStore(state => state.actionItems);
+
+  const MODULE_LABELS = {
+    TICKET: t('dashboards.audit.modules.TICKET', 'Awarie'),
+    PLANNED_SERVICE: t('dashboards.audit.modules.PLANNED_SERVICE', 'Serwisy Planowane'),
+    MACHINE: t('dashboards.audit.modules.MACHINE', 'Maszyny'),
+    PART: t('dashboards.audit.modules.PART', 'Magazyn Części'),
+    ACTION_ITEM: t('dashboards.audit.modules.ACTION_ITEM', 'Tematy do realizacji'),
+    USER: t('dashboards.audit.modules.USER', 'Użytkownicy'),
+    ROLE: t('dashboards.audit.modules.ROLE', 'Role i Uprawnienia'),
+    REGION: t('dashboards.audit.modules.REGION', 'Rejony / Mapy')
+  };
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,12 +103,12 @@ export default function AuditLogs() {
     const dataForExport = logs.map(log => {
       const date = log.timestamp?.toDate ? log.timestamp.toDate() : new Date();
       return {
-        'Data i czas': date.toLocaleString('pl-PL'),
-        'Użytkownik': log.userName,
-        'Akcja': log.action,
-        'Moduł': MODULE_LABELS[log.entityType] || log.entityType,
-        'Szczegóły': normalizeAuditLogDetails(log, storeSnapshot),
-        'ID Obiektu': log.entityId || ''
+        [t('dashboards.audit.col_date', 'Data i czas')]: date.toLocaleString(locale),
+        [t('dashboards.audit.col_user', 'Użytkownik')]: log.userName,
+        [t('dashboards.audit.col_action', 'Akcja')]: log.action,
+        [t('dashboards.audit.col_module', 'Moduł')]: MODULE_LABELS[log.entityType] || log.entityType,
+        [t('dashboards.audit.col_details', 'Szczegóły')]: normalizeAuditLogDetails(log, storeSnapshot),
+        [t('dashboards.audit.col_entity_id', 'ID Obiektu')]: log.entityId || ''
       };
     });
     exportToExcel(dataForExport, 'Dziennik_Zdarzen_Audit_Trail', 'Zdarzenia');
@@ -141,13 +142,13 @@ export default function AuditLogs() {
             onClick={() => fetchLogs(false)}
             className="flex-1 sm:flex-none justify-center px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
           >
-            <i className="ph ph-arrows-clockwise"></i> Odśwież
+            <i className="ph ph-arrows-clockwise"></i> {t("dashboards.audit.refresh", "Odśwież")}
           </button>
           <button
             onClick={handleExport}
             className="flex-1 sm:flex-none justify-center px-3 sm:px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 flex items-center gap-2 font-medium shadow-xs text-xs sm:text-sm cursor-pointer"
           >
-            <i className="ph ph-file-xls"></i> Eksportuj Excel
+            <i className="ph ph-file-xls"></i> {t("dashboards.audit.export_excel", "Eksportuj Excel")}
           </button>
         </div>
       </div>
@@ -155,7 +156,7 @@ export default function AuditLogs() {
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200 mb-4 sm:mb-6">
         <form onSubmit={handleFilter} className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap gap-3 sm:gap-4 items-end">
           <div className="w-full md:w-auto">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data od</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{t("dashboards.audit.date_from", "Data od")}</label>
             <input 
               type="date" 
               value={dateFrom}
@@ -164,7 +165,7 @@ export default function AuditLogs() {
             />
           </div>
           <div className="w-full md:w-auto">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data do</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{t("dashboards.audit.date_to", "Data do")}</label>
             <input 
               type="date" 
               value={dateTo}
@@ -178,7 +179,7 @@ export default function AuditLogs() {
             </button>
             {(dateFrom || dateTo) && (
               <button type="button" onClick={executeClear} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm cursor-pointer">
-                Wyczyść
+                {t("dashboards.audit.clear_btn", "Wyczyść")}
               </button>
             )}
           </div>
@@ -215,7 +216,7 @@ export default function AuditLogs() {
                         </span>
                       </div>
                       <span className="text-[11px] font-medium text-slate-500">
-                        {date.toLocaleString('pl-PL')}
+                        {date.toLocaleString(locale)}
                       </span>
                     </div>
 
@@ -239,11 +240,11 @@ export default function AuditLogs() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-bold">Data</th>
-                    <th className="p-4 font-bold">Użytkownik</th>
+                    <th className="p-4 font-bold">{t("dashboards.audit.col_date", "Data")}</th>
+                    <th className="p-4 font-bold">{t("dashboards.audit.col_user", "Użytkownik")}</th>
                     <th className="p-4 font-bold">{t("dashboards.audit.col_action", "Akcja")}</th>
-                    <th className="p-4 font-bold">Moduł</th>
-                    <th className="p-4 font-bold">Szczegóły</th>
+                    <th className="p-4 font-bold">{t("dashboards.audit.col_module", "Moduł")}</th>
+                    <th className="p-4 font-bold">{t("dashboards.audit.col_details", "Szczegóły")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -253,7 +254,7 @@ export default function AuditLogs() {
                     return (
                       <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap">
-                          {date.toLocaleString('pl-PL')}
+                          {date.toLocaleString(locale)}
                         </td>
                         <td className="p-4 text-sm text-slate-600 font-semibold">
                           <div className="flex items-center gap-2">
@@ -291,7 +292,7 @@ export default function AuditLogs() {
                   className="w-full sm:w-auto justify-center px-6 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2 shadow-xs disabled:opacity-50 text-xs sm:text-sm cursor-pointer"
                 >
                   {loadingMore ? <i className="ph ph-spinner animate-spin"></i> : <i className="ph ph-caret-down"></i>}
-                  {loadingMore ? 'Ładowanie...' : 'Pokaż starsze zdarzenia'}
+                  {loadingMore ? t("dashboards.audit.loading_more", "Ładowanie...") : t("dashboards.audit.load_more", "Pokaż starsze zdarzenia")}
                 </button>
               </div>
             )}

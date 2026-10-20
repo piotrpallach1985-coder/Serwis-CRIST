@@ -4,6 +4,11 @@ import { getBrandingLogoBase64, getImageDimensions } from './pdfHelpers';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../tenantHelper';
 import { fetchTransactionsForReference } from '../../hooks/usePartTransactions';
+import {
+  formatFGasSummary,
+  formatGpsCheckIn,
+  getCkobCategoryLabel,
+} from '../fieldServiceHelpers';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -112,23 +117,43 @@ export const generateTicketPDF = async (ticket) => {
 
     let currentY = 45;
 
+    const infoRows = [
+      [n('Maszyna:'), n(`${machineName}${machineObj?.internalId ? ' (' + machineObj.internalId + ')' : ''}`)],
+      [n('Lokalizacja:'), n(`${regionName} ${ticket.bay || machineObj?.bay ? '/ ' + (ticket.bay || machineObj?.bay) : ''}`)],
+    ];
+    const addrStr = ticket.address || machineObj?.address || machineObj?.mapAddress || regionObj?.address || regionObj?.mapAddress;
+    if (addrStr) {
+      infoRows.push([n('Adres GPS:'), n(addrStr)]);
+    }
+    const ckobStr = getCkobCategoryLabel(machineObj?.inspectionCategory);
+    if (ckobStr) {
+      infoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
+    }
+    infoRows.push(
+      [n('Zglaszajacy:'), n(`${ticket.reportedBy || 'Nieznany'} ${ticket.reporterPhone ? '(' + ticket.reporterPhone + ')' : ''}`)],
+      [n('Data Zgloszenia:'), safeParseDate(ticket.createdAt)?.toLocaleString('pl-PL') || '-'],
+      [n('Priorytet:'), n(ticket.isCritical ? 'Krytyczny (Wysoki)' : 'Standardowy')],
+      [n('Wyznaczony Wykonawca:'), n(ticket.assignedTo || '-')],
+      [n('Data Przypisania:'), ticket.assignedAt ? safeParseDate(ticket.assignedAt)?.toLocaleString('pl-PL') : '-'],
+      [n('Rozpoczecie Naprawy:'), ticket.inProgressAt ? safeParseDate(ticket.inProgressAt)?.toLocaleString('pl-PL') : '-'],
+      [n('Planowany Czas Zakonczenia (ETR):'), ticket.etr ? safeParseDate(ticket.etr)?.toLocaleString('pl-PL') : '-'],
+      [n('Data Zamkniecia:'), ticket.closedAt ? safeParseDate(ticket.closedAt)?.toLocaleString('pl-PL') : '-'],
+      [n('Zakonczone przez:'), n(ticket.completedBy || ticket.assignedTo || '-')],
+      [n('Koszt Zuzytych Czesci:'), n(`${totalTicketPartsCost.toFixed(2)} PLN`)]
+    );
+    const gpsStr = formatGpsCheckIn(ticket.completedGps);
+    if (gpsStr) {
+      infoRows.push([n('Potwierdzenie GPS:'), n(gpsStr)]);
+    }
+    const fGasStr = formatFGasSummary(ticket.fGasProtocol);
+    if (fGasStr) {
+      infoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
+    }
+
     autoTable(doc, {
       startY: currentY,
       head: [[n('Informacje o Zgloszeniu i Realizacji'), '']],
-      body: [
-        [n('Maszyna:'), n(`${machineName}${machineObj?.internalId ? ' (' + machineObj.internalId + ')' : ''}`)],
-        [n('Lokalizacja:'), n(`${regionName} ${ticket.bay || machineObj?.bay ? '/ ' + (ticket.bay || machineObj?.bay) : ''}`)],
-        [n('Zglaszajacy:'), n(`${ticket.reportedBy || 'Nieznany'} ${ticket.reporterPhone ? '(' + ticket.reporterPhone + ')' : ''}`)],
-        [n('Data Zgloszenia:'), safeParseDate(ticket.createdAt)?.toLocaleString('pl-PL') || '-'],
-        [n('Priorytet:'), n(ticket.isCritical ? 'Krytyczny (Wysoki)' : 'Standardowy')],
-        [n('Wyznaczony Wykonawca:'), n(ticket.assignedTo || '-')],
-        [n('Data Przypisania:'), ticket.assignedAt ? safeParseDate(ticket.assignedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Rozpoczecie Naprawy:'), ticket.inProgressAt ? safeParseDate(ticket.inProgressAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Planowany Czas Zakonczenia (ETR):'), ticket.etr ? safeParseDate(ticket.etr)?.toLocaleString('pl-PL') : '-'],
-        [n('Data Zamkniecia:'), ticket.closedAt ? safeParseDate(ticket.closedAt)?.toLocaleString('pl-PL') : '-'],
-        [n('Zakonczone przez:'), n(ticket.completedBy || ticket.assignedTo || '-')],
-        [n('Koszt Zuzytych Czesci:'), n(`${totalTicketPartsCost.toFixed(2)} PLN`)]
-      ],
+      body: infoRows,
       theme: 'grid',
       headStyles: { fillColor: [60, 100, 180] },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
@@ -295,6 +320,43 @@ export const generateTicketPDF = async (ticket) => {
          }
       }
     }
+
+    // Sekcja podpisu odbioru (wraz z podpisem cyfrowym na ekranie telefonu, jeśli złożono)
+    if (currentY > 235) {
+      doc.addPage();
+      currentY = 25;
+    } else {
+      currentY += 8;
+    }
+
+    doc.setDrawColor(180, 180, 180);
+    doc.line(14, currentY + 22, 90, currentY + 22);
+    doc.line(115, currentY + 22, 195, currentY + 22);
+
+    if (ticket.clientSignature && ticket.clientSignature.startsWith('data:image')) {
+      try {
+        doc.addImage(ticket.clientSignature, 'PNG', 120, currentY + 2, 65, 18, '', 'FAST');
+      } catch (sigErr) {
+        console.warn('Blad osadzania podpisu w PDF:', sigErr);
+      }
+    }
+
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text(
+      n(`Podpis Wykonawcy (${ticket.completedBy || ticket.assignedTo || 'Serwis'})`),
+      14,
+      currentY + 27
+    );
+    doc.text(
+      n(
+        `Podpis Odbierajacego / Klienta${
+          ticket.clientSignerName ? ' (' + ticket.clientSignerName + ')' : ''
+        }`
+      ),
+      115,
+      currentY + 27
+    );
 
     await savePdfWithPrompt(doc, n(`Zgłoszenie_T${ticket.id?.slice(0, 4).toUpperCase() || '1'}.pdf`));
   } catch (error) {

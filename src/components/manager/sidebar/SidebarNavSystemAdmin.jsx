@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../../store/managerStore';
 
@@ -8,7 +8,7 @@ export default function SidebarNavSystemAdmin({ saasTenants, onNavigate }) {
   return (
     <div className="space-y-1 mt-4 px-3">
       <div className="px-3 py-1.5 text-[11px] font-bold text-yellow-500 uppercase tracking-wider mb-1">
-        Lista Firm (SaaS)
+        {t("sidebar.saas_tenants_list", "Lista Firm (SaaS)")}
       </div>
       {saasTenants.map(tenantItem => (
          <button

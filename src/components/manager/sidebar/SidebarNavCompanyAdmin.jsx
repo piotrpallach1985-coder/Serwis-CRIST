@@ -14,7 +14,7 @@ export default function SidebarNavCompanyAdmin({ activeTab, handleItemClick }) {
   return (
     <div className="space-y-1">
       <div className="px-3 py-1.5 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1">
-        Administracja Firmy
+        {t("sidebar.company_admin_section", "Administracja Firmy")}
       </div>
 
       {canAccessTab('users') && (
@@ -80,14 +80,14 @@ export default function SidebarNavCompanyAdmin({ activeTab, handleItemClick }) {
         <button
           onClick={forceUpdatePWA}
           className="w-full flex flex-col items-center justify-center gap-1 py-1.5 px-3 bg-emerald-950/40 hover:bg-emerald-900/60 active:bg-emerald-950 rounded-xl transition-all border border-emerald-900/50 cursor-pointer shadow-xs"
-          title="Aktualizuj aplikację (Wyczyść cache)"
+          title={t("sidebar.update_pwa_title", "Aktualizuj aplikację (Wyczyść cache)")}
         >
           <div className="flex items-center gap-2 text-emerald-400">
             <i className="ph ph-arrows-clockwise text-lg"></i>
-            <span className="text-[11px] font-bold uppercase tracking-wider">Aktualizuj PWA</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">{t("sidebar.update_pwa", "Aktualizuj PWA")}</span>
           </div>
           <span className="text-[9px] text-emerald-500/70 truncate w-full text-center">
-            Wersja: {import.meta.env.VITE_BUILD_TIME || 'Brak danych'}
+            {t("sidebar.version", "Wersja:")} {import.meta.env.VITE_BUILD_TIME || t("sidebar.no_data", "Brak danych")}
           </span>
         </button>
       </div>

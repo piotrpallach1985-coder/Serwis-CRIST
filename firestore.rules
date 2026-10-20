@@ -240,6 +240,11 @@ service cloud.firestore {
           && request.resource.data.key.size() >= 20;
       }
 
+      match /settings/map {
+        allow read: if isTenantUser(tenantId);
+        allow write: if isTenantUser(tenantId) && isStaff();
+      }
+
       match /settings/{document=**} {
         allow read: if isTenantUser(tenantId); 
         allow write: if isTenantUser(tenantId) && isAdmin();
@@ -256,6 +261,7 @@ service cloud.firestore {
       }
       
       match /parts/{document=**} {
+        allow get: if isAnonymousInTenant(tenantId);
         allow read, create, update: if isTenantUser(tenantId);
         allow delete: if isTenantUser(tenantId) && isAdmin();
       }

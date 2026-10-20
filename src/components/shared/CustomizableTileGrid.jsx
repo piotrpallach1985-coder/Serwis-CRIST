@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { getAllowedColStarts } from '../../hooks/useTileLayout';
 
@@ -65,11 +65,12 @@ function getAutoCandidateCols0(span) {
 function snapRelXToColStart(relX, colSpan) {
   const slots = getAllowedColStarts(colSpan);
   if (slots.length <= 1) return 1;
-  // Map relX (0..1) across available slots
   const clamped = Math.max(0, Math.min(0.999, relX));
   const idx = Math.floor(clamped * slots.length);
   return slots[Math.min(slots.length - 1, Math.max(0, idx))];
 }
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function TileLayoutButton({ isEditing, setIsEditing, resetLayout, compact = false }) {
   return (
@@ -77,7 +78,7 @@ export function TileLayoutButton({ isEditing, setIsEditing, resetLayout, compact
       <button
         type="button"
         onClick={() => setIsEditing(prev => !prev)}
-        className={`flex items-center justify-center gap-1.5 font-bold text-sm rounded-lg transition-all shrink-0 shadow-sm border ${
+        className={`flex items-center justify-center gap-1.5 font-bold text-sm rounded-lg transition-all shrink-0 shadow-sm border cursor-pointer ${
           compact ? 'w-10 h-10 md:w-auto md:h-auto md:px-3.5 md:py-1.5 px-2.5 py-1.5' : 'px-3 py-1.5'
         } ${
           isEditing
@@ -95,7 +96,7 @@ export function TileLayoutButton({ isEditing, setIsEditing, resetLayout, compact
         <button
           type="button"
           onClick={resetLayout}
-          className="flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs px-2.5 py-1.5 rounded-lg transition-colors shrink-0"
+          className="flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs px-2.5 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer"
           title="Przywróć domyślny układ okienek"
         >
           <i className="ph ph-arrow-counter-clockwise text-sm"></i>
@@ -133,7 +134,7 @@ function MasonryGridItem({
 }) {
   const innerRef = useRef(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!isDesktop) return;
     const el = innerRef.current;
     if (!el) return;
@@ -153,7 +154,15 @@ function MasonryGridItem({
       ro.observe(el);
       return () => ro.disconnect();
     }
-  }, [isDesktop, tileItem.id, tileItem.collapsed, tileItem.height, tileItem.colSpan, isEditing, onRowSpanChange]);
+  }, [
+    isDesktop,
+    tileItem.id,
+    tileItem.collapsed,
+    tileItem.height,
+    tileItem.colSpan,
+    isEditing,
+    onRowSpanChange,
+  ]);
 
   const desktopGridStyle =
     isDesktop && placement
@@ -175,19 +184,17 @@ function MasonryGridItem({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`col-span-1 ${colSpanClass} min-w-0 relative transition-all duration-150 ${
-        tileItem.hidden ? 'opacity-50' : ''
-      } ${isBeingDragged ? 'opacity-60 scale-[0.99] z-30' : ''}`}
+      className={`col-span-1 ${colSpanClass} min-w-0 relative ${
+        isEditing ? 'transition-all duration-150' : ''
+      } ${tileItem.hidden ? 'opacity-50' : ''} ${
+        isBeingDragged ? 'opacity-60 scale-[0.99] z-30' : ''
+      }`}
     >
       <div ref={innerRef} className="pb-4 sm:pb-5">
         <div
-          className={`relative transition-all duration-150 ${
+          className={`relative ${isEditing ? 'transition-all duration-150' : ''} ${
             isDragTarget ? 'ring-4 ring-blue-500 rounded-xl' : ''
-          } ${
-            isEditing
-              ? 'ring-2 ring-blue-400/80 rounded-xl bg-white/60 shadow-md'
-              : ''
-          }`}
+          } ${isEditing ? 'ring-2 ring-blue-400/80 rounded-xl bg-white/60 shadow-md' : ''}`}
         >
           {children}
         </div>
@@ -196,11 +203,7 @@ function MasonryGridItem({
   );
 }
 
-export default function CustomizableTileGrid({
-  tiles,
-  layoutState,
-  className = '',
-}) {
+export default function CustomizableTileGrid({ tiles, layoutState, className = '' }) {
   const {
     layout,
     deviceMode,
@@ -208,6 +211,7 @@ export default function CustomizableTileGrid({
     setIsEditing,
     moveTile,
     moveTileHorizontal,
+    alignTileInRow,
     setTileColStart,
     reorderTiles,
     setTileColSpan,
@@ -242,19 +246,106 @@ export default function CustomizableTileGrid({
     .filter(item => item.hidden && tilesMap.has(item.id))
     .map(item => tilesMap.get(item.id));
 
-  // Oblicz dokładne położenie 2D (kolumna + wiersz) każdego kafelka w 12-kolumnowej siatce
+  // Oblicz dokładne położenie 2D (kolumna + wiersz) każdego kafelka w 12-kolumnowej siatce.
+  // Sąsiadujące kafelki, których łączna szerokość mieści się w 12 kolumnach (np. 50% + 50%, 66% + 33%, 3x 33%),
+  // są układane w JEDNEJ LINII poziomej (ten sam rowStart).
   const placementsById = useMemo(() => {
     const colHeights = new Array(12).fill(0);
     const result = {};
 
-    for (const tileItem of visibleLayout) {
-      const span = Math.min(12, Math.max(3, tileItem.colSpan || 12));
-      const rSpan = rowSpansById[tileItem.id] || (tileItem.collapsed ? 6 : 22);
+    let i = 0;
+    while (i < visibleLayout.length) {
+      const firstTile = visibleLayout[i];
+      const firstSpan = Math.min(12, Math.max(3, firstTile.colSpan || 12));
 
+      if (firstSpan === 12) {
+        const rSpan = rowSpansById[firstTile.id] || (firstTile.collapsed ? 6 : 22);
+        let startRow0 = 0;
+        for (let k = 0; k < 12; k++) {
+          if (colHeights[k] > startRow0) startRow0 = colHeights[k];
+        }
+        const endRow0 = startRow0 + rSpan;
+        for (let k = 0; k < 12; k++) {
+          colHeights[k] = endRow0;
+        }
+        result[firstTile.id] = {
+          colStart: 1,
+          colSpan: 12,
+          rowStart: startRow0 + 1,
+          rowSpan: rSpan,
+        };
+        i += 1;
+        continue;
+      }
+
+      // Sprawdź, czy kolejne sąsiadujące kafelki mieszczą się razem w jednej linii (suma szerokości <= 12)
+      const group = [firstTile];
+      let groupSpan = firstSpan;
+      let j = i + 1;
+      while (j < visibleLayout.length) {
+        const nextTile = visibleLayout[j];
+        const nextSpan = Math.min(12, Math.max(3, nextTile.colSpan || 12));
+        if (groupSpan + nextSpan > 12) break;
+
+        // Jeśli oba mają jawnie ustawioną tę samą kolumnę startową (np. colStart=1) i nie wymuszono sameRow,
+        // nadal pozwalamy im ułożyć się w jednej linii, chyba że mają skonfliktowany ręczny układ
+        group.push(nextTile);
+        groupSpan += nextSpan;
+        j += 1;
+      }
+
+      if (group.length >= 2) {
+        // Wyznacz najlepszą kolumnę początkową dla całej grupy poziomej (np. 0 dla grupy 12-kolumnowej lub 8-kolumnowej pod nagłówkiem)
+        let baseCol0 = 0;
+        const maxBaseCol0 = 12 - groupSpan;
+        if (maxBaseCol0 > 0) {
+          let minTop = Infinity;
+          for (let c = 0; c <= maxBaseCol0; c++) {
+            let maxH = 0;
+            for (let k = c; k < c + groupSpan; k++) {
+              if (colHeights[k] > maxH) maxH = colHeights[k];
+            }
+            if (maxH < minTop) {
+              minTop = maxH;
+              baseCol0 = c;
+            }
+          }
+        }
+
+        // Wszystkie kafelki w grupie dostają DOKŁADNIE TEN SAM wiersz początkowy (w jednej linii!)
+        let groupStartRow0 = 0;
+        for (let k = baseCol0; k < baseCol0 + groupSpan; k++) {
+          if (colHeights[k] > groupStartRow0) groupStartRow0 = colHeights[k];
+        }
+
+        let curCol0 = baseCol0;
+        for (const member of group) {
+          const mSpan = Math.min(12, Math.max(3, member.colSpan || 12));
+          const rSpan = rowSpansById[member.id] || (member.collapsed ? 6 : 22);
+          const endRow0 = groupStartRow0 + rSpan;
+          for (let k = curCol0; k < curCol0 + mSpan; k++) {
+            colHeights[k] = endRow0;
+          }
+          result[member.id] = {
+            colStart: curCol0 + 1,
+            colSpan: mSpan,
+            rowStart: groupStartRow0 + 1,
+            rowSpan: rSpan,
+          };
+          curCol0 += mSpan;
+        }
+
+        i = j;
+        continue;
+      }
+
+      // Pojedynczy kafelek o szerokości < 12 (np. 66% pod nagłówkiem obok wysokiej Historii 33%)
+      const span = firstSpan;
+      const rSpan = rowSpansById[firstTile.id] || (firstTile.collapsed ? 6 : 22);
       let bestStart0 = 0;
 
-      if (tileItem.colStart != null && Number.isFinite(Number(tileItem.colStart))) {
-        bestStart0 = Math.min(12 - span, Math.max(0, Number(tileItem.colStart) - 1));
+      if (firstTile.colStart != null && Number.isFinite(Number(firstTile.colStart))) {
+        bestStart0 = Math.min(12 - span, Math.max(0, Number(firstTile.colStart) - 1));
       } else {
         const candidates = getAutoCandidateCols0(span);
         let minTop = Infinity;
@@ -269,8 +360,6 @@ export default function CustomizableTileGrid({
           }
         }
 
-        // Dla kafelków >= 50% (6, 8, 9 kolumn): preferuj wyrównanie do lewej krawędzi (kolumna 0),
-        // jeśli różnica wysokości względem prawej strony jest niewielka (<= 18 wierszy = 144px).
         if (span >= 6 && bestStart0 !== 0) {
           let leftTop = 0;
           for (let k = 0; k < span; k++) {
@@ -292,12 +381,13 @@ export default function CustomizableTileGrid({
         colHeights[k] = endRow0;
       }
 
-      result[tileItem.id] = {
+      result[firstTile.id] = {
         colStart: bestStart0 + 1,
         colSpan: span,
         rowStart: startRow0 + 1,
         rowSpan: rSpan,
       };
+      i += 1;
     }
 
     return result;
@@ -352,7 +442,7 @@ export default function CustomizableTileGrid({
       liveHeight: tileItem.height,
     });
 
-    const onMove = (moveEvent) => {
+    const onMove = moveEvent => {
       const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const clientY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
 
@@ -402,9 +492,9 @@ export default function CustomizableTileGrid({
 
   return (
     <div className={`w-full ${className}`}>
-      {/* BANER TRYBU EDYCJI UKŁADU (WARIANT 2+) */}
+      {/* BANER TRYBU EDYCJI UKŁADU */}
       {isEditing && (
-        <div className="mb-4 bg-blue-50/95 border-2 border-blue-300 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 animate-fade-in">
+        <div className="mb-4 bg-blue-50/95 border-2 border-blue-300 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col gap-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-start sm:items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
@@ -415,7 +505,7 @@ export default function CustomizableTileGrid({
                   Tryb dostosowywania okienek (Układ + Rozmiar)
                 </div>
                 <div className="text-[11px] sm:text-xs text-blue-800">
-                  Przeciągaj okienka za pasek (również w puste miejsca po lewej/prawej) lub użyj strzałek <span className="font-bold">← → ↑ ↓</span>. Na PC zmieniaj szerokość przyciskami (<span className="font-bold">25%–100%</span>) lub rozciągaj za <span className="font-bold">prawy dolny róg / krawędzie</span>.
+                  Przeciągaj okienka za pasek, użyj strzałek <span className="font-bold">← → ↑ ↓</span> lub przycisku <span className="font-bold">W linii</span>, aby ustawić sąsiadujące okna obok siebie w jednym wierszu. Szerokość zmienisz przyciskami (<span className="font-bold">25%–100%</span>) lub ciągnąc za narożnik.
                 </div>
               </div>
             </div>
@@ -423,14 +513,14 @@ export default function CustomizableTileGrid({
               <button
                 type="button"
                 onClick={resetLayout}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm flex items-center gap-1 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <i className="ph ph-arrow-counter-clockwise"></i> Domyślny układ
               </button>
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center gap-1 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <i className="ph ph-check-circle text-sm"></i> Zakończ
               </button>
@@ -445,7 +535,7 @@ export default function CustomizableTileGrid({
                   key={ht.id}
                   type="button"
                   onClick={() => toggleHidden(ht.id)}
-                  className="px-2.5 py-1 rounded-md bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 font-semibold flex items-center gap-1 transition-colors"
+                  className="px-2.5 py-1 rounded-md bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <i className="ph ph-eye"></i> Pokaż: {ht.title}
                 </button>
@@ -455,7 +545,7 @@ export default function CustomizableTileGrid({
         </div>
       )}
 
-      {/* SIATKA 12-KOLUMNOWA Z PŁYNNYM POZYCJONOWANIEM 2D */}
+      {/* SIATKA 12-KOLUMNOWA Z POZYCJONOWANIEM 2D */}
       <div
         ref={gridRef}
         style={
@@ -481,7 +571,9 @@ export default function CustomizableTileGrid({
           const src = draggedId || e.dataTransfer.getData('text/plain');
           if (!src) return;
           const draggedItem = visibleLayout.find(it => it.id === src);
-          const targetColStart = draggedItem ? computeColStartFromEvent(e, draggedItem.colSpan) : undefined;
+          const targetColStart = draggedItem
+            ? computeColStartFromEvent(e, draggedItem.colSpan)
+            : undefined;
           const targetId = dragOverId || findNearestVerticalTargetId(e.clientY, src);
           reorderTiles(src, targetId, targetColStart);
           setDraggedId(null);
@@ -501,8 +593,26 @@ export default function CustomizableTileGrid({
           const placement = placementsById[tileItem.id];
           const resolvedColStart = placement?.colStart || tileItem.colStart || 1;
           const allowedSlots = getAllowedColStarts(tileItem.colSpan || 12);
-          const canMoveLeft = isDesktop && (tileItem.colSpan || 12) < 12 && resolvedColStart > allowedSlots[0];
-          const canMoveRight = isDesktop && (tileItem.colSpan || 12) < 12 && resolvedColStart < allowedSlots[allowedSlots.length - 1];
+
+          const prevNeighbor = idx > 0 ? visibleLayout[idx - 1] : null;
+          const nextNeighbor = idx < visibleLayout.length - 1 ? visibleLayout[idx + 1] : null;
+          const sharesRowWithPrev =
+            prevNeighbor &&
+            placementsById[prevNeighbor.id]?.rowStart === placement?.rowStart;
+          const sharesRowWithNext =
+            nextNeighbor &&
+            placementsById[nextNeighbor.id]?.rowStart === placement?.rowStart;
+
+          const canMoveLeft =
+            isDesktop &&
+            (tileItem.colSpan || 12) < 12 &&
+            (resolvedColStart > allowedSlots[0] || sharesRowWithPrev);
+          const canMoveRight =
+            isDesktop &&
+            (tileItem.colSpan || 12) < 12 &&
+            (resolvedColStart < allowedSlots[allowedSlots.length - 1] || sharesRowWithNext);
+
+          const isAlignedInRow = Boolean(sharesRowWithPrev || sharesRowWithNext);
 
           return (
             <MasonryGridItem
@@ -525,7 +635,7 @@ export default function CustomizableTileGrid({
                 e.dataTransfer.effectAllowed = 'move';
                 try {
                   e.dataTransfer.setData('text/plain', tileItem.id);
-                } catch (_) {}
+                } catch {}
               }}
               onDragOver={e => {
                 if (!isEditing || !draggedId) return;
@@ -542,7 +652,9 @@ export default function CustomizableTileGrid({
                 e.stopPropagation();
                 const src = draggedId || e.dataTransfer.getData('text/plain');
                 const draggedItem = visibleLayout.find(it => it.id === src);
-                const targetColStart = draggedItem ? computeColStartFromEvent(e, draggedItem.colSpan) : undefined;
+                const targetColStart = draggedItem
+                  ? computeColStartFromEvent(e, draggedItem.colSpan)
+                  : undefined;
                 reorderTiles(src, tileItem.id, targetColStart);
                 setDraggedId(null);
                 setDragOverId(null);
@@ -552,7 +664,7 @@ export default function CustomizableTileGrid({
                 setDragOverId(null);
               }}
             >
-              {/* PASEK NAGŁÓWKOWY KAFELKA (Zwijanie + Narzędzia w trybie edycji) */}
+              {/* PASEK NAGŁÓWKOWY KAFELKA */}
               <div
                 className={`flex flex-wrap items-center justify-between gap-1.5 px-3 py-1.5 text-xs select-none transition-colors ${
                   isEditing
@@ -567,13 +679,20 @@ export default function CustomizableTileGrid({
                   }
                 }}
               >
-                {/* Lewa strona paska: uchwyt + ikona + tytuł */}
+                {/* Lewa strona paska */}
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   {isEditing && (
-                    <i className="ph ph-dots-six-vertical text-base opacity-90 shrink-0" title="Przeciągnij kafelek"></i>
+                    <i
+                      className="ph ph-dots-six-vertical text-base opacity-90 shrink-0"
+                      title="Przeciągnij kafelek"
+                    ></i>
                   )}
                   {def.icon && (
-                    <i className={`ph ${def.icon} text-sm shrink-0 ${isEditing ? 'text-blue-100' : 'text-slate-500'}`}></i>
+                    <i
+                      className={`ph ${def.icon} text-sm shrink-0 ${
+                        isEditing ? 'text-blue-100' : 'text-slate-500'
+                      }`}
+                    ></i>
                   )}
                   <span className="font-bold truncate text-[11px] sm:text-xs uppercase tracking-wider">
                     {def.title}
@@ -590,28 +709,52 @@ export default function CustomizableTileGrid({
                   )}
                 </div>
 
-                {/* Prawa strona paska: kontrolki (z flex-wrap dla wąskich kafelków 25%/33%) */}
-                <div className="flex flex-wrap items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                {/* Prawa strona paska */}
+                <div
+                  className="flex flex-wrap items-center gap-1 shrink-0"
+                  onClick={e => e.stopPropagation()}
+                >
                   {isEditing ? (
                     <>
-                      {/* Strzałki Lewo / Prawo (Desktop, gdy szerokość < 100%) */}
+                      {/* Przycisk ustawienia sąsiadujących okien w jednej linii (PC) */}
+                      {isDesktop && alignTileInRow && visibleLayout.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => alignTileInRow(tileItem.id)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                            isAlignedInRow
+                              ? 'bg-emerald-400 text-slate-950 shadow-xs'
+                              : 'bg-blue-700/80 hover:bg-blue-800 text-white'
+                          }`}
+                          title="Ustaw to okienko i sąsiadujące okienko obok siebie w jednej linii"
+                        >
+                          <i className="ph ph-arrows-horizontal text-xs"></i>
+                          <span className="hidden xl:inline">W linii</span>
+                        </button>
+                      )}
+
+                      {/* Strzałki Lewo / Prawo */}
                       {isDesktop && (tileItem.colSpan || 12) < 12 && moveTileHorizontal && (
                         <>
                           <button
                             type="button"
-                            onClick={() => moveTileHorizontal(tileItem.id, 'left', resolvedColStart)}
+                            onClick={() =>
+                              moveTileHorizontal(tileItem.id, 'left', resolvedColStart)
+                            }
                             disabled={!canMoveLeft}
-                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
-                            title="Przesuń do lewej"
+                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors cursor-pointer"
+                            title="Przesuń do lewej / zamień miejscami w linii"
                           >
                             <i className="ph ph-arrow-left text-xs"></i>
                           </button>
                           <button
                             type="button"
-                            onClick={() => moveTileHorizontal(tileItem.id, 'right', resolvedColStart)}
+                            onClick={() =>
+                              moveTileHorizontal(tileItem.id, 'right', resolvedColStart)
+                            }
                             disabled={!canMoveRight}
-                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
-                            title="Przesuń do prawej"
+                            className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors cursor-pointer"
+                            title="Przesuń do prawej / zamień miejscami w linii"
                           >
                             <i className="ph ph-arrow-right text-xs"></i>
                           </button>
@@ -623,7 +766,7 @@ export default function CustomizableTileGrid({
                         type="button"
                         onClick={() => moveTile(tileItem.id, 'up')}
                         disabled={idx === 0}
-                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
+                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors cursor-pointer"
                         title="Przesuń wyżej"
                       >
                         <i className="ph ph-arrow-up text-xs"></i>
@@ -632,7 +775,7 @@ export default function CustomizableTileGrid({
                         type="button"
                         onClick={() => moveTile(tileItem.id, 'down')}
                         disabled={idx === visibleLayout.length - 1}
-                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors"
+                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 disabled:opacity-30 text-white transition-colors cursor-pointer"
                         title="Przesuń niżej"
                       >
                         <i className="ph ph-arrow-down text-xs"></i>
@@ -645,7 +788,7 @@ export default function CustomizableTileGrid({
                             key={opt.span}
                             type="button"
                             onClick={() => setTileColSpan(tileItem.id, opt.span)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
                               tileItem.colSpan === opt.span
                                 ? 'bg-white text-blue-700 shadow-sm'
                                 : 'text-blue-100 hover:bg-blue-700'
@@ -669,12 +812,16 @@ export default function CustomizableTileGrid({
                               key={hp.label}
                               type="button"
                               onClick={() => setTileHeight(tileItem.id, hp.height)}
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
                                 isSelected
                                   ? 'bg-white text-blue-700 shadow-sm'
                                   : 'text-blue-100 hover:bg-blue-700'
                               }`}
-                              title={hp.height ? `Wysokość: ${hp.height}px` : 'Automatyczna wysokość (bez ucinania)'}
+                              title={
+                                hp.height
+                                  ? `Wysokość: ${hp.height}px`
+                                  : 'Automatyczna wysokość (bez ucinania)'
+                              }
                             >
                               {hp.label}
                             </button>
@@ -686,18 +833,19 @@ export default function CustomizableTileGrid({
                       <button
                         type="button"
                         onClick={() => toggleHidden(tileItem.id)}
-                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 text-white transition-colors"
+                        className="p-1 rounded bg-blue-700/80 hover:bg-blue-800 text-white transition-colors cursor-pointer"
                         title={tileItem.hidden ? 'Pokaż kafelek' : 'Ukryj kafelek'}
                       >
                         <i className={`ph ${tileItem.hidden ? 'ph-eye' : 'ph-eye-slash'} text-xs`}></i>
                       </button>
                     </>
                   ) : (
-                    tileItem.height && !tileItem.collapsed && (
+                    tileItem.height &&
+                    !tileItem.collapsed && (
                       <button
                         type="button"
                         onClick={() => setTileHeight(tileItem.id, null)}
-                        className="text-[10px] font-bold text-slate-500 hover:text-blue-600 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 transition-colors"
+                        className="text-[10px] font-bold text-slate-500 hover:text-blue-600 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 transition-colors cursor-pointer"
                         title="Przywróć automatyczną wysokość kafelka"
                       >
                         ↕ Auto
@@ -705,18 +853,22 @@ export default function CustomizableTileGrid({
                     )
                   )}
 
-                  {/* Zwiń / Rozwiń (dostępne zawsze) */}
+                  {/* Zwiń / Rozwiń */}
                   <button
                     type="button"
                     onClick={() => toggleCollapse(tileItem.id)}
-                    className={`p-1 rounded transition-colors flex items-center gap-0.5 ${
+                    className={`p-1 rounded transition-colors flex items-center gap-0.5 cursor-pointer ${
                       isEditing
                         ? 'bg-blue-700/80 hover:bg-blue-800 text-white'
                         : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'
                     }`}
                     title={tileItem.collapsed ? 'Rozwiń okienko' : 'Zwiń okienko'}
                   >
-                    <i className={`ph ${tileItem.collapsed ? 'ph-caret-down' : 'ph-caret-up'} text-xs font-bold`}></i>
+                    <i
+                      className={`ph ${
+                        tileItem.collapsed ? 'ph-caret-down' : 'ph-caret-up'
+                      } text-xs font-bold`}
+                    ></i>
                   </button>
                 </div>
               </div>
@@ -735,10 +887,9 @@ export default function CustomizableTileGrid({
                 </div>
               )}
 
-              {/* UCHWYTY ROZCIĄGANIA (RESIZE HANDLES) W TRYBIE EDYCJI */}
+              {/* UCHWYTY ROZCIĄGANIA W TRYBIE EDYCJI */}
               {isEditing && !tileItem.collapsed && (
                 <>
-                  {/* Prawa krawędź — rozciąganie szerokości na PC */}
                   <div
                     onMouseDown={e => startResize(e, tileItem, 'width')}
                     className="hidden lg:flex absolute top-8 right-0 bottom-4 w-2.5 cursor-ew-resize items-center justify-center group z-30 hover:bg-blue-500/20 rounded-r"
@@ -747,7 +898,6 @@ export default function CustomizableTileGrid({
                     <div className="w-1 h-8 rounded-full bg-blue-400 group-hover:bg-blue-600 transition-colors"></div>
                   </div>
 
-                  {/* Dolna krawędź — rozciąganie wysokości */}
                   <div
                     onMouseDown={e => startResize(e, tileItem, 'height')}
                     onTouchStart={e => startResize(e, tileItem, 'height')}
@@ -757,7 +907,6 @@ export default function CustomizableTileGrid({
                     <div className="w-10 h-1 rounded-full bg-blue-400 group-hover:bg-blue-600 transition-colors"></div>
                   </div>
 
-                  {/* Prawy dolny narożnik — swobodne rozciąganie 2D (Szerokość + Wysokość) */}
                   <div
                     onMouseDown={e => startResize(e, tileItem, 'both')}
                     onTouchStart={e => startResize(e, tileItem, 'height')}

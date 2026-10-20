@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import PropTypes from 'prop-types';
 import TicketLightbox from './tickets/TicketLightbox';
@@ -37,6 +38,7 @@ export default function TicketDetails({
   STATUSES,
   isArchive
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { machines, regions, services, branding, parts = [] } = useManagerStore();
   const location = useLocation();
@@ -60,7 +62,7 @@ export default function TicketDetails({
     return partTransactions.filter(tx => tx.referenceId === currentTicket.id && tx.type === 'issue_adhoc');
   }, [partTransactions, currentTicket.id]);
 
-  const handleUploadAndUpdate = async (ticketId, newStatus, actionText, newEtr, files, noteText) => {
+  const handleUploadAndUpdate = async (ticketId, newStatus, actionText, newEtr, files, noteText, extraData = null) => {
     let finalUrls = [];
     if (files && files.length > 0 && files[0] instanceof File) {
       setIsUploading(true);
@@ -68,7 +70,7 @@ export default function TicketDetails({
       try {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          setUploadProgress(`Wysyłanie zdjęcia (${i + 1}/${files.length})...`);
+          setUploadProgress(`${t('tickets.details.uploading_photo', 'Wysyłanie zdjęcia')} (${i + 1}/${files.length})...`);
 
           let fileToUpload = file;
           try {
@@ -86,7 +88,7 @@ export default function TicketDetails({
         }
       } catch (err) {
         console.error('Upload error:', err);
-        setUploadError('Błąd wgrywania zdjęć: ' + err.message);
+        setUploadError(t('tickets.details.upload_error', 'Błąd wgrywania zdjęć: ') + err.message);
         setIsUploading(false);
         setUploadProgress('');
         return;
@@ -98,7 +100,7 @@ export default function TicketDetails({
     setIsUploading(false);
     setUploadProgress('');
 
-    return handleUpdate(ticketId, newStatus, actionText, newEtr, finalUrls, noteText);
+    return handleUpdate(ticketId, newStatus, actionText, newEtr, finalUrls, noteText, extraData);
   };
 
   const machine = machines?.find(m => m.id === currentTicket.machineId);
@@ -107,7 +109,7 @@ export default function TicketDetails({
     const list = [
       {
         id: 'header',
-        title: 'Dane obiektu i zgłoszenia',
+        title: t('tickets.details.tile_header', 'Dane obiektu i zgłoszenia'),
         icon: 'ph-info',
         defaultColSpan: 8,
         render: () => (
@@ -121,7 +123,7 @@ export default function TicketDetails({
       },
       {
         id: 'history',
-        title: 'Historia zdarzeń',
+        title: t('tickets.details.tile_history', 'Historia zdarzeń'),
         icon: 'ph-clock-counter-clockwise',
         defaultColSpan: 4,
         render: () => (
@@ -133,7 +135,7 @@ export default function TicketDetails({
       },
       {
         id: 'content',
-        title: 'Opis awarii, zdjęcia i części',
+        title: t('tickets.details.tile_content', 'Opis awarii, zdjęcia i części'),
         icon: 'ph-file-text',
         defaultColSpan: 8,
         render: () => (
@@ -147,7 +149,7 @@ export default function TicketDetails({
       },
       {
         id: 'stepper',
-        title: 'Kroki realizacji awarii (1–5)',
+        title: t('tickets.details.tile_stepper', 'Kroki realizacji awarii (1–5)'),
         icon: 'ph-list-numbers',
         defaultColSpan: 8,
         render: () => (
@@ -181,7 +183,7 @@ export default function TicketDetails({
     if (machine) {
       list.push({
         id: 'dtr',
-        title: 'Dokumentacja DTR i notatki techniczne',
+        title: t('tickets.details.tile_dtr', 'Dokumentacja DTR i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (
@@ -226,6 +228,7 @@ export default function TicketDetails({
     isUploading,
     uploadProgress,
     machine,
+    t,
   ]);
 
   // Wspólny klucz 'ticket_details' dla aktywnych awarii oraz archiwum awarii
@@ -239,7 +242,7 @@ export default function TicketDetails({
           {/* Tytuł - zawsze na górze na mobile */}
           <div className="md:hidden w-full">
             <h2 className="text-xl font-bold text-gray-800 truncate">
-              {isArchive ? 'Szczegóły Awarii (Archiwum)' : 'Szczegóły Awarii'}
+              {isArchive ? t('tickets.details.title_archive', 'Szczegóły Awarii (Archiwum)') : t('tickets.details.title', 'Szczegóły Awarii')}
             </h2>
           </div>
 
@@ -258,15 +261,15 @@ export default function TicketDetails({
                   }
                 }}
                 className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm transition-colors flex items-center gap-1 text-sm shrink-0"
-                title="Powrót"
+                title={t('common.back', 'Powrót')}
               >
-                <i className="ph ph-arrow-left text-lg"></i> <span className="inline">Powrót</span>
+                <i className="ph ph-arrow-left text-lg"></i> <span className="inline">{t('common.back', 'Powrót')}</span>
               </button>
             </div>
 
             {/* Tytuł na Desktop - schowany na mobile */}
             <h2 className="hidden md:block text-xl font-bold text-gray-800 shrink-0 truncate max-w-[200px] sm:max-w-md ml-2">
-              {isArchive ? 'Szczegóły Awarii (Archiwum)' : 'Szczegóły Awarii'}
+              {isArchive ? t('tickets.details.title_archive', 'Szczegóły Awarii (Archiwum)') : t('tickets.details.title', 'Szczegóły Awarii')}
             </h2>
 
             {/* Prawa strona (Mobile) */}
@@ -282,7 +285,7 @@ export default function TicketDetails({
                   import('../../utils/reports/pdfTicketCard').then(m => m.generateTicketPDF(currentTicket))
                 }
                 className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0"
-                title="Raport PDF"
+                title={t('tickets.details.pdf_report', 'Raport PDF')}
               >
                 <i className="ph ph-file-pdf text-lg"></i> <span>PDF</span>
               </button>
@@ -301,10 +304,10 @@ export default function TicketDetails({
                 import('../../utils/reports/pdfTicketCard').then(m => m.generateTicketPDF(currentTicket))
               }
               className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-lg font-bold text-sm shadow-md transition-colors shrink-0"
-              title="Raport PDF"
+              title={t('tickets.details.pdf_report', 'Raport PDF')}
             >
               <i className="ph ph-file-pdf text-base"></i>
-              <span>Raport PDF</span>
+              <span>{t('tickets.details.pdf_report', 'Raport PDF')}</span>
             </button>
           </div>
         </div>

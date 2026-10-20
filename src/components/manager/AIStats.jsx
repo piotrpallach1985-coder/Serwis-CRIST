@@ -5,7 +5,8 @@ import { fetchTenantUsageStats } from '../../services/admin.service';
 import { useManagerStore } from '../../store/managerStore';
 
 export default function AIStats() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'en' ? 'en-US' : 'pl-PL';
   const geminiPrice = useManagerStore(state => state.geminiPrice) || 0.60;
   const groqPrice = useManagerStore(state => state.groqPrice) || 0.40;
   const [stats, setStats] = useState({ 
@@ -69,12 +70,12 @@ export default function AIStats() {
           <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-2">
             <i className="ph ph-chat-teardrop-text"></i>
           </div>
-          <h3 className="text-lg font-bold text-slate-700">Zużycie Modeli Analitycznych</h3>
+          <h3 className="text-lg font-bold text-slate-700">{t("dashboards.ai_stats.gemini_title", "Zużycie Modeli Analitycznych")}</h3>
           <p className="text-xs text-slate-400">{t("dashboards.ai_stats.gemini_desc")}</p>
           <div className="text-4xl font-black text-blue-600 mt-2">
-            {stats.geminiTokens.toLocaleString('pl-PL')}
+            {stats.geminiTokens.toLocaleString(locale)}
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tokenów Zużyto (Biling)</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("dashboards.ai_stats.tokens_used", "Tokenów Zużyto (Biling)")}</p>
           <div className="mt-3 py-1 px-3 bg-blue-100 text-blue-700 rounded-full text-xs font-bold shadow-inner">
             ~ {(stats.geminiCost !== undefined ? stats.geminiCost : (stats.geminiTokens / 1000000) * geminiPrice).toFixed(4)} PLN
           </div>
@@ -84,12 +85,12 @@ export default function AIStats() {
           <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center text-3xl mb-2">
             <i className="ph ph-microphone-stage"></i>
           </div>
-          <h3 className="text-lg font-bold text-slate-700">Zużycie Modeli Transkrypcyjnych</h3>
+          <h3 className="text-lg font-bold text-slate-700">{t("dashboards.ai_stats.groq_title", "Zużycie Modeli Transkrypcyjnych")}</h3>
           <p className="text-xs text-slate-400">{t("dashboards.ai_stats.groq_desc")}</p>
           <div className="text-4xl font-black text-orange-600 mt-2">
             {(stats.whisperSeconds / 60).toFixed(1)} min
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Minut Audio Zużyto (Biling)</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("dashboards.ai_stats.audio_minutes_used", "Minut Audio Zużyto (Biling)")}</p>
           <div className="mt-3 py-1 px-3 bg-orange-100 text-orange-700 rounded-full text-xs font-bold shadow-inner">
             ~ {(stats.groqCost !== undefined ? stats.groqCost : (stats.whisperSeconds / 60) * groqPrice).toFixed(4)} PLN
           </div>

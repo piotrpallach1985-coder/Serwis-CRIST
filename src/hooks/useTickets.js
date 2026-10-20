@@ -6,6 +6,7 @@ import { safeParseDate } from '../utils/dateHelpers';
 import { TICKET_STATUS, TICKET_STATUS_LABELS } from '../utils/constants';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
+import { filterTasksForFieldTechnician } from '../utils/fieldServiceHelpers';
 
 
 const DEFAULT_COLS = {
@@ -31,7 +32,15 @@ const DEFAULT_COLS = {
  * @param {string} [params.initialSearchQuery=''] Wstępna fraza wyszukiwania (np. przekazana z mapy)
  * @returns {Object} Stan i akcje obsługi zgłoszeń
  */
-export function useTickets({ tickets = [], machines = [], regions = [], isArchive = false, initialSearchQuery = '' }) {
+export function useTickets({
+  tickets = [],
+  machines = [],
+  regions = [],
+  isArchive = false,
+  initialSearchQuery = '',
+  user = null,
+  onlyAssignedTasks = false,
+}) {
   const tenantId = getCurrentTenant();
   const [internalArchive, setInternalArchive] = useState([]);
   const [lastArchiveDoc, setLastArchiveDoc] = useState(null);
@@ -119,7 +128,12 @@ export function useTickets({ tickets = [], machines = [], regions = [], isArchiv
     setLoadingArchive(false);
   };
 
-  const activeTicketsArray = isArchive ? internalArchive : tickets;
+  const scopedArchive = useMemo(
+    () => filterTasksForFieldTechnician(internalArchive, user, onlyAssignedTasks),
+    [internalArchive, user, onlyAssignedTasks]
+  );
+
+  const activeTicketsArray = isArchive ? scopedArchive : tickets;
 
   const filteredTickets = useMemo(() => {
     return activeTicketsArray

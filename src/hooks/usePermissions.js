@@ -35,6 +35,7 @@ export function usePermissions(user, roles = [], customModules = null) {
         canAccessTab: () => false,
         isPlannedServicesModuleEnabled,
         isInventoryModuleEnabled,
+        onlyAssignedTasks: false,
         isAdmin: false,
         isManager: false,
       };
@@ -53,6 +54,9 @@ export function usePermissions(user, roles = [], customModules = null) {
     );
 
     const hasPermission = (perm) => isAdmin || perms.includes(perm);
+    const onlyAssignedTasks =
+      !isAdmin &&
+      (perms.includes('only_assigned_tasks') || Boolean(user.onlyAssignedTasks));
 
     const PLANNED_TABS = ['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'planned_services', 'archive_planned'];
     const ADMIN_TABS = ['users', 'roles', 'reports', 'audit', 'ai_stats', 'api_settings'];
@@ -76,6 +80,7 @@ export function usePermissions(user, roles = [], customModules = null) {
       // 3. Niestandardowa rola z przypisaną listą uprawnień
       if (hasCustomPerms) {
         if (perms.includes(tabId)) return true;
+        if (tabId === 'machines_qr' && perms.includes('machines')) return true;
         if (tabId.startsWith('parts_') && perms.includes('parts')) return true;
         if (tabId === 'planned_kpi' && perms.includes('planned_maintenance')) return true;
         if (tabId === 'action_items' && (perms.includes('planned_maintenance') || perms.includes('tickets'))) return true;
@@ -109,6 +114,7 @@ export function usePermissions(user, roles = [], customModules = null) {
       canManageRoles: hasPermission('roles') || isAdmin,
       canViewReports: hasPermission('reports') || hasPermission('view_reports') || (!hasCustomPerms && isManager),
       canDeleteTickets: hasPermission('delete_tickets') || isAdmin,
+      onlyAssignedTasks,
     };
   }, [user, effectiveRoles, branding]);
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import NotificationCenter from '../NotificationCenter';
 
 export default function SidebarHeader({ 
@@ -17,6 +18,8 @@ export default function SidebarHeader({
   notifications,
   onNavigate
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex-shrink-0 h-16 bg-[#161f30] px-5 flex items-center justify-between border-b border-gray-800">
       <div className="flex items-center gap-3 overflow-hidden">
@@ -35,9 +38,9 @@ export default function SidebarHeader({
             {branding?.companyName || 'VexoNT'}
           </div>
           <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold truncate">
-            {isUrModule && 'PANEL AWARII & SERWISU'}
-            {isCompanyAdmin && 'ADMINISTRATOR FIRMY'}
-            {isSystemAdmin && 'ADMINISTRATOR PROGRAMU'}
+            {isUrModule && t('sidebar.ur_panel_subtitle', 'PANEL AWARII & SERWISU')}
+            {isCompanyAdmin && t('sidebar.company_admin_subtitle', 'ADMINISTRATOR FIRMY')}
+            {isSystemAdmin && t('sidebar.system_admin_subtitle', 'ADMINISTRATOR PROGRAMU')}
           </div>
         </div>
       </div>

@@ -1,9 +1,16 @@
-import {  collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, serverTimestamp , increment, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  setDoc,
+  doc,
+  serverTimestamp,
+  increment,
+  onSnapshot,
+} from 'firebase/firestore';
 import { db } from '../firebase';
-import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import { logAudit } from './audit.service';
-
 
 /**
  * Zwiększa lub ustawia licznik roboczogodzin dla maszyny.
@@ -12,50 +19,68 @@ import { logAudit } from './audit.service';
 export const updateMachineWorkHours = async (machineId, newHours, isDelta = false) => {
   try {
     const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
-    
+
     if (isDelta) {
       await updateDoc(machineRef, {
         currentWorkHours: increment(newHours),
-        lastWorkHoursUpdate: serverTimestamp()
+        lastWorkHoursUpdate: serverTimestamp(),
       });
     } else {
       await updateDoc(machineRef, {
         currentWorkHours: newHours,
-        lastWorkHoursUpdate: serverTimestamp()
+        lastWorkHoursUpdate: serverTimestamp(),
       });
     }
-    
+
     return true;
   } catch (error) {
-    console.error("Błąd aktualizacji roboczogodzin maszyny:", error);
+    console.error('Błąd aktualizacji roboczogodzin maszyny:', error);
     throw error;
   }
 };
 
 /**
- * Dodaje nową maszynę do bazy.
+ * Dodaje nową maszynę do bazy (wraz z datą wygenerowania kodu QR i utworzenia).
  * @param {Object} machineData Dane maszyny
  * @returns {Promise<import('firebase/firestore').DocumentReference>} Referencja do utworzonego dokumentu
  */
 export const addMachine = async (machineData) => {
-  const res = await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), machineData);
+  const payload = {
+    ...machineData,
+    createdAt: machineData.createdAt || serverTimestamp(),
+    updatedAt: machineData.updatedAt || serverTimestamp(),
+    qrCreatedAt: machineData.qrCreatedAt || serverTimestamp(),
+  };
+  const res = await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), payload);
   logAudit('CREATE', 'MACHINE', res.id, `Dodano maszynę: ${machineData.name}`);
   return res;
 };
 
 export const updateMachine = async (machineId, machineData) => {
-  const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), machineData);
-  logAudit('UPDATE', 'MACHINE', machineId, machineData);
+  const payload = {
+    ...machineData,
+    updatedAt: machineData.updatedAt || serverTimestamp(),
+  };
+  const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), payload);
+  logAudit('UPDATE', 'MACHINE', machineId, payload);
   return res;
 };
 
 export const deleteMachine = async (machineId) => {
   logAudit('DELETE', 'MACHINE', machineId, 'Usunięto maszynę');
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: 'System' });
+  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), {
+    isDeleted: true,
+    deletedAt: serverTimestamp(),
+    deletedBy: 'System',
+  });
 };
 
 export const updateMapSettings = async (updateData) => {
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'), updateData);
+  return await setDoc(
+    doc(db, 'tenants', getCurrentTenant(), 'settings', 'map'),
+    updateData,
+    { merge: true }
+  );
 };
 
 export const subscribeToMapSettings = (callback) => {
@@ -63,9 +88,17 @@ export const subscribeToMapSettings = (callback) => {
 };
 
 export const updateRegion = async (regionId, updateData) => {
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'regions', regionId), updateData);
+  return await setDoc(
+    doc(db, 'tenants', getCurrentTenant(), 'regions', regionId),
+    updateData,
+    { merge: true }
+  );
 };
 
 export const updateMachineRegion = async (machineId, updateData) => {
-  return await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), updateData);
+  return await setDoc(
+    doc(db, 'tenants', getCurrentTenant(), 'machines', machineId),
+    updateData,
+    { merge: true }
+  );
 };

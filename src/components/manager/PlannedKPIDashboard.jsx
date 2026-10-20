@@ -70,7 +70,7 @@ export default function PlannedKPIDashboard() {
     () => [
       {
         id: 'planned_kpi_summary',
-        title: 'Podsumowanie wskaźników serwisów',
+        title: t('planned.dashboard.summaryTile', 'Podsumowanie wskaźników serwisów'),
         icon: 'ph-gauge',
         defaultColSpan: 12,
         render: () => (

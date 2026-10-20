@@ -6,6 +6,11 @@ import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { safeParseDate } from '../../../utils/dateHelpers';
+import {
+  buildPartQrValue,
+  resolveTenantDisplayName,
+  formatQrDate,
+} from '../../../services/qrAccess.service';
 import PartTransactionModal from './PartTransactionModal';
 import { useTileLayout } from '../../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../../shared/CustomizableTileGrid';
@@ -27,9 +32,16 @@ export default function PartDetails({ part, onBack, onEdit }) {
   const plannedServices = useManagerStore(state => state.plannedServices || []);
   const tickets = useManagerStore(state => state.tickets || []);
   const machines = useManagerStore(state => state.machines || []);
+  const branding = useManagerStore(state => state.branding);
 
   const tenantId = getCurrentTenant();
-  const qrValue = `tenant=${tenantId}&part=${part.id}`;
+  const tenantName = resolveTenantDisplayName(tenantId, branding);
+  const qrDateStr = formatQrDate(part, [], '-');
+  const qrValue = buildPartQrValue(part, tenantId, {
+    branding,
+    tenantName,
+    date: qrDateStr,
+  });
 
   const partTxs = useMemo(() => {
     return transactions
@@ -316,11 +328,17 @@ export default function PartDetails({ part, onBack, onEdit }) {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
               {t('parts.details.qr_title')}
             </h3>
-            <div className="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm">
-              <QRCodeCanvas value={qrValue} size={140} level="H" />
+            <div className="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col items-center">
+              <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+                {tenantName}
+              </div>
+              <div className="text-xs font-extrabold text-slate-800 mb-2 text-center line-clamp-1">
+                {part.name}
+              </div>
+              <QRCodeCanvas value={qrValue} size={140} level="M" />
               <div className="mt-3 text-center">
                 <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">
-                  DATA: {safeParseDate(part.createdAt)?.toLocaleDateString('pl-PL') || '-'}
+                  DATA: {qrDateStr}
                 </span>
               </div>
             </div>

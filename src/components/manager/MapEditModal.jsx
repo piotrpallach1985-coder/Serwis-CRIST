@@ -1,21 +1,50 @@
 /**
- * MapEditModal — Modal przypinania rejonu lub maszyny na mapie.
- * Wyciągnięty z Map.jsx (linie 1225–1290).
+ * MapEditModal — Modal przypinania rejonu (podmapy/osiedla) lub maszyny/urządzenia na mapie.
+ * Obsługuje zarówno kliknięcie na mapie, jak i wyszukiwanie po adresie (Miejscowość, ulica i numer) dla Mapy Google.
  */
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
+import { geocodeAddressQuery, searchAddressSuggestions } from './map/InteractiveGoogleMap';
 
 export default function MapEditModal({
   isModalOpen,
-  editingType, setEditingType,
-  editingId, setEditingId,
+  editingType,
+  setEditingType,
+  editingId,
+  setEditingId,
   currentSubmapId,
   regions,
   machines,
+  isGoogleMap = false,
+  tempPos,
   onSave,
   onClose,
 }) {
   const { t } = useTranslation();
+
+  const [addressQuery, setAddressQuery] = useState('');
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [addressError, setAddressError] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [resolvedGeo, setResolvedGeo] = useState(null);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setAddressQuery(tempPos?.address || '');
+      setAddressError('');
+      setSuggestions([]);
+      if (tempPos?.lat != null && tempPos?.lng != null) {
+        setResolvedGeo({
+          lat: Number(tempPos.lat),
+          lng: Number(tempPos.lng),
+          displayName: tempPos.address || `${Number(tempPos.lat).toFixed(5)}, ${Number(tempPos.lng).toFixed(5)}`,
+        });
+      } else {
+        setResolvedGeo(null);
+      }
+    }
+  }, [isModalOpen, tempPos]);
 
   if (!isModalOpen) return null;
 
@@ -30,78 +59,247 @@ export default function MapEditModal({
     return ids;
   };
 
-  const getUnpinnedItems = () => {
+  const hasCoords = (item) =>
+    (item.xPercent != null && item.yPercent != null) || (item.lat != null && item.lng != null);
+
+  const getSelectableItems = () => {
     const activeRegions = regions.filter(r => !r.isDeleted);
     if (editingType === 'region') {
       if (currentSubmapId === null) {
-        return activeRegions.filter(r => !r.parentId && (r.xPercent == null || r.yPercent == null));
+        const candidates = activeRegions.filter(r => !r.parentId);
+        return {
+          unpinned: candidates.filter(r => !hasCoords(r)),
+          pinned: candidates.filter(r => hasCoords(r)),
+        };
       } else {
         const forbiddenIds = getAncestorAndSelfIds(currentSubmapId);
-        return activeRegions.filter(
-          r =>
-            !forbiddenIds.has(r.id) &&
-            (r.xPercent == null || r.yPercent == null) &&
-            (r.parentId === currentSubmapId || !r.parentId)
+        const candidates = activeRegions.filter(
+          r => !forbiddenIds.has(r.id) && (r.parentId === currentSubmapId || !r.parentId)
         );
+        return {
+          unpinned: candidates.filter(r => !hasCoords(r) || r.parentId !== currentSubmapId),
+          pinned: candidates.filter(r => hasCoords(r) && r.parentId === currentSubmapId),
+        };
       }
     } else {
       const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
       if (currentSubmapId !== null) {
-        return mainMachines.filter(m => m.regionId === currentSubmapId && !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions));
+        const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
+        return {
+          unpinned: inRegion.filter(m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions)),
+          pinned: inRegion.filter(m => isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions)),
+        };
       }
-      return mainMachines.filter(m => m.xPercent == null || m.yPercent == null);
+      return {
+        unpinned: mainMachines.filter(m => !hasCoords(m)),
+        pinned: mainMachines.filter(m => hasCoords(m)),
+      };
     }
   };
 
-  const unpinnedItems = getUnpinnedItems();
+  const { unpinned: unpinnedItems, pinned: pinnedItems } = getSelectableItems();
+
+  const handleSearchAddress = async () => {
+    const q = addressQuery.trim();
+    if (!q) return;
+    setSearchingAddress(true);
+    setAddressError('');
+    const results = await searchAddressSuggestions(q);
+    setSearchingAddress(false);
+    if (results.length > 0) {
+      setSuggestions(results);
+      setResolvedGeo(results[0]);
+    } else {
+      setSuggestions([]);
+      setAddressError(t('map_component.address_not_found', 'Nie znaleziono adresu. Sprawdź pisownię (np. Gdańsk, Długa 10).'));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingId) return;
+
+    let finalGeo = resolvedGeo;
+    const trimmedQuery = addressQuery.trim();
+
+    if (isGoogleMap && trimmedQuery && (!finalGeo || finalGeo.fromClick)) {
+      setSearchingAddress(true);
+      setAddressError('');
+      const geo = await geocodeAddressQuery(trimmedQuery);
+      setSearchingAddress(false);
+      if (geo) {
+        finalGeo = geo;
+        setResolvedGeo(geo);
+      } else if (!tempPos || (tempPos.xPercent == null && tempPos.lat == null)) {
+        setAddressError(t('map_component.address_not_found', 'Nie znaleziono podanego adresu. Sprawdź miejscowość, ulicę i numer.'));
+        return;
+      }
+    }
+
+    onSave(e, {
+      lat: finalGeo?.lat ?? tempPos?.lat ?? null,
+      lng: finalGeo?.lng ?? tempPos?.lng ?? null,
+      address: trimmedQuery || finalGeo?.displayName || tempPos?.address || '',
+    });
+  };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
         <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <i className="ph ph-push-pin text-blue-600 text-base md:text-xl"></i>{t('map_component.pin_object')}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-base">
+            <i className="ph ph-push-pin text-blue-600 text-base md:text-xl"></i>
+            {t('map_component.pin_object')}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <i className="ph ph-x text-base md:text-xl"></i>
           </button>
         </div>
 
-        <form onSubmit={onSave} className="p-6 space-y-5">
-          {/* Typ: Rejon / Podmapa vs Maszyna */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Typ: Rejon / Podmapa vs Maszyna / Urządzenie */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
-              onClick={() => { setEditingType('region'); setEditingId(''); }}
-              className={`flex-1 py-2 text-[10px] md:text-sm font-bold rounded-md transition-all ${editingType === 'region' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => {
+                setEditingType('region');
+                setEditingId('');
+              }}
+              className={`flex-1 py-2 text-[11px] md:text-xs font-bold rounded-md transition-all ${
+                editingType === 'region' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              {currentSubmapId !== null ? 'Podrejon / Podmapa' : t('map_component.region_hall')}
+              {currentSubmapId !== null
+                ? t('map_component.subregion_submap', 'Podrejon / Podmapa')
+                : t('map_component.region_hall')}
             </button>
             <button
               type="button"
-              onClick={() => { setEditingType('machine'); setEditingId(''); }}
-              className={`flex-1 py-2 text-[10px] md:text-sm font-bold rounded-md transition-all ${editingType === 'machine' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >{t('map_component.specific_machine')}</button>
+              onClick={() => {
+                setEditingType('machine');
+                setEditingId('');
+              }}
+              className={`flex-1 py-2 text-[11px] md:text-xs font-bold rounded-md transition-all ${
+                editingType === 'machine' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t('map_component.specific_machine')}
+            </button>
           </div>
+
+          {/* Wyszukiwanie po miejscowości, ulicy i numerze (dla Mapy Google) */}
+          {isGoogleMap && (
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2">
+              <label className="block text-[10px] md:text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                <i className="ph ph-map-pin-line mr-1"></i>
+                {t('map_component.address_label', 'Miejscowość, ulica i numer')}
+              </label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={addressQuery}
+                  onChange={e => {
+                    setAddressQuery(e.target.value);
+                    setAddressError('');
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearchAddress();
+                    }
+                  }}
+                  placeholder={t('map_component.address_placeholder', 'np. Gdańsk, ul. Długa 10 / Gdynia, Cechowa 5')}
+                  className="flex-1 p-2.5 text-xs md:text-sm border border-emerald-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchAddress}
+                  disabled={searchingAddress || !addressQuery.trim()}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg flex items-center gap-1 shrink-0 transition-colors"
+                >
+                  <i className={`ph ${searchingAddress ? 'ph-spinner-gap animate-spin' : 'ph-magnifying-glass'}`}></i>
+                  <span>{t('map_component.search_address_btn', 'Szukaj')}</span>
+                </button>
+              </div>
+
+              {addressError && (
+                <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1">
+                  <i className="ph ph-warning-circle"></i>
+                  <span>{addressError}</span>
+                </p>
+              )}
+
+              {suggestions.length > 1 && (
+                <div className="max-h-28 overflow-y-auto bg-white border border-emerald-200 rounded-lg divide-y divide-slate-100 text-[11px]">
+                  {suggestions.map((sug, idx) => {
+                    const isSelected = resolvedGeo && resolvedGeo.lat === sug.lat && resolvedGeo.lng === sug.lng;
+                    return (
+                      <button
+                        key={`${sug.lat}-${sug.lng}-${idx}`}
+                        type="button"
+                        onClick={() => {
+                          setResolvedGeo(sug);
+                          setAddressQuery(sug.displayName);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 hover:bg-emerald-50 transition-colors flex items-start gap-1.5 ${
+                          isSelected ? 'bg-emerald-100/80 font-bold text-emerald-900' : 'text-slate-700'
+                        }`}
+                      >
+                        <i className="ph ph-map-pin text-emerald-600 shrink-0 mt-0.5"></i>
+                        <span className="line-clamp-2">{sug.displayName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {resolvedGeo && (
+                <div className="text-[10px] text-emerald-800 bg-emerald-100/80 px-2.5 py-1.5 rounded-lg flex items-center justify-between font-mono">
+                  <span className="truncate mr-2">
+                    <i className="ph ph-check-circle text-emerald-600 mr-1"></i>
+                    GPS: {Number(resolvedGeo.lat).toFixed(5)}, {Number(resolvedGeo.lng).toFixed(5)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Wybór elementu */}
           <div>
-            <label className="block text-[9px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('map_component.choose_element')}</label>
+            <label className="block text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+              {t('map_component.choose_element')}
+            </label>
             <select
               value={editingId}
               onChange={e => setEditingId(e.target.value)}
-              className="w-full p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-gray-50 font-medium"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-gray-50 font-medium text-xs md:text-sm"
               required
             >
               <option value="">{t('map_component.choose_from_list')}</option>
-              {unpinnedItems.map(item => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
+              {unpinnedItems.length > 0 && (
+                <optgroup label={t('map_component.unpinned_items', 'Nieprzypięte (wolne)')}>
+                  {unpinnedItems.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {pinnedItems.length > 0 && (
+                <optgroup label={t('map_component.already_pinned_items', 'Już przypięte (zmień lokalizację)')}>
+                  {pinnedItems.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} {item.address ? `(${item.address})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
-            {unpinnedItems.length === 0 && (
+            {unpinnedItems.length === 0 && pinnedItems.length === 0 && (
               <p className="text-[11px] text-amber-600 mt-2 font-semibold">
                 <i className="ph ph-check-circle mr-1"></i>
                 {editingType === 'region'
-                  ? 'Brak wolnych rejonów/podmap do przypięcia (dodaj nowy rejon w Słownikach -> Rejony).'
+                  ? t('map_component.no_free_regions', 'Brak rejonów/podmap do przypięcia (dodaj nowy rejon w Słownikach -> Rejony).')
                   : currentSubmapId !== null
                     ? t('map_component.all_machines_pinned')
                     : t('map_component.no_objects_to_pin')}
@@ -109,12 +307,15 @@ export default function MapEditModal({
             )}
           </div>
 
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="submit"
-              disabled={!editingId}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-lg shadow-sm transition-colors text-[10px] md:text-sm"
-            >{t('map_component.save_pin')}</button>
+              disabled={!editingId || searchingAddress}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg shadow-sm transition-colors text-xs md:text-sm flex items-center justify-center gap-2"
+            >
+              <i className="ph ph-push-pin"></i>
+              <span>{t('map_component.save_pin')}</span>
+            </button>
           </div>
         </form>
       </div>

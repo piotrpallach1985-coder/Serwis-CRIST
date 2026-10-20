@@ -7,7 +7,7 @@ import MachineDTR from './MachineDTR';
 import MachineWorkHoursModal from './MachineWorkHoursModal';
 import { USER_ROLES } from '../../utils/constants';
 import { getCurrentTenant } from '../../utils/tenantHelper';
-import { getOrCreateQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
+import { getOrCreateQrKey, getCachedQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import { usePermissions } from '../../hooks/usePermissions';
 import CustomizableTileGrid from '../shared/CustomizableTileGrid';
@@ -55,6 +55,7 @@ export default function MachineDetails({
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
   const machines = useManagerStore(state => state.machines || []);
+  const branding = useManagerStore(state => state.branding);
 
   const parentMachine = machine.parentId ? machines.find(m => m.id === machine.parentId) : null;
   const childMachines = machines.filter(m => m.parentId === machine.id);
@@ -98,12 +99,12 @@ export default function MachineDetails({
       );
   }, [partTransactions, machine.id, tickets, plannedServices]);
 
-  const [qrKey, setQrKey] = useState(null);
+  const [qrKey, setQrKey] = useState(() => getCachedQrKey(currentTenantId));
   useEffect(() => {
     let active = true;
     getOrCreateQrKey(currentTenantId)
       .then(k => {
-        if (active) setQrKey(k);
+        if (active && k) setQrKey(prev => (prev === k ? prev : k));
       })
       .catch(err => console.error('Nie udało się pobrać klucza QR firmy:', err));
     return () => {
@@ -111,13 +112,20 @@ export default function MachineDetails({
     };
   }, [currentTenantId]);
 
-  const qrValue = qrKey ? buildMachineQrValue(currentTenantId, machine.id, qrKey) : null;
+  const qrValue = useMemo(
+    () =>
+      buildMachineQrValue(machine, currentTenantId, qrKey, {
+        allMachines: machines,
+        branding,
+      }),
+    [machine, currentTenantId, qrKey, machines, branding]
+  );
 
   const tiles = useMemo(
     () => [
       {
         id: 'machine_info',
-        title: 'Dane maszyny, podzespoły i części (BOM)',
+        title: t('machines.details.infoTileTitle', 'Dane maszyny, podzespoły i części (BOM)'),
         icon: 'ph-engine',
         defaultColSpan: 8,
         render: () => (
@@ -137,14 +145,21 @@ export default function MachineDetails({
       },
       {
         id: 'machine_qr',
-        title: 'Kod QR maszyny',
+        title: t('machines.details.qrTileTitle', 'Kod QR maszyny'),
         icon: 'ph-qr-code',
         defaultColSpan: 4,
-        render: () => <MachineQRCard machine={machine} qrValue={qrValue} />,
+        render: () => (
+          <MachineQRCard
+            machine={machine}
+            qrValue={qrValue}
+            machines={machines}
+            branding={branding}
+          />
+        ),
       },
       {
         id: 'machine_dtr',
-        title: 'Dokumentacja DTR i notatki techniczne',
+        title: t('machines.details.dtrTileTitle', 'Dokumentacja DTR i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (
@@ -248,7 +263,7 @@ export default function MachineDetails({
   const tileLayout = useTileLayout('machine_details', tiles);
 
   return (
-    <div className="bg-[#f8f9fa] w-full flex flex-col h-full animate-fade-in relative text-[#111827]">
+    <div className="bg-[#f8f9fa] w-full flex flex-col h-full relative text-[#111827]">
       <MachineHeader
         machine={machine}
         onBack={onBack}

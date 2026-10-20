@@ -200,11 +200,13 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
     expect(screen.getByText(/Wyznaczony wykonawca:/i)).toBeInTheDocument();
     expect(screen.getByText('Serwis Dźwigowy Sp. z o.o.')).toBeInTheDocument();
 
-    // Kliknięcie nagłówka Kroku 2 rozwija Krok 2 i pozwala zmienić wykonawcę lub cofnąć do Kroku 1
-    fireEvent.click(screen.getByText('tickets.details.step_2'));
+    // W aktywnym Kroku 3 przycisk cofania wykonawcy działa
+    fireEvent.click(screen.getByText('tickets.details.change_contractor'));
+    expect(handleUpdate).toHaveBeenCalledWith('t100', 2, 'tickets.details.reverted_contractor', '');
+
+    // W podglądzie Kroku 2 (gdy aktywny jest Krok 3) przyciski z Kroku 2 są zablokowane, a nie zawiera sekcji notatki
     expect(screen.getByText(/Wybierz wykonawcę \(serwis wewnętrzny lub podwykonawca\):/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Cofnij'));
-    expect(handleUpdate).toHaveBeenCalledWith('t100', 1, 'Cofnięto do przyjęcia zgłoszenia', '');
+    expect(screen.getByText('Cofnij').closest('button')).toBeDisabled();
 
     // Krok 5 po zakończeniu wyświetla komunikat "Naprawa została pomyślnie zrealizowana i przeniesiona do historii."
     rerender(

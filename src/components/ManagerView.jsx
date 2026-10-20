@@ -19,6 +19,7 @@ const PlannedKPIDashboard = lazy(() => import('./manager/PlannedKPIDashboard'));
 const PartsLayout = lazy(() => import('./manager/parts/PartsLayout'));
 const MapComponent = lazy(() => import('./manager/Map'));
 const Machines = lazy(() => import('./manager/Machines'));
+const MachinesQRCodes = lazy(() => import('./manager/machines/MachinesQRCodes'));
 const Regions = lazy(() => import('./manager/Regions'));
 const Roles = lazy(() => import('./manager/Roles'));
 const Users = lazy(() => import('./manager/Users'));
@@ -302,6 +303,7 @@ function ManagerViewInner() {
           {activeTab === 'machines' && (
             <Machines 
               initialMachineId={globalMachineId}
+              onOpenMachinesQR={() => handleTabChange('machines_qr')}
               onClearMachineId={() => { setGlobalMachineId(null); clearUrlParam('openMachine'); }}
               onOpenTicket={(id, isArchived, machineId) => {
                 setGlobalTicketId(id);
@@ -319,6 +321,7 @@ function ManagerViewInner() {
               }}
             />
           )}
+          {activeTab === 'machines_qr' && <MachinesQRCodes />}
           {activeTab === 'regions' && <Regions />}
           {activeTab === 'services' && <Services />}
           {activeTab === 'topics' && <Topics />}
