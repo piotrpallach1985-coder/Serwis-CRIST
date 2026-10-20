@@ -1,71 +1,83 @@
 {
-    "indexes":  [
-                    {
-                        "collectionGroup":  "tickets",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "status",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "closedAt",
-                                           "order":  "DESCENDING"
-                                       }
-                                   ]
-                    },
-                    {
-                        "collectionGroup":  "tickets",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "machineId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "status",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "closedAt",
-                                           "order":  "DESCENDING"
-                                       }
-                                   ]
-                    },
-                    {
-                        "collectionGroup":  "tickets",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "regionId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "status",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "closedAt",
-                                           "order":  "DESCENDING"
-                                       }
-                                   ]
-                    },
-                    {
-                        "collectionGroup":  "planned_services",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "machineId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "status",
-                                           "order":  "ASCENDING"
-                                       }
-                                   ]
-                    }
-                ],
-    "fieldOverrides":  [
-
-                       ]
+  "indexes": [
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "closedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "machineId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "closedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "regionId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "closedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "planned_services",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "machineId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
 }

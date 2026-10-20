@@ -1,21 +1,35 @@
 import { useEffect } from 'react';
 import { useManagerStore } from '../store/managerStore';
-import { collection, onSnapshot, query, orderBy, where, doc, limit, getDocs, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, doc, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { TICKET_STATUS } from '../utils/constants';
+import { useAuth } from './useAuth';
+import {
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+} from '../utils/fieldServiceHelpers';
 
 /**
  * useManagerData — centralny hook danych dla ManagerView.
- * Optymalizacja: Słowniki i maszyny pobierane jednorazowo (getDocs).
+ * Optymalizacja: Słowniki i maszyny pobierane z wykorzystaniem cache.
  * Awarie i aktywne działania pobierane w czasie rzeczywistym (onSnapshot).
+ * Obsługuje izolację RODO B2C (only_assigned_tasks) dla mobilnych serwisantów.
  */
 export function useManagerData() {
   const tenantId = useManagerStore(state => state.tenantId);
+  let user = null;
+  try {
+    const authCtx = useAuth();
+    user = authCtx?.user || null;
+  } catch {
+    user = null;
+  }
+
   const { 
     setTickets, setMachines, setReporters, setParts, setPartTransactions, 
     setServices, setPlannedServices, setNotifications, setActionItems, 
     setRoles, setRegions, setAllowTicketDeletion, setPlannedWarningDays, 
-    setBranding, setLimits, setTranscribeModel 
+    setBranding, setLimits 
   } = useManagerStore.getState();
 
   useEffect(() => {
@@ -40,25 +54,61 @@ export function useManagerData() {
       appLogoUrl: useManagerStore.getState().branding.appLogoUrl || '' 
     });
 
-        // 1. POBIERANIE SŁOWNIKÓW I MASZYN (Real-time z wykorzystaniem cache)
+    let rawMachines = [];
+    let rawTickets = [];
+    let rawPlannedServices = [];
+    let currentRoles = useManagerStore.getState().roles || [];
+
+    const hasOnlyAssignedFlag = () => {
+      if (!user || user.role === 'admin' || user.role === 'superadmin') return false;
+      const roleConfig = (currentRoles || []).find(
+        r => r.id === user.role || r.name === user.role
+      );
+      const perms = roleConfig?.permissions || user.permissions || [];
+      return Boolean(perms.includes('only_assigned_tasks') || user.onlyAssignedTasks);
+    };
+
+    const syncFilteredDataToStore = () => {
+      const restricted = hasOnlyAssignedFlag();
+      if (restricted) {
+        const filteredTickets = filterTasksForFieldTechnician(rawTickets, user, true);
+        const filteredPlanned = filterTasksForFieldTechnician(rawPlannedServices, user, true);
+        const filteredMachines = filterMachinesForFieldTechnician(
+          rawMachines,
+          filteredTickets,
+          filteredPlanned,
+          user,
+          true
+        );
+        setTickets(filteredTickets);
+        setPlannedServices(filteredPlanned);
+        setMachines(filteredMachines);
+      } else {
+        setTickets(rawTickets);
+        setPlannedServices(rawPlannedServices);
+        setMachines(rawMachines);
+      }
+    };
+
+    // 1. POBIERANIE SŁOWNIKÓW I MASZYN (Real-time z wykorzystaniem cache)
     const unsubRegions = onSnapshot(collection(db, 'tenants', tenantId, 'regions'), (snap) => {
       setRegions(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
     });
 
     const unsubMachines = onSnapshot(query(collection(db, 'tenants', tenantId, 'machines'), where('isDeleted', '==', false)), (snap) => {
-      setMachines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      rawMachines = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncFilteredDataToStore();
     });
 
-    
     const unsubServices = onSnapshot(collection(db, 'tenants', tenantId, 'services'), (snap) => {
       setServices(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
     });
 
     const unsubRoles = onSnapshot(collection(db, 'tenants', tenantId, 'roles'), (snap) => {
-      setRoles(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
+      currentRoles = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true);
+      setRoles(currentRoles);
+      syncFilteredDataToStore();
     });
-
-    
 
     const unsubSettings = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (snap) => {
       if (snap.exists()) {
@@ -107,26 +157,36 @@ export function useManagerData() {
 
     // 2. DANE W CZASIE RZECZYWISTYM (REAL-TIME ONSNAPSHOT)
     
-    // --- Tickets (aktywne, nie-zarchiwizowane) ---
-    const qTickets = query(
-      collection(db, 'tenants', tenantId, 'tickets'),
-      where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new'])
+    // --- Tickets (aktywne, nie-zarchiwizowane; z filtrem assignedTo na poziomie zapytania dla only_assigned_tasks) ---
+    const isDirectRestricted = Boolean(
+      user &&
+        user.role !== 'admin' &&
+        user.role !== 'superadmin' &&
+        (user.onlyAssignedTasks || (user.permissions || []).includes('only_assigned_tasks'))
     );
+
+    const qTickets = isDirectRestricted && user?.name
+      ? query(
+          collection(db, 'tenants', tenantId, 'tickets'),
+          where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new']),
+          where('assignedTo', '==', user.name)
+        )
+      : query(
+          collection(db, 'tenants', tenantId, 'tickets'),
+          where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new'])
+        );
+
     const unsubTickets = onSnapshot(qTickets, (snapshot) => {
-      setTickets(
-        snapshot.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(t => !t.isDeleted && Number(t.status) !== TICKET_STATUS.CLOSED)
-      );
+      rawTickets = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(t => !t.isDeleted && Number(t.status) !== TICKET_STATUS.CLOSED);
+      syncFilteredDataToStore();
     }, (err) => console.debug("onSnapshot err:", err.code));
 
-    // --- Magazyn części (na razie zostawiamy onSnapshot ze względu na stany magazynowe) ---
+    // --- Magazyn części ---
     const unsubParts = onSnapshot(collection(db, 'tenants', tenantId, 'parts'), (snapshot) => {
       setParts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !p.isDeleted));
     }, (err) => console.debug("onSnapshot err:", err.code));
-    
-    
-    
 
     // --- Serwisy planowane ---
     const qPlanned = query(
@@ -134,7 +194,10 @@ export function useManagerData() {
       where('status', '!=', 'completed')
     );
     const unsubPlanned = onSnapshot(qPlanned, (snapshot) => {
-      setPlannedServices(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
+      rawPlannedServices = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => d.isDeleted !== true);
+      syncFilteredDataToStore();
     }, (err) => console.debug("onSnapshot err:", err.code));
 
     // --- Powiadomienia (ograniczone do 100 ostatnich) ---
@@ -161,24 +224,21 @@ export function useManagerData() {
       setActionItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => console.debug("onSnapshot err:", err.code));
 
-
     return () => {
       unsubRegions();
       unsubMachines();
-            unsubServices();
+      unsubServices();
       unsubRoles();
-      
       unsubSettings();
       unsubBranding();
       unsubTenantRegistry();
       unsubTickets();
       unsubParts();
-      
       unsubPlanned();
       unsubNotifications();
       unsubActionItems();
     };
-  }, [tenantId]);
+  }, [tenantId, user?.uid, user?.role, user?.name, user?.onlyAssignedTasks]);
 
   return null;
 }

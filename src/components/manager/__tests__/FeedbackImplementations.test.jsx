@@ -85,6 +85,8 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
         ]}
         activeMapType="google"
         activeGoogleQuery="Gdańsk, ul. Słoneczna 10"
+        activeGoogleLat={54.352}
+        activeGoogleLng={18.6466}
         activeGoogleZoom={18}
         activeGoogleStyle="k"
         onSaveGoogleMapConfig={onSaveGoogleMapConfig}
@@ -120,8 +122,8 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
     expect(onSaveGoogleMapConfig).toHaveBeenCalledWith({
       mapType: 'google',
       googleQuery: 'Gdańsk, ul. Słoneczna 10',
-      googleLat: 54.5364,
-      googleLng: 18.5469,
+      googleLat: 54.352,
+      googleLng: 18.6466,
       googleZoom: 18,
       googleMapStyle: 'k'
     });

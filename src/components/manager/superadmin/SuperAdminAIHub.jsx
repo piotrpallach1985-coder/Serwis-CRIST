@@ -103,7 +103,7 @@ export default function SuperAdminAIHub({
         <h3 className="text-md font-bold text-slate-800 mb-4">{t("dashboards.superadmin.models_pricing_config", "Konfiguracja Modeli i Cennika")}</h3>
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.analytical_model_label", "Model Analityczny (np. gemini-3.8-flash)")}</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.analytical_model_label", "Model Analityczny (np. gemini-2.5-flash)")}</label>
             <input 
               type="text" 
               value={globalGeminiModel || ""} 
@@ -113,7 +113,7 @@ export default function SuperAdminAIHub({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.transcription_model_label", "Model Transkrypcji (np. gemini-3.5-transcribe)")}</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.transcription_model_label", "Model Transkrypcji (np. chirp_2)")}</label>
             <input 
               type="text" 
               value={globalTranscribeModel || ""} 

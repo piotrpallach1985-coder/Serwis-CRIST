@@ -32,8 +32,8 @@ export default function SuperAdminPanel({ onNavigate }) {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [globalAppLogoUrl, setGlobalAppLogoUrl] = useState('');
-    const [globalGeminiModel, setGlobalGeminiModel] = useState('gemini-3.8-flash');
-  const [globalTranscribeModel, setGlobalTranscribeModel] = useState('gemini-3.5-transcribe');
+  const [globalGeminiModel, setGlobalGeminiModel] = useState('gemini-2.5-flash');
+  const [globalTranscribeModel, setGlobalTranscribeModel] = useState('chirp_2');
   const [globalGeminiPrice, setGlobalGeminiPrice] = useState(0.60);
   const [globalTranscribePrice, setGlobalTranscribePrice] = useState(0.40);
 
@@ -105,8 +105,8 @@ export default function SuperAdminPanel({ onNavigate }) {
 
     const unsubSecrets = subscribeToGlobalSecrets((docSnap) => {
       if (docSnap.exists()) {
-                setGlobalTranscribeModel(docSnap.data().transcribeModel || 'gemini-3.5-transcribe');
-        setGlobalGeminiModel(docSnap.data().geminiModel || 'gemini-3.8-flash');
+        setGlobalTranscribeModel(docSnap.data().transcribeModel || 'chirp_2');
+        setGlobalGeminiModel(docSnap.data().geminiModel || 'gemini-2.5-flash');
         if (docSnap.data().geminiPrice !== undefined) setGlobalGeminiPrice(docSnap.data().geminiPrice);
         if (docSnap.data().transcribePrice !== undefined) setGlobalTranscribePrice(docSnap.data().transcribePrice);
       }

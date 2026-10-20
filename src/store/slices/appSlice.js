@@ -4,8 +4,8 @@ export const createAppSlice = (set) => ({
   tenantId: null,
   limits: { maxUsers: 10, maxMachines: 50 },
   
-  transcribeModel: 'gemini-3.8-flash',
-  geminiModel: 'gemini-3.8-flash',
+  transcribeModel: 'chirp_2',
+  geminiModel: 'gemini-2.5-flash',
   geminiPrice: 0.60,
   transcribePrice: 0.40,
   branding: {

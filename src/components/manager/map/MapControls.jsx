@@ -49,10 +49,12 @@ export default function MapControls({
   const [tabType, setTabType] = useState(activeMapType || 'image');
   const [gQuery, setGQuery] = useState(activeGoogleQuery || '');
   const [searchingGeo, setSearchingGeo] = useState(false);
+  const lastGeocodedQueryRef = React.useRef((activeGoogleQuery || '').trim());
 
   React.useEffect(() => {
     setTabType(activeMapType || 'image');
     setGQuery(activeGoogleQuery || '');
+    lastGeocodedQueryRef.current = (activeGoogleQuery || '').trim();
   }, [currentSubmapId, activeMapType, activeGoogleQuery]);
 
   const parentSubmapId = breadcrumbPath.length > 1 ? breadcrumbPath[breadcrumbPath.length - 2].id : null;
@@ -65,11 +67,13 @@ export default function MapControls({
 
   const handleSearchAddress = async (e) => {
     if (e) e.preventDefault();
-    if (!gQuery.trim()) return;
+    const trimmed = gQuery.trim();
+    if (!trimmed) return;
     setSearchingGeo(true);
-    const geo = await geocodeAddressQuery(gQuery);
+    const geo = await geocodeAddressQuery(trimmed);
     setSearchingGeo(false);
     if (geo && setDraftGoogleView) {
+      lastGeocodedQueryRef.current = trimmed;
       setDraftGoogleView(prev => ({
         ...prev,
         lat: geo.lat,
@@ -81,14 +85,38 @@ export default function MapControls({
     }
   };
 
-  const handleSaveCurrentGoogleView = () => {
+  const handleSaveCurrentGoogleView = async () => {
     if (!onSaveGoogleMapConfig) return;
+    let resolvedLat = Number(currentLat);
+    let resolvedLng = Number(currentLng);
+    const resolvedZoom = clampZoom(currentZoom);
+    const trimmedQuery = gQuery.trim();
+
+    if (trimmedQuery && trimmedQuery !== lastGeocodedQueryRef.current) {
+      setSearchingGeo(true);
+      const geo = await geocodeAddressQuery(trimmedQuery);
+      setSearchingGeo(false);
+      if (geo && Number.isFinite(geo.lat) && Number.isFinite(geo.lng)) {
+        resolvedLat = Number(geo.lat);
+        resolvedLng = Number(geo.lng);
+        lastGeocodedQueryRef.current = trimmedQuery;
+        if (setDraftGoogleView) {
+          setDraftGoogleView(prev => ({
+            ...prev,
+            lat: resolvedLat,
+            lng: resolvedLng,
+            zoom: resolvedZoom,
+          }));
+        }
+      }
+    }
+
     onSaveGoogleMapConfig({
       mapType: 'google',
-      googleQuery: gQuery.trim() || `${Number(currentLat).toFixed(5)}, ${Number(currentLng).toFixed(5)}`,
-      googleLat: Number(currentLat),
-      googleLng: Number(currentLng),
-      googleZoom: clampZoom(currentZoom),
+      googleQuery: trimmedQuery || `${resolvedLat.toFixed(5)}, ${resolvedLng.toFixed(5)}`,
+      googleLat: resolvedLat,
+      googleLng: resolvedLng,
+      googleZoom: resolvedZoom,
       googleMapStyle: currentStyle || 'k',
     });
     if (setIsFramingGoogleMap) setIsFramingGoogleMap(false);

@@ -21,6 +21,7 @@ import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdmi
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
+import MachineCard from '../../components/manager/MachineCard';
 import { useManagerStore } from '../../store/managerStore';
 import { formatDetails } from '../../services/audit.service';
 
@@ -543,6 +544,39 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(fGasToggleBtn.disabled).toBe(true);
       fireEvent.click(fGasToggleBtn);
       expect(screen.queryByText('Wynik próby szczelności układu')).toBeNull();
+    });
+  });
+
+  describe('8. Weryfikacja poprawek z audytu Gemini (MachineCard toggleNode, domyślne modele Vertex AI)', () => {
+    it('MachineCard poprawnie przyjmuje i wywołuje toggleNode dla maszyny nadrzędnej na widoku mobilnym', () => {
+      const toggleNode = vi.fn();
+      const onClick = vi.fn();
+      const parentMachine = {
+        id: 'parent-1',
+        name: 'Linia Produkcyjna A',
+        hasChildren: true,
+        isCollapsed: true,
+        regionId: 'r1',
+      };
+
+      render(
+        <MachineCard
+          machine={parentMachine}
+          regions={[{ id: 'r1', name: 'Hala 1' }]}
+          onClick={onClick}
+          toggleNode={toggleNode}
+        />
+      );
+
+      fireEvent.click(screen.getByText('Linia Produkcyjna A'));
+      expect(toggleNode).toHaveBeenCalledWith('parent-1');
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('ustawia istniejące modele Vertex AI jako bezpieczny fallback (gemini-2.5-flash oraz chirp_2)', () => {
+      const state = useManagerStore.getState();
+      expect(state.geminiModel).toBe('gemini-2.5-flash');
+      expect(state.transcribeModel).toBe('chirp_2');
     });
   });
 });

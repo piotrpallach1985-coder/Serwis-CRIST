@@ -21,7 +21,7 @@ export default function TicketsLayout({ currentTab, setActiveTab }) {
       {/* PWA / Mobile Horizontal Tabs - widoczne na urządzeniach mobilnych i desktopie */}
       <div className="sticky top-0 z-20 -mx-4 px-4 pb-2 bg-[#f8f9fa]/90 backdrop-blur shadow-sm border-b border-gray-200 lg:-mx-8 lg:px-8">
         <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pt-2">
-          {tabs.map(t => (
+          {tabs.map(tabItem => (
             <button
               key={tabItem.id}
               onClick={() => setActiveTab(tabItem.id)}

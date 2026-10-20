@@ -117,7 +117,7 @@ export const getOrCreateQrKey = async (tenantId) => {
   if (qrKeyMemoryCache.has(tenantId)) {
     return qrKeyMemoryCache.get(tenantId);
   }
-  const ref = doc(db, 'tenants', tenantId, 'secrets', 'qr_key');
+  const ref = doc(db, 'tenants', tenantId, 'settings', 'qr_access');
   const snap = await getDoc(ref);
   if (snap.exists() && snap.data()?.key) {
     const k = snap.data().key;
@@ -125,7 +125,7 @@ export const getOrCreateQrKey = async (tenantId) => {
     return k;
   }
   const key = generateQrKey(24);
-  await setDoc(ref, { key, updatedAt: serverTimestamp() });
+  await setDoc(ref, { key, createdAt: serverTimestamp() });
   qrKeyMemoryCache.set(tenantId, key);
   return key;
 };
@@ -133,8 +133,8 @@ export const getOrCreateQrKey = async (tenantId) => {
 export const rotateQrKey = async (tenantId) => {
   if (!tenantId) return null;
   const key = generateQrKey(24);
-  const ref = doc(db, 'tenants', tenantId, 'secrets', 'qr_key');
-  await setDoc(ref, { key, updatedAt: serverTimestamp() });
+  const ref = doc(db, 'tenants', tenantId, 'settings', 'qr_access');
+  await setDoc(ref, { key, createdAt: serverTimestamp() });
   qrKeyMemoryCache.set(tenantId, key);
   return key;
 };

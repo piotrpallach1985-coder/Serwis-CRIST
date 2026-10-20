@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
-﻿import React from 'react';
+import React from 'react';
 
-export default function MachineCard({ machine, regions, onClick, onPrintQR, onShowQR, handleCopyNfc }) {
+export default function MachineCard({ machine, regions, onClick, onPrintQR, onShowQR, handleCopyNfc, toggleNode }) {
   const { t } = useTranslation();
 
   return (
@@ -21,7 +21,7 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
           className="font-bold text-[#002b5e] text-base leading-tight mb-1 flex items-center gap-1.5" 
           style={{ marginLeft: `${(machine.depth || 0) * 1}rem` }}
           onClick={(e) => { 
-            if (machine.hasChildren) { 
+            if (machine.hasChildren && toggleNode) { 
               e.stopPropagation(); 
               toggleNode(machine.id); 
             }
@@ -66,4 +66,5 @@ MachineCard.propTypes = {
   onPrintQR: PropTypes.func,
   onShowQR: PropTypes.func,
   handleCopyNfc: PropTypes.func,
+  toggleNode: PropTypes.func,
 };

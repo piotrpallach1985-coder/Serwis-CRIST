@@ -193,7 +193,7 @@ exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (d
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
-    let actualModel = (globalDoc.exists && globalDoc.data().transcribeModel) ? globalDoc.data().transcribeModel : (model || "gemini-3.8-flash");
+    let actualModel = (globalDoc.exists && globalDoc.data().transcribeModel) ? globalDoc.data().transcribeModel : (model || "chirp_2");
     actualModel = actualModel.trim().toLowerCase().replace(/\s+/g, "-");
     
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist";
@@ -266,7 +266,7 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
-    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-3.8-flash";
+    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-2.5-flash";
     
     const vertex_ai = new VertexAI({ project: process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist", location: "europe-central2" });
     const generativeModel = vertex_ai.preview.getGenerativeModel({ 
@@ -327,7 +327,7 @@ exports.processDictationText = functions.region('europe-west1').https.onCall(asy
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
-    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-3.8-flash";
+    const actualModel = (globalDoc.exists && globalDoc.data().geminiModel) ? globalDoc.data().geminiModel : "gemini-2.5-flash";
     
     const vertex_ai = new VertexAI({ project: process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist", location: "europe-central2" });
     const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
@@ -549,8 +549,24 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
   }
 
   try {
-    let q = db.collection('tenants').doc(tenantId).collection('tickets');
-    const snapshot = await q.get();
+    const ticketsRef = db.collection('tenants').doc(tenantId).collection('tickets');
+    let ticketDocs = [];
+    if (startDate) {
+      const [isoSnap, tsSnap] = await Promise.all([
+        ticketsRef.where('createdAt', '>=', startDate.toISOString()).limit(2500).get(),
+        ticketsRef.where('createdAt', '>=', startDate).limit(2500).get()
+      ]);
+      const seenIds = new Set();
+      [...isoSnap.docs, ...tsSnap.docs].forEach(d => {
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          ticketDocs.push(d);
+        }
+      });
+    } else {
+      const snapshot = await ticketsRef.limit(2500).get();
+      ticketDocs = snapshot.docs;
+    }
     
     let totalTickets = 0;
     let closedTicketsCount = 0;
@@ -560,7 +576,7 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
     const statusCounts = {};
     const trendMap = {};
 
-    snapshot.docs.forEach(docSnap => {
+    ticketDocs.forEach(docSnap => {
       const t = docSnap.data();
       if (t.isDeleted === true) return;
       const createdAt = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt);
@@ -634,8 +650,25 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
   }
 
   try {
-    const q = db.collection('tenants').doc(tenantId).collection('planned_services');
-    const snapshot = await q.get();
+    const servicesRef = db.collection('tenants').doc(tenantId).collection('planned_services');
+    let serviceDocs = [];
+    if (startDate) {
+      const [activeSnap, completedIsoSnap, completedTsSnap] = await Promise.all([
+        servicesRef.where('status', '!=', 'completed').limit(1500).get(),
+        servicesRef.where('completedAt', '>=', startDate.toISOString()).limit(1500).get(),
+        servicesRef.where('completedAt', '>=', startDate).limit(1500).get()
+      ]);
+      const seenIds = new Set();
+      [...activeSnap.docs, ...completedIsoSnap.docs, ...completedTsSnap.docs].forEach(d => {
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          serviceDocs.push(d);
+        }
+      });
+    } else {
+      const snapshot = await servicesRef.limit(2500).get();
+      serviceDocs = snapshot.docs;
+    }
     
     let totalServicesCount = 0;
     let completedCount = 0;
@@ -647,7 +680,7 @@ exports.getPlannedKPIStats = functions.region('europe-west1').https.onCall(async
     const typeCounts = { 'calendar': 0, 'hours': 0, 'mixed': 0 };
     const trendMap = {};
 
-    snapshot.docs.forEach(docSnap => {
+    serviceDocs.forEach(docSnap => {
       const s = docSnap.data();
       if (s.isDeleted === true) return;
       
