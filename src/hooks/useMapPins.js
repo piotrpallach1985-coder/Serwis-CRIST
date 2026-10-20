@@ -27,26 +27,31 @@ export function isMachinePinnedOnSubmap(m, submapId, regions = []) {
 }
 
 export function useMapPins({
-  tickets,
-  plannedServices,
-  modeType,
-  machines,
-  regions,
-  plannedWarningDays,
-  currentSubmapId,
-  draggingPin,
-}) {
+  tickets = [],
+  plannedServices = [],
+  modeType = 'tickets',
+  machines = [],
+  regions = [],
+  plannedWarningDays = 7,
+  currentSubmapId = null,
+  draggingPin = null,
+} = {}) {
   const { pinData, unpinnedData } = useMemo(() => {
-    const validMachines = machines.filter(m => !m.isDeleted);
+    const safeMachines = Array.isArray(machines) ? machines : [];
+    const safeTickets = Array.isArray(tickets) ? tickets : [];
+    const safePlannedServices = Array.isArray(plannedServices) ? plannedServices : [];
+    const safeRegions = Array.isArray(regions) ? regions : [];
+
+    const validMachines = safeMachines.filter(m => !m.isDeleted);
 
     const activeTickets =
       modeType === 'tickets'
-        ? tickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED)
+        ? safeTickets.filter(t => Number(t.status) !== TICKET_STATUS.CLOSED)
         : [];
 
     const activeServices = [];
-    if (modeType === 'services') {
-      plannedServices.forEach(srv => {
+    if (modeType === 'services' || modeType === 'planned_maintenance') {
+      safePlannedServices.forEach(srv => {
         if (srv.status === 'completed') return;
         const machine = validMachines.find(m => m.id === srv.machineId);
         if (!machine) return;
@@ -62,7 +67,7 @@ export function useMapPins({
     const getDescendantRegionIds = (rootId, visited = new Set()) => {
       if (!rootId || visited.has(rootId)) return [];
       visited.add(rootId);
-      const children = regions.filter(r => r.parentId === rootId);
+      const children = safeRegions.filter(r => r.parentId === rootId);
       let ids = [rootId];
       children.forEach(child => {
         ids = ids.concat(getDescendantRegionIds(child.id, visited));
@@ -101,6 +106,7 @@ export function useMapPins({
       return {
         status,
         itemCount: itemsInRegion.length,
+        itemIds: itemsInRegion.map(i => i.id),
         machineCount: regionMachines.length,
       };
     };
@@ -122,7 +128,11 @@ export function useMapPins({
         else if (hasUpcoming) status = 'warning';
       }
 
-      return { status, itemCount: itemsForMachine.length };
+      return {
+        status,
+        itemCount: itemsForMachine.length,
+        itemIds: itemsForMachine.map(i => i.id),
+      };
     };
 
     const isSubmapConfigured = region => {
@@ -138,14 +148,14 @@ export function useMapPins({
     const pins = [];
 
     const currentSubmapRegion = currentSubmapId
-      ? regions.find(r => r.id === currentSubmapId)
+      ? safeRegions.find(r => r.id === currentSubmapId)
       : null;
     const currentSubmapHasMap = currentSubmapId
       ? isSubmapConfigured(currentSubmapRegion)
       : true;
 
     const visibleRegions = currentSubmapHasMap
-      ? regions.filter(reg => {
+      ? safeRegions.filter(reg => {
           const regParent = reg.parentId || null;
           const activeParent = currentSubmapId || null;
           return (
@@ -159,12 +169,12 @@ export function useMapPins({
     visibleRegions.forEach(reg => {
       const isDragging =
         draggingPin && draggingPin.type === 'region' && draggingPin.id === reg.id;
-      const x = isDragging ? draggingPin.x : reg.xPercent ?? 50;
-      const y = isDragging ? draggingPin.y : reg.yPercent ?? 50;
+      const x = isDragging ? (draggingPin.xPercent ?? draggingPin.x ?? reg.xPercent ?? 50) : (reg.xPercent ?? 50);
+      const y = isDragging ? (draggingPin.yPercent ?? draggingPin.y ?? reg.yPercent ?? 50) : (reg.yPercent ?? 50);
 
       const descendantIds = getDescendantRegionIds(reg.id);
       const hasConfiguredMap = isSubmapConfigured(reg);
-      const hasChildRegions = regions.some(r => r.parentId === reg.id);
+      const hasChildRegions = safeRegions.some(r => r.parentId === reg.id);
 
       const excludeMachinesWithOwnPinHere = m => {
         const hasCoords =
@@ -177,7 +187,7 @@ export function useMapPins({
         return !(m.regionId === currentSubmapId && m.pinnedOnMap !== 'main');
       };
 
-      const { status, itemCount, machineCount } = getRegionStatusAndCount(
+      const { status, itemCount, itemIds, machineCount } = getRegionStatusAndCount(
         descendantIds,
         excludeMachinesWithOwnPinHere
       );
@@ -197,6 +207,7 @@ export function useMapPins({
         hasConfiguredMap,
         status,
         itemCount,
+        itemIds,
         machineCount,
       });
     });
@@ -221,9 +232,9 @@ export function useMapPins({
     visibleMachines.forEach(m => {
       const isDragging =
         draggingPin && draggingPin.type === 'machine' && draggingPin.id === m.id;
-      const x = isDragging ? draggingPin.x : m.xPercent ?? 50;
-      const y = isDragging ? draggingPin.y : m.yPercent ?? 50;
-      const { status, itemCount } = getMachineStatusAndCount(m.id);
+      const x = isDragging ? (draggingPin.xPercent ?? draggingPin.x ?? m.xPercent ?? 50) : (m.xPercent ?? 50);
+      const y = isDragging ? (draggingPin.yPercent ?? draggingPin.y ?? m.yPercent ?? 50) : (m.yPercent ?? 50);
+      const { status, itemCount, itemIds } = getMachineStatusAndCount(m.id);
 
       pins.push({
         id: m.id,
@@ -238,16 +249,18 @@ export function useMapPins({
         address: m.address || '',
         status,
         itemCount,
+        itemIds,
       });
     });
 
     let unpinnedStatus = 'ok';
     let unpinnedCount = 0;
     let unpinnedMachineCount = 0;
+    let unpinnedItemIds = [];
 
     if (!currentSubmapId) {
       const pinnedTopRegions = new Set(
-        regions
+        safeRegions
           .filter(
             r =>
               !r.parentId &&
@@ -262,7 +275,7 @@ export function useMapPins({
         getDescendantRegionIds(topId).forEach(id => coveredRegions.add(id));
       });
 
-      const unpinnedRegions = regions.filter(r => !coveredRegions.has(r.id));
+      const unpinnedRegions = safeRegions.filter(r => !coveredRegions.has(r.id));
       const unpinnedRegionIds = new Set(unpinnedRegions.map(r => r.id));
 
       const unpinnedMachines = validMachines.filter(m => {
@@ -289,6 +302,7 @@ export function useMapPins({
       });
 
       unpinnedCount = unpinnedItems.length;
+      unpinnedItemIds = unpinnedItems.map(i => i.id);
 
       if (modeType === 'tickets') {
         if (unpinnedItems.some(t => t.isCritical)) unpinnedStatus = 'critical';
@@ -302,7 +316,7 @@ export function useMapPins({
     } else {
       const pinnedChildRegions = new Set(
         currentSubmapHasMap
-          ? regions
+          ? safeRegions
               .filter(
                 r =>
                   r.parentId === currentSubmapId &&
@@ -343,6 +357,7 @@ export function useMapPins({
         item => item.machineId && unpinnedMachineIds.has(item.machineId)
       );
       unpinnedCount = unpinnedItems.length;
+      unpinnedItemIds = unpinnedItems.map(i => i.id);
 
       if (modeType === 'tickets') {
         if (unpinnedItems.some(t => t.isCritical)) unpinnedStatus = 'critical';
@@ -361,6 +376,7 @@ export function useMapPins({
         status: unpinnedStatus,
         unpinnedCount,
         unpinnedMachineCount,
+        itemIds: unpinnedItemIds,
       },
     };
   }, [
@@ -374,5 +390,5 @@ export function useMapPins({
     draggingPin,
   ]);
 
-  return { pinData, unpinnedData };
+  return { displayPins: pinData, pinData, unpinnedData };
 }

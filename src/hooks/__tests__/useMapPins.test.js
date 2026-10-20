@@ -244,6 +244,53 @@ describe('useMapPins', () => {
     );
 
     expect(result.current.pinData).toHaveLength(0);
+    expect(result.current.displayPins).toHaveLength(0);
     expect(result.current.unpinnedData.unpinnedMachineCount).toBe(3);
+  });
+
+  it('exposes displayPins alias for Map.jsx and supports modeType="planned_maintenance"', () => {
+    const machines = [
+      {
+        id: 'm_srv',
+        name: 'Suwnica S1',
+        regionId: 'gp510',
+        xPercent: 40,
+        yPercent: 40,
+        pinnedOnMap: 'main',
+        currentWorkHours: 120,
+      },
+    ];
+    const plannedServices = [
+      {
+        id: 'srv_1',
+        machineId: 'm_srv',
+        status: 'pending',
+        triggerType: 'hours',
+        targetWorkHours: 100,
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useMapPins({
+        tickets: [],
+        plannedServices,
+        modeType: 'planned_maintenance',
+        machines,
+        regions,
+        plannedWarningDays: 7,
+        currentSubmapId: null,
+        draggingPin: { id: 'm_srv', type: 'machine', xPercent: 75, yPercent: 80 },
+      })
+    );
+
+    expect(Array.isArray(result.current.displayPins)).toBe(true);
+    expect(result.current.displayPins).toBe(result.current.pinData);
+    const machPin = result.current.displayPins.find(p => p.id === 'm_srv');
+    expect(machPin).toBeDefined();
+    expect(machPin.status).toBe('critical');
+    expect(machPin.itemCount).toBe(1);
+    expect(machPin.itemIds).toEqual(['srv_1']);
+    expect(machPin.xPercent).toBe(75);
+    expect(machPin.yPercent).toBe(80);
   });
 });

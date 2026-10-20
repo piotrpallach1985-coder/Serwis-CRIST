@@ -92,7 +92,7 @@ export default function SuperAdminPanel({ onNavigate }) {
       setLoading(false);
     }, (err) => {
       console.error("SuperAdmin error:", err);
-      showToast("Błąd pobierania rejestru firm: " + err.message, "error");
+      showToast(t("dashboards.superadmin.fetch_tenants_error", "Błąd pobierania rejestru firm: ") + err.message, "error");
       setLoading(false);
     });
 
@@ -152,9 +152,9 @@ export default function SuperAdminPanel({ onNavigate }) {
     if(e) e.preventDefault();
     try {
       await saveGlobalKey(globalTranscribeModel, globalGeminiPrice, globalTranscribePrice, globalGeminiModel);
-      showToast('Globalny klucz AI został zapisany.', 'success');
+      showToast(t('dashboards.superadmin.global_ai_saved', 'Globalny klucz AI został zapisany.'), 'success');
     } catch (err) {
-      showToast('Błąd zapisywania klucza: ' + err.message, 'error');
+      showToast(t('dashboards.superadmin.global_ai_save_error', 'Błąd zapisywania klucza: ') + err.message, 'error');
     }
   };
 
@@ -196,13 +196,13 @@ export default function SuperAdminPanel({ onNavigate }) {
 
     uploadTask.on('state_changed', 
       (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100), 
-      (error) => { showToast('Błąd wgrywania: ' + error.message, 'error'); setUploadingLogo(false); }, 
+      (error) => { showToast(t('dashboards.superadmin.upload_error', 'Błąd wgrywania: ') + error.message, 'error'); setUploadingLogo(false); }, 
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         setFormData(prev => ({ ...prev, companyLogoUrl: downloadURL, companyLogoBase64: base64Data }));
         setUploadingLogo(false);
         setUploadProgress(0);
-        showToast('Logo firmy wgrane pomyślnie!', 'success');
+        showToast(t('dashboards.superadmin.company_logo_uploaded', 'Logo firmy wgrane pomyślnie!'), 'success');
       }
     );
   };
@@ -216,14 +216,14 @@ export default function SuperAdminPanel({ onNavigate }) {
 
     uploadTask.on('state_changed', 
       (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100), 
-      (error) => { showToast('Błąd wgrywania: ' + error.message, 'error'); setUploadingLogo(false); }, 
+      (error) => { showToast(t('dashboards.superadmin.upload_error', 'Błąd wgrywania: ') + error.message, 'error'); setUploadingLogo(false); }, 
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         const { saveGlobalAppLogo } = await import('../../services/admin.service');
         await saveGlobalAppLogo(downloadURL, base64Data, tenants);
         setUploadingLogo(false);
         setUploadProgress(0);
-        showToast('Logo aplikacji zmienione dla wszystkich firm!', 'success');
+        showToast(t('dashboards.superadmin.global_logo_changed', 'Logo aplikacji zmienione dla wszystkich firm!'), 'success');
       }
     );
   };
@@ -258,13 +258,13 @@ export default function SuperAdminPanel({ onNavigate }) {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.id.trim() || !formData.name.trim()) return showToast('Podaj unikalne ID i pełną nazwę.', 'error');
-    if (!isEditing && !/^[a-z0-9]+$/.test(formData.id)) return showToast('ID firmy może zawierać tylko małe litery i cyfry.', 'error');
+    if (!formData.id.trim() || !formData.name.trim()) return showToast(t('dashboards.superadmin.provide_id_and_name', 'Podaj unikalne ID i pełną nazwę.'), 'error');
+    if (!isEditing && !/^[a-z0-9]+$/.test(formData.id)) return showToast(t('dashboards.superadmin.id_alphanumeric_only', 'ID firmy może zawierać tylko małe litery i cyfry.'), 'error');
 
     try {
       const { saveTenant } = await import('../../services/admin.service');
       await saveTenant(formData, isEditing);
-      showToast(isEditing ? 'Dane firmy zostały zaktualizowane.' : 'Firma została pomyślnie dodana!', 'success');
+      showToast(isEditing ? t('dashboards.superadmin.company_updated', 'Dane firmy zostały zaktualizowane.') : t('dashboards.superadmin.company_added', 'Firma została pomyślnie dodana!'), 'success');
       setIsModalOpen(false);
     } catch (err) {
       showToast('Błąd: ' + err.message, 'error');
@@ -272,19 +272,19 @@ export default function SuperAdminPanel({ onNavigate }) {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm(`UWAGA! Chcesz usunąć firmę ${id} z rejestru? To natychmiast odetnie dostęp jej pracownikom.`)) {
+    if (window.confirm(t('dashboards.superadmin.delete_confirm', { id, defaultValue: `UWAGA! Chcesz usunąć firmę ${id} z rejestru? To natychmiast odetnie dostęp jej pracownikom.` }))) {
       try {
         const { deleteTenant } = await import('../../services/admin.service');
         await deleteTenant(id);
-        showToast('Firma usunięta z rejestru.', 'success');
+        showToast(t('dashboards.superadmin.company_deleted', 'Firma usunięta z rejestru.'), 'success');
       } catch (err) {
-        showToast('Błąd usuwania: ' + err.message, 'error');
+        showToast(t('dashboards.superadmin.delete_error', 'Błąd usuwania: ') + err.message, 'error');
       }
     }
   };
 
   if (user?.role !== 'superadmin') {
-    return <div className="p-8 text-center text-red-500 font-bold">Brak uprawnień. Ten panel jest tylko dla Super Administratora (Właściciela SaaS).</div>;
+    return <div className="p-8 text-center text-red-500 font-bold">{t('dashboards.superadmin.no_permission', 'Brak uprawnień. Ten panel jest tylko dla Super Administratora (Właściciela SaaS).')}</div>;
   }
 
   return (

@@ -39,8 +39,8 @@ export default function SuperAdminAIHub({
            <i className="ph ph-brain"></i>
          </div>
          <div>
-           <h2 className="text-xl font-bold text-slate-800">Centrum Sztucznej Inteligencji (Google Vertex AI)</h2>
-           <p className="text-sm text-slate-500">Statystyki zużycia i globalna konfiguracja modeli</p>
+           <h2 className="text-xl font-bold text-slate-800">{t("dashboards.superadmin.ai_hub_title", "Centrum Sztucznej Inteligencji (Google Vertex AI)")}</h2>
+           <p className="text-sm text-slate-500">{t("dashboards.superadmin.ai_hub_subtitle", "Statystyki zużycia i globalna konfiguracja modeli")}</p>
          </div>
       </div>
 
@@ -48,42 +48,42 @@ export default function SuperAdminAIHub({
         {/* Licznik 1A: Klient - Analityka */}
         <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
           <div className="text-blue-500 mb-2 text-2xl"><i className="ph ph-chat-teardrop-text"></i></div>
-          <h3 className="text-sm font-bold text-slate-700">Zużycie Analityczne (Klient)</h3>
-          <p className="text-[11px] text-slate-400 mb-2">Gemini Flash (Czat DTR, wyciąganie JSON)</p>
+          <h3 className="text-sm font-bold text-slate-700">{t("dashboards.superadmin.analytical_usage_title", "Zużycie Analityczne (Klient)")}</h3>
+          <p className="text-[11px] text-slate-400 mb-2">{t("dashboards.superadmin.analytical_usage_desc", "Gemini Flash (Czat DTR, wyciąganie JSON)")}</p>
           <div className="text-2xl font-black text-blue-600">
             {totalGeminiTokens.toLocaleString("pl-PL")}
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Tokenów (Biling)</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">{t("dashboards.superadmin.tokens_billing", "Tokenów (Biling)")}</p>
           <div className="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
-            Koszt: {(totalGeminiCost || 0).toFixed(2)} PLN
+            {t("dashboards.superadmin.cost_label", "Koszt:")} {(totalGeminiCost || 0).toFixed(2)} PLN
           </div>
         </div>
 
         {/* Licznik 1B: Klient - Audio */}
         <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
           <div className="text-orange-500 mb-2 text-2xl"><i className="ph ph-microphone-stage"></i></div>
-          <h3 className="text-sm font-bold text-slate-700">Zużycie Audio (Klient)</h3>
-          <p className="text-[11px] text-slate-400 mb-2">Voice-to-Text (Dyktowanie na żywo)</p>
+          <h3 className="text-sm font-bold text-slate-700">{t("dashboards.superadmin.audio_usage_title", "Zużycie Audio (Klient)")}</h3>
+          <p className="text-[11px] text-slate-400 mb-2">{t("dashboards.superadmin.audio_usage_desc", "Voice-to-Text (Dyktowanie na żywo)")}</p>
           <div className="text-2xl font-black text-orange-600">
             {((totalWhisperSeconds || 0) / 60).toFixed(1)} min
           </div>
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">Minut Audio (Biling)</p>
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1 mb-2">{t("dashboards.superadmin.audio_minutes_billing", "Minut Audio (Biling)")}</p>
           <div className="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200">
-            Koszt: {(totalGroqCost || 0).toFixed(2)} PLN
+            {t("dashboards.superadmin.cost_label", "Koszt:")} {(totalGroqCost || 0).toFixed(2)} PLN
           </div>
         </div>
 
         {/* Licznik 2: Google Vertex AI (Weryfikacja Serwerowa) */}
         <div className="bg-purple-50/70 p-5 rounded-xl border border-purple-200 flex flex-col items-center justify-center text-center">
           <div className="text-purple-600 mb-2 text-2xl"><i className="ph ph-shield-check"></i></div>
-          <h3 className="text-sm font-bold text-purple-900">Google Vertex AI (Serwer API)</h3>
-          <p className="text-[11px] text-purple-500 mb-2">Bezpośredni licznik odpowiedzi Vertex Cloud</p>
+          <h3 className="text-sm font-bold text-purple-900">{t("dashboards.superadmin.vertex_server_title", "Google Vertex AI (Serwer API)")}</h3>
+          <p className="text-[11px] text-purple-500 mb-2">{t("dashboards.superadmin.vertex_server_desc", "Bezpośredni licznik odpowiedzi Vertex Cloud")}</p>
           <div className="text-2xl font-black text-purple-700">
             {totalVertexTokens.toLocaleString("pl-PL")}
           </div>
-          <p className="text-[10px] text-purple-600 uppercase font-bold tracking-wider mt-1 mb-2">{totalVertexCalls} Wywołań API</p>
+          <p className="text-[10px] text-purple-600 uppercase font-bold tracking-wider mt-1 mb-2">{totalVertexCalls} {t("dashboards.superadmin.api_calls_label", "Wywołań API")}</p>
           <div className="text-xs font-semibold text-purple-800 bg-white px-3 py-1 rounded-full border border-purple-200">
-            Koszt API: {(totalVertexCost || 0).toFixed(2)} PLN
+            {t("dashboards.superadmin.api_cost_label", "Koszt API:")} {(totalVertexCost || 0).toFixed(2)} PLN
           </div>
         </div>
       </div>
@@ -91,7 +91,7 @@ export default function SuperAdminAIHub({
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-8 flex flex-col sm:flex-row justify-between items-center gap-2">
          <div className="flex items-center gap-2">
            <i className="ph ph-coins text-blue-700 text-xl"></i>
-           <span className="font-bold text-blue-900 text-sm">Szacunkowy koszt bilingowy w tym miesiącu (SaaS):</span>
+           <span className="font-bold text-blue-900 text-sm">{t("dashboards.superadmin.estimated_monthly_cost", "Szacunkowy koszt bilingowy w tym miesiącu (SaaS):")}</span>
          </div>
          <div className="flex items-center gap-3">
            <span className="text-xs text-slate-500">Vertex API: <strong className="text-purple-700">{(totalVertexCost || 0).toFixed(2)} PLN</strong></span>
@@ -100,10 +100,10 @@ export default function SuperAdminAIHub({
       </div>
 
       <div>
-        <h3 className="text-md font-bold text-slate-800 mb-4">Konfiguracja Modeli i Cennika</h3>
+        <h3 className="text-md font-bold text-slate-800 mb-4">{t("dashboards.superadmin.models_pricing_config", "Konfiguracja Modeli i Cennika")}</h3>
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">Model Analityczny (np. gemini-3.8-flash)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.analytical_model_label", "Model Analityczny (np. gemini-3.8-flash)")}</label>
             <input 
               type="text" 
               value={globalGeminiModel || ""} 
@@ -113,7 +113,7 @@ export default function SuperAdminAIHub({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">Model Transkrypcji (np. gemini-3.5-transcribe)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.transcription_model_label", "Model Transkrypcji (np. gemini-3.5-transcribe)")}</label>
             <input 
               type="text" 
               value={globalTranscribeModel || ""} 
@@ -126,7 +126,7 @@ export default function SuperAdminAIHub({
         
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">Koszt 1M tokenów (PLN)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.price_per_1m_tokens", "Koszt 1M tokenów (PLN)")}</label>
             <input 
               type="number" step="0.01"
               value={globalGeminiPrice} 
@@ -136,7 +136,7 @@ export default function SuperAdminAIHub({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs font-bold text-slate-500 mb-1 block">Koszt 1 minuty audio (PLN)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t("dashboards.superadmin.price_per_audio_min", "Koszt 1 minuty audio (PLN)")}</label>
             <input 
               type="number" step="0.01"
               value={globalTranscribePrice} 
@@ -155,7 +155,7 @@ export default function SuperAdminAIHub({
               className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2"
             >
               <i className="ph ph-pencil-simple"></i>
-              Odblokuj do edycji
+              {t("dashboards.superadmin.unlock_to_edit", "Odblokuj do edycji")}
             </button>
           ) : (
             <button 
@@ -164,7 +164,7 @@ export default function SuperAdminAIHub({
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center gap-2"
             >
               <i className="ph ph-floppy-disk"></i>
-              Zapisz Zmiany Globalne
+              {t("dashboards.superadmin.save_global_changes", "Zapisz Zmiany Globalne")}
             </button>
           )}
         </div>

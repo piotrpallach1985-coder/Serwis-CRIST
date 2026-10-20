@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,8 +21,8 @@ export default function SuperAdminGlobalLogo({
           )}
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-800">{t("dashboards.superadmin.logo_title")}</h2>
-          <p className="text-sm text-slate-500 max-w-md">To logo będzie wyświetlane w lewym górnym rogu u wszystkich klientów (tenantów) niezależnie od ich własnego brandingu.</p>
+          <h2 className="text-lg font-bold text-slate-800">{t("dashboards.superadmin.logo_title", "Globalne Logo Aplikacji")}</h2>
+          <p className="text-sm text-slate-500 max-w-md">{t("dashboards.superadmin.logo_desc", "To logo będzie wyświetlane w lewym górnym rogu u wszystkich klientów (tenantów) niezależnie od ich własnego brandingu.")}</p>
         </div>
       </div>
       
@@ -43,7 +43,7 @@ export default function SuperAdminGlobalLogo({
           disabled={uploadingLogo}
           className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md whitespace-nowrap disabled:opacity-50"
         >
-          <Upload size={18} /> {uploadingLogo ? 'Wgrywanie...' : 'Zmień Logo Główne'}
+          <Upload size={18} /> {uploadingLogo ? t("dashboards.superadmin.uploading", "Wgrywanie...") : t("dashboards.superadmin.change_main_logo", "Zmień Logo Główne")}
         </button>
       </div>
     </div>

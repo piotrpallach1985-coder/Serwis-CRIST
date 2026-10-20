@@ -100,7 +100,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
             <span>{t("sidebar.section_tickets")}</span>
             {criticalTicketsCount > 0 && (
               <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30">
-                {criticalTicketsCount} kryt.
+                {criticalTicketsCount} {t("sidebar.crit_short", "kryt.")}
               </span>
             )}
           </div>
@@ -161,7 +161,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
             <span>{t("sidebar.section_services")}</span>
             {overdueServicesCount > 0 && (
               <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30 animate-pulse">
-                {overdueServicesCount} kryt.
+                {overdueServicesCount} {t("sidebar.crit_short", "kryt.")}
               </span>
             )}
           </div>

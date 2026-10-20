@@ -1,5 +1,6 @@
 import React from 'react';
 import { Crown, Plus, CheckCircle, Trash } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function SuperAdminTenantTable({
   tenantsWithTokens,
@@ -11,6 +12,7 @@ export default function SuperAdminTenantTable({
   globalTranscribePrice = 0.40,
   globalGroqPrice = 0.40
 }) {
+  const { t } = useTranslation();
   const audioPrice = globalTranscribePrice ?? globalGroqPrice;
 
   return (
@@ -18,32 +20,32 @@ export default function SuperAdminTenantTable({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-r from-gray-900 to-blue-900 text-white px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl shadow-lg gap-3 w-full">
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2.5 truncate">
-            <Crown className="text-yellow-400" size={22} /> Super Panel SaaS
+            <Crown className="text-yellow-400" size={22} /> {t("dashboards.superadmin.saas_panel_title", "Super Panel SaaS")}
           </h1>
-          <p className="text-gray-300 mt-0.5 text-xs sm:text-sm">Zarządzanie klientami (Multi-Tenancy) i ich licencjami</p>
+          <p className="text-gray-300 mt-0.5 text-xs sm:text-sm">{t("dashboards.superadmin.saas_panel_subtitle", "Zarządzanie klientami (Multi-Tenancy) i ich licencjami")}</p>
         </div>
         <button 
           onClick={openNewModal}
           className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shrink-0 w-full sm:w-auto justify-center"
         >
-          <Plus size={18} /> Nowy Klient (Firma)
+          <Plus size={18} /> {t("dashboards.superadmin.new_client_btn", "Nowy Klient (Firma)")}
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-gray-500 font-medium text-sm">Ładowanie rejestru firm...</div>
+        <div className="text-center py-8 text-gray-500 font-medium text-sm">{t("dashboards.superadmin.loading_tenants", "Ładowanie rejestru firm...")}</div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full max-w-full">
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className="bg-gray-50/90 border-b border-gray-200">
                 <tr>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-12">Logo</th>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-28">ID (Silos)</th>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-48">Nazwa Klienta</th>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aktywne Moduły</th>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-64">AI (Tokeny i Koszty)</th>
-                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right w-36">Zarządzaj</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-12">{t("dashboards.superadmin.col_logo", "Logo")}</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-28">{t("dashboards.superadmin.col_id", "ID (Silos)")}</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-48">{t("dashboards.superadmin.col_name", "Nazwa Klienta")}</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t("dashboards.superadmin.col_modules", "Aktywne Moduły")}</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-64">{t("dashboards.superadmin.col_ai", "AI (Tokeny i Koszty)")}</th>
+                  <th className="py-2.5 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right w-36">{t("dashboards.superadmin.col_manage", "Zarządzaj")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -51,8 +53,8 @@ export default function SuperAdminTenantTable({
                   const hasPlannedDtr = tenant.modules?.planned_services !== false;
                   const hasInventory = tenant.modules?.inventory !== false;
                   const activeModules = [
-                    ...(hasPlannedDtr ? ['Panel Serwisu (DTR)'] : []),
-                    ...(hasInventory ? ['Magazyn części zamiennych'] : [])
+                    ...(hasPlannedDtr ? [t("dashboards.superadmin.mod_planned_dtr", "Panel Serwisu (DTR)")] : []),
+                    ...(hasInventory ? [t("dashboards.superadmin.mod_inventory", "Magazyn części zamiennych")] : [])
                   ];
 
                   const clientAiCost = (
@@ -95,7 +97,7 @@ export default function SuperAdminTenantTable({
                             ))
                           ) : (
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-md text-[11px] font-medium">
-                              Pakiet Podstawowy (Awarie)
+                              {t("dashboards.superadmin.mod_basic", "Pakiet Podstawowy (Awarie)")}
                             </span>
                           )}
                         </div>
@@ -110,7 +112,7 @@ export default function SuperAdminTenantTable({
                           </div>
                           <div className="flex items-center justify-between gap-2 bg-purple-50/70 px-2 py-1 rounded border border-purple-200">
                             <span className="text-purple-800 font-mono truncate">
-                              Vertex: {tenant.vertexTokens?.toLocaleString('pl-PL') || 0} ({tenant.vertexCalls || 0} wyw.)
+                              Vertex: {tenant.vertexTokens?.toLocaleString('pl-PL') || 0} ({tenant.vertexCalls || 0} {t("dashboards.superadmin.calls_short", "wyw.")})
                             </span>
                             <span className="text-purple-700 font-bold whitespace-nowrap">~{vertexAiCost} PLN</span>
                           </div>
@@ -121,14 +123,14 @@ export default function SuperAdminTenantTable({
                           <button 
                             onClick={() => openEditModal(tenant)}
                             className="text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100 font-bold text-[11px] uppercase"
-                            title="Edytuj dane i licencje"
+                            title={t("dashboards.superadmin.edit_tooltip", "Edytuj dane i licencje")}
                           >
-                            Edytuj
+                            {t("dashboards.superadmin.edit_btn", "Edytuj")}
                           </button>
                           <button 
                             onClick={() => handleDelete(tenant.id)}
                             className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
-                            title="Usuń z rejestru (zablokuj)"
+                            title={t("dashboards.superadmin.delete_tooltip", "Usuń z rejestru (zablokuj)")}
                           >
                             <Trash size={16} />
                           </button>

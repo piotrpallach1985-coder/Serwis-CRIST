@@ -181,7 +181,7 @@ export default function ShipyardMap({
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
 
   // --- Pinezki (przez hook) ---
-  const { displayPins, unpinnedData } = useMapPins({
+  const { displayPins = [], unpinnedData } = useMapPins({
     tickets,
     plannedServices,
     modeType,
@@ -1014,7 +1014,7 @@ export default function ShipyardMap({
                 {t('map_component.no_map')}
                 <br />
                 <span className="text-sm md:text-base font-medium text-slate-500 mt-2">
-                  {t('map_component.upload_map_hint')} (lub ustaw Mapę Google w Opcjach Mapy)
+                  {t('map_component.upload_map_hint')} {t('map_component.or_set_google_map', '(lub ustaw Mapę Google w Opcjach Mapy)')}
                 </span>
               </div>
             )}
@@ -1029,7 +1029,7 @@ export default function ShipyardMap({
             >
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
                 <i className="ph ph-hand-grabbing text-lg animate-bounce"></i>
-                <span>Przesuń mapę myszką i przybliż płynnie rolką w wybrane miejsce</span>
+                <span>{t('map_component.framing_hint', 'Przesuń mapę myszką i przybliż płynnie rolką w wybrane miejsce')}</span>
               </div>
               <button
                 type="button"
@@ -1045,7 +1045,7 @@ export default function ShipyardMap({
                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <i className="ph ph-floppy-disk text-sm"></i>
-                <span>Wgraj ustawiony widok mapy</span>
+                <span>{t('map_component.save_google_view', 'Wgraj ustawiony widok mapy')}</span>
               </button>
             </div>
           )}
@@ -1089,7 +1089,7 @@ export default function ShipyardMap({
                           className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <i className="ph ph-map-pin-line text-sm"></i>
-                          <span>Przypnij po adresie (miejscowość, ulica, nr)</span>
+                          <span>{t('map_component.pin_by_address_full', 'Przypnij po adresie (miejscowość, ulica, nr)')}</span>
                         </button>
                         <button
                           type="button"
@@ -1101,7 +1101,7 @@ export default function ShipyardMap({
                           className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <i className="ph ph-arrows-out-cardinal text-sm"></i>
-                          <span>Kadruj Mapę Google</span>
+                          <span>{t('map_component.frame_google_map_btn', 'Kadruj Mapę Google')}</span>
                         </button>
                       </>
                     )}
