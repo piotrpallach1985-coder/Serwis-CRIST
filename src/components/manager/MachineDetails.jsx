@@ -154,7 +154,6 @@ export default function MachineDetails({
             qrValue={qrValue}
             machines={machines}
             branding={branding}
-            onPrint={onPrint}
           />
         ),
       },

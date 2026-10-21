@@ -11,7 +11,7 @@ import {
   formatQrDate,
 } from '../../../services/qrAccess.service';
 
-export default function MachineQRCard({ machine, onPrint }) {
+export default function MachineQRCard({ machine }) {
   const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const branding = useManagerStore(state => state.branding);
@@ -86,16 +86,6 @@ export default function MachineQRCard({ machine, onPrint }) {
       <div className="text-[11px] font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full mb-1.5">
         {t('machines.details.qrDate')} {qrDateStr}
       </div>
-      {onPrint && (
-        <button
-          type="button"
-          onClick={() => onPrint(machine)}
-          className="mt-1 mb-1.5 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-        >
-          <i className="ph ph-printer text-sm"></i>
-          {t('machines.buttons.printQr', 'Drukuj QR')}
-        </button>
-      )}
       <p className="text-[11px] text-gray-500 max-w-[220px] leading-snug">
         {t('machines.details.qrHint')}
       </p>
@@ -105,5 +95,4 @@ export default function MachineQRCard({ machine, onPrint }) {
 
 MachineQRCard.propTypes = {
   machine: PropTypes.object.isRequired,
-  onPrint: PropTypes.func,
 };
