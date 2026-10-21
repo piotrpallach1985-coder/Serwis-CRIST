@@ -45,37 +45,25 @@ export function getRegionSubmaps(region) {
     });
   }
 
-  if (region.submapConfigured === false) return [];
-  const hasLegacyGoogle =
+  return [];
+}
+
+export function isRegionMapConfigured(region) {
+  if (!region) return false;
+  const regSubmaps = getRegionSubmaps(region);
+  if (regSubmaps.length > 0) {
+    return regSubmaps.some(s => s.submapConfigured);
+  }
+  if (region.submapConfigured === false) return false;
+  const hasDirectGoogle =
     region.mapType === 'google' &&
     Boolean(
       region.submapConfigured === true ||
         (region.googleLat && region.googleLng) ||
         (region.googleQuery && String(region.googleQuery).trim() !== '')
     );
-  const hasLegacyImage = Boolean(region.mapImageUrl && String(region.mapImageUrl).trim() !== '');
-
-  if (hasLegacyGoogle || hasLegacyImage) {
-    return [
-      {
-        id: 'default',
-        name: normalizeSubmapName(region.submapName, 0),
-        mapType: hasLegacyGoogle && !hasLegacyImage ? 'google' : region.mapType === 'google' ? 'google' : 'image',
-        mapImageUrl: region.mapImageUrl || '',
-        googleQuery: region.googleQuery || region.address || '',
-        googleLat: Number(region.googleLat ?? region.lat) || 54.5364,
-        googleLng: Number(region.googleLng ?? region.lng) || 18.5469,
-        googleZoom: Number(region.googleZoom) || 17,
-        googleMapStyle: region.googleMapStyle || 'k',
-        defaultZoom: Number(region.defaultZoom) || 1,
-        defaultPanX: Number(region.defaultPanX) || 0,
-        defaultPanY: Number(region.defaultPanY) || 0,
-        submapConfigured: true,
-      },
-    ];
-  }
-
-  return [];
+  const hasDirectImage = Boolean(region.mapImageUrl && String(region.mapImageUrl).trim() !== '');
+  return hasDirectGoogle || hasDirectImage;
 }
 
 export function doesEntityBelongToSubmapTab(entity, submaps = [], activeTabId = null) {
@@ -105,9 +93,9 @@ export function isMachinePinnedOnSubmap(m, submapId, regions = [], submapTabId =
     const reg = regions.find(r => r.id === submapId);
     if (reg) {
       const regSubmaps = getRegionSubmaps(reg);
-      const hasMap = regSubmaps.some(s => s.submapConfigured);
+      const hasMap = isRegionMapConfigured(reg);
       if (!hasMap && m.pinnedOnMap !== 'submap') return false;
-      if (submapTabId) {
+      if (submapTabId && regSubmaps.length > 0) {
         return doesEntityBelongToSubmapTab(m, regSubmaps, submapTabId);
       }
     }
@@ -213,11 +201,7 @@ export function useMapPins({
       };
     };
 
-    const isSubmapConfigured = region => {
-      if (!region) return false;
-      const regSubmaps = getRegionSubmaps(region);
-      return regSubmaps.some(s => s.submapConfigured);
-    };
+    const isSubmapConfigured = region => isRegionMapConfigured(region);
 
     const computeSubmapTabsWithStats = region => {
       if (!region) return [];
@@ -286,7 +270,7 @@ export function useMapPins({
 
       const descendantIds = getDescendantRegionIds(reg.id);
       const regTabs = computeSubmapTabsWithStats(reg);
-      const hasConfiguredMap = regTabs.some(s => s.submapConfigured);
+      const hasConfiguredMap = isSubmapConfigured(reg);
       const hasChildRegions = safeRegions.some(r => r.parentId === reg.id);
 
       const excludeMachinesWithOwnPinHere = m => {

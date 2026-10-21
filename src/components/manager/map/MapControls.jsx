@@ -268,13 +268,13 @@ export default function MapControls({
                   </span>
                 </h3>
 
-                {/* Równorzędne podmapy (domyślnie Podmapa 1, Podmapa 2... z możliwością zmiany w Zapisz nazwę) */}
+                {/* Równorzędne podmapy (domyślnie Podmapa 1, Podmapa 2... z możliwością zmiany w Zapisz nazwę oraz usunięcia ostatniej podmapy) */}
                 {currentSubmapId && (
                   <div className="mb-3 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-[9px] md:text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1">
                         <i className="ph ph-stack text-indigo-600 text-sm"></i>
-                        <span>Równorzędne podmapy ({Math.max(1, submapTabs.length)})</span>
+                        <span>Równorzędne podmapy ({submapTabs.length})</span>
                       </label>
                     </div>
 
@@ -313,56 +313,58 @@ export default function MapControls({
                       </button>
                     )}
 
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <input
-                        type="text"
-                        value={submapNameDraft}
-                        onChange={e => setSubmapNameDraft(e.target.value)}
-                        onBlur={() => {
-                          if (
-                            onRenameParallelSubmap &&
-                            submapNameDraft.trim() &&
-                            submapNameDraft.trim() !== activeTabObj?.name
-                          ) {
-                            onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
-                          }
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (onRenameParallelSubmap && submapNameDraft.trim()) {
-                              onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
-                            }
-                          }
-                        }}
-                        placeholder="Nazwa (np. Podmapa 1)"
-                        className="flex-1 px-2 py-1 text-xs border border-indigo-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      {onRenameParallelSubmap && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (submapNameDraft.trim()) {
+                    {submapTabs.length > 0 && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <input
+                          type="text"
+                          value={submapNameDraft}
+                          onChange={e => setSubmapNameDraft(e.target.value)}
+                          onBlur={() => {
+                            if (
+                              onRenameParallelSubmap &&
+                              submapNameDraft.trim() &&
+                              submapNameDraft.trim() !== activeTabObj?.name
+                            ) {
                               onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
                             }
                           }}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded transition-colors cursor-pointer"
-                          title="Zapisz nazwę podmapy"
-                        >
-                          Zapisz nazwę
-                        </button>
-                      )}
-                      {submapTabs.length > 1 && onDeleteParallelSubmap && (
-                        <button
-                          type="button"
-                          onClick={() => onDeleteParallelSubmap(activeTabObj?.id)}
-                          className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold rounded transition-colors cursor-pointer"
-                          title="Usuń tę równorzędną podmapę"
-                        >
-                          <i className="ph ph-trash"></i>
-                        </button>
-                      )}
-                    </div>
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (onRenameParallelSubmap && submapNameDraft.trim()) {
+                                onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
+                              }
+                            }
+                          }}
+                          placeholder="Nazwa (np. Podmapa 1)"
+                          className="flex-1 px-2 py-1 text-xs border border-indigo-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        {onRenameParallelSubmap && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (submapNameDraft.trim()) {
+                                onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
+                              }
+                            }}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded transition-colors cursor-pointer"
+                            title="Zapisz nazwę podmapy"
+                          >
+                            Zapisz nazwę
+                          </button>
+                        )}
+                        {onDeleteParallelSubmap && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteParallelSubmap(activeTabObj?.id)}
+                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold rounded transition-colors cursor-pointer"
+                            title="Usuń tę równorzędną podmapę"
+                          >
+                            <i className="ph ph-trash"></i>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

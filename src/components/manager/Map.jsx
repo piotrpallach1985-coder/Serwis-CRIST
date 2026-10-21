@@ -494,42 +494,28 @@ export default function ShipyardMap({
   const handleAddParallelSubmap = async (customName = '') => {
     if (!currentSubmapId || !currentRegion) return;
     try {
-      const existing = regionSubmaps.length > 0
-        ? [...regionSubmaps]
-        : [
-            {
-              id: 'default',
-              name: currentRegion.submapName || 'Podmapa 1',
-              mapType: currentRegion.mapType || 'image',
-              mapImageUrl: currentRegion.mapImageUrl || '',
-              googleQuery: currentRegion.googleQuery || currentRegion.address || '',
-              googleLat: activeGoogleLat,
-              googleLng: activeGoogleLng,
-              googleZoom: activeGoogleZoom,
-              googleMapStyle: activeGoogleStyle,
-              defaultZoom: 1,
-              defaultPanX: 0,
-              defaultPanY: 0,
-              submapConfigured: Boolean(currentRegion.mapImageUrl || (currentRegion.mapType === 'google' && currentRegion.submapConfigured !== false)),
-            },
-          ];
-
+      const existing = [...regionSubmaps];
       const nextIndex = existing.length + 1;
       const newTabId = `sub_${Date.now()}`;
+      const inheritFromDirect = existing.length === 0;
+      const directConfigured = Boolean(
+        currentRegion.mapImageUrl ||
+          (currentRegion.mapType === 'google' && currentRegion.submapConfigured !== false)
+      );
       const newTab = {
         id: newTabId,
         name: customName.trim() || `Podmapa ${nextIndex}`,
-        mapType: 'image',
-        mapImageUrl: '',
-        googleQuery: currentRegion.address || '',
+        mapType: inheritFromDirect ? currentRegion.mapType || 'image' : 'image',
+        mapImageUrl: inheritFromDirect ? currentRegion.mapImageUrl || '' : '',
+        googleQuery: currentRegion.googleQuery || currentRegion.address || '',
         googleLat: activeGoogleLat,
         googleLng: activeGoogleLng,
-        googleZoom: 17,
-        googleMapStyle: 'k',
-        defaultZoom: 1,
-        defaultPanX: 0,
-        defaultPanY: 0,
-        submapConfigured: false,
+        googleZoom: inheritFromDirect ? activeGoogleZoom : 17,
+        googleMapStyle: inheritFromDirect ? activeGoogleStyle : 'k',
+        defaultZoom: inheritFromDirect ? currentRegion.defaultZoom || 1 : 1,
+        defaultPanX: inheritFromDirect ? currentRegion.defaultPanX || 0 : 0,
+        defaultPanY: inheritFromDirect ? currentRegion.defaultPanY || 0 : 0,
+        submapConfigured: inheritFromDirect ? directConfigured : false,
       };
       const updatedTabs = [...existing, newTab];
       await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
@@ -543,29 +529,10 @@ export default function ShipyardMap({
   };
 
   const handleRenameParallelSubmap = async (tabId, newName) => {
-    if (!currentSubmapId || !currentRegion || !newName.trim()) return;
+    if (!currentSubmapId || !currentRegion || !newName.trim() || regionSubmaps.length === 0) return;
     try {
-      const existing = regionSubmaps.length > 0
-        ? [...regionSubmaps]
-        : [
-            {
-              id: tabId || 'default',
-              name: newName.trim(),
-              mapType: currentRegion.mapType || 'image',
-              mapImageUrl: currentRegion.mapImageUrl || '',
-              googleQuery: currentRegion.googleQuery || currentRegion.address || '',
-              googleLat: activeGoogleLat,
-              googleLng: activeGoogleLng,
-              googleZoom: activeGoogleZoom,
-              googleMapStyle: activeGoogleStyle,
-              defaultZoom: currentRegion.defaultZoom || 1,
-              defaultPanX: currentRegion.defaultPanX || 0,
-              defaultPanY: currentRegion.defaultPanY || 0,
-              submapConfigured: Boolean(currentRegion.submapConfigured),
-            },
-          ];
-      const updatedTabs = existing.map(s =>
-        s.id === (tabId || existing[0]?.id) ? { ...s, name: newName.trim() } : s
+      const updatedTabs = regionSubmaps.map(s =>
+        s.id === (tabId || regionSubmaps[0]?.id) ? { ...s, name: newName.trim() } : s
       );
       await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
     } catch (err) {
@@ -574,12 +541,40 @@ export default function ShipyardMap({
   };
 
   const handleDeleteParallelSubmap = async (tabId) => {
-    if (!currentSubmapId || !currentRegion || regionSubmaps.length <= 1) return;
-    if (!confirm('Czy na pewno chcesz usunąć tę równorzędną podmapę (piętro)?')) return;
+    if (!currentSubmapId || !currentRegion || regionSubmaps.length === 0) return;
+    if (!confirm('Czy na pewno chcesz usunąć tę równorzędną podmapę?')) return;
     try {
-      const updatedTabs = regionSubmaps.filter(s => s.id !== tabId);
-      await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
-      setCurrentSubmapTabId(updatedTabs[0]?.id || 'default');
+      const targetId = tabId || regionSubmaps[0]?.id;
+      const deletedSub = regionSubmaps.find(s => s.id === targetId) || regionSubmaps[0];
+      const updatedTabs = regionSubmaps.filter(s => s.id !== targetId);
+      if (updatedTabs.length === 0) {
+        const keepSource = deletedSub || currentRegion;
+        const hasDirectMap = Boolean(
+          keepSource.mapImageUrl ||
+            currentRegion.mapImageUrl ||
+            ((keepSource.mapType === 'google' || currentRegion.mapType === 'google') &&
+              keepSource.submapConfigured !== false)
+        );
+        await updateRegion(currentSubmapId, {
+          submaps: [],
+          submapName: '',
+          mapType: keepSource.mapType || currentRegion.mapType || 'image',
+          mapImageUrl: keepSource.mapImageUrl || currentRegion.mapImageUrl || '',
+          submapConfigured: hasDirectMap,
+          googleQuery: keepSource.googleQuery || currentRegion.googleQuery || currentRegion.address || '',
+          googleLat: Number(keepSource.googleLat ?? currentRegion.googleLat ?? currentRegion.lat) || 54.5364,
+          googleLng: Number(keepSource.googleLng ?? currentRegion.googleLng ?? currentRegion.lng) || 18.5469,
+          googleZoom: Number(keepSource.googleZoom ?? currentRegion.googleZoom) || 17,
+          googleMapStyle: keepSource.googleMapStyle || currentRegion.googleMapStyle || 'k',
+          defaultZoom: Number(keepSource.defaultZoom ?? currentRegion.defaultZoom) || 1,
+          defaultPanX: Number(keepSource.defaultPanX ?? currentRegion.defaultPanX) || 0,
+          defaultPanY: Number(keepSource.defaultPanY ?? currentRegion.defaultPanY) || 0,
+        });
+        setCurrentSubmapTabId(null);
+      } else {
+        await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+        setCurrentSubmapTabId(updatedTabs[0]?.id || 'default');
+      }
     } catch (err) {
       console.error('Błąd usuwania podmapy:', err);
     }
@@ -611,24 +606,11 @@ export default function ShipyardMap({
               );
               await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
             } else {
-              const singleTab = [
-                {
-                  id: 'default',
-                  name: currentRegion?.submapName || 'Podmapa 1',
-                  mapType: 'image',
-                  mapImageUrl: url,
-                  googleQuery: currentRegion?.address || '',
-                  googleLat: activeGoogleLat,
-                  googleLng: activeGoogleLng,
-                  googleZoom: activeGoogleZoom,
-                  googleMapStyle: activeGoogleStyle,
-                  defaultZoom: 1,
-                  defaultPanX: 0,
-                  defaultPanY: 0,
-                  submapConfigured: true,
-                },
-              ];
-              await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(singleTab));
+              await updateRegion(currentSubmapId, {
+                mapImageUrl: url,
+                mapType: 'image',
+                submapConfigured: true,
+              });
             }
           } else {
             await updateMapSettings({ mapUrl: url, mapType: 'image' });
@@ -676,17 +658,12 @@ export default function ShipyardMap({
           );
           await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
         } else {
-          const singleTab = [
-            {
-              id: 'default',
-              name: currentRegion?.submapName || 'Podmapa 1',
-              ...payload,
-              defaultZoom: 1,
-              defaultPanX: 0,
-              defaultPanY: 0,
-            },
-          ];
-          await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(singleTab));
+          await updateRegion(currentSubmapId, {
+            ...payload,
+            defaultZoom: 1,
+            defaultPanX: 0,
+            defaultPanY: 0,
+          });
         }
       } else {
         await updateMapSettings({

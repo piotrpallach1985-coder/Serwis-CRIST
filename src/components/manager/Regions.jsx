@@ -7,7 +7,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { useAuth } from '../../hooks/useAuth';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addRegion, updateRegion, checkRegionInUse } from '../../services/dictionary.service';
-import { getRegionSubmaps } from '../../hooks/useMapPins';
+import { getRegionSubmaps, isRegionMapConfigured } from '../../hooks/useMapPins';
 import InteractiveGoogleMap, {
   geocodeAddressQuery,
   searchAddressSuggestions,
@@ -138,11 +138,7 @@ export default function Regions() {
     regions.filter(r => (showDeleted ? true : !r.isDeleted))
   );
 
-  const isRegionSubmapConfigured = (r) => {
-    if (!r) return false;
-    const subs = getRegionSubmaps(r);
-    return subs.some(s => s.submapConfigured);
-  };
+  const isRegionSubmapConfigured = (r) => isRegionMapConfigured(r);
 
   const resetForm = () => {
     setName('');
