@@ -335,7 +335,21 @@ export default function PartDetails({ part, onBack, onEdit }) {
               <div className="text-xs font-extrabold text-slate-800 mb-2 text-center line-clamp-1">
                 {part.name}
               </div>
-              <QRCodeCanvas value={qrValue} size={140} level="M" />
+              <div className="flex items-center justify-center gap-1.5">
+                <span
+                  className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                >
+                  system VexoNT
+                </span>
+                <QRCodeCanvas value={qrValue} size={140} level="M" />
+                <span
+                  className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+                  style={{ writingMode: 'vertical-rl' }}
+                >
+                  system VexoNT
+                </span>
+              </div>
               <div className="mt-3 text-center">
                 <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">
                   DATA: {qrDateStr}

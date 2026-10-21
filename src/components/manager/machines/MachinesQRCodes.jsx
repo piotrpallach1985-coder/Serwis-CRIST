@@ -304,8 +304,20 @@ export default function MachinesQRCodes({ onBack }) {
                   {tenantName}
                 </div>
 
-                <div className="p-2 bg-white rounded-xl mb-2 border border-gray-100">
+                <div className="p-2 bg-white rounded-xl mb-2 border border-gray-100 flex items-center justify-center gap-1.5">
+                  <span
+                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    system VexoNT
+                  </span>
                   <QRCodeCanvas value={qrVal} size={120} level="M" />
+                  <span
+                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+                    style={{ writingMode: 'vertical-rl' }}
+                  >
+                    system VexoNT
+                  </span>
                 </div>
 
                 <div className="font-extrabold text-gray-900 text-xs line-clamp-2 leading-tight mb-1 w-full">

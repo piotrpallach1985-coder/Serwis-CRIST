@@ -11,7 +11,7 @@ import {
   formatQrDate,
 } from '../../../services/qrAccess.service';
 
-export default function MachineQRCard({ machine }) {
+export default function MachineQRCard({ machine, onPrint }) {
   const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const branding = useManagerStore(state => state.branding);
@@ -62,12 +62,40 @@ export default function MachineQRCard({ machine }) {
       <h3 className="text-xs font-extrabold text-gray-800 mb-2 line-clamp-1 px-2">
         {machine.name}
       </h3>
-      <div className="p-2.5 bg-white border-2 border-dashed border-gray-300 rounded-xl mb-2.5">
-        <QRCodeSVG id="machine-qr-code-svg" value={qrValue} size={130} level="M" includeMargin={false} />
+      <div className="p-2.5 bg-white border-2 border-dashed border-gray-300 rounded-xl mb-2.5 flex items-center justify-center gap-1.5">
+        <span
+          className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+        >
+          system VexoNT
+        </span>
+        <QRCodeSVG
+          id={`qr-svg-${machine.id}`}
+          value={qrValue}
+          size={130}
+          level="M"
+          includeMargin={false}
+        />
+        <span
+          className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
+          style={{ writingMode: 'vertical-rl' }}
+        >
+          system VexoNT
+        </span>
       </div>
       <div className="text-[11px] font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full mb-1.5">
         {t('machines.details.qrDate')} {qrDateStr}
       </div>
+      {onPrint && (
+        <button
+          type="button"
+          onClick={() => onPrint(machine)}
+          className="mt-1 mb-1.5 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+        >
+          <i className="ph ph-printer text-sm"></i>
+          {t('machines.buttons.printQr', 'Drukuj QR')}
+        </button>
+      )}
       <p className="text-[11px] text-gray-500 max-w-[220px] leading-snug">
         {t('machines.details.qrHint')}
       </p>
@@ -77,4 +105,5 @@ export default function MachineQRCard({ machine }) {
 
 MachineQRCard.propTypes = {
   machine: PropTypes.object.isRequired,
+  onPrint: PropTypes.func,
 };

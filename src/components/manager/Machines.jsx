@@ -245,12 +245,15 @@ export default function Machines({
         .replace(/'/g, '&#039;');
     };
 
-    const svgElement = document.getElementById(`qr-svg-${id}`);
+    const svgElement =
+      document.getElementById(`qr-svg-${id}`) ||
+      document.getElementById('machine-qr-code-svg');
     if (!svgElement) return;
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const tenantDisplayName = resolveTenantDisplayName(getCurrentTenant(), branding);
     const qrDateFormatted = formatQrDate(machine, machines, '-');
     const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
     printWindow.document.write(`
       <html>
         <head>
@@ -259,6 +262,9 @@ export default function Machines({
               body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
               .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
               .tenant { font-size: 11px; font-weight: 800; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+              .qr-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0; }
+              .qr-side-brand { writing-mode: vertical-rl; font-size: 9px; font-weight: 600; color: #9ca3af; letter-spacing: 0.14em; user-select: none; }
+              .qr-side-brand.left { transform: rotate(180deg); }
               h2 { margin: 10px 0 5px; font-size: 22px; }
               p { margin: 2px 0; color: #555; font-size: 13px; }
             </style>
@@ -266,7 +272,11 @@ export default function Machines({
           <body>
             <div class="qr-container">
               <div class="tenant">${escapeHtml(tenantDisplayName)}</div>
-              ${svgData}
+              <div class="qr-row">
+                <span class="qr-side-brand left">system VexoNT</span>
+                ${svgData}
+                <span class="qr-side-brand">system VexoNT</span>
+              </div>
               <h2>${escapeHtml(name)}</h2>
               <p>${escapeHtml(t('machines.print.date'))}${escapeHtml(qrDateFormatted)}</p>
             </div>
