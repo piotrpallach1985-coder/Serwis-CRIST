@@ -293,4 +293,88 @@ describe('useMapPins', () => {
     expect(machPin.xPercent).toBe(75);
     expect(machPin.yPercent).toBe(80);
   });
+
+  it('supports multiple parallel submaps (e.g. floors of a single building) and isolates pins per floor while aggregating on parent map', () => {
+    const multiFloorRegions = [
+      {
+        id: 'budynek_biurowy',
+        name: 'Budynek Biurowy B1',
+        parentId: null,
+        xPercent: 50,
+        yPercent: 50,
+        submaps: [
+          { id: 'floor_0', name: 'Parter', mapType: 'image', mapImageUrl: 'https://example.com/parter.png', submapConfigured: true },
+          { id: 'floor_1', name: 'Piętro 1', mapType: 'image', mapImageUrl: 'https://example.com/pietro1.png', submapConfigured: true },
+          { id: 'floor_2', name: 'Piętro 2', mapType: 'image', mapImageUrl: 'https://example.com/pietro2.png', submapConfigured: true },
+        ],
+      },
+    ];
+
+    const machines = [
+      { id: 'klima_parter', name: 'Klimatyzator Recepcja', regionId: 'budynek_biurowy', submapTabId: 'floor_0', xPercent: 20, yPercent: 20, pinnedOnMap: 'submap' },
+      { id: 'centrala_p1', name: 'Centrala Wentylacyjna P1', regionId: 'budynek_biurowy', submapTabId: 'floor_1', xPercent: 60, yPercent: 40, pinnedOnMap: 'submap' },
+    ];
+
+    const tickets = [
+      { id: 't_p1', machineId: 'centrala_p1', regionId: 'budynek_biurowy', isCritical: true, status: 1 },
+    ];
+
+    // 1. Widok Mapy Głównej -> pinezka Budynku B1 posiada 3 równorzędne podmapy i zagregowany status krytyczny z Piętra 1
+    const { result: mainRes } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: multiFloorRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: null,
+      })
+    );
+
+    expect(mainRes.current.pinData).toHaveLength(1);
+    const bPin = mainRes.current.pinData[0];
+    expect(bPin.id).toBe('budynek_biurowy');
+    expect(bPin.status).toBe('critical');
+    expect(bPin.submaps).toHaveLength(3);
+    expect(bPin.submaps[0].name).toBe('Parter');
+    expect(bPin.submaps[0].status).toBe('ok');
+    expect(bPin.submaps[1].name).toBe('Piętro 1');
+    expect(bPin.submaps[1].status).toBe('critical');
+    expect(bPin.submaps[1].itemCount).toBe(1);
+
+    // 2. Widok podmapy Parteru ('floor_0') -> widać tylko Klimatyzator Recepcja
+    const { result: floor0Res } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: multiFloorRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: 'budynek_biurowy',
+        currentSubmapTabId: 'floor_0',
+      })
+    );
+    expect(floor0Res.current.pinData).toHaveLength(1);
+    expect(floor0Res.current.pinData[0].id).toBe('klima_parter');
+    expect(floor0Res.current.submapTabs).toHaveLength(3);
+
+    // 3. Widok podmapy Piętra 1 ('floor_1') -> widać tylko Centralę Wentylacyjną P1 ze statusem krytycznym
+    const { result: floor1Res } = renderHook(() =>
+      useMapPins({
+        tickets,
+        plannedServices: [],
+        modeType: 'tickets',
+        machines,
+        regions: multiFloorRegions,
+        plannedWarningDays: 7,
+        currentSubmapId: 'budynek_biurowy',
+        currentSubmapTabId: 'floor_1',
+      })
+    );
+    expect(floor1Res.current.pinData).toHaveLength(1);
+    expect(floor1Res.current.pinData[0].id).toBe('centrala_p1');
+    expect(floor1Res.current.pinData[0].status).toBe('critical');
+  });
 });

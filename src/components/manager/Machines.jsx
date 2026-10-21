@@ -522,7 +522,7 @@ export default function Machines({
                     className="flex-1 md:flex-none bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
                   >
                     <i className="ph ph-printer text-lg"></i>{' '}
-                    {t('machines.buttons.qrList', 'Lista kodów QR')}
+                    {t('machines.buttons.qrList', 'Baza QR Urządzeń')}
                   </button>
                 )}
               </div>

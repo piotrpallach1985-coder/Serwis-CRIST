@@ -99,7 +99,7 @@ export default function MachinesQRCodes({ onBack }) {
 
   const handlePrint = () => {
     if (selectedIds.length === 0) {
-      alert(t('machines.qr_list.print_alert', 'Wybierz przynajmniej jedną maszynę do druku.'));
+      alert(t('machines.qr.print_alert', 'Wybierz przynajmniej jedno urządzenie do druku.'));
       return;
     }
     window.print();
@@ -127,10 +127,10 @@ export default function MachinesQRCodes({ onBack }) {
             )}
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                {t('machines.qr_list.title', 'Zestawienie Kodów QR Maszyn')}
+                {t('machines.qr.title', 'Baza QR Urządzeń')}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                {t('machines.qr_list.subtitle', 'Wybierz maszyny i podzespoły, aby wydrukować ich etykiety QR.')}
+                {t('machines.qr.subtitle', 'Wybierz urządzenia i podzespoły, aby wydrukować ich etykiety QR.')}
               </p>
             </div>
           </div>
@@ -177,15 +177,15 @@ export default function MachinesQRCodes({ onBack }) {
           </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-              {t('machines.form.region', 'Rejon')}
+              {t('machines.form.region', 'Miejsce montażu')}
             </label>
             <select
               value={filterRegion}
               onChange={e => setFilterRegion(e.target.value)}
               className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">{t('machines.filters.allRegions', 'Wszystkie Rejony')}</option>
-              <option value="bez_rejonu">{t('machines.filters.noRegion', 'Bez rejonu')}</option>
+              <option value="">{t('machines.filters.allRegions', 'Wszystkie miejsca montażu')}</option>
+              <option value="bez_rejonu">{t('machines.filters.noRegion', 'Bez miejsca montażu')}</option>
               {regions.map(r => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -262,7 +262,7 @@ export default function MachinesQRCodes({ onBack }) {
           <div className="col-span-full bg-white p-12 text-center rounded-2xl border border-gray-100 no-print">
             <i className="ph ph-qr-code text-4xl text-gray-300 mb-2"></i>
             <h3 className="text-lg font-bold text-gray-700">
-              {t('machines.table.empty', 'Brak maszyn spełniających kryteria.')}
+              {t('machines.table.empty', 'Brak urządzeń spełniających kryteria.')}
             </h3>
           </div>
         ) : (

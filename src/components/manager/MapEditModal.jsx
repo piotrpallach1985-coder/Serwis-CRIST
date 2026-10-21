@@ -2,9 +2,9 @@
  * MapEditModal — Modal przypinania rejonu (podmapy/osiedla) lub maszyny/urządzenia na mapie.
  * Obsługuje zarówno kliknięcie na mapie, jak i wyszukiwanie po adresie (Miejscowość, ulica i numer) dla Mapy Google.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
+import { isMachinePinnedOnSubmap, getRegionSubmaps, doesEntityBelongToSubmapTab } from '../../hooks/useMapPins';
 import { geocodeAddressQuery, searchAddressSuggestions } from './map/InteractiveGoogleMap';
 
 export default function MapEditModal({
@@ -14,6 +14,7 @@ export default function MapEditModal({
   editingId,
   setEditingId,
   currentSubmapId,
+  currentSubmapTabId = null,
   regions,
   machines,
   isGoogleMap = false,
@@ -28,9 +29,11 @@ export default function MapEditModal({
   const [addressError, setAddressError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [resolvedGeo, setResolvedGeo] = useState(null);
+  const skipAutoSuggestRef = useRef(false);
 
   useEffect(() => {
     if (isModalOpen) {
+      skipAutoSuggestRef.current = true;
       setAddressQuery(tempPos?.address || '');
       setAddressError('');
       setSuggestions([]);
@@ -39,12 +42,39 @@ export default function MapEditModal({
           lat: Number(tempPos.lat),
           lng: Number(tempPos.lng),
           displayName: tempPos.address || `${Number(tempPos.lat).toFixed(5)}, ${Number(tempPos.lng).toFixed(5)}`,
+          fromClick: Boolean(tempPos.fromClick),
         });
       } else {
         setResolvedGeo(null);
       }
     }
   }, [isModalOpen, tempPos]);
+
+  useEffect(() => {
+    if (!isModalOpen || !isGoogleMap) return;
+    if (skipAutoSuggestRef.current) {
+      skipAutoSuggestRef.current = false;
+      return;
+    }
+    const q = addressQuery.trim();
+    if (q.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setSearchingAddress(true);
+      const results = await searchAddressSuggestions(q);
+      if (!cancelled) {
+        setSearchingAddress(false);
+        setSuggestions(results);
+      }
+    }, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [addressQuery, isModalOpen, isGoogleMap]);
 
   if (!isModalOpen) return null;
 
@@ -86,8 +116,12 @@ export default function MapEditModal({
       if (currentSubmapId !== null) {
         const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
         return {
-          unpinned: inRegion.filter(m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions)),
-          pinned: inRegion.filter(m => isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions)),
+          unpinned: inRegion.filter(
+            m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, currentSubmapTabId)
+          ),
+          pinned: inRegion.filter(
+            m => isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, currentSubmapTabId)
+          ),
         };
       }
       return {
@@ -95,6 +129,15 @@ export default function MapEditModal({
         pinned: mainMachines.filter(m => hasCoords(m)),
       };
     }
+  };
+
+  const currentRegionObj = currentSubmapId ? regions.find(r => r.id === currentSubmapId) : null;
+  const currentRegionTabs = currentRegionObj ? getRegionSubmaps(currentRegionObj) : [];
+  const getAssignedTabLabel = (item) => {
+    if (!currentSubmapId || currentRegionTabs.length <= 1) return '';
+    if (!hasCoords(item) || item.pinnedOnMap === 'main') return '';
+    const tab = currentRegionTabs.find(t => doesEntityBelongToSubmapTab(item, currentRegionTabs, t.id));
+    return tab ? ` [${tab.name}]` : '';
   };
 
   const { unpinned: unpinnedItems, pinned: pinnedItems } = getSelectableItems();
@@ -157,7 +200,7 @@ export default function MapEditModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Typ: Rejon / Podmapa vs Maszyna / Urządzenie */}
+          {/* Typ: Miejsce montażu vs Konkretne Urządzenie */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
@@ -171,7 +214,7 @@ export default function MapEditModal({
             >
               {currentSubmapId !== null
                 ? t('map_component.subregion_submap', 'Podrejon / Podmapa')
-                : t('map_component.region_hall')}
+                : t('map_component.region_hall', 'Miejsce montażu')}
             </button>
             <button
               type="button"
@@ -183,7 +226,7 @@ export default function MapEditModal({
                 editingType === 'machine' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t('map_component.specific_machine')}
+              {t('map_component.specific_machine', 'Konkretne Urządzenie')}
             </button>
           </div>
 
@@ -229,8 +272,8 @@ export default function MapEditModal({
                 </p>
               )}
 
-              {suggestions.length > 1 && (
-                <div className="max-h-28 overflow-y-auto bg-white border border-emerald-200 rounded-lg divide-y divide-slate-100 text-[11px]">
+              {suggestions.length > 0 && (
+                <div className="max-h-36 overflow-y-auto bg-white border border-emerald-200 rounded-lg divide-y divide-slate-100 text-[11px] shadow-sm">
                   {suggestions.map((sug, idx) => {
                     const isSelected = resolvedGeo && resolvedGeo.lat === sug.lat && resolvedGeo.lng === sug.lng;
                     return (
@@ -238,8 +281,10 @@ export default function MapEditModal({
                         key={`${sug.lat}-${sug.lng}-${idx}`}
                         type="button"
                         onClick={() => {
+                          skipAutoSuggestRef.current = true;
                           setResolvedGeo(sug);
                           setAddressQuery(sug.displayName);
+                          setSuggestions([]);
                         }}
                         className={`w-full text-left px-2.5 py-1.5 hover:bg-emerald-50 transition-colors flex items-start gap-1.5 ${
                           isSelected ? 'bg-emerald-100/80 font-bold text-emerald-900' : 'text-slate-700'
@@ -277,10 +322,11 @@ export default function MapEditModal({
             >
               <option value="">{t('map_component.choose_from_list')}</option>
               {unpinnedItems.length > 0 && (
-                <optgroup label={t('map_component.unpinned_items', 'Nieprzypięte (wolne)')}>
+                <optgroup label={t('map_component.unpinned_items', 'Nieprzypięte na tej mapie (wolne)')}>
                   {unpinnedItems.map(item => (
                     <option key={item.id} value={item.id}>
                       {item.name}
+                      {getAssignedTabLabel(item)}
                     </option>
                   ))}
                 </optgroup>
@@ -289,7 +335,8 @@ export default function MapEditModal({
                 <optgroup label={t('map_component.already_pinned_items', 'Już przypięte (zmień lokalizację)')}>
                   {pinnedItems.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name} {item.address ? `(${item.address})` : ''}
+                      {item.name}
+                      {getAssignedTabLabel(item)} {item.address ? `(${item.address})` : ''}
                     </option>
                   ))}
                 </optgroup>

@@ -44,10 +44,10 @@ export const INDUSTRY_PROFILES = {
     icon: 'ph-factory',
     badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
     bannerClass: 'bg-slate-900 text-white border-slate-800',
-    machineLabel: 'Maszyna / Urządzenie',
-    regionLabel: 'Rejon / Hala',
-    bayLabel: 'Przelot / Stanowisko',
-    ticketCardTitle: 'Karta Zgłoszenia Awarii Maszyny (UR)',
+    machineLabel: 'Urządzenie',
+    regionLabel: 'Miejsce montażu',
+    bayLabel: 'Informacja dodatkowa',
+    ticketCardTitle: 'Karta Zgłoszenia Awarii Urządzenia (UR)',
     ticketPdfTitle: 'Karta Zgłoszenia Awarii (UR)',
     serviceCardTitle: 'Karta Serwisu Planowanego (Prewencja UR)',
     servicePdfTitle: 'Karta Serwisu Planowanego (UR)',
@@ -66,9 +66,9 @@ export const INDUSTRY_PROFILES = {
     icon: 'ph-buildings',
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-300',
     bannerClass: 'bg-amber-900 text-white border-amber-800',
-    machineLabel: 'Urządzenie / Instalacja Budynku',
-    regionLabel: 'Budynek / Obiekt',
-    bayLabel: 'Klatka / Piętro / Lokal',
+    machineLabel: 'Urządzenie',
+    regionLabel: 'Miejsce montażu',
+    bayLabel: 'Informacja dodatkowa',
     ticketCardTitle: 'Karta Zgłoszenia Usterki Obiektu (Facility / c-KOB)',
     ticketPdfTitle: 'Karta Usterki Obiektu (Facility / c-KOB)',
     serviceCardTitle: 'Protokół Przeglądu Okresowego Obiektu (c-KOB art. 62)',
@@ -88,9 +88,9 @@ export const INDUSTRY_PROFILES = {
     icon: 'ph-snowflake',
     badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-300',
     bannerClass: 'bg-cyan-900 text-white border-cyan-800',
-    machineLabel: 'Urządzenie HVAC / Kocioł',
-    regionLabel: 'Lokalizacja / Klient',
-    bayLabel: 'Pomieszczenie / Adres',
+    machineLabel: 'Urządzenie',
+    regionLabel: 'Miejsce montażu',
+    bayLabel: 'Informacja dodatkowa',
     ticketCardTitle: 'Karta Naprawy Serwisowej HVAC / F-Gaz',
     ticketPdfTitle: 'Protokół Naprawy Serwisowej HVAC / F-Gaz',
     serviceCardTitle: 'Protokół Przeglądu i Szczelności HVAC / F-Gaz (CRO)',
@@ -269,8 +269,8 @@ export function resolveMachineGeoLocation(machine, regions = []) {
     r => r.id === machine.regionId || (machine.regionName && r.name === machine.regionName)
   );
 
-  const rawLat = machine.gpsLat ?? machine.mapLat ?? region?.mapLat ?? region?.gpsLat ?? null;
-  const rawLng = machine.gpsLng ?? machine.mapLng ?? region?.mapLng ?? region?.gpsLng ?? null;
+  const rawLat = machine.gpsLat ?? machine.lat ?? machine.mapLat ?? region?.lat ?? region?.mapLat ?? region?.gpsLat ?? region?.googleLat ?? null;
+  const rawLng = machine.gpsLng ?? machine.lng ?? machine.mapLng ?? region?.lng ?? region?.mapLng ?? region?.gpsLng ?? region?.googleLng ?? null;
 
   const lat = rawLat !== null && rawLat !== '' && Number.isFinite(Number(rawLat)) ? Number(rawLat) : null;
   const lng = rawLng !== null && rawLng !== '' && Number.isFinite(Number(rawLng)) ? Number(rawLng) : null;

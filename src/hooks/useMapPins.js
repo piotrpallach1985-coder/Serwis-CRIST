@@ -2,7 +2,87 @@ import { useMemo } from 'react';
 import { TICKET_STATUS } from '../utils/constants';
 import { checkServiceUrgency } from '../utils/logicHelpers';
 
-export function isMachinePinnedOnSubmap(m, submapId, regions = []) {
+export function getRegionSubmaps(region) {
+  if (!region) return [];
+  if (Array.isArray(region.submaps) && region.submaps.length > 0) {
+    return region.submaps.map((sub, idx) => {
+      const mType = sub.mapType === 'google' ? 'google' : 'image';
+      const isConfigured =
+        sub.submapConfigured !== false &&
+        (mType === 'google'
+          ? Boolean(
+              sub.submapConfigured === true ||
+                (sub.googleLat && sub.googleLng) ||
+                (sub.googleQuery && String(sub.googleQuery).trim() !== '')
+            )
+          : Boolean(sub.mapImageUrl && String(sub.mapImageUrl).trim() !== ''));
+      return {
+        id: sub.id || (idx === 0 ? 'default' : `sub_${idx + 1}`),
+        name: sub.name || `Podmapa ${idx + 1}`,
+        mapType: mType,
+        mapImageUrl: sub.mapImageUrl || '',
+        googleQuery: sub.googleQuery || region.address || '',
+        googleLat: Number(sub.googleLat ?? region.googleLat ?? region.lat) || 54.5364,
+        googleLng: Number(sub.googleLng ?? region.googleLng ?? region.lng) || 18.5469,
+        googleZoom: Number(sub.googleZoom ?? region.googleZoom) || 17,
+        googleMapStyle: sub.googleMapStyle || region.googleMapStyle || 'k',
+        defaultZoom: Number(sub.defaultZoom) || 1,
+        defaultPanX: Number(sub.defaultPanX) || 0,
+        defaultPanY: Number(sub.defaultPanY) || 0,
+        submapConfigured: isConfigured,
+      };
+    });
+  }
+
+  if (region.submapConfigured === false) return [];
+  const hasLegacyGoogle =
+    region.mapType === 'google' &&
+    Boolean(
+      region.submapConfigured === true ||
+        (region.googleLat && region.googleLng) ||
+        (region.googleQuery && String(region.googleQuery).trim() !== '')
+    );
+  const hasLegacyImage = Boolean(region.mapImageUrl && String(region.mapImageUrl).trim() !== '');
+
+  if (hasLegacyGoogle || hasLegacyImage) {
+    return [
+      {
+        id: 'default',
+        name: region.submapName || 'Podmapa 1',
+        mapType: hasLegacyGoogle && !hasLegacyImage ? 'google' : region.mapType === 'google' ? 'google' : 'image',
+        mapImageUrl: region.mapImageUrl || '',
+        googleQuery: region.googleQuery || region.address || '',
+        googleLat: Number(region.googleLat ?? region.lat) || 54.5364,
+        googleLng: Number(region.googleLng ?? region.lng) || 18.5469,
+        googleZoom: Number(region.googleZoom) || 17,
+        googleMapStyle: region.googleMapStyle || 'k',
+        defaultZoom: Number(region.defaultZoom) || 1,
+        defaultPanX: Number(region.defaultPanX) || 0,
+        defaultPanY: Number(region.defaultPanY) || 0,
+        submapConfigured: true,
+      },
+    ];
+  }
+
+  return [];
+}
+
+export function doesEntityBelongToSubmapTab(entity, submaps = [], activeTabId = null) {
+  if (!entity) return false;
+  if (!Array.isArray(submaps) || submaps.length <= 1) return true;
+  const resolvedTabId = activeTabId || submaps[0]?.id || 'default';
+  const activeIdx = submaps.findIndex(s => s.id === resolvedTabId);
+  const isFirstTab = activeIdx <= 0;
+  const otherTabIds = new Set(
+    submaps.filter((_, idx) => idx !== Math.max(0, activeIdx)).map(s => s.id)
+  );
+  if (isFirstTab) {
+    return !entity.submapTabId || entity.submapTabId === resolvedTabId || !otherTabIds.has(entity.submapTabId);
+  }
+  return entity.submapTabId === resolvedTabId;
+}
+
+export function isMachinePinnedOnSubmap(m, submapId, regions = [], submapTabId = null) {
   if (!m || !submapId) return false;
   const hasCoords =
     (m.xPercent !== undefined && m.xPercent !== null) ||
@@ -13,14 +93,12 @@ export function isMachinePinnedOnSubmap(m, submapId, regions = []) {
   if (Array.isArray(regions) && regions.length > 0) {
     const reg = regions.find(r => r.id === submapId);
     if (reg) {
-      const hasMap =
-        reg.mapType === 'google'
-          ? Boolean(
-              (reg.googleLat && reg.googleLng) ||
-                (reg.googleQuery && reg.googleQuery.trim() !== '')
-            )
-          : Boolean(reg.mapImageUrl && reg.mapImageUrl.trim() !== '');
+      const regSubmaps = getRegionSubmaps(reg);
+      const hasMap = regSubmaps.some(s => s.submapConfigured);
       if (!hasMap && m.pinnedOnMap !== 'submap') return false;
+      if (submapTabId) {
+        return doesEntityBelongToSubmapTab(m, regSubmaps, submapTabId);
+      }
     }
   }
   return true;
@@ -34,9 +112,10 @@ export function useMapPins({
   regions = [],
   plannedWarningDays = 7,
   currentSubmapId = null,
+  currentSubmapTabId = null,
   draggingPin = null,
 } = {}) {
-  const { pinData, unpinnedData } = useMemo(() => {
+  const { pinData, unpinnedData, submapTabs } = useMemo(() => {
     const safeMachines = Array.isArray(machines) ? machines : [];
     const safeTickets = Array.isArray(tickets) ? tickets : [];
     const safePlannedServices = Array.isArray(plannedServices) ? plannedServices : [];
@@ -75,6 +154,19 @@ export function useMapPins({
       return ids;
     };
 
+    const computeItemsStatus = itemsList => {
+      let status = 'ok';
+      if (modeType === 'tickets') {
+        if (itemsList.some(t => t.isCritical)) status = 'critical';
+        else if (itemsList.length > 0) status = 'warning';
+      } else {
+        if (itemsList.some(s => s.isOverdue)) status = 'critical';
+        else if (itemsList.some(s => s.status === 'in_progress')) status = 'in_progress';
+        else if (itemsList.some(s => s.isUpcoming)) status = 'warning';
+      }
+      return status;
+    };
+
     const getRegionStatusAndCount = (regionIds, filterMachinesFn = null) => {
       const regionIdSet = new Set(Array.isArray(regionIds) ? regionIds : [regionIds]);
       let regionMachines = validMachines.filter(m => regionIdSet.has(m.regionId));
@@ -89,19 +181,7 @@ export function useMapPins({
         return false;
       });
 
-      let status = 'ok';
-      if (modeType === 'tickets') {
-        const hasCritical = itemsInRegion.some(t => t.isCritical);
-        if (hasCritical) status = 'critical';
-        else if (itemsInRegion.length > 0) status = 'warning';
-      } else {
-        const hasOverdue = itemsInRegion.some(s => s.isOverdue);
-        const hasInProgress = itemsInRegion.some(s => s.status === 'in_progress');
-        const hasUpcoming = itemsInRegion.some(s => s.isUpcoming);
-        if (hasOverdue) status = 'critical';
-        else if (hasInProgress) status = 'in_progress';
-        else if (hasUpcoming) status = 'warning';
-      }
+      const status = computeItemsStatus(itemsInRegion);
 
       return {
         status,
@@ -113,20 +193,7 @@ export function useMapPins({
 
     const getMachineStatusAndCount = machineId => {
       const itemsForMachine = activeItems.filter(item => item.machineId === machineId);
-      let status = 'ok';
-
-      if (modeType === 'tickets') {
-        const hasCritical = itemsForMachine.some(t => t.isCritical);
-        if (hasCritical) status = 'critical';
-        else if (itemsForMachine.length > 0) status = 'warning';
-      } else {
-        const hasOverdue = itemsForMachine.some(s => s.isOverdue);
-        const hasInProgress = itemsForMachine.some(s => s.status === 'in_progress');
-        const hasUpcoming = itemsForMachine.some(s => s.isUpcoming);
-        if (hasOverdue) status = 'critical';
-        else if (hasInProgress) status = 'in_progress';
-        else if (hasUpcoming) status = 'warning';
-      }
+      const status = computeItemsStatus(itemsForMachine);
 
       return {
         status,
@@ -137,12 +204,35 @@ export function useMapPins({
 
     const isSubmapConfigured = region => {
       if (!region) return false;
-      return region.mapType === 'google'
-        ? Boolean(
-            (region.googleLat && region.googleLng) ||
-              (region.googleQuery && region.googleQuery.trim() !== '')
-          )
-        : Boolean(region.mapImageUrl && region.mapImageUrl.trim() !== '');
+      const regSubmaps = getRegionSubmaps(region);
+      return regSubmaps.some(s => s.submapConfigured);
+    };
+
+    const computeSubmapTabsWithStats = region => {
+      if (!region) return [];
+      const rawTabs = getRegionSubmaps(region);
+      if (rawTabs.length === 0) return [];
+      const regMachines = validMachines.filter(
+        m =>
+          m.regionId === region.id &&
+          m.pinnedOnMap !== 'main' &&
+          ((m.xPercent !== undefined && m.xPercent !== null) ||
+            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null))
+      );
+      return rawTabs.map(tab => {
+        const tabMachines = regMachines.filter(m =>
+          doesEntityBelongToSubmapTab(m, rawTabs, tab.id)
+        );
+        const tabMachineIds = new Set(tabMachines.map(m => m.id));
+        const tabItems = activeItems.filter(item => item.machineId && tabMachineIds.has(item.machineId));
+        return {
+          ...tab,
+          machineCount: tabMachines.length,
+          itemCount: tabItems.length,
+          itemIds: tabItems.map(i => i.id),
+          status: computeItemsStatus(tabItems),
+        };
+      });
     };
 
     const pins = [];
@@ -150,19 +240,30 @@ export function useMapPins({
     const currentSubmapRegion = currentSubmapId
       ? safeRegions.find(r => r.id === currentSubmapId)
       : null;
+    const currentRegionTabs = currentSubmapRegion
+      ? computeSubmapTabsWithStats(currentSubmapRegion)
+      : [];
+    const resolvedActiveTab =
+      (currentSubmapTabId && currentRegionTabs.find(t => t.id === currentSubmapTabId)) ||
+      currentRegionTabs[0] ||
+      null;
+
     const currentSubmapHasMap = currentSubmapId
-      ? isSubmapConfigured(currentSubmapRegion)
+      ? Boolean(resolvedActiveTab ? resolvedActiveTab.submapConfigured : isSubmapConfigured(currentSubmapRegion))
       : true;
 
     const visibleRegions = currentSubmapHasMap
       ? safeRegions.filter(reg => {
           const regParent = reg.parentId || null;
           const activeParent = currentSubmapId || null;
-          return (
-            regParent === activeParent &&
-            ((reg.xPercent !== undefined && reg.xPercent !== null) ||
-              (reg.lat !== undefined && reg.lat !== null && reg.lng !== undefined && reg.lng !== null))
-          );
+          const hasPinCoords =
+            (reg.xPercent !== undefined && reg.xPercent !== null) ||
+            (reg.lat !== undefined && reg.lat !== null && reg.lng !== undefined && reg.lng !== null);
+          if (regParent !== activeParent || !hasPinCoords) return false;
+          if (currentSubmapId && currentRegionTabs.length > 1 && resolvedActiveTab) {
+            return doesEntityBelongToSubmapTab(reg, currentRegionTabs, resolvedActiveTab.id);
+          }
+          return true;
         })
       : [];
 
@@ -173,7 +274,8 @@ export function useMapPins({
       const y = isDragging ? (draggingPin.yPercent ?? draggingPin.y ?? reg.yPercent ?? 50) : (reg.yPercent ?? 50);
 
       const descendantIds = getDescendantRegionIds(reg.id);
-      const hasConfiguredMap = isSubmapConfigured(reg);
+      const regTabs = computeSubmapTabsWithStats(reg);
+      const hasConfiguredMap = regTabs.some(s => s.submapConfigured);
       const hasChildRegions = safeRegions.some(r => r.parentId === reg.id);
 
       const excludeMachinesWithOwnPinHere = m => {
@@ -198,6 +300,7 @@ export function useMapPins({
         name: reg.name,
         description: reg.description,
         parentId: reg.parentId || null,
+        submapTabId: reg.submapTabId || null,
         xPercent: x,
         yPercent: y,
         lat: isDragging && draggingPin.lat !== undefined ? draggingPin.lat : reg.lat,
@@ -205,6 +308,7 @@ export function useMapPins({
         address: reg.address || '',
         hasSubmap: hasConfiguredMap || hasChildRegions,
         hasConfiguredMap,
+        submaps: regTabs.filter(s => s.submapConfigured),
         status,
         itemCount,
         itemIds,
@@ -220,13 +324,18 @@ export function useMapPins({
             (!m.regionId || m.pinnedOnMap === 'main')
         )
       : currentSubmapHasMap
-      ? validMachines.filter(
-          m =>
-            m.regionId === currentSubmapId &&
-            ((m.xPercent !== undefined && m.xPercent !== null) ||
-              (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null)) &&
-            m.pinnedOnMap !== 'main'
-        )
+      ? validMachines.filter(m => {
+          const hasPinCoords =
+            (m.xPercent !== undefined && m.xPercent !== null) ||
+            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
+          if (m.regionId !== currentSubmapId || !hasPinCoords || m.pinnedOnMap === 'main') {
+            return false;
+          }
+          if (currentRegionTabs.length > 1 && resolvedActiveTab) {
+            return doesEntityBelongToSubmapTab(m, currentRegionTabs, resolvedActiveTab.id);
+          }
+          return true;
+        })
       : [];
 
     visibleMachines.forEach(m => {
@@ -242,6 +351,7 @@ export function useMapPins({
         name: m.name,
         internalId: m.internalId,
         additionalDescription: m.additionalDescription,
+        submapTabId: m.submapTabId || null,
         xPercent: x,
         yPercent: y,
         lat: isDragging && draggingPin.lat !== undefined ? draggingPin.lat : m.lat,
@@ -303,19 +413,11 @@ export function useMapPins({
 
       unpinnedCount = unpinnedItems.length;
       unpinnedItemIds = unpinnedItems.map(i => i.id);
-
-      if (modeType === 'tickets') {
-        if (unpinnedItems.some(t => t.isCritical)) unpinnedStatus = 'critical';
-        else if (unpinnedItems.length > 0) unpinnedStatus = 'warning';
-      } else {
-        if (unpinnedItems.some(s => s.isOverdue)) unpinnedStatus = 'critical';
-        else if (unpinnedItems.some(s => s.status === 'in_progress'))
-          unpinnedStatus = 'in_progress';
-        else if (unpinnedItems.some(s => s.isUpcoming)) unpinnedStatus = 'warning';
-      }
+      unpinnedStatus = computeItemsStatus(unpinnedItems);
     } else {
+      const anySubmapConfiguredOnRegion = isSubmapConfigured(currentSubmapRegion);
       const pinnedChildRegions = new Set(
-        currentSubmapHasMap
+        anySubmapConfiguredOnRegion
           ? safeRegions
               .filter(
                 r =>
@@ -341,7 +443,7 @@ export function useMapPins({
 
       const unpinnedMachines = validMachines.filter(m => {
         if (m.regionId === currentSubmapId) {
-          if (!currentSubmapHasMap) return true;
+          if (!anySubmapConfiguredOnRegion) return true;
           const hasCoords =
             (m.xPercent !== undefined && m.xPercent !== null) ||
             (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
@@ -358,16 +460,7 @@ export function useMapPins({
       );
       unpinnedCount = unpinnedItems.length;
       unpinnedItemIds = unpinnedItems.map(i => i.id);
-
-      if (modeType === 'tickets') {
-        if (unpinnedItems.some(t => t.isCritical)) unpinnedStatus = 'critical';
-        else if (unpinnedItems.length > 0) unpinnedStatus = 'warning';
-      } else {
-        if (unpinnedItems.some(s => s.isOverdue)) unpinnedStatus = 'critical';
-        else if (unpinnedItems.some(s => s.status === 'in_progress'))
-          unpinnedStatus = 'in_progress';
-        else if (unpinnedItems.some(s => s.isUpcoming)) unpinnedStatus = 'warning';
-      }
+      unpinnedStatus = computeItemsStatus(unpinnedItems);
     }
 
     return {
@@ -378,6 +471,7 @@ export function useMapPins({
         unpinnedMachineCount,
         itemIds: unpinnedItemIds,
       },
+      submapTabs: currentRegionTabs,
     };
   }, [
     tickets,
@@ -387,8 +481,9 @@ export function useMapPins({
     regions,
     plannedWarningDays,
     currentSubmapId,
+    currentSubmapTabId,
     draggingPin,
   ]);
 
-  return { displayPins: pinData, pinData, unpinnedData };
+  return { displayPins: pinData, pinData, unpinnedData, submapTabs };
 }

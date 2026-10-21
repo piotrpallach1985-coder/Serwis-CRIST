@@ -316,7 +316,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
               className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'machines_qr' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
             >
               <i className="ph ph-qr-code text-lg shrink-0"></i>
-              <span className="text-[13px] truncate">{t("sidebar.machines_qr_menu", "Kody QR Maszyn")}</span>
+              <span className="text-[13px] truncate">{t("sidebar.machines_qr_menu", "Baza QR Urządzeń")}</span>
             </button>
           )}
 
@@ -326,7 +326,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
               className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'regions' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
             >
               <i className="ph ph-map-pin-line text-lg shrink-0"></i>
-              <span className="text-[13px]">{t("sidebar.regions_menu")}</span>
+              <span className="text-[13px]">{t("sidebar.regions_menu", "Rejony/Miejsca montażu")}</span>
             </button>
           )}
 

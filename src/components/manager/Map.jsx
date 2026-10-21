@@ -17,7 +17,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 
-import { useMapPins } from '../../hooks/useMapPins';
+import { useMapPins, getRegionSubmaps, isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
 import MapEditModal from './MapEditModal';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 
@@ -36,11 +36,13 @@ export default function ShipyardMap({
   const [mode, setMode] = useState('view');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentSubmapId, setCurrentSubmapId] = useState(null);
+  const [currentSubmapTabId, setCurrentSubmapTabId] = useState(null);
 
   // --- Konfiguracja mapy ---
   const [mapConfig, setMapConfig] = useState({
     url: '',
     mapType: 'image',
+    googleFrameSaved: false,
     googleQuery: '',
     googleLat: 54.5364,
     googleLng: 18.5469,
@@ -64,6 +66,11 @@ export default function ShipyardMap({
         setMapConfig({
           url: data.mapUrl || '',
           mapType: data.mapType || (data.googleQuery && !data.mapUrl ? 'google' : 'image'),
+          googleFrameSaved: Boolean(
+            data.mapType === 'google' ||
+              data.googleLat != null ||
+              (data.googleQuery && String(data.googleQuery).trim())
+          ),
           googleQuery: data.googleQuery || '',
           googleLat: Number.isFinite(Number(data.googleLat)) && Number(data.googleLat) !== 0 ? Number(data.googleLat) : 54.5364,
           googleLng: Number.isFinite(Number(data.googleLng)) && Number(data.googleLng) !== 0 ? Number(data.googleLng) : 18.5469,
@@ -107,53 +114,80 @@ export default function ShipyardMap({
   const [mapDragActive, setMapDragActive] = useState(false);
   const [isSettingsMinimized, setIsSettingsMinimized] = useState(true);
   const [isFramingGoogleMap, setIsFramingGoogleMap] = useState(false);
+  const [selectedMapKind, setSelectedMapKind] = useState('image');
+  const [selectedPinCandidate, setSelectedPinCandidate] = useState(null);
+
+  const regionSubmaps = useMemo(
+    () => (currentRegion ? getRegionSubmaps(currentRegion) : []),
+    [currentRegion]
+  );
+
+  useEffect(() => {
+    if (!currentSubmapId) {
+      setCurrentSubmapTabId(null);
+      return;
+    }
+    if (regionSubmaps.length > 0) {
+      if (!currentSubmapTabId || !regionSubmaps.some(s => s.id === currentSubmapTabId)) {
+        setCurrentSubmapTabId(regionSubmaps[0].id);
+      }
+    } else if (!currentSubmapTabId) {
+      setCurrentSubmapTabId('default');
+    }
+  }, [currentSubmapId, regionSubmaps, currentSubmapTabId]);
+
+  const activeSubmapObj = useMemo(() => {
+    if (!currentSubmapId || regionSubmaps.length === 0) return null;
+    return regionSubmaps.find(s => s.id === currentSubmapTabId) || regionSubmaps[0];
+  }, [currentSubmapId, regionSubmaps, currentSubmapTabId]);
 
   const activeMapType = useMemo(() => {
     if (!currentSubmapId) return mapConfig.mapType;
+    if (activeSubmapObj) {
+      if (activeSubmapObj.mapType === 'image' && activeSubmapObj.mapImageUrl) return 'image';
+      if (activeSubmapObj.mapType === 'google' && activeSubmapObj.submapConfigured !== false) {
+        return 'google';
+      }
+      return activeSubmapObj.mapType || 'image';
+    }
     if (currentRegion?.mapType === 'image' && currentRegion?.mapImageUrl) return 'image';
-    if (
-      currentRegion?.mapType === 'google' ||
-      currentRegion?.googleQuery ||
-      currentRegion?.googleLat != null ||
-      currentRegion?.lat != null ||
-      (!currentRegion?.mapImageUrl && mapConfig.mapType === 'google')
-    ) {
+    if (currentRegion?.mapType === 'google' && currentRegion?.submapConfigured !== false) {
       return 'google';
     }
     return currentRegion?.mapType || 'image';
-  }, [currentSubmapId, currentRegion, mapConfig.mapType]);
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.mapType]);
 
   const activeGoogleQuery = currentSubmapId
-    ? (currentRegion?.googleQuery || currentRegion?.address || '')
+    ? (activeSubmapObj?.googleQuery || currentRegion?.googleQuery || currentRegion?.address || '')
     : (mapConfig.googleQuery || '');
 
   const activeGoogleLat = useMemo(() => {
     if (currentSubmapId) {
-      const regLat = Number(currentRegion?.googleLat ?? currentRegion?.lat);
+      const regLat = Number(activeSubmapObj?.googleLat ?? currentRegion?.googleLat ?? currentRegion?.lat);
       if (Number.isFinite(regLat) && regLat !== 0) return regLat;
     }
     const mainLat = Number(mapConfig.googleLat);
     return Number.isFinite(mainLat) && mainLat !== 0 ? mainLat : 54.5364;
-  }, [currentSubmapId, currentRegion, mapConfig.googleLat]);
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.googleLat]);
 
   const activeGoogleLng = useMemo(() => {
     if (currentSubmapId) {
-      const regLng = Number(currentRegion?.googleLng ?? currentRegion?.lng);
+      const regLng = Number(activeSubmapObj?.googleLng ?? currentRegion?.googleLng ?? currentRegion?.lng);
       if (Number.isFinite(regLng) && regLng !== 0) return regLng;
     }
     const mainLng = Number(mapConfig.googleLng);
     return Number.isFinite(mainLng) && mainLng !== 0 ? mainLng : 18.5469;
-  }, [currentSubmapId, currentRegion, mapConfig.googleLng]);
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.googleLng]);
 
   const activeGoogleZoom = useMemo(() => {
     if (currentSubmapId) {
-      return clampZoom(currentRegion?.googleZoom || 17);
+      return clampZoom(activeSubmapObj?.googleZoom || currentRegion?.googleZoom || 17);
     }
     return clampZoom(mapConfig.googleZoom || 17);
-  }, [currentSubmapId, currentRegion, mapConfig.googleZoom]);
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.googleZoom]);
 
   const activeGoogleStyle = currentSubmapId
-    ? (currentRegion?.googleMapStyle || mapConfig.googleMapStyle || 'k')
+    ? (activeSubmapObj?.googleMapStyle || currentRegion?.googleMapStyle || mapConfig.googleMapStyle || 'k')
     : (mapConfig.googleMapStyle || 'k');
 
   const [draftGoogleView, setDraftGoogleView] = useState({
@@ -181,7 +215,7 @@ export default function ShipyardMap({
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
 
   // --- Pinezki (przez hook) ---
-  const { displayPins = [], unpinnedData } = useMapPins({
+  const { displayPins = [], unpinnedData, submapTabs = [] } = useMapPins({
     tickets,
     plannedServices,
     modeType,
@@ -189,23 +223,109 @@ export default function ShipyardMap({
     regions,
     plannedWarningDays,
     currentSubmapId,
+    currentSubmapTabId: activeSubmapObj?.id || currentSubmapTabId,
     draggingPin,
   });
 
-  const hasSavedGoogleMap =
-    activeMapType === 'google' &&
-    (Boolean(activeGoogleQuery.trim()) ||
-      Boolean(currentSubmapId ? (currentRegion?.googleLat ?? currentRegion?.lat ?? mapConfig.googleLat) : mapConfig.googleLat) ||
-      displayPins.some(p => p.lat != null && p.lng != null));
+  const hasSavedGoogleFrame = useMemo(() => {
+    if (currentSubmapId) {
+      if (activeSubmapObj) {
+        return (
+          activeSubmapObj.submapConfigured !== false &&
+          Boolean(
+            activeSubmapObj.mapType === 'google' ||
+              activeSubmapObj.googleLat != null ||
+              activeSubmapObj.googleQuery
+          )
+        );
+      }
+      return (
+        currentRegion?.submapConfigured !== false &&
+        Boolean(
+          currentRegion?.mapType === 'google' ||
+            currentRegion?.googleLat != null ||
+            currentRegion?.googleQuery
+        )
+      );
+    }
+    return Boolean(
+      mapConfig.googleFrameSaved ||
+        mapConfig.mapType === 'google' ||
+        activeGoogleQuery.trim() ||
+        displayPins.some(p => p.lat != null && p.lng != null)
+    );
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.googleFrameSaved, mapConfig.mapType, activeGoogleQuery, displayPins]);
 
-  const isGoogleMap = hasSavedGoogleMap || (mode === 'edit' && isFramingGoogleMap);
+  const hasSavedImageFrame = useMemo(() => {
+    if (currentSubmapId) {
+      if (activeSubmapObj) return Boolean(activeSubmapObj.mapImageUrl);
+      return Boolean(currentRegion?.mapImageUrl);
+    }
+    return Boolean(mapConfig.url);
+  }, [currentSubmapId, activeSubmapObj, currentRegion, mapConfig.url]);
+
+  useEffect(() => {
+    setSelectedMapKind(activeMapType || 'image');
+  }, [currentSubmapId, currentSubmapTabId, activeMapType]);
+
+  const hasSavedGoogleMap = activeMapType === 'google' && hasSavedGoogleFrame;
+
+  const isGoogleMap =
+    mode === 'edit' ? selectedMapKind === 'google' : hasSavedGoogleMap;
 
   const currentMapUrl = !isGoogleMap
-    ? (currentSubmapId ? (currentRegion?.mapImageUrl || '') : mapConfig.url)
+    ? (currentSubmapId ? (activeSubmapObj ? activeSubmapObj.mapImageUrl || '' : currentRegion?.mapImageUrl || '') : mapConfig.url)
     : '';
 
-  // Oblicz widok 100% dopasowany do wszystkich pinezek na bieżącym poziomie Mapy Google
+  // Lista nieprzypisanych miejsc montażu i urządzeń dla aktywnej mapy / podmapy (w trybie Przypinanie pinesek)
+  const { unpinnedRegions, unpinnedMachines } = useMemo(() => {
+    const hasCoords = (item) =>
+      (item.xPercent != null && item.yPercent != null) || (item.lat != null && item.lng != null);
+    const activeRegions = regions.filter(r => !r.isDeleted);
+    let uRegions = [];
+    if (currentSubmapId === null) {
+      uRegions = activeRegions.filter(r => !r.parentId && !hasCoords(r));
+    } else {
+      const forbiddenIds = new Set();
+      let currId = currentSubmapId;
+      while (currId && !forbiddenIds.has(currId)) {
+        forbiddenIds.add(currId);
+        const reg = regions.find(r => r.id === currId);
+        currId = reg?.parentId || null;
+      }
+      uRegions = activeRegions.filter(
+        r =>
+          !forbiddenIds.has(r.id) &&
+          (r.parentId === currentSubmapId || !r.parentId) &&
+          (!hasCoords(r) || r.parentId !== currentSubmapId)
+      );
+    }
+
+    const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
+    const activeTabId = activeSubmapObj?.id || currentSubmapTabId;
+    let uMachines = [];
+    if (currentSubmapId !== null) {
+      const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
+      uMachines = inRegion.filter(
+        m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, activeTabId)
+      );
+    } else {
+      uMachines = mainMachines.filter(m => !hasCoords(m));
+    }
+
+    return { unpinnedRegions: uRegions, unpinnedMachines: uMachines };
+  }, [regions, machines, currentSubmapId, activeSubmapObj, currentSubmapTabId]);
+
+  // Oblicz widok domyślny (zapisany kadr domyślny lub dopasowany do pinezek)
   const computeCurrentLevelFitView = useCallback(() => {
+    if (hasSavedGoogleFrame) {
+      return {
+        lat: activeGoogleLat,
+        lng: activeGoogleLng,
+        zoom: activeGoogleZoom,
+      };
+    }
+
     const geoPoints = displayPins
       .filter(p => p.lat != null && p.lng != null)
       .map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
@@ -220,16 +340,11 @@ export default function ShipyardMap({
     }
 
     if (geoPoints.length === 1) {
-      const hasExplicitConfig = currentSubmapId
-        ? currentRegion?.googleLat != null && currentRegion?.googleZoom != null
-        : mapConfig.googleLat != null && mapConfig.googleZoom != null;
-      if (!hasExplicitConfig) {
-        return {
-          lat: geoPoints[0].lat,
-          lng: geoPoints[0].lng,
-          zoom: clampZoom(currentSubmapId ? 17 : 16),
-        };
-      }
+      return {
+        lat: geoPoints[0].lat,
+        lng: geoPoints[0].lng,
+        zoom: clampZoom(activeGoogleZoom || (currentSubmapId ? 17 : 16)),
+      };
     }
 
     return {
@@ -237,13 +352,14 @@ export default function ShipyardMap({
       lng: activeGoogleLng,
       zoom: activeGoogleZoom,
     };
-  }, [displayPins, activeGoogleLat, activeGoogleLng, activeGoogleZoom, imgBounds.width, imgBounds.height, currentSubmapId, currentRegion, mapConfig]);
+  }, [hasSavedGoogleFrame, displayPins, activeGoogleLat, activeGoogleLng, activeGoogleZoom, imgBounds.width, imgBounds.height, currentSubmapId]);
 
-  // Przy zmianie poziomu podmapy lub załadowaniu mapy ustaw widok 100% (dopasowany do pinezek lub zapisanego kadru)
+  // Przy zmianie poziomu podmapy lub załadowaniu mapy ustaw widok 100% (zapisany kadr domyślny)
   const lastFittedLevelRef = useRef(undefined);
   useEffect(() => {
     if (!mapLoaded) return;
-    const levelKey = `${currentSubmapId || 'main'}-${activeMapType}`;
+    const activeTabKey = activeSubmapObj?.id || currentSubmapTabId || 'default';
+    const levelKey = `${currentSubmapId || 'main'}-${activeTabKey}-${activeMapType}`;
     if (lastFittedLevelRef.current !== levelKey) {
       lastFittedLevelRef.current = levelKey;
       if (activeMapType === 'google') {
@@ -259,34 +375,17 @@ export default function ShipyardMap({
         setZoomPan({ x: 0, y: 0 });
       } else if (currentSubmapId) {
         const reg = regions.find(r => r.id === currentSubmapId);
-        setZoomScale(reg?.defaultZoom || 1);
-        setZoomPan({ x: reg?.defaultPanX || 0, y: reg?.defaultPanY || 0 });
+        setZoomScale(activeSubmapObj?.defaultZoom || reg?.defaultZoom || 1);
+        setZoomPan({
+          x: activeSubmapObj?.defaultPanX ?? reg?.defaultPanX ?? 0,
+          y: activeSubmapObj?.defaultPanY ?? reg?.defaultPanY ?? 0,
+        });
       } else {
         setZoomScale(mapConfig.defaultZoom || 1);
         setZoomPan(mapConfig.defaultPan || { x: 0, y: 0 });
       }
     }
-  }, [mapLoaded, currentSubmapId, activeMapType, activeGoogleStyle, computeCurrentLevelFitView, regions, mapConfig]);
-
-  // Gdy na bieżącym poziomie pojawią się współrzędne pinezek (np. po pierwszym pobraniu z Firestore), dopasuj widok 100% jeśli użytkownik nie ruszał mapy
-  const geoPinsCount = useMemo(
-    () => displayPins.filter(p => p.lat != null && p.lng != null).length,
-    [displayPins]
-  );
-  const prevGeoPinsCountRef = useRef(0);
-  useEffect(() => {
-    if (isGoogleMap && geoPinsCount >= 2 && prevGeoPinsCountRef.current < 2 && !isFramingGoogleMap) {
-      const fitted = computeCurrentLevelFitView();
-      setDraftGoogleView(prev => ({
-        ...prev,
-        lat: fitted.lat,
-        lng: fitted.lng,
-        zoom: fitted.zoom,
-      }));
-      setBaseGoogleZoom(fitted.zoom);
-    }
-    prevGeoPinsCountRef.current = geoPinsCount;
-  }, [isGoogleMap, geoPinsCount, isFramingGoogleMap, computeCurrentLevelFitView]);
+  }, [mapLoaded, currentSubmapId, currentSubmapTabId, activeSubmapObj, activeMapType, activeGoogleStyle, computeCurrentLevelFitView, regions, mapConfig]);
 
   // Jeśli rejon ma zapisany tekstowy googleQuery, ale nie miał jeszcze współrzędnych googleLat/googleLng, dogeokoduj je
   useEffect(() => {
@@ -306,11 +405,34 @@ export default function ShipyardMap({
     }
   }, [activeMapType, activeGoogleQuery, currentSubmapId, currentRegion, mapConfig.googleLat]);
 
+  // Jeśli w wybranym rodzaju mapy kadr domyślny nie został jeszcze wgrany/zapisany, wymuś tryb Ustawienie widoku
   useEffect(() => {
     if (mode !== 'edit') {
       setIsFramingGoogleMap(false);
+      setSelectedPinCandidate(null);
+      return;
     }
-  }, [mode]);
+    const canPin = selectedMapKind === 'google' ? hasSavedGoogleFrame : hasSavedImageFrame;
+    if (!canPin) {
+      setIsFramingGoogleMap(true);
+    }
+  }, [mode, selectedMapKind, hasSavedGoogleFrame, hasSavedImageFrame]);
+
+  const handleSelectMapType = useCallback(
+    (nextType) => {
+      setSelectedMapKind(nextType);
+      if (nextType === 'google') {
+        if (!hasSavedGoogleFrame) {
+          setIsFramingGoogleMap(true);
+        }
+      } else {
+        if (!hasSavedImageFrame) {
+          setIsFramingGoogleMap(true);
+        }
+      }
+    },
+    [hasSavedGoogleFrame, hasSavedImageFrame]
+  );
 
   const handleResetView100 = useCallback(() => {
     setZoomScale(1);
@@ -349,6 +471,120 @@ export default function ShipyardMap({
   const handleMapDrop = (e) => { e.preventDefault(); e.stopPropagation(); setMapDragActive(false); if (e.dataTransfer.files?.[0]) processMapFile(e.dataTransfer.files[0]); };
   const handleMapFileChange = (e) => { if (e.target.files?.[0]) processMapFile(e.target.files[0]); };
 
+  const buildRegionSubmapsUpdate = (updatedTabs) => {
+    const first = updatedTabs[0] || {};
+    const anyConfigured = updatedTabs.some(s => s.submapConfigured !== false && (s.mapImageUrl || s.mapType === 'google'));
+    return {
+      submaps: updatedTabs,
+      submapName: first.name || 'Podmapa 1',
+      mapType: first.mapType || 'image',
+      mapImageUrl: first.mapImageUrl || '',
+      submapConfigured: anyConfigured,
+      googleQuery: first.googleQuery || currentRegion?.googleQuery || currentRegion?.address || '',
+      googleLat: Number(first.googleLat ?? currentRegion?.googleLat ?? currentRegion?.lat) || 54.5364,
+      googleLng: Number(first.googleLng ?? currentRegion?.googleLng ?? currentRegion?.lng) || 18.5469,
+      googleZoom: Number(first.googleZoom ?? currentRegion?.googleZoom) || 17,
+      googleMapStyle: first.googleMapStyle || currentRegion?.googleMapStyle || 'k',
+      defaultZoom: Number(first.defaultZoom) || 1,
+      defaultPanX: Number(first.defaultPanX) || 0,
+      defaultPanY: Number(first.defaultPanY) || 0,
+    };
+  };
+
+  const handleAddParallelSubmap = async (customName = '') => {
+    if (!currentSubmapId || !currentRegion) return;
+    try {
+      const existing = regionSubmaps.length > 0
+        ? [...regionSubmaps]
+        : [
+            {
+              id: 'default',
+              name: currentRegion.submapName || 'Parter / Poziom 1',
+              mapType: currentRegion.mapType || 'image',
+              mapImageUrl: currentRegion.mapImageUrl || '',
+              googleQuery: currentRegion.googleQuery || currentRegion.address || '',
+              googleLat: activeGoogleLat,
+              googleLng: activeGoogleLng,
+              googleZoom: activeGoogleZoom,
+              googleMapStyle: activeGoogleStyle,
+              defaultZoom: 1,
+              defaultPanX: 0,
+              defaultPanY: 0,
+              submapConfigured: Boolean(currentRegion.mapImageUrl || (currentRegion.mapType === 'google' && currentRegion.submapConfigured !== false)),
+            },
+          ];
+
+      const nextIndex = existing.length + 1;
+      const newTabId = `sub_${Date.now()}`;
+      const newTab = {
+        id: newTabId,
+        name: customName.trim() || `Piętro ${nextIndex - 1} / Podmapa ${nextIndex}`,
+        mapType: 'image',
+        mapImageUrl: '',
+        googleQuery: currentRegion.address || '',
+        googleLat: activeGoogleLat,
+        googleLng: activeGoogleLng,
+        googleZoom: 17,
+        googleMapStyle: 'k',
+        defaultZoom: 1,
+        defaultPanX: 0,
+        defaultPanY: 0,
+        submapConfigured: false,
+      };
+      const updatedTabs = [...existing, newTab];
+      await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+      setCurrentSubmapTabId(newTabId);
+      setMode('edit');
+      setIsSettingsMinimized(false);
+    } catch (err) {
+      console.error('Błąd dodawania równorzędnej podmapy:', err);
+      alert('Błąd dodawania podmapy: ' + err.message);
+    }
+  };
+
+  const handleRenameParallelSubmap = async (tabId, newName) => {
+    if (!currentSubmapId || !currentRegion || !newName.trim()) return;
+    try {
+      const existing = regionSubmaps.length > 0
+        ? [...regionSubmaps]
+        : [
+            {
+              id: tabId || 'default',
+              name: newName.trim(),
+              mapType: currentRegion.mapType || 'image',
+              mapImageUrl: currentRegion.mapImageUrl || '',
+              googleQuery: currentRegion.googleQuery || currentRegion.address || '',
+              googleLat: activeGoogleLat,
+              googleLng: activeGoogleLng,
+              googleZoom: activeGoogleZoom,
+              googleMapStyle: activeGoogleStyle,
+              defaultZoom: currentRegion.defaultZoom || 1,
+              defaultPanX: currentRegion.defaultPanX || 0,
+              defaultPanY: currentRegion.defaultPanY || 0,
+              submapConfigured: Boolean(currentRegion.submapConfigured),
+            },
+          ];
+      const updatedTabs = existing.map(s =>
+        s.id === (tabId || existing[0]?.id) ? { ...s, name: newName.trim() } : s
+      );
+      await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+    } catch (err) {
+      console.error('Błąd zmiany nazwy podmapy:', err);
+    }
+  };
+
+  const handleDeleteParallelSubmap = async (tabId) => {
+    if (!currentSubmapId || !currentRegion || regionSubmaps.length <= 1) return;
+    if (!confirm('Czy na pewno chcesz usunąć tę równorzędną podmapę (piętro)?')) return;
+    try {
+      const updatedTabs = regionSubmaps.filter(s => s.id !== tabId);
+      await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+      setCurrentSubmapTabId(updatedTabs[0]?.id || 'default');
+    } catch (err) {
+      console.error('Błąd usuwania podmapy:', err);
+    }
+  };
+
   const processMapFile = (file) => {
     if (!file) return;
     setUploadingMap(true);
@@ -366,7 +602,34 @@ export default function ShipyardMap({
         try {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
           if (currentSubmapId !== null) {
-            await updateRegion(currentSubmapId, { mapImageUrl: url, mapType: 'image' });
+            const targetTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+            if (regionSubmaps.length > 0) {
+              const updatedTabs = regionSubmaps.map(s =>
+                s.id === targetTabId
+                  ? { ...s, mapImageUrl: url, mapType: 'image', submapConfigured: true }
+                  : s
+              );
+              await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+            } else {
+              const singleTab = [
+                {
+                  id: 'default',
+                  name: currentRegion?.submapName || 'Podmapa 1',
+                  mapType: 'image',
+                  mapImageUrl: url,
+                  googleQuery: currentRegion?.address || '',
+                  googleLat: activeGoogleLat,
+                  googleLng: activeGoogleLng,
+                  googleZoom: activeGoogleZoom,
+                  googleMapStyle: activeGoogleStyle,
+                  defaultZoom: 1,
+                  defaultPanX: 0,
+                  defaultPanY: 0,
+                  submapConfigured: true,
+                },
+              ];
+              await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(singleTab));
+            }
           } else {
             await updateMapSettings({ mapUrl: url, mapType: 'image' });
           }
@@ -385,21 +648,46 @@ export default function ShipyardMap({
   const handleSaveGoogleMapConfig = async ({ googleQuery, googleLat, googleLng, googleZoom, googleMapStyle }) => {
     try {
       const savedZoom = clampZoom(googleZoom ?? draftGoogleView.zoom ?? 17);
+      const savedLat = Number(googleLat ?? draftGoogleView.lat) || 54.5364;
+      const savedLng = Number(googleLng ?? draftGoogleView.lng) || 18.5469;
+      const savedStyle = googleMapStyle || draftGoogleView.style || 'k';
       const payload = {
         mapType: 'google',
-        googleQuery: googleQuery || `${Number(googleLat || draftGoogleView.lat).toFixed(5)}, ${Number(googleLng || draftGoogleView.lng).toFixed(5)}`,
-        googleLat: Number(googleLat ?? draftGoogleView.lat) || 54.5364,
-        googleLng: Number(googleLng ?? draftGoogleView.lng) || 18.5469,
+        submapConfigured: true,
+        googleQuery: googleQuery || `${savedLat.toFixed(5)}, ${savedLng.toFixed(5)}`,
+        googleLat: savedLat,
+        googleLng: savedLng,
         googleZoom: savedZoom,
-        googleMapStyle: googleMapStyle || draftGoogleView.style || 'k',
+        googleMapStyle: savedStyle,
       };
       if (currentSubmapId !== null) {
-        await updateRegion(currentSubmapId, {
-          ...payload,
-          defaultZoom: 1,
-          defaultPanX: 0,
-          defaultPanY: 0,
-        });
+        const targetTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+        if (regionSubmaps.length > 0) {
+          const updatedTabs = regionSubmaps.map(s =>
+            s.id === targetTabId
+              ? {
+                  ...s,
+                  ...payload,
+                  defaultZoom: 1,
+                  defaultPanX: 0,
+                  defaultPanY: 0,
+                }
+              : s
+          );
+          await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+        } else {
+          const singleTab = [
+            {
+              id: 'default',
+              name: currentRegion?.submapName || 'Podmapa 1',
+              ...payload,
+              defaultZoom: 1,
+              defaultPanX: 0,
+              defaultPanY: 0,
+            },
+          ];
+          await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(singleTab));
+        }
       } else {
         await updateMapSettings({
           ...payload,
@@ -408,6 +696,13 @@ export default function ShipyardMap({
           defaultPanY: 0,
         });
       }
+      setDraftGoogleView(prev => ({
+        ...prev,
+        lat: savedLat,
+        lng: savedLng,
+        zoom: savedZoom,
+        style: savedStyle,
+      }));
       setBaseGoogleZoom(savedZoom);
       setZoomScale(1);
       setZoomPan({ x: 0, y: 0 });
@@ -421,7 +716,15 @@ export default function ShipyardMap({
   const handleSwitchToImageMode = async () => {
     try {
       if (currentSubmapId !== null) {
-        await updateRegion(currentSubmapId, { mapType: 'image' });
+        const targetTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+        if (regionSubmaps.length > 0) {
+          const updatedTabs = regionSubmaps.map(s =>
+            s.id === targetTabId ? { ...s, mapType: 'image' } : s
+          );
+          await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+        } else {
+          await updateRegion(currentSubmapId, { mapType: 'image' });
+        }
       } else {
         await updateMapSettings({ mapType: 'image' });
       }
@@ -433,10 +736,21 @@ export default function ShipyardMap({
   const saveDefaultView = async () => {
     try {
       if (currentSubmapId !== null) {
-        await updateRegion(currentSubmapId, { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
+        const targetTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+        if (regionSubmaps.length > 0) {
+          const updatedTabs = regionSubmaps.map(s =>
+            s.id === targetTabId
+              ? { ...s, defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y }
+              : s
+          );
+          await updateRegion(currentSubmapId, buildRegionSubmapsUpdate(updatedTabs));
+        } else {
+          await updateRegion(currentSubmapId, { defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
+        }
       } else {
         await updateMapSettings({ defaultZoom: zoomScale, defaultPanX: zoomPan.x, defaultPanY: zoomPan.y });
       }
+      setIsFramingGoogleMap(false);
       alert(t('map_component.view_saved'));
     } catch (error) {
       console.error('Błąd zapisywania widoku:', error);
@@ -713,15 +1027,9 @@ export default function ShipyardMap({
       if (isGoogleMap && lat != null && lng != null) {
         updateData.lat = lat;
         updateData.lng = lng;
-        if (type === 'region') {
-          const targetReg = regions.find(r => r.id === id);
-          if (!targetReg?.mapImageUrl) {
-            updateData.mapType = 'google';
-            updateData.googleLat = lat;
-            updateData.googleLng = lng;
-            if (!targetReg?.googleZoom) updateData.googleZoom = 17;
-          }
-        }
+      }
+      if (currentSubmapId !== null) {
+        updateData.submapTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
       }
       if (type === 'machine') updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
       if (type === 'region') await updateRegion(id, updateData);
@@ -769,7 +1077,12 @@ export default function ShipyardMap({
     } else {
       setTempPos({ xPercent, yPercent });
     }
-    setEditingId('');
+    if (selectedPinCandidate) {
+      setEditingType(selectedPinCandidate.type);
+      setEditingId(selectedPinCandidate.id);
+    } else {
+      setEditingId('');
+    }
     setIsModalOpen(true);
   };
 
@@ -782,7 +1095,12 @@ export default function ShipyardMap({
       address: initialQuery || '',
       fromClick: true,
     });
-    setEditingId('');
+    if (selectedPinCandidate) {
+      setEditingType(selectedPinCandidate.type);
+      setEditingId(selectedPinCandidate.id);
+    } else {
+      setEditingId('');
+    }
     setIsModalOpen(true);
   };
 
@@ -822,44 +1140,29 @@ export default function ShipyardMap({
 
       if (editingType === 'machine') {
         updateData.pinnedOnMap = currentSubmapId === null ? 'main' : 'submap';
-        if (currentSubmapId !== null) updateData.regionId = currentSubmapId;
+        if (currentSubmapId !== null) {
+          updateData.regionId = currentSubmapId;
+          updateData.submapTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+        }
         await updateMachineRegion(editingId, updateData);
       } else {
         updateData.parentId = currentSubmapId || null;
-        if (isGoogleMap && pinLat != null && pinLng != null) {
-          const targetReg = regions.find(r => r.id === editingId);
-          if (!targetReg?.mapImageUrl) {
-            updateData.mapType = 'google';
-            updateData.googleLat = Number(pinLat);
-            updateData.googleLng = Number(pinLng);
-            updateData.googleZoom = targetReg?.googleZoom || 17;
-            if (pinAddress) updateData.googleQuery = pinAddress;
-          }
+        if (currentSubmapId !== null) {
+          updateData.submapTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
         }
         await updateRegion(editingId, updateData);
       }
 
-      // Jeśli przypięto po adresie spoza aktualnego kadru, płynnie pokaż wszystkie pinezki (lub nową pinezkę)
-      if (isGoogleMap && pinLat != null && pinLng != null) {
-        const otherPoints = displayPins
-          .filter(p => !(p.id === editingId && p.type === editingType) && p.lat != null && p.lng != null)
-          .map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
-        const allPoints = [...otherPoints, { lat: Number(pinLat), lng: Number(pinLng) }];
-        const nextFit = computeGoogleFitView(
-          allPoints,
-          { lat: Number(pinLat), lng: Number(pinLng), zoom: draftGoogleView.zoom },
-          imgBounds.width || 1000,
-          imgBounds.height || 700
-        );
+      // Jeśli przypięto po adresie (geoOverride) spoza aktualnego kadru, przesuń widok na nowy adres
+      if (isGoogleMap && geoOverride && pinLat != null && pinLng != null) {
         setDraftGoogleView(prev => ({
           ...prev,
-          lat: nextFit.lat,
-          lng: nextFit.lng,
-          zoom: nextFit.zoom,
+          lat: Number(pinLat),
+          lng: Number(pinLng),
         }));
-        setBaseGoogleZoom(nextFit.zoom);
       }
 
+      setSelectedPinCandidate(null);
       setIsModalOpen(false);
       setTempPos(null);
     } catch (error) {
@@ -988,7 +1291,17 @@ export default function ShipyardMap({
                 className={`w-full h-full object-contain transition-opacity duration-300 ${
                   mode === 'edit' ? 'opacity-80' : 'opacity-100'
                 } cursor-${
-                  mode === 'edit' ? (draggingPin ? 'grabbing' : 'crosshair') : isPanningMap ? 'grabbing' : 'grab'
+                  mode === 'edit'
+                    ? draggingPin
+                      ? 'grabbing'
+                      : isFramingGoogleMap
+                        ? isPanningMap
+                          ? 'grabbing'
+                          : 'grab'
+                        : 'crosshair'
+                    : isPanningMap
+                      ? 'grabbing'
+                      : 'grab'
                 }`}
                 onClick={handleMapClick}
                 draggable="false"
@@ -1021,7 +1334,7 @@ export default function ShipyardMap({
           </div>
 
           {/* Pływający pasek zapisu kadrowania Mapy Google */}
-          {mode === 'edit' && isFramingGoogleMap && (
+          {mode === 'edit' && isFramingGoogleMap && isGoogleMap && (
             <div
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -1045,7 +1358,7 @@ export default function ShipyardMap({
                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <i className="ph ph-floppy-disk text-sm"></i>
-                <span>{t('map_component.save_google_view', 'Wgraj ustawiony widok mapy')}</span>
+                <span>Ustaw jako domyślny kadr</span>
               </button>
             </div>
           )}
@@ -1062,49 +1375,24 @@ export default function ShipyardMap({
             </div>
           )}
 
-          {/* Pinezki (ukryte podczas kadrowania Mapy Google lub gdy brak podkładu) */}
+          {/* Pinezki */}
           <div
             className="absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out origin-center pointer-events-none"
             style={pinsTransformStyle}
           >
-            {(isGoogleMap || Boolean(currentMapUrl)) && !isFramingGoogleMap && imgBounds.width > 0 && (
+            {(isGoogleMap || Boolean(currentMapUrl)) && imgBounds.width > 0 && (
               <div
                 id="map-bounds-container"
                 className="absolute pointer-events-none overflow-hidden"
                 style={{ width: `${imgBounds.width}px`, height: `${imgBounds.height}px` }}
               >
-                {mode === 'edit' && !draggingPin && (
+                {mode === 'edit' && !isFramingGoogleMap && !draggingPin && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-auto flex flex-wrap items-center gap-2 justify-center z-10">
                     <div className="bg-amber-500/90 backdrop-blur text-white px-4 py-1.5 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap">
-                      {t('map_component.pin_hint')}
+                      {selectedPinCandidate
+                        ? `Kliknij na mapę, aby przypiąć: ${selectedPinCandidate.name}`
+                        : t('map_component.pin_hint')}
                     </div>
-                    {isGoogleMap && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenAddressPinModal('');
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <i className="ph ph-map-pin-line text-sm"></i>
-                          <span>{t('map_component.pin_by_address_full', 'Przypnij po adresie (miejscowość, ulica, nr)')}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsFramingGoogleMap(true);
-                            setIsSettingsMinimized(false);
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-full font-bold shadow-xl text-[10px] md:text-xs whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <i className="ph ph-arrows-out-cardinal text-sm"></i>
-                          <span>{t('map_component.frame_google_map_btn', 'Kadruj Mapę Google')}</span>
-                        </button>
-                      </>
-                    )}
                   </div>
                 )}
 
@@ -1112,7 +1400,7 @@ export default function ShipyardMap({
                   <MapPin
                     key={`${pin.type}-${pin.id}`}
                     pin={pin}
-                    mode={mode}
+                    mode={isFramingGoogleMap ? 'view' : mode}
                     modeType={modeType}
                     zoomScale={isGoogleMap ? 1 : zoomScale}
                     hoveredPin={hoveredPin}
@@ -1126,6 +1414,18 @@ export default function ShipyardMap({
                     handleDeletePin={handleDeletePin}
                     onNavigateToTickets={onNavigateToTickets}
                     setCurrentSubmapId={setCurrentSubmapId}
+                    onOpenSubmap={(regionId, submapTabId) => {
+                      setCurrentSubmapId(regionId);
+                      setCurrentSubmapTabId(submapTabId || null);
+                      setHoveredPin(null);
+                    }}
+                    onSetupSubmap={(regionId) => {
+                      setCurrentSubmapId(regionId);
+                      setCurrentSubmapTabId(null);
+                      setMode('edit');
+                      setIsSettingsMinimized(false);
+                      setHoveredPin(null);
+                    }}
                   />
                 ))}
               </div>
@@ -1154,8 +1454,21 @@ export default function ShipyardMap({
             setMode={setMode}
             currentSubmapId={currentSubmapId}
             setCurrentSubmapId={setCurrentSubmapId}
+            currentSubmapTabId={activeSubmapObj?.id || currentSubmapTabId}
+            setCurrentSubmapTabId={setCurrentSubmapTabId}
+            submapTabs={submapTabs}
+            onAddParallelSubmap={handleAddParallelSubmap}
+            onRenameParallelSubmap={handleRenameParallelSubmap}
+            onDeleteParallelSubmap={handleDeleteParallelSubmap}
             breadcrumbPath={breadcrumbPath}
-            activeMapType={activeMapType}
+            activeMapType={selectedMapKind}
+            onSelectMapType={handleSelectMapType}
+            hasSavedGoogleFrame={hasSavedGoogleFrame}
+            hasSavedImageFrame={hasSavedImageFrame}
+            unpinnedRegions={unpinnedRegions}
+            unpinnedMachines={unpinnedMachines}
+            selectedPinCandidate={selectedPinCandidate}
+            onSelectPinCandidate={setSelectedPinCandidate}
             activeGoogleQuery={activeGoogleQuery}
             activeGoogleLat={activeGoogleLat}
             activeGoogleLng={activeGoogleLng}
@@ -1185,6 +1498,7 @@ export default function ShipyardMap({
             handleMapDragEnter={handleMapDragEnter}
             handleMapDragLeave={handleMapDragLeave}
             handleMapDragOver={handleMapDragOver}
+            handleMapDragDrag={handleMapDragOver}
             handleMapDrop={handleMapDrop}
             isSettingsMinimized={isSettingsMinimized}
             setIsSettingsMinimized={setIsSettingsMinimized}
@@ -1200,6 +1514,7 @@ export default function ShipyardMap({
         editingId={editingId}
         setEditingId={setEditingId}
         currentSubmapId={currentSubmapId}
+        currentSubmapTabId={activeSubmapObj?.id || currentSubmapTabId}
         regions={regions}
         machines={machines}
         isGoogleMap={isGoogleMap}

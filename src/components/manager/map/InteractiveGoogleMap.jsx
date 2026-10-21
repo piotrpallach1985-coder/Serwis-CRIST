@@ -7,7 +7,7 @@ export const DEFAULT_ZOOM = 17;
 export function clampZoom(z) {
   const num = Number(z);
   if (!Number.isFinite(num)) return DEFAULT_ZOOM;
-  return Math.min(20, Math.max(5, Math.round(num * 100) / 100));
+  return Math.min(20, Math.max(5, Math.round(num * 1000) / 1000));
 }
 
 export function lngToWorldX(lng, zoom) {
@@ -204,10 +204,71 @@ export async function geocodeAddressQuery(queryStr) {
   return results.length > 0 ? results[0] : null;
 }
 
+export async function reverseGeocodeLatLng(lat, lng) {
+  const numLat = Number(lat);
+  const numLng = Number(lng);
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLng)) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${encodeURIComponent(numLat)}&lon=${encodeURIComponent(numLng)}`;
+    const res = await fetch(url, {
+      headers: { 'Accept-Language': 'pl,en' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.display_name) {
+      return {
+        lat: numLat,
+        lng: numLng,
+        displayName: data.display_name,
+      };
+    }
+  } catch (e) {
+    console.warn('Reverse geocoding error:', e);
+  }
+  return null;
+}
+
 function resolveGoogleLyrs(style) {
   if (style === 'm') return 'm';
   if (style === 's') return 's';
   return 'y';
+}
+
+function buildTilesForZoom(tileZ, centerLat, centerLng, width, height, scaleFactor, lyrs, keyPrefix = '') {
+  const maxTileIdx = Math.pow(2, tileZ);
+  const centerWx = lngToWorldX(centerLng, tileZ);
+  const centerWy = latToWorldY(centerLat, tileZ);
+
+  const effectiveWidth = width / scaleFactor;
+  const effectiveHeight = height / scaleFactor;
+
+  const minTx = Math.floor((centerWx - effectiveWidth / 2) / 256) - 1;
+  const maxTx = Math.floor((centerWx + effectiveWidth / 2) / 256) + 1;
+  const minTy = Math.floor((centerWy - effectiveHeight / 2) / 256) - 1;
+  const maxTy = Math.floor((centerWy + effectiveHeight / 2) / 256) + 1;
+
+  const tiles = [];
+  for (let tx = minTx; tx <= maxTx; tx++) {
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      if (ty < 0 || ty >= maxTileIdx) continue;
+      const wrappedTx = ((tx % maxTileIdx) + maxTileIdx) % maxTileIdx;
+      const serverIdx = Math.abs(tx + ty) % 4;
+      const left = width / 2 + (tx * 256 - centerWx);
+      const top = height / 2 + (ty * 256 - centerWy);
+      const src = `https://mt${serverIdx}.google.com/vt/lyrs=${lyrs}&x=${wrappedTx}&y=${ty}&z=${tileZ}&hl=pl`;
+      tiles.push(
+        <img
+          key={`${keyPrefix}${tileZ}-${tx}-${ty}-${lyrs}`}
+          src={src}
+          alt=""
+          draggable={false}
+          className="absolute w-[256px] h-[256px] max-w-none select-none pointer-events-none"
+          style={{ left: `${left}px`, top: `${top}px` }}
+        />
+      );
+    }
+  }
+  return tiles;
 }
 
 export default function InteractiveGoogleMap({
@@ -217,6 +278,8 @@ export default function InteractiveGoogleMap({
   mapStyle = 'k',
   interactive = true,
   showHintBar = false,
+  markerPosition = null,
+  onPickLocation,
   onViewChange,
   onClickCanvas,
   className = '',
@@ -231,6 +294,9 @@ export default function InteractiveGoogleMap({
   });
 
   const dragRef = useRef(null);
+  const pinchDistRef = useRef(null);
+  const prevTileZRef = useRef(Math.max(5, Math.min(20, Math.floor(clampZoom(zoom)))));
+  const [bgTileZ, setBgTileZ] = useState(prevTileZRef.current);
 
   useEffect(() => {
     const nextLat = Number(lat);
@@ -265,8 +331,9 @@ export default function InteractiveGoogleMap({
       if (!interactive) return;
       e.preventDefault();
       e.stopPropagation();
-      const rawStep = -e.deltaY * 0.0025;
-      const step = Math.abs(rawStep) > 0.02 ? Math.max(-0.4, Math.min(0.4, rawStep)) : (e.deltaY < 0 ? 0.25 : -0.25);
+      const deltaModeFactor = e.deltaMode === 1 ? 25 : 1;
+      const rawStep = -e.deltaY * deltaModeFactor * 0.0016;
+      const step = Math.abs(rawStep) > 0.01 ? Math.max(-0.28, Math.min(0.28, rawStep)) : (e.deltaY < 0 ? 0.15 : -0.15);
       setView(prev => {
         const nextZoom = clampZoom(prev.zoom + step);
         if (nextZoom === prev.zoom) return prev;
@@ -347,50 +414,106 @@ export default function InteractiveGoogleMap({
     const wasMoved = dragRef.current.moved;
     dragRef.current = null;
     setIsDragging(false);
-    if (!wasMoved && onClickCanvas) {
-      onClickCanvas(e);
+    if (!wasMoved) {
+      if (onPickLocation && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
+          const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
+          const picked = unprojectViewportPercentToLatLng(
+            xPercent,
+            yPercent,
+            view.lat,
+            view.lng,
+            view.zoom,
+            rect.width,
+            rect.height
+          );
+          if (picked) {
+            onPickLocation(picked);
+          }
+        }
+      }
+      if (onClickCanvas) {
+        onClickCanvas(e);
+      }
     }
+  };
+
+  const handleTouchStart = (e) => {
+    if (!interactive) return;
+    if (e.touches && e.touches.length === 2) {
+      dragRef.current = null;
+      setIsDragging(false);
+      pinchDistRef.current = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!interactive) return;
+    if (e.touches && e.touches.length === 2 && pinchDistRef.current) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (dist > 0 && pinchDistRef.current > 0) {
+        const ratio = dist / pinchDistRef.current;
+        const zoomDelta = Math.log2(ratio);
+        if (Math.abs(zoomDelta) > 0.005) {
+          pinchDistRef.current = dist;
+          setView(prev => {
+            const nextZoom = clampZoom(prev.zoom + zoomDelta);
+            const next = { ...prev, zoom: nextZoom };
+            if (onViewChange) onViewChange(next);
+            return next;
+          });
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchDistRef.current = null;
   };
 
   const z = clampZoom(view.zoom);
   const tileZ = Math.max(5, Math.min(20, Math.floor(z)));
   const fracScale = Math.pow(2, z - tileZ);
 
-  const maxTileIdx = Math.pow(2, tileZ);
-  const centerWx = lngToWorldX(view.lng, tileZ);
-  const centerWy = latToWorldY(view.lat, tileZ);
-
-  const effectiveWidth = size.width / fracScale;
-  const effectiveHeight = size.height / fracScale;
-
-  const minTx = Math.floor((centerWx - effectiveWidth / 2) / 256) - 1;
-  const maxTx = Math.floor((centerWx + effectiveWidth / 2) / 256) + 1;
-  const minTy = Math.floor((centerWy - effectiveHeight / 2) / 256) - 1;
-  const maxTy = Math.floor((centerWy + effectiveHeight / 2) / 256) + 1;
+  useEffect(() => {
+    if (tileZ !== prevTileZRef.current) {
+      setBgTileZ(prevTileZRef.current);
+      prevTileZRef.current = tileZ;
+    }
+  }, [tileZ]);
 
   const lyrs = resolveGoogleLyrs(mapStyle);
-  const tiles = [];
+  const tiles = buildTilesForZoom(tileZ, view.lat, view.lng, size.width, size.height, fracScale, lyrs, 'fg-');
 
-  for (let tx = minTx; tx <= maxTx; tx++) {
-    for (let ty = minTy; ty <= maxTy; ty++) {
-      if (ty < 0 || ty >= maxTileIdx) continue;
-      const wrappedTx = ((tx % maxTileIdx) + maxTileIdx) % maxTileIdx;
-      const serverIdx = Math.abs(tx + ty) % 4;
-      const left = size.width / 2 + (tx * 256 - centerWx);
-      const top = size.height / 2 + (ty * 256 - centerWy);
-      const src = `https://mt${serverIdx}.google.com/vt/lyrs=${lyrs}&x=${wrappedTx}&y=${ty}&z=${tileZ}&hl=pl`;
-      tiles.push(
-        <img
-          key={`${tileZ}-${tx}-${ty}-${lyrs}`}
-          src={src}
-          alt=""
-          draggable={false}
-          className="absolute w-[256px] h-[256px] max-w-none select-none pointer-events-none"
-          style={{ left: `${left}px`, top: `${top}px` }}
-        />
-      );
-    }
-  }
+  const showBgLayer = bgTileZ !== tileZ && Math.abs(z - bgTileZ) <= 2.2;
+  const bgScale = showBgLayer ? Math.pow(2, z - bgTileZ) : 1;
+  const bgTiles = showBgLayer
+    ? buildTilesForZoom(bgTileZ, view.lat, view.lng, size.width, size.height, bgScale, lyrs, 'bg-')
+    : null;
+
+  const projectedMarker =
+    markerPosition &&
+    Number.isFinite(Number(markerPosition.lat)) &&
+    Number.isFinite(Number(markerPosition.lng)) &&
+    (Number(markerPosition.lat) !== 0 || Number(markerPosition.lng) !== 0)
+      ? projectLatLngToViewportPercent(
+          Number(markerPosition.lat),
+          Number(markerPosition.lng),
+          view.lat,
+          view.lng,
+          z,
+          size.width,
+          size.height
+        )
+      : null;
 
   return (
     <div
@@ -400,18 +523,53 @@ export default function InteractiveGoogleMap({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className={`relative w-full h-full overflow-hidden bg-slate-900 select-none ${
-        interactive ? (isDragging ? 'cursor-grabbing' : onClickCanvas ? 'cursor-crosshair' : 'cursor-grab') : ''
+        interactive
+          ? isDragging
+            ? 'cursor-grabbing'
+            : onClickCanvas || onPickLocation
+              ? 'cursor-crosshair'
+              : 'cursor-grab'
+          : ''
       } ${className}`}
     >
+      {showBgLayer && (
+        <div
+          className="absolute inset-0 pointer-events-none origin-center"
+          style={{ transform: `scale(${bgScale})`, willChange: 'transform' }}
+        >
+          {bgTiles}
+        </div>
+      )}
       <div
-        className={`absolute inset-0 pointer-events-none origin-center ${
-          isDragging ? '' : 'transition-transform duration-150 ease-out'
-        }`}
-        style={{ transform: `scale(${fracScale})` }}
+        className="absolute inset-0 pointer-events-none origin-center"
+        style={{ transform: `scale(${fracScale})`, willChange: 'transform' }}
       >
         {tiles}
       </div>
+
+      {projectedMarker && (
+        <div
+          className="absolute z-30 pointer-events-none"
+          style={{
+            left: `${projectedMarker.xPercent}%`,
+            top: `${projectedMarker.yPercent}%`,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <div className="relative flex flex-col items-center">
+            <div className="bg-red-600 text-white w-8 h-8 rounded-full border-2 border-white shadow-xl flex items-center justify-center ring-4 ring-red-500/40">
+              <i className="ph-fill ph-map-pin text-lg"></i>
+            </div>
+            <div className="w-2.5 h-2.5 bg-red-600 rotate-45 -mt-1.5 border-r border-b border-white shadow"></div>
+            <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mt-0.5"></div>
+          </div>
+        </div>
+      )}
+
       {showHintBar && (
         <div className="absolute bottom-2 left-2 z-20 bg-slate-900/85 backdrop-blur px-2.5 py-1 rounded-md border border-emerald-500/50 text-[10px] font-mono text-emerald-300 pointer-events-none flex items-center gap-2 shadow">
           <i className="ph ph-arrows-out-cardinal text-xs"></i>
