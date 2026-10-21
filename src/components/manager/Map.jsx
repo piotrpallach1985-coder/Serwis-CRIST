@@ -296,18 +296,16 @@ export default function ShipyardMap({
       uRegions = activeRegions.filter(
         r =>
           !forbiddenIds.has(r.id) &&
-          (r.parentId === currentSubmapId || !r.parentId) &&
-          (!hasCoords(r) || r.parentId !== currentSubmapId)
+          !hasCoords(r) &&
+          (!r.parentId || r.parentId === currentSubmapId)
       );
     }
 
     const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
-    const activeTabId = activeSubmapObj?.id || currentSubmapTabId;
     let uMachines = [];
     if (currentSubmapId !== null) {
-      const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
-      uMachines = inRegion.filter(
-        m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, activeTabId)
+      uMachines = mainMachines.filter(
+        m => (!m.regionId || m.regionId === currentSubmapId) && !hasCoords(m)
       );
     } else {
       uMachines = mainMachines.filter(m => !hasCoords(m));

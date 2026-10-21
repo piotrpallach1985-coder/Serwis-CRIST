@@ -103,12 +103,16 @@ export default function MapEditModal({
         };
       } else {
         const forbiddenIds = getAncestorAndSelfIds(currentSubmapId);
-        const candidates = activeRegions.filter(
-          r => !forbiddenIds.has(r.id) && (r.parentId === currentSubmapId || !r.parentId)
-        );
         return {
-          unpinned: candidates.filter(r => !hasCoords(r) || r.parentId !== currentSubmapId),
-          pinned: candidates.filter(r => hasCoords(r) && r.parentId === currentSubmapId),
+          unpinned: activeRegions.filter(
+            r =>
+              !forbiddenIds.has(r.id) &&
+              !hasCoords(r) &&
+              (!r.parentId || r.parentId === currentSubmapId)
+          ),
+          pinned: activeRegions.filter(
+            r => !forbiddenIds.has(r.id) && hasCoords(r) && r.parentId === currentSubmapId
+          ),
         };
       }
     } else {
@@ -116,9 +120,7 @@ export default function MapEditModal({
       if (currentSubmapId !== null) {
         const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
         return {
-          unpinned: inRegion.filter(
-            m => !isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, currentSubmapTabId)
-          ),
+          unpinned: inRegion.filter(m => !hasCoords(m)),
           pinned: inRegion.filter(
             m => isMachinePinnedOnSubmap(m, currentSubmapId, activeRegions, currentSubmapTabId)
           ),
