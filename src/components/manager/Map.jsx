@@ -1000,10 +1000,18 @@ export default function ShipyardMap({
     const { id, type, xPercent, yPercent, lat, lng } = draggingPin;
     setDraggingPin(null);
     try {
-      const updateData = { xPercent, yPercent };
+      const updateData = {
+        xPercent,
+        yPercent,
+        pinnedOnMapType: isGoogleMap ? 'google' : 'image',
+      };
       if (isGoogleMap && lat != null && lng != null) {
         updateData.lat = lat;
         updateData.lng = lng;
+      } else if (!isGoogleMap) {
+        updateData.lat = null;
+        updateData.lng = null;
+        updateData.address = null;
       }
       if (currentSubmapId !== null) {
         updateData.submapTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
@@ -1108,11 +1116,19 @@ export default function ShipyardMap({
         }
       }
 
-      const updateData = { xPercent, yPercent };
+      const updateData = {
+        xPercent,
+        yPercent,
+        pinnedOnMapType: isGoogleMap ? 'google' : 'image',
+      };
       if (isGoogleMap && pinLat != null && pinLng != null) {
         updateData.lat = Number(pinLat);
         updateData.lng = Number(pinLng);
         if (pinAddress) updateData.address = pinAddress;
+      } else if (!isGoogleMap) {
+        updateData.lat = null;
+        updateData.lng = null;
+        updateData.address = null;
       }
 
       if (editingType === 'machine') {

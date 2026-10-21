@@ -29,7 +29,7 @@ export function useManagerData() {
     setTickets, setMachines, setReporters, setParts, setPartTransactions, 
     setServices, setPlannedServices, setNotifications, setActionItems, 
     setRoles, setRegions, setAllowTicketDeletion, setPlannedWarningDays, 
-    setBranding, setLimits 
+    setBranding, setLimits, setMapSettings
   } = useManagerStore.getState();
 
   useEffect(() => {
@@ -155,6 +155,20 @@ export function useManagerData() {
       }
     }, () => {});
 
+    const unsubMapSettings = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'map'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setMapSettings({
+          mapType: data.mapType || (data.googleQuery && !data.mapUrl ? 'google' : 'image'),
+          mapUrl: data.mapUrl || '',
+          googleLat: data.googleLat ?? null,
+          googleLng: data.googleLng ?? null,
+        });
+      } else {
+        setMapSettings({ mapType: 'image', mapUrl: '' });
+      }
+    }, () => {});
+
     // 2. DANE W CZASIE RZECZYWISTYM (REAL-TIME ONSNAPSHOT)
     
     // --- Tickets (aktywne, nie-zarchiwizowane; z filtrem assignedTo na poziomie zapytania dla only_assigned_tasks) ---
@@ -232,6 +246,7 @@ export function useManagerData() {
       unsubSettings();
       unsubBranding();
       unsubTenantRegistry();
+      unsubMapSettings();
       unsubTickets();
       unsubParts();
       unsubPlanned();

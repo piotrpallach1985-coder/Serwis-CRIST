@@ -24,6 +24,7 @@ export default function PlannedMaintenanceInfo({
 }) {
   const { t } = useTranslation();
   const branding = useManagerStore(state => state.branding || {});
+  const mapSettings = useManagerStore(state => state.mapSettings);
   const industryProfile = branding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
 
@@ -31,7 +32,7 @@ export default function PlannedMaintenanceInfo({
   const showResources = section === 'all' || section === 'resources';
   const showChecklist = section === 'all' || section === 'checklist';
 
-  const geo = resolveMachineGeoLocation(machine, regions);
+  const geo = resolveMachineGeoLocation(machine, regions, mapSettings);
   const navUrl = buildGoogleMapsNavigationUrl(geo);
   const ckobLabel = getCkobCategoryLabel(machine?.inspectionCategory);
   const completedGpsStr = formatGpsCheckIn(

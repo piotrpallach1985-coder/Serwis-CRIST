@@ -15,6 +15,7 @@ export const createAppSlice = (set) => ({
     companyLogoUrl: '',
     appLogoUrl: ''
   },
+  mapSettings: null,
   setNotifications: (notifications) => set({ notifications }),
   setAllowTicketDeletion: (allowTicketDeletion) => set({ allowTicketDeletion }),
   setTenantId: (tenantId) => set({ tenantId }),
@@ -25,4 +26,5 @@ export const createAppSlice = (set) => ({
   setGeminiPrice: (geminiPrice) => set({ geminiPrice }),
   setTranscribePrice: (transcribePrice) => set({ transcribePrice }),
   setBranding: (branding) => set({ branding }),
+  setMapSettings: (mapSettings) => set({ mapSettings }),
 });

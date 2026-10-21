@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { safeParseDate } from '../../../utils/dateHelpers';
+import { useManagerStore } from '../../../store/managerStore';
 import {
   resolveMachineGeoLocation,
   buildGoogleMapsNavigationUrl,
@@ -21,8 +22,9 @@ export default function MachineInfoCard({
   parts,
 }) {
   const { t } = useTranslation();
+  const mapSettings = useManagerStore(state => state.mapSettings);
 
-  const geo = resolveMachineGeoLocation(machine, regions);
+  const geo = resolveMachineGeoLocation(machine, regions, mapSettings);
   const navUrl = buildGoogleMapsNavigationUrl(geo);
   const fGasCalc = machine?.refrigerantType
     ? calculateCo2Equivalent(machine.refrigerantType, machine.refrigerantChargeKg)

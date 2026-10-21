@@ -251,48 +251,191 @@ export function formatFGasSummary(fGasData = {}) {
 }
 
 /**
- * Wyznacza dane geolokalizacyjne i adresowe maszyny (z maszyny lub z przypisanego rejonu/podmapy).
+ * Sprawdza, czy podmapa danego rejonu (lub wskazana zakładka podmapy) jest skonfigurowana
+ * i zwraca jej typ ('google' | 'image' | null).
  */
-export function resolveMachineGeoLocation(machine, regions = []) {
-  if (!machine) {
-    return {
-      lat: null,
-      lng: null,
-      address: '',
-      hasCoordinates: false,
-      hasAddress: false,
-      canNavigate: false,
-    };
+function getRegionSubmapEffectiveType(region, submapTabId = null) {
+  if (!region) return null;
+  if (Array.isArray(region.submaps) && region.submaps.length > 0) {
+    const tab =
+      (submapTabId && region.submaps.find(s => s.id === submapTabId)) ||
+      region.submaps[0];
+    if (!tab || tab.submapConfigured === false) return null;
+    if (tab.mapType === 'google') {
+      const hasGoogle = Boolean(
+        tab.submapConfigured === true ||
+          (tab.googleLat != null && tab.googleLng != null) ||
+          (tab.googleQuery && String(tab.googleQuery).trim() !== '')
+      );
+      return hasGoogle ? 'google' : null;
+    }
+    if (tab.mapImageUrl && String(tab.mapImageUrl).trim() !== '') {
+      return 'image';
+    }
+    if (tab.mapType === 'image' && tab.submapConfigured === true) {
+      return 'image';
+    }
+    return null;
   }
+
+  if (region.submapConfigured === false) return null;
+  if (region.mapType === 'google') {
+    const hasGoogle = Boolean(
+      region.submapConfigured === true ||
+        (region.googleLat != null && region.googleLng != null) ||
+        (region.googleQuery && String(region.googleQuery).trim() !== '')
+    );
+    return hasGoogle ? 'google' : null;
+  }
+  if (region.mapImageUrl && String(region.mapImageUrl).trim() !== '') {
+    return 'image';
+  }
+  if (region.mapType === 'image' && region.submapConfigured === true) {
+    return 'image';
+  }
+  return null;
+}
+
+/**
+ * Wyznacza dane geolokalizacyjne i adresowe maszyny (z maszyny lub z przypisanego rejonu).
+ * Zasady:
+ * 1. Brak pineski na Mapie Google -> brak przycisku "Nawiguj GPS" (nie bierzemy pod uwagę samych
+ *    współrzędnych kadru podmapy googleLat/googleLng).
+ * 2. Nawigacja działa TYLKO wtedy, gdy mapa nadrzędna ("mapa powyższa"), na której znajduje się
+ *    dana pineska, jest ustawiona na Mapę Google ('google'). Jeśli mapa nadrzędna jest ustawiona
+ *    jako JPG / PNG ('image'), nawigacja jest wyłączona.
+ */
+export function resolveMachineGeoLocation(machine, regions = [], mapSettings = null) {
+  const emptyResult = {
+    lat: null,
+    lng: null,
+    address: '',
+    hasCoordinates: false,
+    hasAddress: false,
+    canNavigate: false,
+  };
+
+  if (!machine) return emptyResult;
 
   const region = (regions || []).find(
     r => r.id === machine.regionId || (machine.regionName && r.name === machine.regionName)
   );
 
-  const rawLat = machine.gpsLat ?? machine.lat ?? machine.mapLat ?? region?.lat ?? region?.mapLat ?? region?.gpsLat ?? region?.googleLat ?? null;
-  const rawLng = machine.gpsLng ?? machine.lng ?? machine.mapLng ?? region?.lng ?? region?.mapLng ?? region?.gpsLng ?? region?.googleLng ?? null;
+  const mainMapType = mapSettings?.mapType || null;
 
-  const lat = rawLat !== null && rawLat !== '' && Number.isFinite(Number(rawLat)) ? Number(rawLat) : null;
-  const lng = rawLng !== null && rawLng !== '' && Number.isFinite(Number(rawLng)) ? Number(rawLng) : null;
+  // Współrzędne samej pinezki maszyny (bez googleLat/googleLng kadru!)
+  const mRawLat = machine.gpsLat ?? machine.lat ?? machine.mapLat ?? null;
+  const mRawLng = machine.gpsLng ?? machine.lng ?? machine.mapLng ?? null;
+  const mLat =
+    mRawLat !== null && mRawLat !== '' && Number.isFinite(Number(mRawLat))
+      ? Number(mRawLat)
+      : null;
+  const mLng =
+    mRawLng !== null && mRawLng !== '' && Number.isFinite(Number(mRawLng))
+      ? Number(mRawLng)
+      : null;
+  const mAddress = (machine.address || machine.mapAddress || '').trim();
+  const machinePinnedOnImage = machine.pinnedOnMapType === 'image';
+  const mHasPinGeo =
+    !machinePinnedOnImage && ((mLat !== null && mLng !== null) || mAddress.length > 0);
 
-  const address = (
-    machine.address ||
-    machine.mapAddress ||
-    region?.address ||
-    region?.mapAddress ||
-    ''
-  ).trim();
+  // 1. Maszyna przypięta bezpośrednio na Mapie Głównej (lub nie ma przypisanego rejonu)
+  if (machine.pinnedOnMap === 'main' || !region) {
+    if (mainMapType === 'image' || machinePinnedOnImage) {
+      return emptyResult;
+    }
+    if (!mHasPinGeo) return emptyResult;
+    return {
+      lat: mLat,
+      lng: mLng,
+      address: mAddress,
+      hasCoordinates: mLat !== null && mLng !== null,
+      hasAddress: mAddress.length > 0,
+      canNavigate: true,
+    };
+  }
 
-  const hasCoordinates = lat !== null && lng !== null;
-  const hasAddress = address.length > 0;
+  // 2. Maszyna należy do rejonu (Miejsca montażu)
+  const regionSubmapType = getRegionSubmapEffectiveType(region, machine.submapTabId);
+
+  // 2a. Jeśli rejon posiada własną podmapę, to ona jest "mapą powyższą" dla tego urządzenia
+  if (regionSubmapType !== null) {
+    // Jeśli podmapa rejonu jest ustawiona na JPG / PNG -> brak możliwości nawigacji
+    if (regionSubmapType !== 'google') {
+      return emptyResult;
+    }
+    // Podmapa rejonu to Mapa Google -> urządzenie MUSI mieć na niej postawioną pineskę
+    const hasPinOnSubmap =
+      mHasPinGeo &&
+      (machine.xPercent != null ||
+        machine.lat != null ||
+        machine.mapLat != null ||
+        machine.gpsLat != null);
+    if (!hasPinOnSubmap) {
+      return emptyResult;
+    }
+    return {
+      lat: mLat,
+      lng: mLng,
+      address: mAddress,
+      hasCoordinates: mLat !== null && mLng !== null,
+      hasAddress: mAddress.length > 0,
+      canNavigate: true,
+    };
+  }
+
+  // 2b. Rejon NIE posiada własnej podmapy -> "mapą powyższą" jest mapa, na której leży sam rejon
+  const parentRegion = region.parentId
+    ? (regions || []).find(r => r.id === region.parentId)
+    : null;
+  const parentMapTypeForRegion = parentRegion
+    ? getRegionSubmapEffectiveType(parentRegion, region.submapTabId)
+    : mainMapType;
+
+  // Jeśli mapa powyższa (np. Mapa Główna lub mapa nadrzędnego rejonu) to JPG / PNG -> brak nawigacji
+  if (parentMapTypeForRegion === 'image') {
+    return emptyResult;
+  }
+
+  if (mHasPinGeo) {
+    return {
+      lat: mLat,
+      lng: mLng,
+      address: mAddress,
+      hasCoordinates: mLat !== null && mLng !== null,
+      hasAddress: mAddress.length > 0,
+      canNavigate: true,
+    };
+  }
+
+  // Sprawdź czy sam rejon ma postawioną pineskę na Mapie Google (UWAGA: nie używamy googleLat/googleLng kadru!)
+  if (region.pinnedOnMapType === 'image') {
+    return emptyResult;
+  }
+  const rRawLat = region.lat ?? region.mapLat ?? region.gpsLat ?? null;
+  const rRawLng = region.lng ?? region.mapLng ?? region.gpsLng ?? null;
+  const rLat =
+    rRawLat !== null && rRawLat !== '' && Number.isFinite(Number(rRawLat))
+      ? Number(rRawLat)
+      : null;
+  const rLng =
+    rRawLng !== null && rRawLng !== '' && Number.isFinite(Number(rRawLng))
+      ? Number(rRawLng)
+      : null;
+  const rAddress = (region.address || region.mapAddress || '').trim();
+  const rHasPinGeo = (rLat !== null && rLng !== null) || rAddress.length > 0;
+
+  if (!rHasPinGeo) {
+    return emptyResult;
+  }
 
   return {
-    lat,
-    lng,
-    address,
-    hasCoordinates,
-    hasAddress,
-    canNavigate: hasCoordinates || hasAddress,
+    lat: rLat,
+    lng: rLng,
+    address: rAddress,
+    hasCoordinates: rLat !== null && rLng !== null,
+    hasAddress: rAddress.length > 0,
+    canNavigate: true,
   };
 }
 

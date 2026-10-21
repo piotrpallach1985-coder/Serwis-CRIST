@@ -21,6 +21,7 @@ export default function TicketMainColumnHeader({
 }) {
   const { t } = useTranslation();
   const branding = useManagerStore(state => state.branding || {});
+  const mapSettings = useManagerStore(state => state.mapSettings);
   const industryProfile = branding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
 
@@ -31,7 +32,8 @@ export default function TicketMainColumnHeader({
       regionName: currentTicket.regionName,
       address: currentTicket.address,
     },
-    regions
+    regions,
+    mapSettings
   );
   const navUrl = buildGoogleMapsNavigationUrl(geo);
   const gpsCheckInStr = formatGpsCheckIn(currentTicket.completedGps);

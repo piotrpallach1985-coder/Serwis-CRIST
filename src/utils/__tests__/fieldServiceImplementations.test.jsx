@@ -120,6 +120,72 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(buildGoogleMapsNavigationUrl(geo2)).toContain(
         'https://www.google.com/maps/dir/?api=1&destination=Gda%C5%84sk'
       );
+
+      // 3a. Gdy rejon ma podmapę Google, ale urządzenie NIE ma postawionej pineski -> brak nawigacji (nie bierzemy googleLat/googleLng kadru)
+      const regionsWithGoogleSubmap = [
+        {
+          id: 'gp010',
+          name: 'Gp-010',
+          mapType: 'google',
+          submapConfigured: true,
+          googleLat: 54.5364,
+          googleLng: 18.5469,
+        },
+      ];
+      const unpinnedMachineInGoogleRegion = {
+        id: 'm3',
+        name: 'Suwnica nieprzypięta',
+        regionId: 'gp010',
+      };
+      const geoUnpinned = resolveMachineGeoLocation(
+        unpinnedMachineInGoogleRegion,
+        regionsWithGoogleSubmap
+      );
+      expect(geoUnpinned.canNavigate).toBe(false);
+      expect(buildGoogleMapsNavigationUrl(geoUnpinned)).toBe('');
+
+      // 3b. Gdy urządzenie MA postawioną pineskę na podmapie Google -> nawigacja działa
+      const pinnedMachineInGoogleRegion = {
+        id: 'm4',
+        name: 'Suwnica przypięta na Google',
+        regionId: 'gp010',
+        xPercent: 45,
+        yPercent: 55,
+        lat: 54.5371,
+        lng: 18.5482,
+        pinnedOnMap: 'submap',
+        pinnedOnMapType: 'google',
+      };
+      const geoPinnedGoogle = resolveMachineGeoLocation(
+        pinnedMachineInGoogleRegion,
+        regionsWithGoogleSubmap
+      );
+      expect(geoPinnedGoogle.canNavigate).toBe(true);
+      expect(buildGoogleMapsNavigationUrl(geoPinnedGoogle)).toContain('54.5371%2C18.5482');
+
+      // 3c. Gdy mapa powyższa (podmapa rejonu lub Mapa Główna) jest ustawiona na JPG / PNG ('image') -> brak nawigacji
+      const regionsWithImageSubmap = [
+        {
+          id: 'gp010',
+          name: 'Gp-010',
+          mapType: 'image',
+          mapImageUrl: 'https://example.com/hala.png',
+          submapConfigured: true,
+        },
+      ];
+      const geoOnJpgSubmap = resolveMachineGeoLocation(
+        pinnedMachineInGoogleRegion,
+        regionsWithImageSubmap
+      );
+      expect(geoOnJpgSubmap.canNavigate).toBe(false);
+      expect(buildGoogleMapsNavigationUrl(geoOnJpgSubmap)).toBe('');
+
+      const geoOnJpgMainMap = resolveMachineGeoLocation(
+        { ...machineWithOwnCoords, pinnedOnMap: 'main' },
+        regions,
+        { mapType: 'image' }
+      );
+      expect(geoOnJpgMainMap.canNavigate).toBe(false);
     });
 
     it('formatuje potwierdzenie obecności GPS (Check-in)', () => {
