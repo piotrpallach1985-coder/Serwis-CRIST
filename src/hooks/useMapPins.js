@@ -2,6 +2,17 @@ import { useMemo } from 'react';
 import { TICKET_STATUS } from '../utils/constants';
 import { checkServiceUrgency } from '../utils/logicHelpers';
 
+const LEGACY_AUTO_SUBMAP_NAME_RE =
+  /^(Parter\s*\/\s*(Poziom|Podmapa)\s*\d+|Piętro\s*\d+\s*\/\s*Podmapa\s*\d+)$/i;
+
+function normalizeSubmapName(rawName, index) {
+  const trimmed = String(rawName || '').trim();
+  if (!trimmed || LEGACY_AUTO_SUBMAP_NAME_RE.test(trimmed)) {
+    return `Podmapa ${index + 1}`;
+  }
+  return trimmed;
+}
+
 export function getRegionSubmaps(region) {
   if (!region) return [];
   if (Array.isArray(region.submaps) && region.submaps.length > 0) {
@@ -18,7 +29,7 @@ export function getRegionSubmaps(region) {
           : Boolean(sub.mapImageUrl && String(sub.mapImageUrl).trim() !== ''));
       return {
         id: sub.id || (idx === 0 ? 'default' : `sub_${idx + 1}`),
-        name: sub.name || `Podmapa ${idx + 1}`,
+        name: normalizeSubmapName(sub.name, idx),
         mapType: mType,
         mapImageUrl: sub.mapImageUrl || '',
         googleQuery: sub.googleQuery || region.address || '',
@@ -48,7 +59,7 @@ export function getRegionSubmaps(region) {
     return [
       {
         id: 'default',
-        name: region.submapName || 'Podmapa 1',
+        name: normalizeSubmapName(region.submapName, 0),
         mapType: hasLegacyGoogle && !hasLegacyImage ? 'google' : region.mapType === 'google' ? 'google' : 'image',
         mapImageUrl: region.mapImageUrl || '',
         googleQuery: region.googleQuery || region.address || '',

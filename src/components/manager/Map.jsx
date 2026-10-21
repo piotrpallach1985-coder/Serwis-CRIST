@@ -499,7 +499,7 @@ export default function ShipyardMap({
         : [
             {
               id: 'default',
-              name: currentRegion.submapName || 'Parter / Poziom 1',
+              name: currentRegion.submapName || 'Podmapa 1',
               mapType: currentRegion.mapType || 'image',
               mapImageUrl: currentRegion.mapImageUrl || '',
               googleQuery: currentRegion.googleQuery || currentRegion.address || '',
@@ -518,7 +518,7 @@ export default function ShipyardMap({
       const newTabId = `sub_${Date.now()}`;
       const newTab = {
         id: newTabId,
-        name: customName.trim() || `Piętro ${nextIndex - 1} / Podmapa ${nextIndex}`,
+        name: customName.trim() || `Podmapa ${nextIndex}`,
         mapType: 'image',
         mapImageUrl: '',
         googleQuery: currentRegion.address || '',

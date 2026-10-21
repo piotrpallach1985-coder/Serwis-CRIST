@@ -63,7 +63,7 @@ export default function MapControls({
     (currentSubmapTabId && submapTabs.find(s => s.id === currentSubmapTabId)) ||
     submapTabs[0] ||
     null;
-  const [submapNameDraft, setSubmapNameDraft] = useState(activeTabObj?.name || 'Parter / Poziom 1');
+  const [submapNameDraft, setSubmapNameDraft] = useState(activeTabObj?.name || 'Podmapa 1');
 
   React.useEffect(() => {
     setTabType(activeMapType || 'image');
@@ -109,143 +109,262 @@ export default function MapControls({
 
   return (
     <>
-      {/* Ustawienia mapy / podmapy (z-[150] aby żadna pinezka nie prześwitywała przez menu) */}
-      {mode === 'edit' && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="absolute top-14 sm:top-16 left-4 z-[150] bg-white p-3 md:p-4 rounded-xl shadow-2xl w-72 sm:w-92 border border-amber-200 animate-fade-in transition-all pointer-events-auto"
-        >
-          {isSettingsMinimized ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsSettingsMinimized(false);
-              }}
-              className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2 w-full"
-            >
-              <i className="ph ph-sliders-horizontal text-amber-500 text-base"></i>
-              <span>
-                {t('map_component.map_options', 'Opcje Mapy')} (
-                {currentSubmapId ? currentRegionName : t('map_component.main_short', 'Główna')})
-              </span>
-            </button>
-          ) : (
+      {/* Kontener główny lewego górnego rogu (flex-col): gdy pasek górny zawija się przy dużej liczbie podmap, panel edycji i dodawania podmapy automatycznie przesuwa się w dół bez kolizji */}
+      <div className="absolute top-4 left-4 right-4 z-[150] flex flex-col items-start gap-2.5 pointer-events-none">
+        {/* Przyciski narzędzi i ścieżka podmap (górny pasek) */}
+        <div className="flex flex-wrap items-center gap-2 pointer-events-auto max-w-full">
+          {currentSubmapId && (
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 shadow-lg text-white">
+              <button
+                onClick={() => setCurrentSubmapId(parentSubmapId)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md text-[10px] md:text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Cofnij poziom wyżej"
+              >
+                <i className="ph ph-arrow-left text-sm"></i>
+                <span className="hidden sm:inline">
+                  {parentSubmapId ? t('map_component.level_up', 'Poziom wyżej') : t('map_component.main_map', 'Mapa Główna')}
+                </span>
+              </button>
+              <div className="hidden md:flex items-center gap-1 px-2 text-xs font-semibold overflow-x-auto">
+                <button
+                  onClick={() => setCurrentSubmapId(null)}
+                  className="text-slate-300 hover:text-white transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  {t('map_component.main_map', 'Mapa Główna')}
+                </button>
+                {breadcrumbPath.map((reg, idx) => (
+                  <React.Fragment key={reg.id}>
+                    <i className="ph ph-caret-right text-slate-500 text-[10px]"></i>
+                    <button
+                      onClick={() => setCurrentSubmapId(reg.id)}
+                      className={`whitespace-nowrap transition-colors cursor-pointer ${
+                        idx === breadcrumbPath.length - 1 ? 'text-amber-400 font-bold' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {reg.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+
+              {/* Pasek przełączania równorzędnych podmap (bez przycisku dodawania, który znajduje się w menu po lewej) */}
+              {submapTabs.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 pl-1.5 border-l border-slate-700">
+                  {submapTabs.map((sub) => {
+                    const isActive = (activeTabObj?.id || submapTabs[0]?.id) === sub.id;
+                    const dotColor =
+                      sub.status === PIN_STATUS.CRITICAL
+                        ? 'bg-red-500 animate-pulse'
+                        : sub.status === PIN_STATUS.IN_PROGRESS
+                          ? 'bg-blue-400'
+                          : sub.status === PIN_STATUS.WARNING
+                            ? 'bg-amber-400'
+                            : 'bg-emerald-400';
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setCurrentSubmapTabId && setCurrentSubmapTabId(sub.id)}
+                        className={`px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-amber-500 text-white shadow-sm'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                        }`}
+                        title={`Przełącz na podmapę: ${sub.name}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`}></span>
+                        <span className="whitespace-nowrap">{sub.name}</span>
+                        {sub.itemCount > 0 && (
+                          <span className="px-1 py-0.2 rounded bg-black/40 text-[9px] font-extrabold">
+                            {sub.itemCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {canEditMap && (
             <>
+              <button
+                onClick={() => setMode('view')}
+                className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${
+                  mode === 'view'
+                    ? 'bg-slate-900 text-white shadow-lg'
+                    : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'
+                }`}
+              >
+                <i className="ph ph-eye text-base sm:text-lg"></i>
+                <span className="hidden sm:inline">{t('map_component.preview')}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setMode('edit');
+                  if (setIsSettingsMinimized) setIsSettingsMinimized(false);
+                }}
+                className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${
+                  mode === 'edit'
+                    ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                    : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'
+                }`}
+              >
+                <i className="ph ph-pencil-simple text-base sm:text-lg"></i>
+                <span className="hidden sm:inline">{t('map_component.edit')}</span>
+              </button>
+            </>
+          )}
+          <button
+            onClick={toggleFullscreen}
+            className="px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white flex items-center gap-2 shadow-md"
+          >
+            <i className={`ph ${isFullscreen ? 'ph-corners-in' : 'ph-corners-out'} text-base sm:text-lg`}></i>
+            <span className="hidden sm:inline">
+              {isFullscreen ? t('map_component.close_fullscreen') : t('map_component.fullscreen')}
+            </span>
+          </button>
+        </div>
+
+        {/* Ustawienia mapy / podmapy (przesuwa się automatycznie w dół pod paskiem górnym przy dużej liczbie podmap) */}
+        {mode === 'edit' && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="relative bg-white p-3 md:p-4 rounded-xl shadow-2xl w-72 sm:w-92 max-h-[calc(100vh-7.5rem)] overflow-y-auto border border-amber-200 animate-fade-in transition-all pointer-events-auto"
+          >
+            {isSettingsMinimized ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsSettingsMinimized(true);
+                  setIsSettingsMinimized(false);
                 }}
-                className="absolute top-2 right-2 text-slate-400 hover:text-slate-700 p-1"
+                className="font-bold text-slate-800 text-[10px] md:text-sm flex items-center gap-2 w-full"
               >
-                <i className="ph ph-minus"></i>
-              </button>
-              <h3 className="font-bold text-slate-800 text-[10px] md:text-xs mb-2.5 border-b pb-2 flex items-center gap-1.5 pr-6 truncate">
-                <i className="ph ph-map-trifold text-amber-500 text-base"></i>
+                <i className="ph ph-sliders-horizontal text-amber-500 text-base"></i>
                 <span>
-                  {t('map_component.background_label', 'Podkład')}:{' '}
-                  {currentSubmapId
-                    ? `${currentRegionName}${activeTabObj?.name ? ` — ${activeTabObj.name}` : ''}`
-                    : t('map_component.main_map', 'Mapa Główna')}
+                  {t('map_component.map_options', 'Opcje Mapy')} (
+                  {currentSubmapId ? currentRegionName : t('map_component.main_short', 'Główna')})
                 </span>
-              </h3>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSettingsMinimized(true);
+                  }}
+                  className="absolute top-2 right-2 text-slate-400 hover:text-slate-700 p-1"
+                >
+                  <i className="ph ph-minus"></i>
+                </button>
+                <h3 className="font-bold text-slate-800 text-[10px] md:text-xs mb-2.5 border-b pb-2 flex items-center gap-1.5 pr-6 truncate">
+                  <i className="ph ph-map-trifold text-amber-500 text-base"></i>
+                  <span>
+                    {t('map_component.background_label', 'Podkład')}:{' '}
+                    {currentSubmapId
+                      ? `${currentRegionName}${activeTabObj?.name ? ` — ${activeTabObj.name}` : ''}`
+                      : t('map_component.main_map', 'Mapa Główna')}
+                  </span>
+                </h3>
 
-              {/* Równorzędne podmapy (np. piętra / poziomy dla jednego miejsca montażu) */}
-              {currentSubmapId && (
-                <div className="mb-3 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-[9px] md:text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1">
-                      <i className="ph ph-stack text-indigo-600 text-sm"></i>
-                      <span>Równorzędne podmapy / piętra ({ Math.max(1, submapTabs.length) })</span>
-                    </label>
+                {/* Równorzędne podmapy (domyślnie Podmapa 1, Podmapa 2... z możliwością zmiany w Zapisz nazwę) */}
+                {currentSubmapId && (
+                  <div className="mb-3 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[9px] md:text-[11px] font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1">
+                        <i className="ph ph-stack text-indigo-600 text-sm"></i>
+                        <span>Równorzędne podmapy ({Math.max(1, submapTabs.length)})</span>
+                      </label>
+                    </div>
+
+                    {submapTabs.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {submapTabs.map((sub, idx) => {
+                          const isActive = (activeTabObj?.id || submapTabs[0]?.id) === sub.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => setCurrentSubmapTabId && setCurrentSubmapTabId(sub.id)}
+                              className={`px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-indigo-600 text-white shadow-sm'
+                                  : 'bg-white text-slate-700 border border-indigo-200 hover:bg-indigo-100/60'
+                              }`}
+                            >
+                              <span>{idx + 1}. {sub.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Przycisk dodawania podmapy pod listą – przesuwa się w dół wraz z przybywaniem podmap */}
                     {onAddParallelSubmap && (
                       <button
                         type="button"
                         onClick={() => onAddParallelSubmap()}
-                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-                        title="Dodaj kolejną równorzędną podmapę (np. kolejne piętro budynku)"
+                        className="w-full px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[10px] md:text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                        title="Dodaj kolejną równorzędną podmapę"
                       >
                         <i className="ph ph-plus-bold"></i>
-                        <span>Dodaj podmapę / piętro</span>
+                        <span>Dodaj podmapę</span>
                       </button>
                     )}
-                  </div>
 
-                  {submapTabs.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {submapTabs.map((sub, idx) => {
-                        const isActive = (activeTabObj?.id || submapTabs[0]?.id) === sub.id;
-                        return (
-                          <button
-                            key={sub.id}
-                            type="button"
-                            onClick={() => setCurrentSubmapTabId && setCurrentSubmapTabId(sub.id)}
-                            className={`px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                              isActive
-                                ? 'bg-indigo-600 text-white shadow-sm'
-                                : 'bg-white text-slate-700 border border-indigo-200 hover:bg-indigo-100/60'
-                            }`}
-                          >
-                            <span>{idx + 1}. {sub.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <input
-                      type="text"
-                      value={submapNameDraft}
-                      onChange={e => setSubmapNameDraft(e.target.value)}
-                      onBlur={() => {
-                        if (
-                          onRenameParallelSubmap &&
-                          submapNameDraft.trim() &&
-                          submapNameDraft.trim() !== activeTabObj?.name
-                        ) {
-                          onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
-                        }
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (onRenameParallelSubmap && submapNameDraft.trim()) {
-                            onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
-                          }
-                        }
-                      }}
-                      placeholder="Nazwa (np. Parter, Piętro 1, Dach)"
-                      className="flex-1 px-2 py-1 text-xs border border-indigo-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    {onRenameParallelSubmap && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (submapNameDraft.trim()) {
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <input
+                        type="text"
+                        value={submapNameDraft}
+                        onChange={e => setSubmapNameDraft(e.target.value)}
+                        onBlur={() => {
+                          if (
+                            onRenameParallelSubmap &&
+                            submapNameDraft.trim() &&
+                            submapNameDraft.trim() !== activeTabObj?.name
+                          ) {
                             onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
                           }
                         }}
-                        className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded transition-colors cursor-pointer"
-                        title="Zapisz nazwę podmapy / piętra"
-                      >
-                        Zapisz nazwę
-                      </button>
-                    )}
-                    {submapTabs.length > 1 && onDeleteParallelSubmap && (
-                      <button
-                        type="button"
-                        onClick={() => onDeleteParallelSubmap(activeTabObj?.id)}
-                        className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold rounded transition-colors cursor-pointer"
-                        title="Usuń tę równorzędną podmapę"
-                      >
-                        <i className="ph ph-trash"></i>
-                      </button>
-                    )}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (onRenameParallelSubmap && submapNameDraft.trim()) {
+                              onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
+                            }
+                          }
+                        }}
+                        placeholder="Nazwa (np. Podmapa 1)"
+                        className="flex-1 px-2 py-1 text-xs border border-indigo-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      {onRenameParallelSubmap && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (submapNameDraft.trim()) {
+                              onRenameParallelSubmap(activeTabObj?.id || 'default', submapNameDraft.trim());
+                            }
+                          }}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded transition-colors cursor-pointer"
+                          title="Zapisz nazwę podmapy"
+                        >
+                          Zapisz nazwę
+                        </button>
+                      )}
+                      {submapTabs.length > 1 && onDeleteParallelSubmap && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteParallelSubmap(activeTabObj?.id)}
+                          className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold rounded transition-colors cursor-pointer"
+                          title="Usuń tę równorzędną podmapę"
+                        >
+                          <i className="ph ph-trash"></i>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* 1. Wybór rodzaju mapy: Mapa Google vs Mapa JPG / PNG */}
               <div className="mb-3">
@@ -600,132 +719,7 @@ export default function MapControls({
             </>
           )}
         </div>
-      )}
-
-      {/* Przyciski narzędzi i ścieżka podmap (górny lewy róg - z-[150] nad pinezkami) */}
-      <div className="absolute top-4 left-4 z-[150] flex flex-wrap items-center gap-2 pointer-events-auto max-w-[92%]">
-        {currentSubmapId && (
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 shadow-lg text-white">
-            <button
-              onClick={() => setCurrentSubmapId(parentSubmapId)}
-              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md text-[10px] md:text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Cofnij poziom wyżej"
-            >
-              <i className="ph ph-arrow-left text-sm"></i>
-              <span className="hidden sm:inline">
-                {parentSubmapId ? t('map_component.level_up', 'Poziom wyżej') : t('map_component.main_map', 'Mapa Główna')}
-              </span>
-            </button>
-            <div className="hidden md:flex items-center gap-1 px-2 text-xs font-semibold overflow-x-auto">
-              <button
-                onClick={() => setCurrentSubmapId(null)}
-                className="text-slate-300 hover:text-white transition-colors whitespace-nowrap cursor-pointer"
-              >
-                {t('map_component.main_map', 'Mapa Główna')}
-              </button>
-              {breadcrumbPath.map((reg, idx) => (
-                <React.Fragment key={reg.id}>
-                  <i className="ph ph-caret-right text-slate-500 text-[10px]"></i>
-                  <button
-                    onClick={() => setCurrentSubmapId(reg.id)}
-                    className={`whitespace-nowrap transition-colors cursor-pointer ${
-                      idx === breadcrumbPath.length - 1 ? 'text-amber-400 font-bold' : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    {reg.name}
-                  </button>
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* Pasek przełączania równorzędnych podmap (np. pięter w budynku) */}
-            {(submapTabs.length > 1 || (canEditMap && currentSubmapId)) && (
-              <div className="flex items-center gap-1 pl-1.5 border-l border-slate-700">
-                {submapTabs.map((sub) => {
-                  const isActive = (activeTabObj?.id || submapTabs[0]?.id) === sub.id;
-                  const dotColor =
-                    sub.status === PIN_STATUS.CRITICAL
-                      ? 'bg-red-500 animate-pulse'
-                      : sub.status === PIN_STATUS.IN_PROGRESS
-                        ? 'bg-blue-400'
-                        : sub.status === PIN_STATUS.WARNING
-                          ? 'bg-amber-400'
-                          : 'bg-emerald-400';
-                  return (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      onClick={() => setCurrentSubmapTabId && setCurrentSubmapTabId(sub.id)}
-                      className={`px-2.5 py-1 rounded-md text-[10px] md:text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-amber-500 text-white shadow-sm'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                      }`}
-                      title={`Przełącz na podmapę: ${sub.name}`}
-                    >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`}></span>
-                      <span className="whitespace-nowrap">{sub.name}</span>
-                      {sub.itemCount > 0 && (
-                        <span className="px-1 py-0.2 rounded bg-black/40 text-[9px] font-extrabold">
-                          {sub.itemCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-                {canEditMap && onAddParallelSubmap && (
-                  <button
-                    type="button"
-                    onClick={() => onAddParallelSubmap()}
-                    className="px-2 py-1 rounded-md text-[10px] md:text-xs font-bold bg-indigo-600/80 hover:bg-indigo-600 text-white flex items-center gap-1 transition-colors cursor-pointer"
-                    title="Dodaj równorzędną podmapę (np. kolejne piętro do tego budynku)"
-                  >
-                    <i className="ph ph-plus-bold"></i>
-                    <span className="hidden sm:inline">+ Podmapa / Piętro</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
         )}
-        {canEditMap && (
-          <>
-            <button
-              onClick={() => setMode('view')}
-              className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${
-                mode === 'view'
-                  ? 'bg-slate-900 text-white shadow-lg'
-                  : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'
-              }`}
-            >
-              <i className="ph ph-eye text-base sm:text-lg"></i>
-              <span className="hidden sm:inline">{t('map_component.preview')}</span>
-            </button>
-            <button
-              onClick={() => {
-                setMode('edit');
-                if (setIsSettingsMinimized) setIsSettingsMinimized(false);
-              }}
-              className={`px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs flex items-center gap-2 transition-all shadow-md ${
-                mode === 'edit'
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                  : 'bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white'
-              }`}
-            >
-              <i className="ph ph-pencil-simple text-base sm:text-lg"></i>
-              <span className="hidden sm:inline">{t('map_component.edit')}</span>
-            </button>
-          </>
-        )}
-        <button
-          onClick={toggleFullscreen}
-          className="px-3 py-1.5 sm:py-2 rounded-lg font-bold text-[9px] md:text-xs bg-white/90 backdrop-blur text-slate-700 border border-slate-300 hover:bg-white flex items-center gap-2 shadow-md"
-        >
-          <i className={`ph ${isFullscreen ? 'ph-corners-in' : 'ph-corners-out'} text-base sm:text-lg`}></i>
-          <span className="hidden sm:inline">
-            {isFullscreen ? t('map_component.close_fullscreen') : t('map_component.fullscreen')}
-          </span>
-        </button>
       </div>
 
       {/* Kontrolki powiększenia (prawy dolny róg - z-[150] nad pinezkami) */}

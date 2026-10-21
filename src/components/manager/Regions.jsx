@@ -38,6 +38,7 @@ export default function Regions() {
   const [mapImageUrl, setMapImageUrl] = useState('');
   const [submapsDraft, setSubmapsDraft] = useState([]);
   const [activeDraftTabId, setActiveDraftTabId] = useState('default');
+  const [submapNameInput, setSubmapNameInput] = useState('Podmapa 1');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -153,7 +154,7 @@ export default function Regions() {
     setGoogleLng(18.5469);
     setPinLat(54.5364);
     setPinLng(18.5469);
-    setHasPinOnMap(true);
+    setHasPinOnMap(false);
     setGoogleZoom(17);
     setGoogleMapStyle('k');
     setAddressSuggestions([]);
@@ -161,6 +162,7 @@ export default function Regions() {
     setMapImageUrl('');
     setSubmapsDraft([]);
     setActiveDraftTabId('default');
+    setSubmapNameInput('Podmapa 1');
     setUploadProgress(0);
     setEditingId(null);
   };
@@ -240,7 +242,7 @@ export default function Regions() {
             : [
                 {
                   id: 'default',
-                  name: 'Parter / Podmapa 1',
+                  name: 'Podmapa 1',
                   mapType: mapType === 'google' ? 'google' : 'image',
                   mapImageUrl: mapImageUrl || '',
                   file: mapFile || null,
@@ -290,21 +292,17 @@ export default function Regions() {
         mapType: effectiveMapType,
         submapConfigured,
         mapImageUrl: finalImageUrl,
-        address: resolvedAddress,
-        googleQuery:
-          effectiveMapType === 'google'
-            ? (resolvedAddress || `${Number(googleLat).toFixed(5)}, ${Number(googleLng).toFixed(5)}`)
-            : resolvedAddress,
-        googleLat: Number(googleLat) || 54.5364,
-        googleLng: Number(googleLng) || 18.5469,
-        googleZoom: Number(googleZoom) || 17,
-        googleMapStyle: googleMapStyle || 'k',
+        ...(submapConfigured && effectiveMapType === 'google'
+          ? {
+              googleQuery:
+                resolvedAddress || `${Number(googleLat).toFixed(5)}, ${Number(googleLng).toFixed(5)}`,
+              googleLat: Number(googleLat) || 54.5364,
+              googleLng: Number(googleLng) || 18.5469,
+              googleZoom: Number(googleZoom) || 17,
+              googleMapStyle: googleMapStyle || 'k',
+            }
+          : {}),
       };
-
-      if (hasPinOnMap && Number.isFinite(Number(pinLat)) && Number.isFinite(Number(pinLng))) {
-        payload.lat = Number(pinLat);
-        payload.lng = Number(pinLng);
-      }
 
       if (editingId) {
         const existing = regions.find(r => r.id === editingId);
@@ -340,34 +338,38 @@ export default function Regions() {
       if (existingSubmaps.length === 0) {
         const initSub = {
           id: 'default',
-          name: 'Parter / Podmapa 1',
+          name: 'Podmapa 1',
           mapType: initialTab === 'google' ? 'google' : 'image',
           mapImageUrl: '',
           file: null,
         };
         setSubmapsDraft([initSub]);
         setActiveDraftTabId('default');
+        setSubmapNameInput('Podmapa 1');
       } else {
         setSubmapsDraft(existingSubmaps.map(s => ({ ...s, file: null })));
         setActiveDraftTabId(existingSubmaps[0].id);
+        setSubmapNameInput(existingSubmaps[0].name || 'Podmapa 1');
       }
     } else if (configured && existingSubmaps.length > 0) {
       setMapType(existingSubmaps[0].mapType === 'google' ? 'google' : 'image');
       setSubmapsDraft(existingSubmaps.map(s => ({ ...s, file: null })));
       setActiveDraftTabId(existingSubmaps[0].id);
+      setSubmapNameInput(existingSubmaps[0].name || 'Podmapa 1');
     } else {
       setMapType('none');
       setSubmapsDraft([]);
       setActiveDraftTabId('default');
+      setSubmapNameInput('Podmapa 1');
     }
-    const initLat = Number(r.lat ?? r.googleLat) || 54.5364;
-    const initLng = Number(r.lng ?? r.googleLng) || 18.5469;
-    setGoogleQuery(r.address || r.googleQuery || '');
-    setGoogleLat(Number(r.googleLat ?? r.lat) || 54.5364);
-    setGoogleLng(Number(r.googleLng ?? r.lng) || 18.5469);
+    const initLat = Number(r.googleLat ?? r.lat) || 54.5364;
+    const initLng = Number(r.googleLng ?? r.lng) || 18.5469;
+    setGoogleQuery(r.googleQuery || r.address || '');
+    setGoogleLat(initLat);
+    setGoogleLng(initLng);
     setPinLat(initLat);
     setPinLng(initLng);
-    setHasPinOnMap(true);
+    setHasPinOnMap(false);
     setGoogleZoom(r.googleZoom || 17);
     setGoogleMapStyle(r.googleMapStyle || 'k');
     setAddressSuggestions([]);
@@ -506,15 +508,15 @@ export default function Regions() {
                       </div>
                     </div>
 
-                    {/* Sekcja adresu, pineski na mapie oraz konfiguracji podmapy */}
+                    {/* Konfiguracja podmapy miejsca montażu (opcjonalnie; lokalizację pineski ustawia się podczas edycji mapy) */}
                     <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <label className="block text-sm font-bold text-gray-800">
-                            Lokalizacja na mapie (Pineska) oraz Podmapa miejsca montażu
+                            Podmapa miejsca montażu (opcjonalnie)
                           </label>
                           <p className="text-xs text-gray-500">
-                            Wpisz adres (miejscowość, ulica) lub kliknij na mapie, aby postawić pineskę. Możesz też od razu ustawić podmapę.
+                            Lokalizację (pineskę) tego miejsca montażu ustawisz bezpośrednio podczas edycji mapy. Tutaj możesz opcjonalnie przypisać podmapy.
                           </p>
                         </div>
                         <div className="flex bg-gray-200/80 p-1 rounded-lg">
@@ -527,7 +529,7 @@ export default function Regions() {
                                 : 'text-gray-600 hover:text-gray-800'
                             }`}
                           >
-                            <i className="ph ph-map-pin text-sm"></i> Tylko pineska (bez podmapy)
+                            Brak podmapy
                           </button>
                           <button
                             type="button"
@@ -537,12 +539,13 @@ export default function Regions() {
                                 if (prev.length === 0) {
                                   const first = {
                                     id: 'default',
-                                    name: 'Parter / Podmapa 1',
+                                    name: 'Podmapa 1',
                                     mapType: 'google',
                                     mapImageUrl: mapImageUrl || '',
                                     file: mapFile || null,
                                   };
                                   setActiveDraftTabId('default');
+                                  setSubmapNameInput('Podmapa 1');
                                   return [first];
                                 }
                                 return prev.map(s =>
@@ -556,7 +559,7 @@ export default function Regions() {
                                 : 'text-gray-600 hover:text-gray-800'
                             }`}
                           >
-                            <i className="ph ph-globe-hemisphere-west text-sm"></i> Podmapa Google
+                            <i className="ph ph-globe-hemisphere-west text-sm"></i> Mapa Google
                           </button>
                           <button
                             type="button"
@@ -566,12 +569,13 @@ export default function Regions() {
                                 if (prev.length === 0) {
                                   const first = {
                                     id: 'default',
-                                    name: 'Parter / Podmapa 1',
+                                    name: 'Podmapa 1',
                                     mapType: 'image',
                                     mapImageUrl: mapImageUrl || '',
                                     file: mapFile || null,
                                   };
                                   setActiveDraftTabId('default');
+                                  setSubmapNameInput('Podmapa 1');
                                   return [first];
                                 }
                                 return prev.map(s =>
@@ -585,61 +589,24 @@ export default function Regions() {
                                 : 'text-gray-600 hover:text-gray-800'
                             }`}
                           >
-                            <i className="ph ph-image text-sm"></i> Podmapy z plików (JPG/PNG — np. piętra)
+                            <i className="ph ph-image text-sm"></i> Mapa JPG / PNG
                           </button>
                         </div>
                       </div>
 
                       {mapType !== 'none' && (
                         <div className="bg-indigo-50/60 border border-indigo-200 p-4 rounded-xl space-y-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <h4 className="text-xs md:text-sm font-bold text-indigo-950 flex items-center gap-1.5">
-                                <i className="ph ph-stack text-indigo-600 text-base"></i>
-                                <span>Równorzędne podmapy miejsca montażu (np. kilka pięter do jednego budynku)</span>
-                              </h4>
-                              <p className="text-[11px] text-indigo-700/80">
-                                Możesz dodać kilka równorzędnych podmap (np. Parter, Piętro 1, Piętro 2) bez tworzenia podmap w podmapach.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSubmapsDraft(prev => {
-                                  const base =
-                                    prev.length > 0
-                                      ? prev
-                                      : [
-                                          {
-                                            id: 'default',
-                                            name: 'Parter / Podmapa 1',
-                                            mapType: mapType === 'google' ? 'google' : 'image',
-                                            mapImageUrl: mapImageUrl || '',
-                                            file: mapFile || null,
-                                          },
-                                        ];
-                                  const nextNum = base.length + 1;
-                                  const newId = `sub_${Date.now()}`;
-                                  const added = {
-                                    id: newId,
-                                    name: `Piętro ${nextNum - 1} / Podmapa ${nextNum}`,
-                                    mapType: 'image',
-                                    mapImageUrl: '',
-                                    file: null,
-                                  };
-                                  setActiveDraftTabId(newId);
-                                  setMapType('image');
-                                  return [...base, added];
-                                });
-                              }}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <i className="ph ph-plus-bold"></i>
-                              <span>+ Dodaj równorzędną podmapę (np. piętro)</span>
-                            </button>
+                          <div>
+                            <h4 className="text-xs md:text-sm font-bold text-indigo-950 flex items-center gap-1.5">
+                              <i className="ph ph-stack text-indigo-600 text-base"></i>
+                              <span>Równorzędne podmapy miejsca montażu</span>
+                            </h4>
+                            <p className="text-[11px] text-indigo-700/80">
+                              Domyślny opis to Podmapa 1, Podmapa 2... Możesz zmienić nazwę wybranej podmapy i kliknąć „Zapisz nazwę”.
+                            </p>
                           </div>
 
-                          {/* Zakładki równorzędnych podmap */}
+                          {/* Zakładki równorzędnych podmap oraz przycisk dodawania przesuwający się w dół */}
                           {(() => {
                             const effectiveDrafts =
                               submapsDraft.length > 0
@@ -647,7 +614,7 @@ export default function Regions() {
                                 : [
                                     {
                                       id: 'default',
-                                      name: 'Parter / Podmapa 1',
+                                      name: 'Podmapa 1',
                                       mapType: mapType === 'google' ? 'google' : 'image',
                                       mapImageUrl: mapImageUrl || '',
                                       file: mapFile || null,
@@ -667,6 +634,7 @@ export default function Regions() {
                                         type="button"
                                         onClick={() => {
                                           setActiveDraftTabId(d.id);
+                                          setSubmapNameInput(d.name || `Podmapa ${idx + 1}`);
                                           setMapType(d.mapType === 'google' ? 'google' : 'image');
                                         }}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -685,53 +653,85 @@ export default function Regions() {
                                   })}
                                 </div>
 
+                                {/* Przycisk dodawania podmapy pod listą – przesuwa się w dół wraz z przybywaniem podmap */}
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSubmapsDraft(prev => {
+                                        const base =
+                                          prev.length > 0
+                                            ? prev
+                                            : [
+                                                {
+                                                  id: 'default',
+                                                  name: 'Podmapa 1',
+                                                  mapType: mapType === 'google' ? 'google' : 'image',
+                                                  mapImageUrl: mapImageUrl || '',
+                                                  file: mapFile || null,
+                                                },
+                                              ];
+                                        const nextNum = base.length + 1;
+                                        const newId = `sub_${Date.now()}`;
+                                        const defaultNewName = `Podmapa ${nextNum}`;
+                                        const added = {
+                                          id: newId,
+                                          name: defaultNewName,
+                                          mapType: 'image',
+                                          mapImageUrl: '',
+                                          file: null,
+                                        };
+                                        setActiveDraftTabId(newId);
+                                        setSubmapNameInput(defaultNewName);
+                                        setMapType('image');
+                                        return [...base, added];
+                                      });
+                                    }}
+                                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                                  >
+                                    <i className="ph ph-plus-bold"></i>
+                                    <span>Dodaj podmapę</span>
+                                  </button>
+                                </div>
+
                                 <div className="bg-white border border-indigo-200 p-3.5 rounded-xl space-y-3">
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                                     <div>
                                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                                        Nazwa podmapy / piętra
+                                        Nazwa podmapy
                                       </label>
-                                      <input
-                                        type="text"
-                                        value={currentDraft.name}
-                                        onChange={e => {
-                                          const val = e.target.value;
-                                          setSubmapsDraft(prev => {
-                                            const list = prev.length > 0 ? prev : effectiveDrafts;
-                                            return list.map(item =>
-                                              item.id === currentDraft.id ? { ...item, name: val } : item
-                                            );
-                                          });
-                                        }}
-                                        placeholder="np. Parter, Piętro 1, Piętro 2, Dach"
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
-                                      />
+                                      <div className="flex gap-1.5">
+                                        <input
+                                          type="text"
+                                          value={submapNameInput}
+                                          onChange={e => setSubmapNameInput(e.target.value)}
+                                          placeholder="Podmapa"
+                                          className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const trimmed = submapNameInput.trim() || 'Podmapa 1';
+                                            setSubmapNameInput(trimmed);
+                                            setSubmapsDraft(prev => {
+                                              const list = prev.length > 0 ? prev : effectiveDrafts;
+                                              return list.map(item =>
+                                                item.id === currentDraft.id ? { ...item, name: trimmed } : item
+                                              );
+                                            });
+                                          }}
+                                          className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors shrink-0 cursor-pointer"
+                                        >
+                                          Zapisz nazwę
+                                        </button>
+                                      </div>
                                     </div>
 
                                     <div>
                                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                                        Rodzaj podkładu tej podmapy
+                                        Rodzaj mapy
                                       </label>
                                       <div className="flex bg-slate-100 p-1 rounded-lg">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setMapType('image');
-                                            setSubmapsDraft(prev => {
-                                              const list = prev.length > 0 ? prev : effectiveDrafts;
-                                              return list.map(item =>
-                                                item.id === currentDraft.id ? { ...item, mapType: 'image' } : item
-                                              );
-                                            });
-                                          }}
-                                          className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-md transition-all ${
-                                            currentDraft.mapType !== 'google'
-                                              ? 'bg-white text-blue-600 shadow-xs'
-                                              : 'text-slate-600'
-                                          }`}
-                                        >
-                                          Plik JPG / PNG
-                                        </button>
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -751,6 +751,25 @@ export default function Regions() {
                                         >
                                           Mapa Google
                                         </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMapType('image');
+                                            setSubmapsDraft(prev => {
+                                              const list = prev.length > 0 ? prev : effectiveDrafts;
+                                              return list.map(item =>
+                                                item.id === currentDraft.id ? { ...item, mapType: 'image' } : item
+                                              );
+                                            });
+                                          }}
+                                          className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-md transition-all ${
+                                            currentDraft.mapType !== 'google'
+                                              ? 'bg-white text-blue-600 shadow-xs'
+                                              : 'text-slate-600'
+                                          }`}
+                                        >
+                                          Mapa JPG / PNG
+                                        </button>
                                       </div>
                                     </div>
 
@@ -762,6 +781,7 @@ export default function Regions() {
                                             const remaining = effectiveDrafts.filter(item => item.id !== currentDraft.id);
                                             setSubmapsDraft(remaining);
                                             setActiveDraftTabId(remaining[0]?.id || 'default');
+                                            setSubmapNameInput(remaining[0]?.name || 'Podmapa 1');
                                           }}
                                           className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                                         >
@@ -772,7 +792,7 @@ export default function Regions() {
                                     </div>
                                   </div>
 
-                                  {currentDraft.mapType !== 'google' && (
+                                  {currentDraft.mapType !== 'google' ? (
                                     <div className="pt-2 border-t border-slate-100">
                                       <label className="block text-xs font-bold text-blue-900 mb-1.5">
                                         Wgraj plik podmapy dla: <span className="text-indigo-600">{currentDraft.name || 'Podmapa'}</span> (JPG lub PNG)
@@ -824,6 +844,37 @@ export default function Regions() {
                                         </div>
                                       )}
                                     </div>
+                                  ) : (
+                                    <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                                        <span>
+                                          Przesuń mapę myszką i przybliż rolką, aby ustawić domyślny widok tej podmapy Google.
+                                        </span>
+                                        <select
+                                          value={googleMapStyle}
+                                          onChange={e => setGoogleMapStyle(e.target.value)}
+                                          className="p-1.5 border border-emerald-300 rounded-md text-xs bg-white text-slate-800 font-semibold"
+                                        >
+                                          <option value="k">Satelita + Ulice</option>
+                                          <option value="s">Satelita (czysty)</option>
+                                          <option value="m">Drogowa</option>
+                                        </select>
+                                      </div>
+                                      <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-inner bg-slate-900">
+                                        <InteractiveGoogleMap
+                                          lat={googleLat}
+                                          lng={googleLng}
+                                          zoom={googleZoom}
+                                          mapStyle={googleMapStyle}
+                                          interactive={true}
+                                          onViewChange={(next) => {
+                                            setGoogleLat(next.lat);
+                                            setGoogleLng(next.lng);
+                                            setGoogleZoom(next.zoom);
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               </>
@@ -831,127 +882,6 @@ export default function Regions() {
                           })()}
                         </div>
                       )}
-
-                      {/* Wyszukiwarka adresu z podpowiedziami + duża interaktywna mapa z pineską */}
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="md:col-span-2 relative">
-                            <label className="block text-xs font-bold text-gray-700 mb-1">
-                              Adres miejsca montażu (Miejscowość, ulica i numer) — podpowiedzi na żywo
-                            </label>
-                            <div className="flex gap-1.5">
-                              <input
-                                type="text"
-                                value={googleQuery}
-                                onChange={e => setGoogleQuery(e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSearchRegionGeo();
-                                  }
-                                }}
-                                className="flex-1 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
-                                placeholder="np. Gdynia, ul. Cechowa 5 lub Gdańsk, Długa 10"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleSearchRegionGeo}
-                                disabled={searchingGeo || !googleQuery.trim()}
-                                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shrink-0"
-                              >
-                                <i className={`ph ${searchingGeo ? 'ph-spinner-gap animate-spin' : 'ph-magnifying-glass'}`}></i>
-                                <span>Szukaj</span>
-                              </button>
-                            </div>
-
-                            {addressSuggestions.length > 0 && (
-                              <div className="mt-1 max-h-40 overflow-y-auto bg-white border border-emerald-300 rounded-lg divide-y divide-slate-100 text-xs shadow-lg z-30">
-                                {addressSuggestions.map((sug, idx) => (
-                                  <button
-                                    key={`${sug.lat}-${sug.lng}-${idx}`}
-                                    type="button"
-                                    onClick={() => {
-                                      skipSuggestRef.current = true;
-                                      setGoogleQuery(sug.displayName);
-                                      setGoogleLat(sug.lat);
-                                      setGoogleLng(sug.lng);
-                                      setPinLat(sug.lat);
-                                      setPinLng(sug.lng);
-                                      setHasPinOnMap(true);
-                                      setAddressSuggestions([]);
-                                    }}
-                                    className="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors flex items-start gap-2 text-slate-700"
-                                  >
-                                    <i className="ph-fill ph-map-pin text-red-600 shrink-0 mt-0.5"></i>
-                                    <span className="line-clamp-2">{sug.displayName}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-xs font-bold text-gray-700 mb-1">Widok mapy</label>
-                              <select
-                                value={googleMapStyle}
-                                onChange={e => setGoogleMapStyle(e.target.value)}
-                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
-                              >
-                                <option value="k">Satelita + Ulice</option>
-                                <option value="s">Satelita (czysty)</option>
-                                <option value="m">Drogowa</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-gray-700 mb-1">
-                                Zoom ({Number(googleZoom).toFixed(1)})
-                              </label>
-                              <input
-                                type="number"
-                                step="0.25"
-                                min="5"
-                                max="20"
-                                value={googleZoom}
-                                onChange={e => setGoogleZoom(Number(e.target.value) || 17)}
-                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-white px-3 py-2 rounded-lg border border-slate-200">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            <i className="ph-fill ph-map-pin text-red-600 text-base"></i>
-                            <span>
-                              Pineska na mapie:{' '}
-                              <strong className="font-mono text-slate-800">
-                                {Number(pinLat).toFixed(5)}, {Number(pinLng).toFixed(5)}
-                              </strong>
-                            </span>
-                          </span>
-                          <span className="text-[11px] text-emerald-700 font-semibold">
-                            Kliknij w dowolne miejsce na mapie, aby przesunąć pineskę • Rolka myszy przybliża/oddala
-                          </span>
-                        </div>
-
-                        <div className="w-full h-80 md:h-[420px] rounded-xl overflow-hidden border-2 border-emerald-400 shadow-inner bg-slate-900">
-                          <InteractiveGoogleMap
-                            lat={googleLat}
-                            lng={googleLng}
-                            zoom={googleZoom}
-                            mapStyle={googleMapStyle}
-                            interactive={true}
-                            markerPosition={hasPinOnMap ? { lat: pinLat, lng: pinLng } : null}
-                            onPickLocation={handlePickLocationOnMap}
-                            onViewChange={(next) => {
-                              setGoogleLat(next.lat);
-                              setGoogleLng(next.lng);
-                              setGoogleZoom(next.zoom);
-                            }}
-                          />
-                        </div>
-                      </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 mt-2 border-t border-gray-100">
@@ -1164,7 +1094,7 @@ export default function Regions() {
                             return (
                               <div className="flex flex-col items-center gap-1">
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold">
-                                  <i className="ph ph-stack"></i> {configuredSubs.length} podmapy / piętra
+                                  <i className="ph ph-stack"></i> {configuredSubs.length} podmapy
                                 </span>
                                 <div className="flex flex-wrap justify-center gap-1">
                                   {configuredSubs.map((sub) => (
@@ -1196,7 +1126,7 @@ export default function Regions() {
                                   onClick={() => handleEdit(r)}
                                   className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                                 >
-                                  + Dodaj kolejną podmapę / piętro
+                                  + Dodaj podmapę
                                 </button>
                               </div>
                             );
@@ -1222,7 +1152,7 @@ export default function Regions() {
                                   onClick={() => handleEdit(r)}
                                   className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                                 >
-                                  + Dodaj kolejną podmapę / piętro
+                                  + Dodaj podmapę
                                 </button>
                               </div>
                             );
