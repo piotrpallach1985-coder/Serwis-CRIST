@@ -7,6 +7,7 @@ import {
   buildGoogleMapsNavigationUrl,
   calculateCo2Equivalent,
   getCkobCategoryLabel,
+  getIndustryProfileConfig,
 } from '../../../utils/fieldServiceHelpers';
 
 export default function MachineInfoCard({
@@ -23,24 +24,47 @@ export default function MachineInfoCard({
 }) {
   const { t } = useTranslation();
   const mapSettings = useManagerStore(state => state.mapSettings);
+  const branding = useManagerStore(state => state.branding || {});
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const geo = resolveMachineGeoLocation(machine, regions, mapSettings);
   const navUrl = buildGoogleMapsNavigationUrl(geo);
-  const fGasCalc = machine?.refrigerantType
-    ? calculateCo2Equivalent(machine.refrigerantType, machine.refrigerantChargeKg)
-    : null;
-  const ckobLabel = getCkobCategoryLabel(machine?.inspectionCategory);
+
+  const showCkob = industryProfile === 'facility';
+  const showFGas =
+    industryProfile === 'hvac' ||
+    (industryProfile === 'facility' && machine?.inspectionCategory === 'hvac_kotlownia');
+  const showContact = industryProfile === 'facility' || industryProfile === 'hvac';
+
+  const fGasCalc =
+    showFGas && machine?.refrigerantType
+      ? calculateCo2Equivalent(machine.refrigerantType, machine.refrigerantChargeKg)
+      : null;
+  const ckobLabel = showCkob ? getCkobCategoryLabel(machine?.inspectionCategory) : '';
   const hasExtendedInfo = Boolean(
     geo.hasAddress ||
-      machine?.contactPerson ||
-      machine?.contactPhone ||
-      machine?.accessNotes ||
+      (showContact &&
+        (machine?.contactPerson || machine?.contactPhone || machine?.accessNotes)) ||
       ckobLabel ||
-      machine?.refrigerantType
+      (fGasCalc && fGasCalc.refrigerantType)
   );
 
   return (
-    <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 flex flex-col gap-2">
+    <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+      <div
+        data-testid="machine-profile-banner"
+        className={`px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b ${profileConfig.bannerClass}`}
+      >
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold tracking-wide">
+          <i className={`ph ${profileConfig.icon} text-base sm:text-lg`}></i>
+          <span>{profileConfig.machineCardTitle}</span>
+        </div>
+        <span className="text-[10px] sm:text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-white/15 text-white border border-white/20">
+          {profileConfig.shortName}
+        </span>
+      </div>
+      <div className="p-4 md:p-6 flex flex-col gap-2">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl shrink-0">
@@ -146,13 +170,12 @@ export default function MachineInfoCard({
         </div>
       </div>
 
-      {/* DANE BRANŻOWE: ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) */}
+      {/* DANE BRANŻOWE: ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) — w Przemysł/Stocznia (industrial) c-KOB i F-Gazy są zablokowane */}
       {hasExtendedInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-2.5">
           {(geo.hasAddress ||
-            machine.contactPerson ||
-            machine.contactPhone ||
-            machine.accessNotes) && (
+            (showContact &&
+              (machine.contactPerson || machine.contactPhone || machine.accessNotes))) && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {geo.hasAddress && (
                 <div>
@@ -164,10 +187,12 @@ export default function MachineInfoCard({
                   </span>
                 </div>
               )}
-              {(machine.contactPerson || machine.contactPhone) && (
+              {showContact && (machine.contactPerson || machine.contactPhone) && (
                 <div>
                   <span className="text-slate-400 font-bold uppercase text-[10px] block">
-                    Klient / Osoba kontaktowa
+                    {industryProfile === 'facility'
+                      ? 'Lokator / Zarządca'
+                      : 'Klient / Osoba kontaktowa'}
                   </span>
                   <span className="font-bold text-slate-800 flex items-center gap-2 flex-wrap">
                     {machine.contactPerson && <span>{machine.contactPerson}</span>}
@@ -182,10 +207,12 @@ export default function MachineInfoCard({
                   </span>
                 </div>
               )}
-              {machine.accessNotes && (
+              {showContact && machine.accessNotes && (
                 <div className="sm:col-span-2">
                   <span className="text-slate-400 font-bold uppercase text-[10px] block">
-                    Dostęp / Domofon / Klucze
+                    {industryProfile === 'facility'
+                      ? 'Dostęp / Domofon / Klucze'
+                      : 'Dostęp / Wskazówki'}
                   </span>
                   <span className="font-semibold text-slate-700">{machine.accessNotes}</span>
                 </div>
@@ -194,8 +221,11 @@ export default function MachineInfoCard({
           )}
 
           {ckobLabel && (
-            <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl px-3 py-2 text-xs flex items-center gap-2 text-indigo-900">
-              <i className="ph ph-buildings text-base text-indigo-600 shrink-0"></i>
+            <div
+              data-testid="machine-ckob-badge"
+              className="bg-amber-50/80 border border-amber-200 rounded-xl px-3 py-2 text-xs flex items-center gap-2 text-amber-900"
+            >
+              <i className="ph ph-buildings text-base text-amber-700 shrink-0"></i>
               <div>
                 <span className="font-bold">Kategoria c-KOB / Przeglądu: </span>
                 <span>{ckobLabel}</span>
@@ -307,6 +337,7 @@ export default function MachineInfoCard({
           </div>
         );
       })()}
+      </div>
     </div>
   );
 }

@@ -62,9 +62,14 @@ export default function TicketMainColumnStepper({
     : null;
 
   const canShowFGasSection =
-    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType);
+    industryProfile !== 'industrial' &&
+    (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType));
 
   useEffect(() => {
+    if (industryProfile === 'industrial') {
+      setShowFGasSection(false);
+      return;
+    }
     if (currentMachine?.refrigerantType) {
       setRefrigerantType(currentMachine.refrigerantType);
       setShowFGasSection(true);

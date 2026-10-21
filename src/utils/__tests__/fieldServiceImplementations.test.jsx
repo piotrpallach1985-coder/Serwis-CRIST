@@ -17,6 +17,7 @@ import {
 } from '../fieldServiceHelpers';
 import SignaturePad from '../../components/shared/SignaturePad';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
+import MachineForm from '../../components/manager/MachineForm';
 import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
@@ -351,7 +352,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(formatted).not.toContain('clientSignature');
     });
 
-    it('wyświetla przycisk Nawiguj GPS, dane F-Gaz (CRO) i dane klienta w MachineInfoCard', () => {
+    it('wyświetla przycisk Nawiguj GPS, dane F-Gaz (CRO) i dane klienta w MachineInfoCard dla profilu hvac oraz blokuje F-Gaz i c-KOB dla profilu industrial (stocznia)', () => {
       const machine = {
         id: 'm-hvac-1',
         name: 'Pompa Ciepła Daikin Altherma',
@@ -360,12 +361,18 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         contactPerson: 'Wspólnota Sopot 15',
         contactPhone: '501 202 303',
         accessNotes: 'Kod domofonu: 15#9999',
-        inspectionCategory: 'hvac_kotlownia',
+        inspectionCategory: 'gazowa_1r',
         refrigerantType: 'R32',
         refrigerantChargeKg: 9,
       };
 
-      render(
+      // A. Profil HVAC -> pokazuje F-Gaz i klienta, ukrywa budowlane c-KOB
+      useManagerStore.getState().setBranding({
+        companyName: 'Klima-Serwis',
+        industryProfile: 'hvac',
+      });
+
+      const { unmount: unmountHvac } = render(
         <MachineInfoCard
           machine={machine}
           parentMachine={null}
@@ -388,7 +395,68 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(fGasBadge.textContent).toContain('R32');
       expect(fGasBadge.textContent).toContain('6.075 t CO2e');
       expect(fGasBadge.textContent).toContain('Wymagana Karta CRO');
+      expect(screen.queryByTestId('machine-ckob-badge')).toBeNull();
       expect(screen.getByText(/Kod domofonu: 15#9999/)).toBeTruthy();
+      unmountHvac();
+
+      // B. Profil FACILITY -> pokazuje c-KOB i lokatora/domofon
+      useManagerStore.getState().setBranding({
+        companyName: 'Osiedle Zielone',
+        industryProfile: 'facility',
+      });
+
+      const { unmount: unmountFacility } = render(
+        <MachineInfoCard
+          machine={machine}
+          parentMachine={null}
+          childMachines={[]}
+          regions={[{ id: 'r1', name: 'Sopot Centrum' }]}
+          regionName="Sopot Centrum"
+          totalPartsCost={0}
+          setIsWorkHoursModalOpen={vi.fn()}
+          onViewRelatedMachine={vi.fn()}
+          onAddChildMachine={vi.fn()}
+          parts={[]}
+        />
+      );
+      expect(screen.getByTestId('machine-ckob-badge')).toBeTruthy();
+      expect(screen.queryByTestId('machine-fgas-badge')).toBeNull();
+      unmountFacility();
+
+      // C. Profil INDUSTRIAL (Stocznia / Przemysł) -> blokuje zarówno F-Gazy, jak i przeglądy c-KOB w karcie i formularzu urządzenia
+      useManagerStore.getState().setBranding({
+        companyName: 'Stocznia CRIST',
+        industryProfile: 'industrial',
+      });
+
+      const { unmount: unmountInd } = render(
+        <>
+          <MachineInfoCard
+            machine={machine}
+            parentMachine={null}
+            childMachines={[]}
+            regions={[{ id: 'r1', name: 'Hala H-1' }]}
+            regionName="Hala H-1"
+            totalPartsCost={0}
+            setIsWorkHoursModalOpen={vi.fn()}
+            onViewRelatedMachine={vi.fn()}
+            onAddChildMachine={vi.fn()}
+            parts={[]}
+          />
+          <MachineForm
+            isOpen={true}
+            onClose={vi.fn()}
+            editingMachine={null}
+            regions={[{ id: 'r1', name: 'Hala H-1' }]}
+            onSaved={vi.fn()}
+            onError={vi.fn()}
+          />
+        </>
+      );
+      expect(screen.queryByTestId('machine-fgas-badge')).toBeNull();
+      expect(screen.queryByTestId('machine-ckob-badge')).toBeNull();
+      expect(screen.queryByTestId('machine-form-domain-section')).toBeNull();
+      unmountInd();
     });
   });
 

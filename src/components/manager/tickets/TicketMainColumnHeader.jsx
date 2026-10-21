@@ -144,7 +144,8 @@ export default function TicketMainColumnHeader({
                 <i className="ph ph-navigation-arrow"></i> {geo.address}
               </div>
             )}
-            {(machineObj?.contactPerson || machineObj?.contactPhone || machineObj?.accessNotes) && (
+            {industryProfile !== 'industrial' &&
+              (machineObj?.contactPerson || machineObj?.contactPhone || machineObj?.accessNotes) && (
               <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 mt-1.5 space-y-0.5">
                 {(machineObj.contactPerson || machineObj.contactPhone) && (
                   <div className="font-bold text-slate-800">
@@ -209,7 +210,7 @@ export default function TicketMainColumnHeader({
                 <i className="ph ph-map-pin-line"></i> Potwierdzenie GPS: {gpsCheckInStr}
               </div>
             )}
-            {fGasSummaryStr && (
+            {industryProfile !== 'industrial' && fGasSummaryStr && (
               <div className="mt-2 text-xs font-semibold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg">
                 <i className="ph ph-snowflake mr-1"></i> {fGasSummaryStr}
               </div>

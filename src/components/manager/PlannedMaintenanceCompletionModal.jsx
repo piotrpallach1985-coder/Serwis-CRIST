@@ -52,10 +52,14 @@ export default function PlannedMaintenanceCompletionModal({
     ? machines.find(m => m.id === serviceToComplete.machineId)
     : null;
   const canShowFGasSection =
-    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType);
+    industryProfile !== 'industrial' &&
+    (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType));
 
   useEffect(() => {
-    if (currentMachine?.refrigerantType || industryProfile === 'hvac') {
+    if (
+      industryProfile !== 'industrial' &&
+      (currentMachine?.refrigerantType || industryProfile === 'hvac')
+    ) {
       setShowFGasSection(true);
     } else {
       setShowFGasSection(false);

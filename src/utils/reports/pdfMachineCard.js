@@ -5,7 +5,11 @@ import { TICKET_STATUS } from '../constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../tenantHelper';
 import { fetchTransactionsForMachine } from '../../hooks/usePartTransactions';
-import { CKOB_CATEGORIES, REFRIGERANT_TYPES } from '../fieldServiceHelpers';
+import {
+  CKOB_CATEGORIES,
+  REFRIGERANT_TYPES,
+  getIndustryProfileConfig,
+} from '../fieldServiceHelpers';
 
 const n = (text) => {
   if (text === null || text === undefined) return '';
@@ -89,14 +93,22 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       doc.text('VexoNT', doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
     }
     
+    const industryProfile = state.branding?.industryProfile || 'industrial';
+    const profileConfig = getIndustryProfileConfig(industryProfile);
+
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(n('System Utrzymania Ruchu VexoNT'), doc.internal.pageSize.getWidth() - 14, 38, { align: 'right' });
+    doc.text(
+      n(`System Utrzymania Ruchu VexoNT (${profileConfig.shortName})`),
+      doc.internal.pageSize.getWidth() - 14,
+      38,
+      { align: 'right' }
+    );
 
-    // Tytuł dokumentu
-    doc.setFontSize(18);
+    // Tytuł dokumentu zależny od profilu branżowego
+    doc.setFontSize(16);
     doc.setTextColor(40, 40, 40);
-    doc.text(n('Karta Urzadzenia PDF (Pelny Raport)'), 14, 20);
+    doc.text(n(profileConfig.machinePdfTitle || 'Karta Urzadzenia PDF (Pelny Raport)'), 14, 20);
 
     doc.setFontSize(9);
     doc.setTextColor(130, 130, 130);
@@ -105,17 +117,39 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
     let currentY = 34;
 
     // ----- 1. Dane podstawowe urządzenia -----
-    const ckobLabel = machine.inspectionCategory
-      ? CKOB_CATEGORIES.find(c => c.id === machine.inspectionCategory)?.label || machine.inspectionCategory
-      : null;
-    const refLabel = machine.refrigerantType
-      ? REFRIGERANT_TYPES[machine.refrigerantType]?.name || machine.refrigerantType
-      : null;
+    const showCkob = industryProfile === 'facility';
+    const showFGas =
+      industryProfile === 'hvac' ||
+      (industryProfile === 'facility' && machine.inspectionCategory === 'hvac_kotlownia');
+    const showContact = industryProfile === 'facility' || industryProfile === 'hvac';
+
+    const ckobLabel =
+      showCkob && machine.inspectionCategory
+        ? CKOB_CATEGORIES.find(c => c.id === machine.inspectionCategory)?.label ||
+          machine.inspectionCategory
+        : null;
+    const refLabel =
+      showFGas && machine.refrigerantType
+        ? REFRIGERANT_TYPES[machine.refrigerantType]?.name || machine.refrigerantType
+        : null;
     const baseInfoRows = [
-      [n('Nazwa Maszyny:'), n(machine.name || 'Brak')],
-      [n('Numer Wewnetrzny / ID QR:'), n(`${machine.internalId || '-'} / ${machine.qrCode || machine.id || '-'}`)],
-      [n('Rejon / Hala / Przelot:'), n(`${regionLabel}${machine.bay ? ' / ' + machine.bay : ''}`)],
-      [n('Urzadzenie Nadrzedne (ISO 55000):'), n(parentMachine ? `${parentMachine.name} (${parentMachine.internalId || parentMachine.id})` : 'Brak (Urzadzenie glowne)')],
+      [n(`${profileConfig.machineLabel}:`), n(machine.name || 'Brak')],
+      [
+        n('Numer Wewnetrzny / ID QR:'),
+        n(`${machine.internalId || '-'} / ${machine.qrCode || machine.id || '-'}`),
+      ],
+      [
+        n(`${profileConfig.regionLabel} / ${profileConfig.bayLabel}:`),
+        n(`${regionLabel}${machine.bay ? ' / ' + machine.bay : ''}`),
+      ],
+      [
+        n('Urzadzenie Nadrzedne (ISO 55000):'),
+        n(
+          parentMachine
+            ? `${parentMachine.name} (${parentMachine.internalId || parentMachine.id})`
+            : 'Brak (Urzadzenie glowne)'
+        ),
+      ],
       [n('Aktualny Stan Licznika:'), n(`${machine.currentWorkHours || 0} RBG`)],
       [n('Laczny Koszt Zuzytych Czesci (TCO):'), n(`${totalPartsCost.toFixed(2)} PLN`)],
       [n('Dodatkowy Opis:'), n(machine.additionalDescription || machine.description || '-')],
@@ -130,13 +164,16 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
         n(`${machine.address || machine.mapAddress || '-'}${gpsSuffix}`),
       ]);
     }
-    if (machine.contactPerson || machine.contactPhone || machine.accessNotes) {
+    if (showContact && (machine.contactPerson || machine.contactPhone || machine.accessNotes)) {
       const contactParts = [
         machine.contactPerson,
         machine.contactPhone ? `Tel: ${machine.contactPhone}` : null,
         machine.accessNotes ? `Dostep: ${machine.accessNotes}` : null,
       ].filter(Boolean);
-      baseInfoRows.push([n('Klient / Kontakt / Dostep:'), n(contactParts.join(' | '))]);
+      baseInfoRows.push([
+        n(industryProfile === 'facility' ? 'Lokator / Kontakt / Domofon:' : 'Klient / Kontakt / Dostep:'),
+        n(contactParts.join(' | ')),
+      ]);
     }
     if (ckobLabel) {
       baseInfoRows.push([n('Kategoria Obiektu (c-KOB):'), n(ckobLabel)]);
@@ -150,14 +187,21 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       baseInfoRows.push([n('Parametry F-Gaz (UE 2024/573 & CRO):'), n(fGasSummary)]);
     }
 
+    const headerColor =
+      industryProfile === 'facility'
+        ? [180, 83, 9]
+        : industryProfile === 'hvac'
+        ? [14, 116, 144]
+        : [30, 41, 59];
+
     autoTable(doc, {
       startY: currentY,
       head: [[n('Dane Podstawowe Urzadzenia'), '']],
       body: baseInfoRows,
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 2.5 },
-      headStyles: { fillColor: [30, 64, 175] },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } }
+      headStyles: { fillColor: headerColor },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
     });
     currentY = doc.lastAutoTable.finalY + 10;
 

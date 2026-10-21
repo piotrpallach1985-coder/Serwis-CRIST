@@ -90,7 +90,8 @@ export default function PlannedMaintenanceTimeline({
 
   const currentMachine = machines.find(m => m.id === srv.machineId) || null;
   const canShowFGasSection =
-    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType);
+    industryProfile !== 'industrial' &&
+    (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType));
   const [completedGps, setCompletedGps] = useState(
     srv.completedGps || srv.completionDetails?.completedGps || null
   );
@@ -101,12 +102,17 @@ export default function PlannedMaintenanceTimeline({
   const [addedRefrigerantKg, setAddedRefrigerantKg] = useState('');
   const [recoveredRefrigerantKg, setRecoveredRefrigerantKg] = useState('');
   const [showFGasSection, setShowFGasSection] = useState(
-    industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType)
+    industryProfile !== 'industrial' &&
+      (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType))
   );
   const [clientSignature, setClientSignature] = useState('');
   const [clientSignerName, setClientSignerName] = useState(currentMachine?.contactPerson || '');
 
   useEffect(() => {
+    if (industryProfile === 'industrial') {
+      setShowFGasSection(false);
+      return;
+    }
     if (currentMachine) {
       if (currentMachine.refrigerantType) {
         setRefrigerantType(currentMachine.refrigerantType);

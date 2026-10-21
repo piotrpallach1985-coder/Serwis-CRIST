@@ -137,45 +137,51 @@ export default function PlannedMaintenanceInfo({
               </div>
             </div>
 
-            {/* Dane klienta / c-KOB / F-Gazy / Potwierdzenie GPS */}
-            {(machine?.contactPerson ||
-              machine?.contactPhone ||
-              machine?.accessNotes ||
-              ckobLabel ||
-              fGasSummaryStr ||
+            {/* Dane klienta / c-KOB / F-Gazy / Potwierdzenie GPS (w Przemysł/Stocznia c-KOB i F-Gazy są zablokowane) */}
+            {((industryProfile !== 'industrial' &&
+              (machine?.contactPerson ||
+                machine?.contactPhone ||
+                machine?.accessNotes ||
+                (industryProfile === 'facility' && ckobLabel) ||
+                fGasSummaryStr)) ||
               completedGpsStr) && (
               <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                {(machine?.contactPerson || machine?.contactPhone || machine?.accessNotes) && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                      Klient / Dostęp do obiektu
-                    </span>
-                    <div className="font-bold text-slate-800">
-                      {machine.contactPerson || '-'}{' '}
-                      {machine.contactPhone && (
-                        <a
-                          href={`tel:${machine.contactPhone.replace(/\s+/g, '')}`}
-                          className="text-blue-600 hover:underline ml-1"
-                        >
-                          ({machine.contactPhone})
-                        </a>
+                {industryProfile !== 'industrial' &&
+                  (machine?.contactPerson || machine?.contactPhone || machine?.accessNotes) && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                        {industryProfile === 'facility'
+                          ? 'Lokator / Zarządca / Dostęp'
+                          : 'Klient / Dostęp do obiektu'}
+                      </span>
+                      <div className="font-bold text-slate-800">
+                        {machine.contactPerson || '-'}{' '}
+                        {machine.contactPhone && (
+                          <a
+                            href={`tel:${machine.contactPhone.replace(/\s+/g, '')}`}
+                            className="text-blue-600 hover:underline ml-1"
+                          >
+                            ({machine.contactPhone})
+                          </a>
+                        )}
+                      </div>
+                      {machine.accessNotes && (
+                        <div className="text-slate-600 mt-0.5">{machine.accessNotes}</div>
                       )}
                     </div>
-                    {machine.accessNotes && (
-                      <div className="text-slate-600 mt-0.5">{machine.accessNotes}</div>
-                    )}
-                  </div>
-                )}
+                  )}
 
-                {(ckobLabel || fGasSummaryStr || completedGpsStr) && (
+                {((industryProfile === 'facility' && ckobLabel) ||
+                  (industryProfile !== 'industrial' && fGasSummaryStr) ||
+                  completedGpsStr) && (
                   <div className="bg-cyan-50/50 border border-cyan-200 rounded-xl p-2.5 space-y-1">
-                    {ckobLabel && (
+                    {industryProfile === 'facility' && ckobLabel && (
                       <div className="text-indigo-900 font-semibold">
                         <i className="ph ph-buildings mr-1"></i>
                         <strong>c-KOB:</strong> {ckobLabel}
                       </div>
                     )}
-                    {fGasSummaryStr && (
+                    {industryProfile !== 'industrial' && fGasSummaryStr && (
                       <div className="text-cyan-900 font-semibold">
                         <i className="ph ph-snowflake mr-1"></i>
                         {fGasSummaryStr}

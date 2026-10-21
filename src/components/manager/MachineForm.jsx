@@ -47,6 +47,8 @@ export default function MachineForm({
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
   const machines = useManagerStore(state => state.machines);
+  const branding = useManagerStore(state => state.branding);
+  const industryProfile = branding?.industryProfile || 'industrial';
 
   useEffect(() => {
     if (editingMachine) {
@@ -68,13 +70,15 @@ export default function MachineForm({
           : ''
       );
       setShowExtendedFields(
-        Boolean(
-          editingMachine.contactPerson ||
-            editingMachine.contactPhone ||
-            editingMachine.accessNotes ||
-            editingMachine.inspectionCategory ||
-            editingMachine.refrigerantType
-        )
+        industryProfile === 'hvac' ||
+          industryProfile === 'facility' ||
+          Boolean(
+            editingMachine.contactPerson ||
+              editingMachine.contactPhone ||
+              editingMachine.accessNotes ||
+              editingMachine.inspectionCategory ||
+              editingMachine.refrigerantType
+          )
       );
     } else {
       setName('');
@@ -102,9 +106,9 @@ export default function MachineForm({
         setRegionId('');
         setBay('');
       }
-      setShowExtendedFields(false);
+      setShowExtendedFields(industryProfile === 'hvac' || industryProfile === 'facility');
     }
-  }, [editingMachine, isOpen, initialParentId, machines]);
+  }, [editingMachine, isOpen, initialParentId, machines, industryProfile]);
 
   const fGasCalc = useMemo(
     () => calculateCo2Equivalent(refrigerantType, refrigerantChargeKg),
@@ -135,19 +139,26 @@ export default function MachineForm({
     if (!name.trim() || !regionId) return;
     setLoading(true);
 
+    const allowCkob = industryProfile === 'facility';
+    const allowFGas =
+      industryProfile === 'hvac' ||
+      (industryProfile === 'facility' && inspectionCategory === 'hvac_kotlownia');
+    const allowContact = industryProfile === 'facility' || industryProfile === 'hvac';
+
+    const effectiveRefType = allowFGas ? refrigerantType || '' : '';
     const extraPayload = {
-      contactPerson: contactPerson.trim(),
-      contactPhone: formatPhoneXxx(contactPhone),
-      accessNotes: accessNotes.trim(),
-      inspectionCategory: inspectionCategory || '',
-      refrigerantType: refrigerantType || '',
+      contactPerson: allowContact ? contactPerson.trim() : '',
+      contactPhone: allowContact ? formatPhoneXxx(contactPhone) : '',
+      accessNotes: allowContact ? accessNotes.trim() : '',
+      inspectionCategory: allowCkob ? inspectionCategory || '' : '',
+      refrigerantType: effectiveRefType,
       refrigerantChargeKg:
-        refrigerantType && refrigerantChargeKg !== '' && Number(refrigerantChargeKg) > 0
+        effectiveRefType && refrigerantChargeKg !== '' && Number(refrigerantChargeKg) > 0
           ? Number(refrigerantChargeKg)
           : null,
       co2EquivalentTons:
-        refrigerantType && fGasCalc.co2EquivalentTons > 0 ? fGasCalc.co2EquivalentTons : null,
-      requiresCroCard: refrigerantType ? fGasCalc.requiresCroCard : false,
+        effectiveRefType && fGasCalc.co2EquivalentTons > 0 ? fGasCalc.co2EquivalentTons : null,
+      requiresCroCard: effectiveRefType ? fGasCalc.requiresCroCard : false,
     };
 
     try {
@@ -298,153 +309,194 @@ export default function MachineForm({
               </p>
             </div>
 
-            {/* Sekcja opcjonalna: Dane Klienta, c-KOB oraz HVAC / F-Gazy (lokalizacja ustawiana jest podczas edycji mapy) */}
-            <div className="border border-blue-200 rounded-xl bg-blue-50/40 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowExtendedFields(prev => !prev)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-blue-50 transition-colors cursor-pointer"
+            {/* Sekcja branżowa (wyłącznie dla profili Facility / c-KOB oraz HVAC / F-Gazy — zablokowana dla Przemysłu / Stoczni) */}
+            {industryProfile !== 'industrial' && (
+              <div
+                data-testid="machine-form-domain-section"
+                className={`border rounded-xl overflow-hidden ${
+                  industryProfile === 'hvac'
+                    ? 'border-cyan-200 bg-cyan-50/40'
+                    : 'border-amber-200 bg-amber-50/40'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <i className="ph ph-sliders-horizontal text-lg text-blue-600"></i>
-                  <span className="text-sm font-bold text-slate-800">
-                    {t(
-                      'machines.form.extendedSectionTitle',
-                      'Opcjonalnie: Dane Klienta / Lokalu, Przeglądy c-KOB oraz F-Gazy (HVAC)'
-                    )}
+                <button
+                  type="button"
+                  onClick={() => setShowExtendedFields(prev => !prev)}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/60 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <i
+                      className={`ph ${
+                        industryProfile === 'hvac'
+                          ? 'ph-snowflake text-cyan-600'
+                          : 'ph-buildings text-amber-700'
+                      } text-lg`}
+                    ></i>
+                    <span className="text-sm font-bold text-slate-800">
+                      {industryProfile === 'hvac'
+                        ? t(
+                            'machines.form.hvacSectionTitle',
+                            'Parametry Chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO) oraz Dane Klienta'
+                          )
+                        : t(
+                            'machines.form.facilitySectionTitle',
+                            'Dane Obiektu / Lokalu oraz Kategoria Przeglądu c-KOB (art. 62 Prawa budowlanego)'
+                          )}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                    {showExtendedFields ? 'Zwiń' : 'Rozwiń opcje'}
+                    <i className={`ph ${showExtendedFields ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
                   </span>
-                </div>
-                <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
-                  {showExtendedFields ? 'Zwiń' : 'Rozwiń opcje'}
-                  <i className={`ph ${showExtendedFields ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
-                </span>
-              </button>
+                </button>
 
-              {showExtendedFields && (
-                <div className="p-4 pt-3 border-t border-blue-100 space-y-4 bg-white">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
-                    </label>
-                    <select
-                      value={inspectionCategory}
-                      onChange={e => setInspectionCategory(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {CKOB_CATEGORIES.map(cat => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Klient / Właściciel / Osoba kontaktowa
-                      </label>
-                      <input
-                        type="text"
-                        value={contactPerson}
-                        onChange={e => setContactPerson(e.target.value)}
-                        placeholder="np. Jan Kowalski / Wspólnota Mieszkaniowa"
-                        className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Telefon kontaktowy klienta (xxx xxx xxx)
-                      </label>
-                      <input
-                        type="tel"
-                        value={contactPhone}
-                        maxLength={11}
-                        onChange={e => setContactPhone(formatPhoneXxx(e.target.value))}
-                        placeholder="xxx xxx xxx (np. 500 600 700)"
-                        className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Dostęp / Kod domofonu / Klatka
-                      </label>
-                      <input
-                        type="text"
-                        value={accessNotes}
-                        onChange={e => setAccessNotes(e.target.value)}
-                        placeholder="np. Kod: 12#3456, klucz w administracji"
-                        className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* HVAC / F-Gazy (Rozporządzenie UE 2024/573 & CRO) */}
-                  <div className="pt-2 border-t border-slate-100">
-                    <div className="text-xs font-extrabold text-cyan-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <i className="ph ph-snowflake text-base text-cyan-600"></i>
-                      Parametry chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO)
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                      <div>
+                {showExtendedFields && (
+                  <div className="p-4 pt-3 border-t border-slate-200/70 space-y-4 bg-white">
+                    {industryProfile === 'facility' && (
+                      <div data-testid="machine-form-ckob-section">
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Rodzaj czynnika chłodniczego
+                          Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
                         </label>
                         <select
-                          value={refrigerantType}
-                          onChange={e => setRefrigerantType(e.target.value)}
-                          className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                          value={inspectionCategory}
+                          onChange={e => setInspectionCategory(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-amber-500"
                         >
-                          <option value="">-- Brak (Nie dotyczy) --</option>
-                          {Object.values(REFRIGERANT_TYPES).map(rt => (
-                            <option key={rt.code} value={rt.code}>
-                              {rt.name} (GWP: {rt.gwp})
+                          {CKOB_CATEGORIES.map(cat => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.label}
                             </option>
                           ))}
                         </select>
                       </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Masa fabryczna czynnika (kg)
+                          {industryProfile === 'facility'
+                            ? 'Lokator / Zarządca / Osoba kontaktowa'
+                            : 'Klient / Właściciel / Osoba kontaktowa'}
                         </label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          disabled={!refrigerantType}
-                          value={refrigerantChargeKg}
-                          onChange={e => setRefrigerantChargeKg(e.target.value)}
-                          placeholder="np. 2.5"
-                          className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-slate-100"
+                          type="text"
+                          value={contactPerson}
+                          onChange={e => setContactPerson(e.target.value)}
+                          placeholder={
+                            industryProfile === 'facility'
+                              ? 'np. Wspólnota Mieszkaniowa / Administracja'
+                              : 'np. Jan Kowalski'
+                          }
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
-                        {refrigerantType && fGasCalc.chargeKg > 0 ? (
-                          <div
-                            className={`p-2 rounded-lg border text-xs font-bold ${
-                              fGasCalc.requiresCroCard
-                                ? 'bg-amber-50 border-amber-300 text-amber-900'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                            }`}
-                          >
-                            <div>Ekwiwalent: {fGasCalc.co2EquivalentTons} t CO2e</div>
-                            <div className="text-[11px] font-medium">
-                              {fGasCalc.requiresCroCard
-                                ? `Wymagana karta CRO! (Próby co ${fGasCalc.recommendedLeakCheckMonths} mies.)`
-                                : 'Poniżej progu 5 t CO2e (brak wymogu CRO)'}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-500">
-                            Wybierz czynnik i wagę, aby obliczyć ekwiwalent CO2e.
-                          </div>
-                        )}
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Telefon kontaktowy (xxx xxx xxx)
+                        </label>
+                        <input
+                          type="tel"
+                          value={contactPhone}
+                          maxLength={11}
+                          onChange={e => setContactPhone(formatPhoneXxx(e.target.value))}
+                          placeholder="xxx xxx xxx (np. 500 600 700)"
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          {industryProfile === 'facility'
+                            ? 'Dostęp / Kod domofonu / Klatka'
+                            : 'Dostęp / Wskazówki dla serwisanta'}
+                        </label>
+                        <input
+                          type="text"
+                          value={accessNotes}
+                          onChange={e => setAccessNotes(e.target.value)}
+                          placeholder={
+                            industryProfile === 'facility'
+                              ? 'np. Kod: 12#3456, klucz w administracji'
+                              : 'np. Brama wjazdowa od ul. Leśnej'
+                          }
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                       </div>
                     </div>
+
+                    {/* HVAC / F-Gazy (Rozporządzenie UE 2024/573 & CRO) — widoczne dla HVAC lub węzłów cieplnych w Facility */}
+                    {(industryProfile === 'hvac' ||
+                      (industryProfile === 'facility' &&
+                        inspectionCategory === 'hvac_kotlownia')) && (
+                      <div
+                        data-testid="machine-form-fgas-section"
+                        className="pt-2 border-t border-slate-100"
+                      >
+                        <div className="text-xs font-extrabold text-cyan-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <i className="ph ph-snowflake text-base text-cyan-600"></i>
+                          Parametry chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Rodzaj czynnika chłodniczego
+                            </label>
+                            <select
+                              value={refrigerantType}
+                              onChange={e => setRefrigerantType(e.target.value)}
+                              className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="">-- Brak (Nie dotyczy) --</option>
+                              {Object.values(REFRIGERANT_TYPES).map(rt => (
+                                <option key={rt.code} value={rt.code}>
+                                  {rt.name} (GWP: {rt.gwp})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Masa fabryczna czynnika (kg)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              disabled={!refrigerantType}
+                              value={refrigerantChargeKg}
+                              onChange={e => setRefrigerantChargeKg(e.target.value)}
+                              placeholder="np. 2.5"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-slate-100"
+                            />
+                          </div>
+                          <div>
+                            {refrigerantType && fGasCalc.chargeKg > 0 ? (
+                              <div
+                                className={`p-2 rounded-lg border text-xs font-bold ${
+                                  fGasCalc.requiresCroCard
+                                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                }`}
+                              >
+                                <div>Ekwiwalent: {fGasCalc.co2EquivalentTons} t CO2e</div>
+                                <div className="text-[11px] font-medium">
+                                  {fGasCalc.requiresCroCard
+                                    ? `Wymagana karta CRO! (Próby co ${fGasCalc.recommendedLeakCheckMonths} mies.)`
+                                    : 'Poniżej progu 5 t CO2e (brak wymogu CRO)'}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-500">
+                                Wybierz czynnik i wagę, aby obliczyć ekwiwalent CO2e.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {editingMachine && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mt-4 text-yellow-800 text-sm">

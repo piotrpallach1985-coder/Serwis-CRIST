@@ -150,7 +150,11 @@ export const generateTicketPDF = async (ticket) => {
       infoRows.push([n('Potwierdzenie GPS:'), n(gpsStr)]);
     }
     const fGasStr = formatFGasSummary(ticket.fGasProtocol);
-    if (fGasStr && (industryProfile === 'hvac' || machineObj?.refrigerantType)) {
+    if (
+      fGasStr &&
+      industryProfile !== 'industrial' &&
+      (industryProfile === 'hvac' || machineObj?.refrigerantType)
+    ) {
       infoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
     }
 

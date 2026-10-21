@@ -149,7 +149,11 @@ export const generateServicePDF = async (service, machine) => {
           }
         : null);
     const fGasStr = formatFGasSummary(rawFGas);
-    if (fGasStr && (industryProfile === 'hvac' || machine?.refrigerantType)) {
+    if (
+      fGasStr &&
+      industryProfile !== 'industrial' &&
+      (industryProfile === 'hvac' || machine?.refrigerantType)
+    ) {
       serviceInfoRows.push([n('Protokol F-Gaz (HVAC):'), n(fGasStr)]);
     }
 
