@@ -133,11 +133,17 @@ export const generateTicketPDF = async (ticket) => {
     if (ckobStr && industryProfile !== 'industrial') {
       infoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
     }
+    const inspectorLicense =
+      ticket.inspectorLicense || ticket.completionDetails?.inspectorLicense || null;
+
     infoRows.push(
       [n('Zglaszajacy:'), n(`${ticket.reportedBy || 'Nieznany'} ${ticket.reporterPhone ? '(' + ticket.reporterPhone + ')' : ''}`)],
       [n('Data Zgloszenia:'), safeParseDate(ticket.createdAt)?.toLocaleString('pl-PL') || '-'],
       [n('Priorytet:'), n(ticket.isCritical ? 'Krytyczny (Wysoki)' : 'Standardowy')],
       [n('Wyznaczony Wykonawca:'), n(ticket.assignedTo || '-')],
+      ...(inspectorLicense
+        ? [[n('Uprawnienia Wykonawcy / Inspektora:'), n(inspectorLicense)]]
+        : []),
       [n('Data Przypisania:'), ticket.assignedAt ? safeParseDate(ticket.assignedAt)?.toLocaleString('pl-PL') : '-'],
       [n('Rozpoczecie Naprawy:'), ticket.inProgressAt ? safeParseDate(ticket.inProgressAt)?.toLocaleString('pl-PL') : '-'],
       [n('Planowany Czas Zakonczenia (ETR):'), ticket.etr ? safeParseDate(ticket.etr)?.toLocaleString('pl-PL') : '-'],
@@ -420,6 +426,13 @@ export const generateTicketPDF = async (ticket) => {
       14,
       currentY + 27
     );
+    if (inspectorLicense) {
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(n(`Uprawnienia: ${inspectorLicense}`), 14, currentY + 32);
+      doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+    }
     doc.text(
       n(
         `${profileConfig.clientSignatureLabel}${

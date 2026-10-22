@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { useManagerStore } from '../../store/managerStore';
+import { useAuth } from '../../hooks/useAuth';
+import { updatePlannedService } from '../../services/plannedServices.service';
 import {
   resolveMachineGeoLocation,
   buildGoogleMapsNavigationUrl,
@@ -11,6 +13,7 @@ import {
   getCkobCategoryLabel,
   getIndustryProfileConfig,
   calculateCo2Equivalent,
+  checkCkob7DaysDeadline,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceInfo({
@@ -23,10 +26,53 @@ export default function PlannedMaintenanceInfo({
   section = 'all',
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const branding = useManagerStore(state => state.branding || {});
   const mapSettings = useManagerStore(state => state.mapSettings);
   const industryProfile = branding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
+
+  const [localCkobEntered, setLocalCkobEntered] = useState(Boolean(srv?.ckobEntered));
+  const [localCkobEnteredAt, setLocalCkobEnteredAt] = useState(srv?.ckobEnteredAt || null);
+  const [localCkobEnteredBy, setLocalCkobEnteredBy] = useState(srv?.ckobEnteredBy || '');
+  const [savingCkobEntry, setSavingCkobEntry] = useState(false);
+
+  useEffect(() => {
+    setLocalCkobEntered(Boolean(srv?.ckobEntered));
+    setLocalCkobEnteredAt(srv?.ckobEnteredAt || null);
+    setLocalCkobEnteredBy(srv?.ckobEnteredBy || '');
+  }, [srv?.id, srv?.ckobEntered, srv?.ckobEnteredAt, srv?.ckobEnteredBy]);
+
+  const effectiveServiceForCkob = {
+    ...srv,
+    ckobEntered: localCkobEntered,
+    ckobEnteredAt: localCkobEnteredAt,
+    ckobEnteredBy: localCkobEnteredBy,
+  };
+  const ckobDeadline = checkCkob7DaysDeadline(effectiveServiceForCkob, machine, industryProfile);
+  const inspectorLicense =
+    srv?.inspectorLicense || srv?.completionDetails?.inspectorLicense || '';
+
+  const handleMarkCkobEntered = async () => {
+    if (!srv?.id || savingCkobEntry) return;
+    setSavingCkobEntry(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const enteredBy = user?.name || 'System';
+      await updatePlannedService(srv.id, {
+        ckobEntered: true,
+        ckobEnteredAt: nowIso,
+        ckobEnteredBy: enteredBy,
+      });
+      setLocalCkobEntered(true);
+      setLocalCkobEnteredAt(nowIso);
+      setLocalCkobEnteredBy(enteredBy);
+    } catch (err) {
+      console.error('Błąd zapisu potwierdzenia wpisu c-KOB:', err);
+    } finally {
+      setSavingCkobEntry(false);
+    }
+  };
 
   const showParams = section === 'all' || section === 'params';
   const showResources = section === 'all' || section === 'resources';
@@ -193,10 +239,113 @@ export default function PlannedMaintenanceInfo({
                         <strong>Check-in GPS:</strong> {completedGpsStr}
                       </div>
                     )}
+                    {inspectorLicense && (
+                      <div
+                        data-testid="service-inspector-license"
+                        className="text-slate-800 font-semibold"
+                      >
+                        <i className="ph ph-certificate mr-1 text-amber-600"></i>
+                        <strong>Uprawnienia kontrolującego:</strong> {inspectorLicense}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
+
+            {inspectorLicense &&
+              !(
+                (industryProfile === 'facility' && ckobLabel) ||
+                (industryProfile !== 'industrial' && fGasSummaryStr) ||
+                completedGpsStr
+              ) && (
+                <div
+                  data-testid="service-inspector-license"
+                  className="mb-4 bg-amber-50/60 border border-amber-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold flex items-center gap-1.5"
+                >
+                  <i className="ph ph-certificate text-amber-600 text-base"></i>
+                  <span>
+                    <strong>Uprawnienia kontrolującego / inspektora:</strong> {inspectorLicense}
+                  </span>
+                </div>
+              )}
+
+            {/* Pasek statusu 7-dniowego terminu wpisu do rządowego c-KOB (art. 60k ust. 2 Prawa budowlanego) */}
+            {srv.status === 'completed' &&
+              industryProfile !== 'industrial' &&
+              (industryProfile === 'facility' || Boolean(machine?.inspectionCategory)) && (
+                <div
+                  data-testid="ckob-7days-banner"
+                  className={`mb-4 rounded-xl border p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                    localCkobEntered
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : ckobDeadline.isOverdue7Days
+                      ? 'bg-red-50 border-red-300 text-red-900'
+                      : 'bg-amber-50 border-amber-300 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <i
+                      className={`ph ${
+                        localCkobEntered
+                          ? 'ph-check-circle text-emerald-600'
+                          : ckobDeadline.isOverdue7Days
+                          ? 'ph-warning-octagon text-red-600 animate-pulse'
+                          : 'ph-clock-countdown text-amber-600'
+                      } text-xl shrink-0 mt-0.5`}
+                    ></i>
+                    <div>
+                      <div className="font-extrabold uppercase tracking-wide">
+                        {localCkobEntered
+                          ? 'Wpisano do rządowego systemu c-KOB (c-kob.gunb.gov.pl)'
+                          : ckobDeadline.isOverdue7Days
+                          ? `PRZEKROCZONO USTAWOWY TERMIN 7 DNI NA WPIS DO c-KOB! (minęło ${ckobDeadline.daysElapsed} dni)`
+                          : `Ustawowy termin 7 dni na wpis do c-KOB (art. 60k ust. 2 PB) — pozostało ${ckobDeadline.daysRemaining} dni`}
+                      </div>
+                      <div className="mt-0.5 text-[11px] opacity-90">
+                        {localCkobEntered ? (
+                          <span>
+                            Potwierdził(a): <strong>{localCkobEnteredBy || 'Użytkownik'}</strong>
+                            {localCkobEnteredAt
+                              ? ` dnia ${safeParseDate(localCkobEnteredAt)?.toLocaleString('pl-PL')}`
+                              : ''}
+                          </span>
+                        ) : (
+                          <span>
+                            Osoba przeprowadzająca kontrolę ma obowiązek dokonać wpisu do
+                            Cyfrowej Książki Obiektu Budowlanego (
+                            <a
+                              href="https://c-kob.gunb.gov.pl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline font-bold"
+                            >
+                              c-kob.gunb.gov.pl
+                            </a>
+                            ) w terminie 7 dni od zakończenia kontroli.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {!localCkobEntered && (
+                    <button
+                      type="button"
+                      disabled={savingCkobEntry}
+                      onClick={handleMarkCkobEntered}
+                      data-testid="mark-ckob-entered-btn"
+                      className="px-3.5 py-2 rounded-lg bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-colors shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <i className="ph ph-check-square-offset text-base"></i>
+                      <span>
+                        {savingCkobEntry
+                          ? 'Zapisywanie...'
+                          : 'Oznacz jako wpisane do rządowego c-KOB'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
 
             {/* Parametry */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">

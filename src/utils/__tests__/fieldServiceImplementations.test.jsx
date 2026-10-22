@@ -14,10 +14,16 @@ import {
   checkQrSubmissionCooldown,
   recordQrSubmissionTimestamp,
   getIndustryProfileConfig,
+  checkCkob7DaysDeadline,
+  getDtrDocCategoryInfo,
 } from '../fieldServiceHelpers';
+import fs from 'fs';
+import path from 'path';
 import SignaturePad from '../../components/shared/SignaturePad';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
 import MachineForm from '../../components/manager/MachineForm';
+import MachineDTR from '../../components/manager/MachineDTR';
+import PlannedMaintenanceFormModal from '../../components/manager/PlannedMaintenanceFormModal';
 import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
@@ -29,6 +35,12 @@ import { formatDetails } from '../../services/audit.service';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key, fallback) => (typeof fallback === 'string' ? fallback : key),
+  }),
+}));
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { uid: 'u-test', name: 'Inż. Testowy', role: 'admin', licenseNumber: 'POM/0123/PBKb/20' },
   }),
 }));
 
@@ -711,6 +723,223 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const state = useManagerStore.getState();
       expect(state.geminiModel).toBe('gemini-2.5-flash');
       expect(state.transcribeModel).toBe('chirp_2');
+    });
+  });
+
+  describe('9. Pakiet B: c-KOB (art. 60j, art. 60k ust. 2 i art. 62 PB), Dedykowane Serwisy, Karta Planowania i ścieżka QR', () => {
+    it('checkCkob7DaysDeadline weryfikuje termin 7 dni na wpis do c-KOB (przed upływem 7 dni, po przekroczeniu 7 dni oraz po odhaczeniu ckobEntered: true)', () => {
+      const nowMs = new Date('2026-10-22T12:00:00.000Z').getTime();
+      const machineWithCkob = { id: 'm-ckob', name: 'Budynek A', inspectionCategory: 'roczny_ogolny' };
+
+      // 1) Przed upływem 7 dni (minęły 3 dni -> pozostały 4 dni)
+      const completed3DaysAgo = new Date(nowMs - 3 * 24 * 60 * 60 * 1000).toISOString();
+      const resBefore = checkCkob7DaysDeadline(
+        { id: 's1', status: 'completed', completedAt: completed3DaysAgo, ckobEntered: false },
+        machineWithCkob,
+        'facility',
+        nowMs
+      );
+      expect(resBefore.requiresCkobEntry).toBe(true);
+      expect(resBefore.daysElapsed).toBe(3);
+      expect(resBefore.daysRemaining).toBe(4);
+      expect(resBefore.isOverdue7Days).toBe(false);
+
+      // 2) Po przekroczeniu 7 dni (minęło 9 dni -> przekroczono o 2 dni)
+      const completed9DaysAgo = new Date(nowMs - 9 * 24 * 60 * 60 * 1000).toISOString();
+      const resOverdue = checkCkob7DaysDeadline(
+        { id: 's2', status: 'completed', completedAt: completed9DaysAgo, ckobEntered: false },
+        machineWithCkob,
+        'facility',
+        nowMs
+      );
+      expect(resOverdue.requiresCkobEntry).toBe(true);
+      expect(resOverdue.daysElapsed).toBe(9);
+      expect(resOverdue.daysRemaining).toBe(-2);
+      expect(resOverdue.isOverdue7Days).toBe(true);
+
+      // 3) Po odhaczeniu ckobEntered: true -> nie wymaga już wpisu
+      const resEntered = checkCkob7DaysDeadline(
+        {
+          id: 's3',
+          status: 'completed',
+          completedAt: completed9DaysAgo,
+          ckobEntered: true,
+          ckobEnteredAt: '2026-10-15T10:00:00.000Z',
+          ckobEnteredBy: 'Inż. Piotr',
+        },
+        machineWithCkob,
+        'facility',
+        nowMs
+      );
+      expect(resEntered.requiresCkobEntry).toBe(false);
+      expect(resEntered.ckobEntered).toBe(true);
+      expect(resEntered.isOverdue7Days).toBe(false);
+    });
+
+    it('renderuje Metryczkę techniczną obiektu budowlanego (art. 60j PB) w MachineInfoCard oraz uprawnienia inspektora i pasek 7 dni c-KOB w PlannedMaintenanceInfo', () => {
+      useManagerStore.getState().setBranding({
+        companyName: 'Zarządca Nieruchomości',
+        industryProfile: 'facility',
+      });
+
+      const buildingMachine = {
+        id: 'b-1',
+        name: 'Budynek Wielorodzinny ul. Morska 10',
+        regionId: 'r1',
+        inspectionCategory: 'budowlany_5l',
+        buildingType: 'Budynek mieszkalny wielorodzinny',
+        constructionYear: '2018',
+        usableAreaM2: '3450',
+        cubatureM3: '11200',
+        floorsCount: '6',
+        hasAsbestos: 'Brak',
+        pinbAuthority: 'PINB w Gdyni',
+        legalTitleDoc: 'GD1Y/00012345/6',
+      };
+
+      const completedService = {
+        id: 'srv-ckob-1',
+        name: 'Przegląd budowlany 5-letni',
+        machineId: 'b-1',
+        machineName: buildingMachine.name,
+        category: 'ckob_5year',
+        triggerType: 'calendar',
+        intervalDays: 1825,
+        status: 'completed',
+        completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        inspectorLicense: 'POM/0123/PBKb/20',
+        ckobEntered: false,
+      };
+
+      const { unmount } = render(
+        <>
+          <MachineInfoCard
+            machine={buildingMachine}
+            parentMachine={null}
+            childMachines={[]}
+            regions={[{ id: 'r1', name: 'Osiedle Nadmorskie' }]}
+            regionName="Osiedle Nadmorskie"
+            totalPartsCost={0}
+            setIsWorkHoursModalOpen={vi.fn()}
+            onViewRelatedMachine={vi.fn()}
+            onAddChildMachine={vi.fn()}
+            parts={[]}
+          />
+          <PlannedMaintenanceInfo
+            srv={completedService}
+            machine={buildingMachine}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Osiedle Nadmorskie'}
+            regions={[{ id: 'r1', name: 'Osiedle Nadmorskie' }]}
+          />
+        </>
+      );
+
+      const metricCard = screen.getByTestId('machine-ckob-metric-card');
+      expect(metricCard.textContent).toContain('Budynek mieszkalny wielorodzinny');
+      expect(metricCard.textContent).toContain('3450');
+      expect(metricCard.textContent).toContain('11200');
+      expect(metricCard.textContent).toContain('PINB w Gdyni');
+      expect(metricCard.textContent).toContain('GD1Y/00012345/6');
+
+      const licenseBadge = screen.getByTestId('service-inspector-license');
+      expect(licenseBadge.textContent).toContain('POM/0123/PBKb/20');
+
+      const ckobBanner = screen.getByTestId('ckob-7days-banner');
+      expect(ckobBanner.textContent).toContain('art. 60k ust. 2 PB');
+      expect(screen.getByTestId('mark-ckob-entered-btn')).toBeTruthy();
+
+      unmount();
+    });
+
+    it('dostosowuje kartę Nowy Plan Serwisowy do profilu facility / hvac i wyświetla "Urządzenie" zamiast "Maszyna"', () => {
+      useManagerStore.getState().setBranding({
+        companyName: 'Wspólnota Mieszkaniowa',
+        industryProfile: 'facility',
+      });
+
+      const { unmount } = render(
+        <PlannedMaintenanceFormModal
+          isOpen={true}
+          onClose={vi.fn()}
+          editingService={null}
+          machines={[{ id: 'm1', name: 'Węzeł cieplny W-1' }]}
+        />
+      );
+
+      expect(screen.getByText('Urządzenie')).toBeTruthy();
+      expect(screen.getByTestId('planned-service-device-input')).toBeTruthy();
+      expect(screen.queryByText('Maszyna')).toBeNull();
+
+      const categorySelect = screen.getByTestId('planned-service-category-select');
+      expect(categorySelect.textContent).toContain('Przegląd roczny okresowy (art. 62 ust. 1 pkt 1 PB - c-KOB)');
+      expect(categorySelect.textContent).toContain('Przegląd 5-letni kompleksowy i elektryczny (art. 62 ust. 1 pkt 2 PB)');
+
+      const statusSelect = screen.getByTestId('planned-service-status-select');
+      expect(statusSelect.textContent).toContain('Wymagane powiadomienie mieszkańców / dostęp do lokali');
+
+      expect(screen.getByText(/Roczny \(365 dni - art\. 62\.1\.1\)/)).toBeTruthy();
+      unmount();
+    });
+
+    it('obsługuje kategorie dokumentacji obiektu pod c-KOB (docCategory) w MachineDTR', () => {
+      expect(getDtrDocCategoryInfo('PROTOKOL_KONTROLI').shortLabel).toContain('Protokół c-KOB');
+      expect(getDtrDocCategoryInfo('DECYZJA_PINB').shortLabel).toContain('Decyzja PINB/UDT');
+
+      const machineWithFiles = {
+        id: 'm-dtr-1',
+        name: 'Budynek B',
+        dtrFiles: [
+          {
+            name: 'protokol_kominiarski_2026.pdf',
+            url: 'https://example.com/p.pdf',
+            docCategory: 'PROTOKOL_KONTROLI',
+            uploadedAt: '2026-10-20T10:00:00.000Z',
+          },
+        ],
+      };
+
+      const { unmount } = render(
+        <MachineDTR machine={machineWithFiles} canManage={true} canDeleteNotes={true} />
+      );
+
+      expect(screen.getByTestId('dtr-doc-category-select')).toBeTruthy();
+      expect(screen.getByTestId('dtr-file-category-badge').textContent).toContain('Protokół c-KOB');
+      unmount();
+    });
+
+    it('filtruje zlecenia i serwis po dedykowanym serwisie przypisanym do serwisanta (user.assignedService)', () => {
+      const dedicatedTech = {
+        uid: 'u-hvac-tech',
+        name: 'Kamil Chłodnik',
+        role: 'serwisant',
+        assignedService: 'Serwis Klimatyzacji i Pomp Ciepła',
+      };
+
+      const allServices = [
+        {
+          id: 'srv-1',
+          name: 'Przegląd agregatu wody lodowej',
+          machineId: 'm-chiller',
+          assignedService: 'Serwis Klimatyzacji i Pomp Ciepła',
+        },
+        {
+          id: 'srv-2',
+          name: 'Przegląd bramy wjazdowej',
+          machineId: 'm-gate',
+          assignedService: 'Serwis Bram i Automatyki',
+        },
+      ];
+
+      const filtered = filterTasksForFieldTechnician(allServices, dedicatedTech, true);
+      expect(filtered.map(s => s.id)).toEqual(['srv-1']);
+    });
+
+    it('używa poprawnej ścieżki Firestore settings/qr_access w qrAccess.service.js', () => {
+      const qrServicePath = path.resolve(__dirname, '../../services/qrAccess.service.js');
+      const source = fs.readFileSync(qrServicePath, 'utf8');
+      expect(source).toContain("doc(db, 'tenants', tenantId, 'settings', 'qr_access')");
     });
   });
 });

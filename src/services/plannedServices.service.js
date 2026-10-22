@@ -471,6 +471,7 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
       fGasProtocol: safeCompletion.fGasProtocol || null,
       clientSignature: safeCompletion.clientSignature || null,
       clientSignerName: safeCompletion.clientSignerName || null,
+      inspectorLicense: safeCompletion.inspectorLicense || null,
       completionDetails: safeCompletion
     };
     

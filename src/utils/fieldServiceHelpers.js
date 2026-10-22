@@ -35,6 +35,50 @@ export const CKOB_CATEGORIES = [
   { id: 'budowlany_5l', label: 'Przegląd ogólnobudowlany 5-letni (art. 62 ust. 1 pkt 2)' },
 ];
 
+export const DTR_DOC_CATEGORIES = [
+  {
+    id: 'DTR',
+    label: 'Dokumentacja DTR / Instrukcja obsługi',
+    shortLabel: 'DTR / Instrukcja',
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+  },
+  {
+    id: 'PROTOKOL_KONTROLI',
+    label: 'Protokół kontroli okresowej (c-KOB)',
+    shortLabel: 'Protokół c-KOB',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+  },
+  {
+    id: 'EKSPERTYZA',
+    label: 'Ekspertyza / Opinia techniczna',
+    shortLabel: 'Ekspertyza',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+  },
+  {
+    id: 'DECYZJA_PINB',
+    label: 'Decyzja administracyjna (PINB / UDT / PSP)',
+    shortLabel: 'Decyzja PINB/UDT',
+    badgeClass: 'bg-red-100 text-red-800 border-red-200',
+  },
+  {
+    id: 'SWIADECTWO_ENERG',
+    label: 'Świadectwo charakterystyki energetycznej',
+    shortLabel: 'Świadectwo Energ.',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+  {
+    id: 'DOK_POWYKONAWCZA',
+    label: 'Dokumentacja budowy / powykonawcza / Plan sytuacyjny',
+    shortLabel: 'Dok. powykonawcza',
+    badgeClass: 'bg-slate-100 text-slate-800 border-slate-200',
+  },
+];
+
+export function getDtrDocCategoryInfo(docCategory) {
+  const found = DTR_DOC_CATEGORIES.find(c => c.id === docCategory);
+  return found || DTR_DOC_CATEGORIES[0];
+}
+
 export const INDUSTRY_PROFILES = {
   industrial: {
     id: 'industrial',
@@ -510,10 +554,17 @@ export function captureCurrentGpsPosition(options = { enableHighAccuracy: true, 
 }
 
 /**
- * Sprawdza, czy dane zlecenie (awaria lub serwis planowany) jest przypisane do danego użytkownika.
+ * Sprawdza, czy dane zlecenie (awaria lub serwis planowany) jest przypisane do danego użytkownika
+ * lub do jego dedykowanego serwisu / zakresu (np. `assignedService` / `dedicatedServices`).
  */
 export function isTaskAssignedToUser(task, user) {
   if (!task || !user) return false;
+
+  const dedicatedList = Array.isArray(user.dedicatedServices)
+    ? user.dedicatedServices
+    : user.dedicatedServices
+    ? [user.dedicatedServices]
+    : [];
 
   const userIdentifiers = [
     user.uid,
@@ -521,6 +572,8 @@ export function isTaskAssignedToUser(task, user) {
     user.name,
     user.email,
     user.serviceName,
+    user.assignedService,
+    ...dedicatedList,
     user.companyName,
   ]
     .filter(Boolean)
@@ -551,19 +604,26 @@ export function isTaskAssignedToUser(task, user) {
 }
 
 /**
- * Filtruje listę zgłoszeń/serwisów dla mobilnego serwisanta z włączonym ograniczeniem RODO B2C (`onlyAssignedTasks`).
+ * Filtruje listę zgłoszeń/serwisów dla mobilnego serwisanta z włączonym ograniczeniem RODO B2C (`onlyAssignedTasks`)
+ * lub przypisanym dedykowanym serwisem (`assignedService` / `dedicatedServices`).
  */
 export function filterTasksForFieldTechnician(tasks = [], user = null, onlyAssignedTasks = false) {
   if (!Array.isArray(tasks)) return [];
-  if (!onlyAssignedTasks || !user) return tasks;
+  if (!user) return tasks;
   if (user.role === 'admin' || user.role === 'superadmin') return tasks;
+  const hasDedicatedScope = Boolean(
+    user.assignedService ||
+      (Array.isArray(user.dedicatedServices) && user.dedicatedServices.length > 0)
+  );
+  if (!onlyAssignedTasks && !hasDedicatedScope) return tasks;
 
   return tasks.filter(task => isTaskAssignedToUser(task, user));
 }
 
 /**
- * Filtruje listę maszyn/urządzeń dla mobilnego serwisanta z włączonym ograniczeniem RODO B2C (`onlyAssignedTasks`),
- * tak aby widział wyłącznie urządzenia powiązane z jego zleceniami (bez dostępu do pełnej bazy adresowej wszystkich klientów).
+ * Filtruje listę maszyn/urządzeń dla mobilnego serwisanta z włączonym ograniczeniem RODO B2C (`onlyAssignedTasks`)
+ * lub przypisanym dedykowanym serwisem (`assignedService` / `dedicatedServices`),
+ * tak aby widział wyłącznie urządzenia powiązane z jego zleceniami (bez dostępu do innych zakresów).
  */
 export function filterMachinesForFieldTechnician(
   machines = [],
@@ -573,8 +633,13 @@ export function filterMachinesForFieldTechnician(
   onlyAssignedTasks = false
 ) {
   if (!Array.isArray(machines)) return [];
-  if (!onlyAssignedTasks || !user) return machines;
+  if (!user) return machines;
   if (user.role === 'admin' || user.role === 'superadmin') return machines;
+  const hasDedicatedScope = Boolean(
+    user.assignedService ||
+      (Array.isArray(user.dedicatedServices) && user.dedicatedServices.length > 0)
+  );
+  if (!onlyAssignedTasks && !hasDedicatedScope) return machines;
 
   const myTickets = filterTasksForFieldTechnician(tickets, user, true);
   const myServices = filterTasksForFieldTechnician(plannedServices, user, true);
@@ -594,6 +659,92 @@ export function filterMachinesForFieldTechnician(
     if (m.name && allowedMachineNames.has(String(m.name).trim().toLowerCase())) return true;
     return false;
   });
+}
+
+/**
+ * Kontrola ustawowego terminu 7 dni na wpis protokołu kontroli do rządowego systemu c-KOB (art. 60k ust. 2 Prawa budowlanego).
+ * @param {object} service Obiekt serwisu planowanego
+ * @param {object} machine Obiekt maszyny/urządzenia
+ * @param {string} industryProfile Profil branżowy firmy ('industrial' | 'facility' | 'hvac')
+ * @param {number} nowMs Czas odniesienia w ms (domyślnie Date.now())
+ */
+export function checkCkob7DaysDeadline(
+  service,
+  machine = null,
+  industryProfile = 'industrial',
+  nowMs = Date.now()
+) {
+  const defaultResult = {
+    requiresCkobEntry: false,
+    ckobEntered: Boolean(service?.ckobEntered || service?.completionDetails?.ckobEntered),
+    daysElapsed: 0,
+    daysRemaining: 7,
+    isOverdue7Days: false,
+    completedDate: null,
+  };
+
+  if (!service) return defaultResult;
+
+  const hasCkobCategory = Boolean(
+    machine?.inspectionCategory ||
+      industryProfile === 'facility' ||
+      String(service.category || '').startsWith('ckob_')
+  );
+
+  if (!hasCkobCategory || service.status !== 'completed') {
+    return defaultResult;
+  }
+
+  const rawCompletedAt =
+    service.completedAt || service.completionDetails?.completedAt || service.closedAt || null;
+
+  if (!rawCompletedAt) {
+    return defaultResult;
+  }
+
+  let completedDate = null;
+  if (rawCompletedAt instanceof Date) {
+    completedDate = rawCompletedAt;
+  } else if (typeof rawCompletedAt?.toDate === 'function') {
+    completedDate = rawCompletedAt.toDate();
+  } else if (typeof rawCompletedAt?.seconds === 'number') {
+    completedDate = new Date(rawCompletedAt.seconds * 1000);
+  } else {
+    completedDate = new Date(rawCompletedAt);
+  }
+
+  if (!completedDate || Number.isNaN(completedDate.getTime())) {
+    return defaultResult;
+  }
+
+  const isAlreadyEntered = Boolean(
+    service.ckobEntered === true || service.completionDetails?.ckobEntered === true
+  );
+
+  const elapsedMs = Math.max(0, nowMs - completedDate.getTime());
+  const daysElapsed = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+  const daysRemaining = 7 - daysElapsed;
+  const isOverdue7Days = daysRemaining < 0;
+
+  if (isAlreadyEntered) {
+    return {
+      requiresCkobEntry: false,
+      ckobEntered: true,
+      daysElapsed,
+      daysRemaining,
+      isOverdue7Days: false,
+      completedDate,
+    };
+  }
+
+  return {
+    requiresCkobEntry: true,
+    ckobEntered: false,
+    daysElapsed,
+    daysRemaining,
+    isOverdue7Days,
+    completedDate,
+  };
 }
 
 const QR_COOLDOWN_STORAGE_KEY = 'vexont_qr_last_submit_ts';

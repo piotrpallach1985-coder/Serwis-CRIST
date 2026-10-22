@@ -124,12 +124,18 @@ export const generateServicePDF = async (service, machine) => {
     if (ckobStr && industryProfile !== 'industrial') {
       serviceInfoRows.push([n('Kategoria c-KOB:'), n(ckobStr)]);
     }
+    const inspectorLicense =
+      service.inspectorLicense || service.completionDetails?.inspectorLicense || null;
+
     serviceInfoRows.push(
       [n('Priorytet:'), n(service.priority || 'Standardowy')],
       [n('Typ Wyzwalacza:'), n(service.triggerType === 'calendar' ? 'Czasowy (Kalendarz)' : service.triggerType === 'hours' ? 'Licznikowy (RBG)' : 'Mieszany (Czas + RBG)')],
       [n('Data Planowana:'), service.nextDate ? safeParseDate(service.nextDate)?.toLocaleDateString('pl-PL') : '-'],
       [n('Docelowy Stan Licznika:'), service.targetWorkHours ? `${service.targetWorkHours} RBG` : '-'],
       [n('Wyznaczony Wykonawca:'), n(service.assignedService || service.completionDetails?.completedBy || service.completedBy || '-')],
+      ...(inspectorLicense
+        ? [[n('Uprawnienia Wykonawcy / Inspektora:'), n(inspectorLicense)]]
+        : []),
       [n('Wykonano Dnia:'), service.completedAt ? safeParseDate(service.completedAt)?.toLocaleString('pl-PL') : '-'],
       [n('Zakonczone przez:'), n(service.completionDetails?.completedBy || service.completedBy || '-')],
       [n('Naklad Pracy (RBG):'), n(actualManHours ? `${actualManHours} h (Plan: ${service.estimatedManHours || '-'} h)` : (service.estimatedManHours ? `Plan: ${service.estimatedManHours} h` : '-'))],
@@ -477,6 +483,13 @@ export const generateServicePDF = async (service, machine) => {
     doc.setFontSize(9);
     doc.setTextColor(90, 90, 90);
     doc.text(n(`${profileConfig.techSignatureLabel} (${execName})`), 14, currentY + 27);
+    if (inspectorLicense) {
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(n(`Uprawnienia: ${inspectorLicense}`), 14, currentY + 32);
+      doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+    }
     doc.text(
       n(`${profileConfig.clientSignatureLabel}${clientSigner ? ' (' + clientSigner + ')' : ''}`),
       115,

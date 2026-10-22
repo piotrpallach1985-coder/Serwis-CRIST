@@ -5,15 +5,19 @@ import { safeParseDate } from '../../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../../utils/constants';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
+import {
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+} from '../../../utils/fieldServiceHelpers';
 
 export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const tickets = useManagerStore(state => state.tickets) || [];
-  const machines = useManagerStore(state => state.machines) || [];
-  const plannedServices = useManagerStore(state => state.plannedServices) || [];
-  const actionItems = useManagerStore(state => state.actionItems) || [];
+  const rawTickets = useManagerStore(state => state.tickets) || [];
+  const rawMachines = useManagerStore(state => state.machines) || [];
+  const rawPlannedServices = useManagerStore(state => state.plannedServices) || [];
+  const rawActionItems = useManagerStore(state => state.actionItems) || [];
   const plannedWarningDays = useManagerStore(state => state.plannedWarningDays) || 30;
   const parts = useManagerStore(state => state.parts) || [];
   const roles = useManagerStore(state => state.roles) || [];
@@ -21,8 +25,34 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const {
     canAccessTab,
     isPlannedServicesModuleEnabled,
-    isInventoryModuleEnabled
+    isInventoryModuleEnabled,
+    onlyAssignedTasks,
   } = usePermissions(user, roles);
+
+  const tickets = React.useMemo(
+    () => filterTasksForFieldTechnician(rawTickets, user, onlyAssignedTasks),
+    [rawTickets, user, onlyAssignedTasks]
+  );
+  const plannedServices = React.useMemo(
+    () => filterTasksForFieldTechnician(rawPlannedServices, user, onlyAssignedTasks),
+    [rawPlannedServices, user, onlyAssignedTasks]
+  );
+  const machines = React.useMemo(
+    () =>
+      filterMachinesForFieldTechnician(
+        rawMachines,
+        rawTickets,
+        rawPlannedServices,
+        user,
+        onlyAssignedTasks
+      ),
+    [rawMachines, rawTickets, rawPlannedServices, user, onlyAssignedTasks]
+  );
+  const actionItems = React.useMemo(() => {
+    if (!onlyAssignedTasks) return rawActionItems;
+    const allowedMachineIds = new Set(machines.map(m => m.id));
+    return rawActionItems.filter(i => allowedMachineIds.has(i.machineId));
+  }, [rawActionItems, machines, onlyAssignedTasks]);
 
   const hasLowStockAlarm = React.useMemo(() => {
     if (!parts || parts.length === 0) return false;

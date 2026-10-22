@@ -42,11 +42,25 @@ export default function MachineInfoCard({
       ? calculateCo2Equivalent(machine.refrigerantType, machine.refrigerantChargeKg)
       : null;
   const ckobLabel = showCkob ? getCkobCategoryLabel(machine?.inspectionCategory) : '';
+  const hasCkobMetricData = Boolean(
+    machine?.buildingType ||
+      machine?.constructionYear ||
+      machine?.usableAreaM2 ||
+      machine?.cubatureM3 ||
+      machine?.floorsCount ||
+      (machine?.hasAsbestos && machine?.hasAsbestos !== 'Brak') ||
+      machine?.pinbAuthority ||
+      machine?.legalTitleDoc
+  );
+  const showCkobMetricFrame =
+    industryProfile !== 'industrial' && (industryProfile === 'facility' || hasCkobMetricData);
+
   const hasExtendedInfo = Boolean(
     geo.hasAddress ||
       (showContact &&
         (machine?.contactPerson || machine?.contactPhone || machine?.accessNotes)) ||
       ckobLabel ||
+      showCkobMetricFrame ||
       (fGasCalc && fGasCalc.refrigerantType)
   );
 
@@ -229,6 +243,84 @@ export default function MachineInfoCard({
               <div>
                 <span className="font-bold">Kategoria c-KOB / Przeglądu: </span>
                 <span>{ckobLabel}</span>
+              </div>
+            </div>
+          )}
+
+          {showCkobMetricFrame && (
+            <div
+              data-testid="machine-ckob-metric-card"
+              className="bg-amber-50/40 border border-amber-200 rounded-xl p-3 text-xs space-y-2"
+            >
+              <div className="font-extrabold text-amber-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-amber-200/70 pb-1.5">
+                <i className="ph ph-identification-card text-amber-700 text-base"></i>
+                Metryczka obiektu budowlanego (c-KOB art. 60j ust. 3 PB)
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-800">
+                <div className="col-span-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Rodzaj i funkcja obiektu
+                  </span>
+                  <span className="font-bold">{machine?.buildingType || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Rok oddania
+                  </span>
+                  <span className="font-bold">{machine?.constructionYear || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Kondygnacje
+                  </span>
+                  <span className="font-bold">{machine?.floorsCount || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Pow. użytkowa
+                  </span>
+                  <span className="font-bold">
+                    {machine?.usableAreaM2 ? `${machine.usableAreaM2} m²` : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Kubatura
+                  </span>
+                  <span className="font-bold">
+                    {machine?.cubatureM3 ? `${machine.cubatureM3} m³` : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Wyroby z azbestem
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      machine?.hasAsbestos === 'Występuje' || machine?.hasAsbestos === true
+                        ? 'text-red-700'
+                        : 'text-emerald-700'
+                    }`}
+                  >
+                    {machine?.hasAsbestos === true
+                      ? 'Występuje'
+                      : machine?.hasAsbestos || 'Brak'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Organ nadzoru (PINB)
+                  </span>
+                  <span className="font-bold">{machine?.pinbAuthority || '-'}</span>
+                </div>
+                {machine?.legalTitleDoc && (
+                  <div className="col-span-2 sm:col-span-4 pt-1 border-t border-amber-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                      Dokument tytułu prawnego / Księga Wieczysta
+                    </span>
+                    <span className="font-semibold text-slate-700">{machine.legalTitleDoc}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

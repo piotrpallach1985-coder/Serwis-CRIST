@@ -21,6 +21,7 @@ export default function PlannedMaintenanceCompletionModal({
   const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
+  const services = useManagerStore(state => state.services || []);
   const branding = useManagerStore(state => state.branding || {});
   const industryProfile = branding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
@@ -45,6 +46,7 @@ export default function PlannedMaintenanceCompletionModal({
   const [refrigerantRecoveredKg, setRefrigerantRecoveredKg] = useState('');
   const [clientSignature, setClientSignature] = useState('');
   const [clientSignerName, setClientSignerName] = useState('');
+  const [inspectorLicense, setInspectorLicense] = useState('');
 
   const parts = useManagerStore(state => state.parts || []);
 
@@ -67,7 +69,29 @@ export default function PlannedMaintenanceCompletionModal({
     if (currentMachine?.contactPerson && !clientSignerName) {
       setClientSignerName(currentMachine.contactPerson);
     }
-  }, [currentMachine?.id, currentMachine?.refrigerantType, industryProfile]);
+    const matchedSrv = (services || []).find(
+      s =>
+        s.name === (serviceToComplete?.assignedService || serviceToComplete?.assignedTo) ||
+        s.id === (serviceToComplete?.assignedService || serviceToComplete?.assignedTo)
+    );
+    const defaultLic =
+      serviceToComplete?.inspectorLicense ||
+      serviceToComplete?.completionDetails?.inspectorLicense ||
+      matchedSrv?.licenseNumber ||
+      user?.licenseNumber ||
+      '';
+    if (defaultLic) {
+      setInspectorLicense(defaultLic);
+    }
+  }, [
+    currentMachine?.id,
+    currentMachine?.refrigerantType,
+    industryProfile,
+    serviceToComplete?.id,
+    serviceToComplete?.assignedService,
+    user?.licenseNumber,
+    services,
+  ]);
 
   useEffect(() => {
     if (serviceToComplete?.id) {
@@ -243,6 +267,7 @@ export default function PlannedMaintenanceCompletionModal({
         fGasProtocol,
         completedGps,
         clientSignerName: clientSignerName || null,
+        inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
       };
 
       const completionData = {
@@ -255,6 +280,7 @@ export default function PlannedMaintenanceCompletionModal({
         completedGps,
         clientSignature: clientSignature || null,
         clientSignerName: clientSignerName || null,
+        inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
       };
 
       const validExtraParts = extraParts.filter(
@@ -309,6 +335,7 @@ export default function PlannedMaintenanceCompletionModal({
           completedGps,
           clientSignature: clientSignature || null,
           clientSignerName: clientSignerName || null,
+          inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
           completionDetails: completionData,
           history: [...(serviceToComplete.history || []), historyEntry],
         });
@@ -356,18 +383,33 @@ export default function PlannedMaintenanceCompletionModal({
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-bold text-slate-700 mb-2">
-            Czas pracy (RBG / Godziny)
-          </label>
-          <input
-            type="number"
-            step="0.1"
-            className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            value={actualManHours}
-            onChange={e => setActualManHours(e.target.value)}
-            placeholder="np. 2.5"
-          />
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Czas pracy (RBG / Godziny)
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              value={actualManHours}
+              onChange={e => setActualManHours(e.target.value)}
+              placeholder="np. 2.5"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)
+            </label>
+            <input
+              type="text"
+              data-testid="modal-inspector-license-input"
+              className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
+              value={inspectorLicense}
+              onChange={e => setInspectorLicense(e.target.value)}
+              placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+            />
+          </div>
         </div>
 
         <div className="mb-4">

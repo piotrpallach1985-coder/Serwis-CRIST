@@ -9,6 +9,7 @@ import {
   CKOB_CATEGORIES,
   REFRIGERANT_TYPES,
   getIndustryProfileConfig,
+  getDtrDocCategoryInfo,
 } from '../fieldServiceHelpers';
 
 const n = (text) => {
@@ -178,6 +179,49 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
     if (ckobLabel) {
       baseInfoRows.push([n('Kategoria Obiektu (c-KOB):'), n(ckobLabel)]);
     }
+    const hasCkobMetric =
+      showCkob ||
+      machine.buildingType ||
+      machine.constructionYear ||
+      machine.usableAreaM2 ||
+      machine.cubatureM3 ||
+      machine.floorsCount ||
+      machine.pinbAuthority ||
+      machine.legalTitleDoc;
+    if (hasCkobMetric && industryProfile !== 'industrial') {
+      if (machine.buildingType) {
+        baseInfoRows.push([n('Rodzaj i funkcja obiektu (c-KOB art. 60j):'), n(machine.buildingType)]);
+      }
+      if (machine.constructionYear || machine.floorsCount) {
+        baseInfoRows.push([
+          n('Rok oddania / Liczba kondygnacji:'),
+          n(`${machine.constructionYear || '-'} / ${machine.floorsCount || '-'}`),
+        ]);
+      }
+      if (machine.usableAreaM2 || machine.cubatureM3) {
+        baseInfoRows.push([
+          n('Powierzchnia uzytkowa / Kubatura:'),
+          n(
+            `${machine.usableAreaM2 ? machine.usableAreaM2 + ' m2' : '-'} / ${
+              machine.cubatureM3 ? machine.cubatureM3 + ' m3' : '-'
+            }`
+          ),
+        ]);
+      }
+      if (machine.hasAsbestos || machine.pinbAuthority) {
+        const asbStr =
+          machine.hasAsbestos === true || machine.hasAsbestos === 'Występuje'
+            ? 'Wystepuje'
+            : 'Brak';
+        baseInfoRows.push([
+          n('Wyroby z azbestem / Organ PINB:'),
+          n(`${asbStr} / ${machine.pinbAuthority || '-'}`),
+        ]);
+      }
+      if (machine.legalTitleDoc) {
+        baseInfoRows.push([n('Tytul prawny / Ksiega Wieczysta:'), n(machine.legalTitleDoc)]);
+      }
+    }
     if (refLabel) {
       const fGasSummary = `${refLabel}${
         machine.refrigerantChargeKg ? ` | Ilosc: ${machine.refrigerantChargeKg} kg` : ''
@@ -315,18 +359,22 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       doc.text(n(`Zalaczone Pliki Dokumentacji DTR (${machine.dtrFiles.length})`), 14, currentY);
       currentY += 4;
 
-      const dtrRows = machine.dtrFiles.map(f => [
-        n(f.name || '-'),
-        f.size ? `${(f.size / (1024 * 1024)).toFixed(2)} MB` : '-',
-        safeParseDate(f.uploadedAt)?.toLocaleDateString('pl-PL') || '-'
-      ]);
+      const dtrRows = machine.dtrFiles.map(f => {
+        const catInfo = getDtrDocCategoryInfo(f.docCategory || 'DTR');
+        return [
+          n(catInfo.shortLabel),
+          n(f.name || '-'),
+          f.size ? `${(f.size / (1024 * 1024)).toFixed(2)} MB` : '-',
+          safeParseDate(f.uploadedAt)?.toLocaleDateString('pl-PL') || '-',
+        ];
+      });
 
       autoTable(doc, {
         startY: currentY,
-        head: [[n('Nazwa Pliku PDF'), n('Rozmiar'), n('Data Wgrania')]],
+        head: [[n('Kategoria'), n('Nazwa Pliku PDF'), n('Rozmiar'), n('Data Wgrania')]],
         body: dtrRows,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [90, 90, 120] }
+        headStyles: { fillColor: [90, 90, 120] },
       });
       currentY = doc.lastAutoTable.finalY + 10;
     }

@@ -28,11 +28,16 @@ export const AuthProvider = ({ children }) => {
               const tId = userData.tenantId || getCurrentTenant();
               useManagerStore.getState().setTenantId(tId);
               setUser({
+                ...userData,
                 uid: firebaseUser.uid,
+                email: userData.email || firebaseUser.email || '',
                 name: userData.name || firebaseUser.email,
                 role: userData.role || 'brak',
                 permissions: userData.permissions || [],
                 phone: userData.phone || "",
+                licenseNumber: userData.licenseNumber || "",
+                assignedService: userData.assignedService || "",
+                onlyAssignedTasks: Boolean(userData.onlyAssignedTasks || userData.assignedService),
                 tenantId: tId
               });
             } else {

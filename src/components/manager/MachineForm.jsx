@@ -42,6 +42,15 @@ export default function MachineForm({
   const [inspectionCategory, setInspectionCategory] = useState('');
   const [refrigerantType, setRefrigerantType] = useState('');
   const [refrigerantChargeKg, setRefrigerantChargeKg] = useState('');
+  // Metryczka obiektu budowlanego wg art. 60j ust. 3 Prawa budowlanego (c-KOB)
+  const [buildingType, setBuildingType] = useState('');
+  const [constructionYear, setConstructionYear] = useState('');
+  const [usableAreaM2, setUsableAreaM2] = useState('');
+  const [cubatureM3, setCubatureM3] = useState('');
+  const [floorsCount, setFloorsCount] = useState('');
+  const [hasAsbestos, setHasAsbestos] = useState('Brak');
+  const [pinbAuthority, setPinbAuthority] = useState('');
+  const [legalTitleDoc, setLegalTitleDoc] = useState('');
   const [showExtendedFields, setShowExtendedFields] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -69,6 +78,34 @@ export default function MachineForm({
           ? String(editingMachine.refrigerantChargeKg)
           : ''
       );
+      setBuildingType(editingMachine.buildingType || '');
+      setConstructionYear(
+        editingMachine.constructionYear !== undefined && editingMachine.constructionYear !== null
+          ? String(editingMachine.constructionYear)
+          : ''
+      );
+      setUsableAreaM2(
+        editingMachine.usableAreaM2 !== undefined && editingMachine.usableAreaM2 !== null
+          ? String(editingMachine.usableAreaM2)
+          : ''
+      );
+      setCubatureM3(
+        editingMachine.cubatureM3 !== undefined && editingMachine.cubatureM3 !== null
+          ? String(editingMachine.cubatureM3)
+          : ''
+      );
+      setFloorsCount(
+        editingMachine.floorsCount !== undefined && editingMachine.floorsCount !== null
+          ? String(editingMachine.floorsCount)
+          : ''
+      );
+      setHasAsbestos(
+        editingMachine.hasAsbestos === true || editingMachine.hasAsbestos === 'Występuje'
+          ? 'Występuje'
+          : 'Brak'
+      );
+      setPinbAuthority(editingMachine.pinbAuthority || '');
+      setLegalTitleDoc(editingMachine.legalTitleDoc || '');
       setShowExtendedFields(
         industryProfile === 'hvac' ||
           industryProfile === 'facility' ||
@@ -77,7 +114,9 @@ export default function MachineForm({
               editingMachine.contactPhone ||
               editingMachine.accessNotes ||
               editingMachine.inspectionCategory ||
-              editingMachine.refrigerantType
+              editingMachine.refrigerantType ||
+              editingMachine.buildingType ||
+              editingMachine.pinbAuthority
           )
       );
     } else {
@@ -90,6 +129,14 @@ export default function MachineForm({
       setInspectionCategory('');
       setRefrigerantType('');
       setRefrigerantChargeKg('');
+      setBuildingType('');
+      setConstructionYear('');
+      setUsableAreaM2('');
+      setCubatureM3('');
+      setFloorsCount('');
+      setHasAsbestos('Brak');
+      setPinbAuthority('');
+      setLegalTitleDoc('');
 
       if (initialParentId) {
         setParentId(initialParentId);
@@ -151,6 +198,23 @@ export default function MachineForm({
       contactPhone: allowContact ? formatPhoneXxx(contactPhone) : '',
       accessNotes: allowContact ? accessNotes.trim() : '',
       inspectionCategory: allowCkob ? inspectionCategory || '' : '',
+      buildingType: allowCkob ? buildingType.trim() : '',
+      constructionYear: allowCkob ? constructionYear.trim() : '',
+      usableAreaM2:
+        allowCkob && usableAreaM2 !== '' && !isNaN(Number(usableAreaM2))
+          ? Number(usableAreaM2)
+          : '',
+      cubatureM3:
+        allowCkob && cubatureM3 !== '' && !isNaN(Number(cubatureM3))
+          ? Number(cubatureM3)
+          : '',
+      floorsCount:
+        allowCkob && floorsCount !== '' && !isNaN(Number(floorsCount))
+          ? Number(floorsCount)
+          : '',
+      hasAsbestos: allowCkob ? hasAsbestos || 'Brak' : 'Brak',
+      pinbAuthority: allowCkob ? pinbAuthority.trim() : '',
+      legalTitleDoc: allowCkob ? legalTitleDoc.trim() : '',
       refrigerantType: effectiveRefType,
       refrigerantChargeKg:
         effectiveRefType && refrigerantChargeKg !== '' && Number(refrigerantChargeKg) > 0
@@ -353,21 +417,146 @@ export default function MachineForm({
                 {showExtendedFields && (
                   <div className="p-4 pt-3 border-t border-slate-200/70 space-y-4 bg-white">
                     {industryProfile === 'facility' && (
-                      <div data-testid="machine-form-ckob-section">
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
-                        </label>
-                        <select
-                          value={inspectionCategory}
-                          onChange={e => setInspectionCategory(e.target.value)}
-                          className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                      <div data-testid="machine-form-ckob-section" className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
+                          </label>
+                          <select
+                            value={inspectionCategory}
+                            onChange={e => setInspectionCategory(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                          >
+                            {CKOB_CATEGORIES.map(cat => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Metryczka obiektu budowlanego (c-KOB art. 60j ust. 3 PB) */}
+                        <div
+                          data-testid="machine-form-ckob-metric-section"
+                          className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 space-y-3"
                         >
-                          {CKOB_CATEGORIES.map(cat => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.label}
-                            </option>
-                          ))}
-                        </select>
+                          <div className="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <i className="ph ph-identification-card text-base text-amber-700"></i>
+                            Metryczka obiektu budowlanego (c-KOB art. 60j)
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Rodzaj i funkcja obiektu
+                              </label>
+                              <input
+                                type="text"
+                                data-testid="ckob-building-type-input"
+                                value={buildingType}
+                                onChange={e => setBuildingType(e.target.value)}
+                                placeholder="np. Budynek mieszkalny wielorodzinny / Hala / Biurowiec"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Rok oddania do użytkowania
+                              </label>
+                              <input
+                                type="text"
+                                data-testid="ckob-construction-year-input"
+                                value={constructionYear}
+                                onChange={e => setConstructionYear(e.target.value)}
+                                placeholder="np. 2012"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Liczba kondygnacji
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                data-testid="ckob-floors-count-input"
+                                value={floorsCount}
+                                onChange={e => setFloorsCount(e.target.value)}
+                                placeholder="np. 5"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Powierzchnia użytkowa (m²)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                data-testid="ckob-usable-area-input"
+                                value={usableAreaM2}
+                                onChange={e => setUsableAreaM2(e.target.value)}
+                                placeholder="np. 2450"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Kubatura (m³)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                data-testid="ckob-cubature-input"
+                                value={cubatureM3}
+                                onChange={e => setCubatureM3(e.target.value)}
+                                placeholder="np. 8200"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Wyroby zawierające azbest
+                              </label>
+                              <select
+                                data-testid="ckob-asbestos-select"
+                                value={hasAsbestos}
+                                onChange={e => setHasAsbestos(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              >
+                                <option value="Brak">Brak</option>
+                                <option value="Występuje">Występuje</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Właściwy organ nadzoru (PINB)
+                              </label>
+                              <input
+                                type="text"
+                                data-testid="ckob-pinb-input"
+                                value={pinbAuthority}
+                                onChange={e => setPinbAuthority(e.target.value)}
+                                placeholder="np. PINB w Gdyni"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div className="sm:col-span-2 lg:col-span-4">
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                Dokument tytułu prawnego / Księga Wieczysta
+                              </label>
+                              <input
+                                type="text"
+                                data-testid="ckob-legal-title-input"
+                                value={legalTitleDoc}
+                                onChange={e => setLegalTitleDoc(e.target.value)}
+                                placeholder="np. KW GD1Y/00012345/6 - własność / zarząd powierzony art. 18 UWL"
+                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 

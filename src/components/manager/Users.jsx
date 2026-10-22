@@ -1,14 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, firebaseConfig } from '../../firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
-import { addUser, updateUser, checkUserInUse } from '../../services/dictionary.service';
-
+import { addUser, updateUser } from '../../services/dictionary.service';
 
 // Inicjalizacja dodatkowej instancji Firebase Auth tylko do tworzenia kont,
 // aby nie wylogowało aktualnie zalogowanego Managera
@@ -26,85 +25,125 @@ export default function Users() {
   const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const limits = useManagerStore(state => state.limits);
+  const services = useManagerStore(state => state.services) || [];
   const [usersList, setUsersList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('admin');
   const [phone, setPhone] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [assignedService, setAssignedService] = useState('');
+  const [onlyAssignedTasks, setOnlyAssignedTasks] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), where('tenantId', '==', tenantId)), (snapshot) => {
-      setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
-    });
-    const unsubRoles = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'roles'), (snapshot) => {
-      setRolesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
-    });
+    const unsubUsers = onSnapshot(
+      query(collection(db, 'users'), where('tenantId', '==', tenantId)),
+      snapshot => {
+        setUsersList(
+          snapshot.docs
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+            .filter(item => !item.isDeleted)
+        );
+      }
+    );
+    const unsubRoles = onSnapshot(
+      collection(db, 'tenants', getCurrentTenant(), 'roles'),
+      snapshot => {
+        setRolesList(
+          snapshot.docs
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+            .filter(item => !item.isDeleted)
+        );
+      }
+    );
     return () => {
       unsubUsers();
       unsubRoles();
     };
-  }, []);
+  }, [tenantId]);
 
-  const handleAddUser = async (e) => {
+  const resetForm = () => {
+    setEditingId(null);
+    setEmail('');
+    setName('');
+    setRole(USER_ROLES.ADMIN);
+    setPhone('');
+    setLicenseNumber('');
+    setAssignedService('');
+    setOnlyAssignedTasks(false);
+  };
+
+  const handleAddUser = async e => {
     e.preventDefault();
     if (!editingId && limits && usersList.length >= (limits.maxUsers || 10)) {
-       alert('Osiągnięto limit użytkowników (' + (limits.maxUsers || 10) + '). Skontaktuj się z autorem oprogramowania.');
-       return;
+      alert(
+        'Osiągnięto limit użytkowników (' +
+          (limits.maxUsers || 10) +
+          '). Skontaktuj się z autorem oprogramowania.'
+      );
+      return;
     }
     if (!email.trim() || !name.trim()) return alert('Podaj e-mail i imię z nazwiskiem');
     setLoading(true);
+
+    const effectiveDedicated = role === USER_ROLES.ADMIN ? '' : assignedService.trim();
+    const effectiveOnlyAssigned =
+      role === USER_ROLES.ADMIN ? false : Boolean(onlyAssignedTasks || effectiveDedicated);
+
     try {
       if (editingId) {
-        // Zmiana nazwy/roli istniejącego usera
         await updateUser(editingId, {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           role: role,
           tenantId: tenantId,
-          phone: phone
+          phone: phone,
+          licenseNumber: licenseNumber.trim(),
+          assignedService: effectiveDedicated,
+          onlyAssignedTasks: effectiveOnlyAssigned,
         });
-        setEditingId(null);
+        resetForm();
         setIsFormOpen(false);
-        setEmail('');
-        
-        setName('');
-        setRole(USER_ROLES.ADMIN);
-        setPhone('');
       } else {
-        // Tworzenie NOWEGO konta w bezpiecznym module Authentication
         const randomBytes = new Uint8Array(6);
         crypto.getRandomValues(randomBytes);
         const randomHex = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('');
-        const tempPassword = randomHex + "Aa1!";
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim().toLowerCase(), tempPassword);
+        const tempPassword = randomHex + 'Aa1!';
+        const userCredential = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          email.trim().toLowerCase(),
+          tempPassword
+        );
         const newUid = userCredential.user.uid;
         await signOut(secondaryAuth);
 
-        // Zapisanie roli i nazwy do bazy danych (BEZ HASŁA!)
         await addUser(newUid, {
-            email: email.trim().toLowerCase(),
-            name: name.trim(),
-            role: role,
-            phone: phone,
-            tenantId: tenantId
-          });
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          role: role,
+          phone: phone,
+          licenseNumber: licenseNumber.trim(),
+          assignedService: effectiveDedicated,
+          onlyAssignedTasks: effectiveOnlyAssigned,
+          tenantId: tenantId,
+        });
 
-        setEmail('');
-        
-        setName('');
-        setRole(USER_ROLES.ADMIN);
-        setPhone('');
-          
-        alert(`Użytkownik został utworzony pomyślnie!\n\nE-mail: ${email.trim().toLowerCase()}\nTymczasowe hasło: ${tempPassword}\n\nSkopiuj to hasło i przekaż użytkownikowi.`);
+        resetForm();
+        setIsFormOpen(false);
+
+        alert(
+          `Użytkownik został utworzony pomyślnie!\n\nE-mail: ${email.trim().toLowerCase()}\nTymczasowe hasło: ${tempPassword}\n\nSkopiuj to hasło i przekaż użytkownikowi.`
+        );
       }
-      } catch (err) {
+    } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        alert('Ten e-mail jest już zarejestrowany w systemie.'); } else {
+        alert('Ten e-mail jest już zarejestrowany w systemie.');
+      } else {
         alert('Nie udało się zapisać użytkownika: ' + err.message);
       }
     } finally {
@@ -112,18 +151,28 @@ export default function Users() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Czy na pewno chcesz usunąć uprawnienia tego użytkownika? Uwaga: Usunie to jego dostęp, ale samo konto logowania (Firebase Auth) musi zostać usunięte w panelu Firebase.')) {
-      await updateUser(id, { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+  const handleDelete = async id => {
+    if (
+      window.confirm(
+        'Czy na pewno chcesz usunąć uprawnienia tego użytkownika? Uwaga: Usunie to jego dostęp, ale samo konto logowania (Firebase Auth) musi zostać usunięte w panelu Firebase.'
+      )
+    ) {
+      await updateUser(id, {
+        isDeleted: true,
+        deletedAt: serverTimestamp(),
+        deletedBy: 'System',
+      });
     }
   };
 
-  const handleEdit = (u) => {
-    setEmail(u.email);
-     // Hasła nie da się podejrzeć
+  const handleEdit = u => {
+    setEmail(u.email || '');
     setName(u.name || '');
     setRole(u.role || 'admin');
     setPhone(u.phone || '');
+    setLicenseNumber(u.licenseNumber || '');
+    setAssignedService(u.assignedService || '');
+    setOnlyAssignedTasks(Boolean(u.onlyAssignedTasks || u.assignedService));
     setEditingId(u.id);
     setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -133,11 +182,21 @@ export default function Users() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-3 bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">{t("admin.users.title")}</h2>
-          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">{t("admin.users.subtitle")}</p>
+          <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">
+            {t('admin.users.title')}
+          </h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">
+            {t('admin.users.subtitle')}
+          </p>
         </div>
-        <button onClick={() => { setEditingId(null); setEmail('');  setName(''); setRole(USER_ROLES.ADMIN); setPhone(''); setIsFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5">
-          <i className="ph ph-plus text-lg"></i> {t("admin.users.add_user")}
+        <button
+          onClick={() => {
+            resetForm();
+            setIsFormOpen(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 md:px-5 md:py-2.5 text-sm md:text-base rounded-md md:rounded-lg font-bold shadow-md transition-all flex items-center gap-1.5"
+        >
+          <i className="ph ph-plus text-lg"></i> {t('admin.users.add_user')}
         </button>
       </div>
 
@@ -147,9 +206,12 @@ export default function Users() {
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
               <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
                 <i className="ph ph-shield-check text-blue-600"></i>
-                {editingId ? t("admin.users.edit_user") : t("admin.users.register_new")}
+                {editingId ? t('admin.users.edit_user') : t('admin.users.register_new')}
               </h2>
-              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200">
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200"
+              >
                 <i className="ph ph-x text-2xl"></i>
               </button>
             </div>
@@ -157,86 +219,165 @@ export default function Users() {
               <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-start gap-3">
                 <i className="ph ph-info text-blue-600 text-xl mt-0.5"></i>
                 <div>
-                  <h4 className="font-bold text-blue-800 text-sm">{t("admin.users.security_title")}</h4>
-                  <p className="text-blue-700 text-xs mt-1">{t("admin.users.security_desc")}</p>
+                  <h4 className="font-bold text-blue-800 text-sm">
+                    {t('admin.users.security_title')}
+                  </h4>
+                  <p className="text-blue-700 text-xs mt-1">{t('admin.users.security_desc')}</p>
                 </div>
               </div>
               <form onSubmit={handleAddUser} className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.name_label")}</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={e => setName(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="np. Jan Kowalski"
-              required
-            />
-          </div>
-          <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.email_label")}</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="np. jan@firma.pl"
-              required
-            />
-          </div>
-          <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.phone_label")}</label>
-            <input 
-              type="text" 
-              value={phone} 
-              onChange={e => {
-                let val = e.target.value.replace(/[^\d]/g, '');
-                if (val.length > 3) val = val.slice(0,3) + ' ' + val.slice(3);
-                if (val.length > 7) val = val.slice(0,7) + ' ' + val.slice(7);
-                if (val.length > 11) val = val.slice(0, 11);
-                setPhone(val);
-              }}
-              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="xxx xxx xxx"
-              pattern="\d{3} \d{3} \d{3}"
-              title="Format: xxx xxx xxx"
-              required
-            />
-          </div>
-          
-          <div className="flex-1 w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin.users.permissions_label")}</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-            >
-              <option value="admin">{t("admin.users.role_admin")}</option>
-              {rolesList.map(r => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="w-full">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t('admin.users.name_label')}
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="np. Jan Kowalski"
+                      required
+                    />
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t('admin.users.email_label')}
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="np. jan@firma.pl"
+                      required
+                    />
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t('admin.users.phone_label')}
+                    </label>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={e => {
+                        let val = e.target.value.replace(/[^\d]/g, '');
+                        if (val.length > 3) val = val.slice(0, 3) + ' ' + val.slice(3);
+                        if (val.length > 7) val = val.slice(0, 7) + ' ' + val.slice(7);
+                        if (val.length > 11) val = val.slice(0, 11);
+                        setPhone(val);
+                      }}
+                      className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="xxx xxx xxx"
+                      pattern="\d{3} \d{3} \d{3}"
+                      title="Format: xxx xxx xxx"
+                      required
+                    />
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {t('admin.users.permissions_label')}
+                    </label>
+                    <select
+                      value={role}
+                      onChange={e => setRole(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      <option value="admin">{t('admin.users.role_admin')}</option>
+                      {rolesList.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
+                {/* Uprawnienia budowlane / kwalifikacyjne oraz Dedykowany Serwis dla Serwisanta */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      {t(
+                        'admin.users.license_label',
+                        'Nr uprawnień budowlanych / świadectwa kwalifikacji (np. PIIB / SEP / F-Gaz)'
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="user-license-input"
+                      value={licenseNumber}
+                      onChange={e => setLicenseNumber(e.target.value)}
+                      className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                      placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/27/00123/22"
+                    />
+                  </div>
+
+                  {role !== USER_ROLES.ADMIN && role !== USER_ROLES.SUPERADMIN && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Dedykowany Serwis / Zakres (Serwisant widzi tylko ten zakres)
+                        </label>
+                        <select
+                          data-testid="user-dedicated-service-select"
+                          value={assignedService}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssignedService(val);
+                            if (val) {
+                              setOnlyAssignedTasks(true);
+                              const srvObj = services.find(s => s.name === val);
+                              if (srvObj?.licenseNumber && !licenseNumber) {
+                                setLicenseNumber(srvObj.licenseNumber);
+                              }
+                            }
+                          }}
+                          className="w-full p-2 border border-slate-300 rounded bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-- Wszystkie zakresy (wg uprawnień roli) --</option>
+                          {services.map(s => (
+                            <option key={s.id} value={s.name}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(onlyAssignedTasks || assignedService)}
+                          onChange={e => setOnlyAssignedTasks(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>
+                          Ukryj inne zakresy — pokazuj wyłącznie zlecenia i urządzenia przypisane do
+                          tego serwisanta / działu
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-3 pt-6 mt-4 border-t border-gray-100 w-full">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsFormOpen(false);
-                      setEditingId(null);
-                      setEmail('');
-                      
-                      setName('');
-                      setRole(USER_ROLES.ADMIN);
-                      setPhone('');
+                      resetForm();
                     }}
                     className="px-6 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold transition-colors"
                   >
                     Anuluj
                   </button>
-                  <button disabled={loading} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50">
-                    {loading ? t('admin.users.saving') : (editingId ? t('admin.users.save_changes') : t('admin.users.add'))}
+                  <button
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {loading
+                      ? t('admin.users.saving')
+                      : editingId
+                      ? t('admin.users.save_changes')
+                      : t('admin.users.add')}
                   </button>
                 </div>
               </form>
@@ -247,93 +388,148 @@ export default function Users() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="font-bold text-gray-700">{t("admin.users.authorized_users")}</h3>
+          <h3 className="font-bold text-gray-700">{t('admin.users.authorized_users')}</h3>
           <span className="text-xs bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded">
-            {t("admin.users.total")}{usersList.length}
+            {t('admin.users.total')}
+            {usersList.length}
           </span>
         </div>
         <div className="overflow-x-auto">
-<div className="lg:hidden flex flex-col gap-1.5 p-2">
-    {usersList.length === 0 ? (
-      <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">{t("admin.users.no_data")}</div>
-    ) : (
-      usersList.map(item => (
-        
-<div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-  <div className="flex items-center gap-1.5 mb-2">
-    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-lg">
-      {(item.name || 'U').charAt(0).toUpperCase()}
-    </div>
-    <div>
-      <h4 className="font-bold text-[#002b5e] text-base">{item.name || 'Brak imienia'}</h4>
-      <p className="text-xs text-gray-500">{item.email}</p>
-    </div>
-  </div>
-  <div className="text-sm space-y-1 mb-1">
-    <div className="flex items-center gap-1.5"><i className="ph ph-phone text-gray-400"></i> {item.phone || '-'}</div>
-    <div className="flex items-center gap-1.5"><i className="ph ph-shield-check text-gray-400"></i> {t("admin.users.role_label")}<span className="font-bold">{(item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN) ? t("admin.users.administrator") : (rolesList.find(r => r.id === item.role)?.name || item.role)}</span></div>
-  </div>
-  <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
-    <button onClick={() => { handleEdit(item); }} className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"><i className="ph ph-pencil-simple"></i> {t("admin.users.edit")}</button>
-    <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs w-10"><i className="ph ph-trash"></i></button>
-  </div>
-</div>
-
-      ))
-    )}
-  </div>
-  <table className="w-full text-left hidden lg:table border-collapse hidden lg:table">
+          <div className="lg:hidden flex flex-col gap-1.5 p-2">
+            {usersList.length === 0 ? (
+              <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">
+                {t('admin.users.no_data')}
+              </div>
+            ) : (
+              usersList.map(item => (
+                <div
+                  key={item.id}
+                  className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col"
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-lg">
+                      {(item.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-[#002b5e] text-base">
+                        {item.name || 'Brak imienia'}
+                      </h4>
+                      <p className="text-xs text-gray-500">{item.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-sm space-y-1 mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <i className="ph ph-phone text-gray-400"></i> {item.phone || '-'}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <i className="ph ph-shield-check text-gray-400"></i>{' '}
+                      {t('admin.users.role_label')}
+                      <span className="font-bold">
+                        {item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN
+                          ? t('admin.users.administrator')
+                          : rolesList.find(r => r.id === item.role)?.name || item.role}
+                      </span>
+                    </div>
+                    {item.licenseNumber && (
+                      <div className="text-xs text-indigo-700 font-semibold flex items-center gap-1">
+                        <i className="ph ph-certificate"></i> Uprawnienia: {item.licenseNumber}
+                      </div>
+                    )}
+                    {item.assignedService && (
+                      <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                        <i className="ph ph-wrench"></i> Dedykowany serwis: {item.assignedService}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
+                    <button
+                      onClick={() => {
+                        handleEdit(item);
+                      }}
+                      className="p-2 bg-gray-100 text-gray-700 rounded-lg flex-1 font-bold text-xs"
+                    >
+                      <i className="ph ph-pencil-simple"></i> {t('admin.users.edit')}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs w-10"
+                    >
+                      <i className="ph ph-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <table className="w-full text-left hidden lg:table border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">
               <tr>
-                <th className="px-6 py-4">{t("admin.users.name_label")}</th>
-                <th className="px-6 py-4">{t("admin.users.email_login")}</th>
-                
-                <th className="px-6 py-4">{t("admin.users.phone")}</th>
-                <th className="px-6 py-4">{t("admin.users.role")}</th>
-                <th className="px-6 py-4 text-right">{t("admin.users.actions")}</th>
+                <th className="px-6 py-4">{t('admin.users.name_label')}</th>
+                <th className="px-6 py-4">{t('admin.users.email_login')}</th>
+                <th className="px-6 py-4">{t('admin.users.phone')}</th>
+                <th className="px-6 py-4">{t('admin.users.role')}</th>
+                <th className="px-6 py-4 text-right">{t('admin.users.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {usersList.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="p-8 text-center text-gray-500">
-                    {t("admin.users.empty_list")}
+                    {t('admin.users.empty_list')}
                   </td>
                 </tr>
               ) : (
                 usersList.map(u => (
                   <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 font-bold text-gray-800">{u.name}</td>
-                    <td className="px-6 py-4 text-gray-600">{u.email}</td>
-                    
-                      <td className="px-6 py-4 text-gray-600">{u.phone || "-"}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        (u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {(u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN) ? t("admin.users.administrator") : 
-                         rolesList.find(r => r.id === u.role)?.name || u.role}
-                      </span>
+                      <div className="font-bold text-gray-800">{u.name}</div>
+                      {u.licenseNumber && (
+                        <div className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-1">
+                          <i className="ph ph-certificate"></i> {u.licenseNumber}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{u.email}</td>
+                    <td className="px-6 py-4 text-gray-600">{u.phone || '-'}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col items-start gap-1">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold ${
+                            u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN
+                            ? t('admin.users.administrator')
+                            : rolesList.find(r => r.id === u.role)?.name || u.role}
+                        </span>
+                        {u.assignedService && (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                            Zakres: {u.assignedService}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                    <div className="flex gap-1.5 justify-end">
-                      <button 
-                        onClick={() => handleEdit(u)}
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
-                      >
-                        <i className="ph ph-pencil-simple"></i>
-                        {t("admin.users.edit")}
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(u.id)}
-                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
-                        title="Usuń"
-                      >
-                        <i className="ph ph-trash"></i>
-                        {t("admin.users.delete")}
-                      </button>
-                    </div>
-                  </td>
+                      <div className="flex gap-1.5 justify-end">
+                        <button
+                          onClick={() => handleEdit(u)}
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
+                        >
+                          <i className="ph ph-pencil-simple"></i>
+                          {t('admin.users.edit')}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(u.id)}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
+                          title="Usuń"
+                        >
+                          <i className="ph ph-trash"></i>
+                          {t('admin.users.delete')}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

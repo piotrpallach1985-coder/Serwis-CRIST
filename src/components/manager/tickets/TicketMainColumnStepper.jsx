@@ -56,6 +56,32 @@ export default function TicketMainColumnStepper({
   const [refrigerantRecoveredKg, setRefrigerantRecoveredKg] = useState('');
   const [clientSignature, setClientSignature] = useState(currentTicket?.clientSignature || '');
   const [clientSignerName, setClientSignerName] = useState(currentTicket?.clientSignerName || '');
+  const matchedServiceForLicense = (services || []).find(
+    s =>
+      s.name === (selectedService || currentTicket?.assignedTo) ||
+      s.id === (selectedService || currentTicket?.assignedTo)
+  );
+  const [inspectorLicense, setInspectorLicense] = useState(
+    currentTicket?.inspectorLicense ||
+      matchedServiceForLicense?.licenseNumber ||
+      user?.licenseNumber ||
+      ''
+  );
+
+  useEffect(() => {
+    const fallbackLic =
+      currentTicket?.inspectorLicense ||
+      matchedServiceForLicense?.licenseNumber ||
+      user?.licenseNumber ||
+      '';
+    if (fallbackLic && !inspectorLicense) {
+      setInspectorLicense(fallbackLic);
+    }
+  }, [
+    currentTicket?.inspectorLicense,
+    matchedServiceForLicense?.licenseNumber,
+    user?.licenseNumber,
+  ]);
 
   const currentMachine = currentTicket?.machineId
     ? machines.find(m => m.id === currentTicket.machineId)
@@ -620,6 +646,22 @@ export default function TicketMainColumnStepper({
                                 </button>
                               </div>
 
+                              {/* Nr uprawnień kontrolującego / inspektora */}
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                                <label className="block text-xs font-bold text-slate-700 mb-1">
+                                  Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)
+                                </label>
+                                <input
+                                  type="text"
+                                  disabled={!isActualStatus}
+                                  data-testid="ticket-inspector-license-input"
+                                  value={inspectorLicense}
+                                  onChange={e => setInspectorLicense(e.target.value)}
+                                  placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-slate-100"
+                                />
+                              </div>
+
                               {/* Protokół F-Gaz / Szczelność (widoczny dla branży HVAC lub urządzeń z czynnikiem, aktywny WYŁĄCZNIE gdy etap 4 jest aktywnym etapem) */}
                               {canShowFGasSection && (
                                 <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">
@@ -799,6 +841,10 @@ export default function TicketMainColumnStepper({
                                       fGasProtocol,
                                       clientSignature: clientSignature || null,
                                       clientSignerName: clientSignerName || null,
+                                      inspectorLicense:
+                                        inspectorLicense && inspectorLicense.trim()
+                                          ? inspectorLicense.trim()
+                                          : null,
                                     }
                                   );
                                   setSelectedStepOverride(5);

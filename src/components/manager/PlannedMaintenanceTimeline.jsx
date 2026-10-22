@@ -107,6 +107,35 @@ export default function PlannedMaintenanceTimeline({
   );
   const [clientSignature, setClientSignature] = useState('');
   const [clientSignerName, setClientSignerName] = useState(currentMachine?.contactPerson || '');
+  const matchedServiceForLicense = (services || []).find(
+    s =>
+      s.name === (selectedService || srv.assignedService || srv.assignedTo) ||
+      s.id === (selectedService || srv.assignedService || srv.assignedTo)
+  );
+  const [inspectorLicense, setInspectorLicense] = useState(
+    srv.inspectorLicense ||
+      srv.completionDetails?.inspectorLicense ||
+      matchedServiceForLicense?.licenseNumber ||
+      user?.licenseNumber ||
+      ''
+  );
+
+  useEffect(() => {
+    const fallbackLicense =
+      srv.inspectorLicense ||
+      srv.completionDetails?.inspectorLicense ||
+      matchedServiceForLicense?.licenseNumber ||
+      user?.licenseNumber ||
+      '';
+    if (fallbackLicense && !inspectorLicense) {
+      setInspectorLicense(fallbackLicense);
+    }
+  }, [
+    srv.inspectorLicense,
+    srv.completionDetails?.inspectorLicense,
+    matchedServiceForLicense?.licenseNumber,
+    user?.licenseNumber,
+  ]);
 
   useEffect(() => {
     if (industryProfile === 'industrial') {
@@ -323,6 +352,9 @@ export default function PlannedMaintenanceTimeline({
         ...(fGasProtocol ? { fGasProtocol } : {}),
         ...(completedGps ? { completedGps } : {}),
         ...(clientSignerName ? { clientSignerName: clientSignerName.trim() } : {}),
+        ...(inspectorLicense && inspectorLicense.trim()
+          ? { inspectorLicense: inspectorLicense.trim() }
+          : {}),
       };
 
       const completionData = {
@@ -336,6 +368,7 @@ export default function PlannedMaintenanceTimeline({
         fGasProtocol: fGasProtocol || null,
         clientSignature: clientSignature || null,
         clientSignerName: clientSignerName ? clientSignerName.trim() : null,
+        inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
       };
 
       let actionItemDataObj = null;
@@ -931,21 +964,40 @@ export default function PlannedMaintenanceTimeline({
                             )}
                           </div>
 
-                          {/* Czas pracy */}
-                          <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">
-                              {t('planned.timeline.manHoursLabel', 'Czas pracy (RBG / Godziny)')}
-                            </label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              inputMode="decimal"
-                              disabled={!isActualStatus}
-                              value={summaryManHours}
-                              onChange={e => setSummaryManHours(e.target.value)}
-                              placeholder="np. 2.5"
-                              className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
-                            />
+                          {/* Czas pracy i Nr uprawnień inspektora / kontrolującego */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-1">
+                                {t('planned.timeline.manHoursLabel', 'Czas pracy (RBG / Godziny)')}
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                inputMode="decimal"
+                                disabled={!isActualStatus}
+                                value={summaryManHours}
+                                onChange={e => setSummaryManHours(e.target.value)}
+                                placeholder="np. 2.5"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-1">
+                                {t(
+                                  'planned.timeline.inspectorLicenseLabel',
+                                  'Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)'
+                                )}
+                              </label>
+                              <input
+                                type="text"
+                                disabled={!isActualStatus}
+                                data-testid="timeline-inspector-license-input"
+                                value={inspectorLicense}
+                                onChange={e => setInspectorLicense(e.target.value)}
+                                placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-slate-100"
+                              />
+                            </div>
                           </div>
 
                           {/* Potwierdzenie zużycia części planowych */}

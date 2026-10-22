@@ -8,6 +8,12 @@ import { TICKET_STATUS, USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { checkInventoryStatus, checkServiceUrgency } from '../../utils/logicHelpers';
+import { usePermissions } from '../../hooks/usePermissions';
+import {
+  checkCkob7DaysDeadline,
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+} from '../../utils/fieldServiceHelpers';
 
 export default function NotificationCenter({
   onNavigate,
@@ -27,13 +33,26 @@ export default function NotificationCenter({
   const notifications = useManagerStore(state => state.notifications || []);
   const currentModule = useManagerStore(state => state.currentModule || 'ur');
   const markAsRead = useManagerStore(state => state.markAsRead);
+  const roles = useManagerStore(state => state.roles || []);
+  const branding = useManagerStore(state => state.branding || {});
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const { onlyAssignedTasks } = usePermissions(user, roles);
 
   const relevantNotifications = useMemo(() => {
     const list = [];
     const isUrModule = currentModule === 'ur' || currentModule === 'tickets' || currentModule === 'planned_maintenance' || currentModule === 'master_data';
+    const visibleTickets = filterTasksForFieldTechnician(tickets, user, onlyAssignedTasks);
+    const visibleServices = filterTasksForFieldTechnician(plannedServices, user, onlyAssignedTasks);
+    const visibleMachines = filterMachinesForFieldTechnician(
+      machines,
+      tickets,
+      plannedServices,
+      user,
+      onlyAssignedTasks
+    );
 
     if (isUrModule || currentModule === 'tickets') {
-      tickets.filter(tk => Number(tk.status) !== TICKET_STATUS.CLOSED).forEach(tk => {
+      visibleTickets.filter(tk => Number(tk.status) !== TICKET_STATUS.CLOSED).forEach(tk => {
         const isCrit = !!tk.isCritical;
         list.push({
           id: 'dyn_ticket_' + tk.id,
@@ -76,9 +95,41 @@ export default function NotificationCenter({
     });
 
     if (isUrModule || currentModule === 'planned_maintenance') {
-      plannedServices.forEach(srv => {
-        if (srv.status === 'completed') return;
+      visibleServices.forEach(srv => {
         const machine = machines.find(m => m.id === srv.machineId);
+
+        if (srv.status === 'completed') {
+          const ckobCheck = checkCkob7DaysDeadline(srv, machine, industryProfile);
+          if (ckobCheck.requiresCkobEntry) {
+            list.push({
+              id: 'dyn_ckob_7d_' + srv.id,
+              title: ckobCheck.isOverdue7Days
+                ? 'PRZEKROCZONO 7 DNI NA WPIS DO c-KOB!'
+                : 'WYMAGANY WPIS DO RZĄDOWEGO c-KOB (7 DNI)',
+              message: `Obiekt: ${machine?.name || srv.machineName || 'Nieznany'} - ${srv.name} (${
+                ckobCheck.isOverdue7Days
+                  ? `minęło ${ckobCheck.daysElapsed} dni od kontroli`
+                  : `pozostało ${ckobCheck.daysRemaining} dni na wpis w c-kob.gunb.gov.pl`
+              })`,
+              isCritical: ckobCheck.isOverdue7Days,
+              priorityRank: ckobCheck.isOverdue7Days ? 2 : 3,
+              icon: 'ph-buildings',
+              colorClass: ckobCheck.isOverdue7Days
+                ? 'bg-red-100 text-red-600'
+                : 'bg-amber-100 text-amber-700',
+              badge: ckobCheck.isOverdue7Days ? 'c-KOB PILNE' : 'c-KOB 7 DNI',
+              badgeClass: ckobCheck.isOverdue7Days
+                ? 'bg-red-600 text-white font-bold animate-pulse'
+                : 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
+              read: false,
+              linkTo: 'archive_planned',
+              serviceId: srv.id,
+              createdAt: { toDate: () => ckobCheck.completedDate || new Date() },
+              isDynamic: true,
+            });
+          }
+          return;
+        }
         
         const { isOverdue, isUpcoming, message } = checkServiceUrgency(srv, machine, plannedWarningDays);
 
@@ -123,7 +174,10 @@ export default function NotificationCenter({
       });
     }
 
-    if (isUrModule || currentModule === 'parts' || currentModule === 'parts_inventory') {
+    if (
+      !onlyAssignedTasks &&
+      (isUrModule || currentModule === 'parts' || currentModule === 'parts_inventory')
+    ) {
       parts.forEach(p => {
         let reservedQty = 0;
         plannedServices.forEach(s => {
@@ -165,7 +219,7 @@ export default function NotificationCenter({
     }
 
     if (isUrModule || currentModule === 'master_data' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)) {
-      machines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
+      visibleMachines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
         list.push({
           id: 'dyn_verif_machine_' + m.id,
           title: t('notifications.machine_to_verify', 'MASZYNA DO WERYFIKACJI'),
@@ -194,7 +248,7 @@ export default function NotificationCenter({
       const dB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
       return dB - dA;
     });
-  }, [tickets, plannedServices, machines, actionItems, notifications, currentModule, user, reporters, parts, plannedWarningDays, t]);
+  }, [tickets, plannedServices, machines, actionItems, notifications, currentModule, user, reporters, parts, plannedWarningDays, t, onlyAssignedTasks, industryProfile]);
 
   const unreadCount = relevantNotifications.filter(n => !n.read).length;
 
@@ -206,6 +260,8 @@ export default function NotificationCenter({
       if (onNavigate) onNavigate(targetModule, 'tickets', { ticketId: n.ticketId });
     } else if (n.linkTo === 'planned_maintenance') {
       if (onNavigate) onNavigate(targetModule, 'planned_maintenance', { serviceId: n.serviceId });
+    } else if (n.linkTo === 'archive_planned') {
+      if (onNavigate) onNavigate(targetModule, 'archive_planned', { serviceId: n.serviceId });
     } else if (n.linkTo === 'action_items') {
       if (onNavigate) onNavigate(targetModule, 'action_items');
     } else if (n.linkTo === 'machines') {
