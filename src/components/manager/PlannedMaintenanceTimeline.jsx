@@ -19,6 +19,7 @@ import {
   buildFGasServiceEntry,
   captureCurrentGpsPosition,
   getIndustryProfileConfig,
+  isInspectorLicenseRequired,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceTimeline({
@@ -95,8 +96,13 @@ export default function PlannedMaintenanceTimeline({
   const [completedGps, setCompletedGps] = useState(
     srv.completedGps || srv.completionDetails?.completedGps || null
   );
+  const [showGpsOption, setShowGpsOption] = useState(
+    Boolean(srv.completedGps || srv.completionDetails?.completedGps)
+  );
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
+  const [licenseError, setLicenseError] = useState('');
+  const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
   const [leakTestResult, setLeakTestResult] = useState('not_applicable');
   const [refrigerantType, setRefrigerantType] = useState(currentMachine?.refrigerantType || '');
   const [addedRefrigerantKg, setAddedRefrigerantKg] = useState('');
@@ -158,6 +164,7 @@ export default function PlannedMaintenanceTimeline({
   }, [srv.machineId, currentMachine, industryProfile]);
 
   const handleCaptureGps = async () => {
+    setShowGpsOption(true);
     setGpsLoading(true);
     setGpsError('');
     try {
@@ -276,6 +283,13 @@ export default function PlannedMaintenanceTimeline({
 
   // 4. Krok 4 -> Krok 5: Zakończ Serwis (Rozliczenie)
   const handleCompleteServiceFromStep4 = async () => {
+    if (requiresInspectorLicense && !inspectorLicense.trim()) {
+      setLicenseError(
+        'Podaj numer uprawnień kontrolującego / inspektora (wymagane dla profilu HVAC i Facility c-KOB).'
+      );
+      return;
+    }
+    setLicenseError('');
     setIsCompletingService(true);
     setTimelineUploadError(null);
     try {
@@ -964,8 +978,12 @@ export default function PlannedMaintenanceTimeline({
                             )}
                           </div>
 
-                          {/* Czas pracy i Nr uprawnień inspektora / kontrolującego */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Czas pracy i Nr uprawnień inspektora / kontrolującego (wymagany przy HVAC i Facility) */}
+                          <div
+                            className={`grid grid-cols-1 ${
+                              requiresInspectorLicense ? 'sm:grid-cols-2' : ''
+                            } gap-3`}
+                          >
                             <div>
                               <label className="block text-sm font-bold text-slate-700 mb-1">
                                 {t('planned.timeline.manHoursLabel', 'Czas pracy (RBG / Godziny)')}
@@ -981,23 +999,47 @@ export default function PlannedMaintenanceTimeline({
                                 className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
                               />
                             </div>
-                            <div>
-                              <label className="block text-sm font-bold text-slate-700 mb-1">
-                                {t(
-                                  'planned.timeline.inspectorLicenseLabel',
-                                  'Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)'
+                            {requiresInspectorLicense && (
+                              <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between gap-2">
+                                  <span>
+                                    {t(
+                                      'planned.timeline.inspectorLicenseLabel',
+                                      'Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)'
+                                    )}{' '}
+                                    <span className="text-red-600">*</span>
+                                  </span>
+                                  <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                                    Wymagane
+                                  </span>
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  disabled={!isActualStatus}
+                                  data-testid="timeline-inspector-license-input"
+                                  value={inspectorLicense}
+                                  onChange={e => {
+                                    setInspectorLicense(e.target.value);
+                                    if (licenseError) setLicenseError('');
+                                  }}
+                                  placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+                                  className={`w-full p-2.5 border rounded-lg text-sm bg-white focus:ring-2 outline-none disabled:bg-slate-100 ${
+                                    licenseError
+                                      ? 'border-red-400 focus:ring-red-500'
+                                      : 'border-slate-300 focus:ring-amber-500'
+                                  }`}
+                                />
+                                {licenseError && (
+                                  <p
+                                    data-testid="timeline-inspector-license-error"
+                                    className="text-[11px] font-bold text-red-600 mt-1"
+                                  >
+                                    {licenseError}
+                                  </p>
                                 )}
-                              </label>
-                              <input
-                                type="text"
-                                disabled={!isActualStatus}
-                                data-testid="timeline-inspector-license-input"
-                                value={inspectorLicense}
-                                onChange={e => setInspectorLicense(e.target.value)}
-                                placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-slate-100"
-                              />
-                            </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Potwierdzenie zużycia części planowych */}
@@ -1191,42 +1233,64 @@ export default function PlannedMaintenanceTimeline({
                             </div>
                           </div>
 
-                          {/* Check-in GPS na miejscu wykonania */}
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="text-xs text-slate-700">
-                              <span className="font-bold flex items-center gap-1.5">
+                          {/* Check-in GPS na miejscu wykonania (Opcjonalnie) */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  disabled={!isActualStatus}
+                                  checked={showGpsOption}
+                                  data-testid="timeline-gps-optional-toggle"
+                                  onChange={e => {
+                                    const next = e.target.checked;
+                                    setShowGpsOption(next);
+                                    if (!next) {
+                                      setCompletedGps(null);
+                                      setGpsError('');
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer"
+                                />
                                 <i className="ph ph-gps-fix text-blue-600 text-base"></i>
-                                Lokalizacja GPS wykonania serwisu (Check-in)
-                              </span>
-                              {completedGps ? (
-                                <span className="text-emerald-700 font-semibold block mt-0.5">
-                                  Zapisano współrzędne: {completedGps.lat.toFixed(5)},{' '}
-                                  {completedGps.lng.toFixed(5)} (±{completedGps.accuracy} m)
+                                <span>Potwierdzenie obecności GPS</span>
+                                <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
+                                  Opcja
                                 </span>
-                              ) : (
-                                <span className="text-slate-500 block mt-0.5">
-                                  Opcjonalne potwierdzenie obecności serwisanta na obiekcie klienta
-                                </span>
-                              )}
-                              {gpsError && (
-                                <span className="text-red-600 font-semibold block mt-0.5">
-                                  {gpsError}
-                                </span>
-                              )}
+                              </label>
+                              <button
+                                type="button"
+                                disabled={!isActualStatus || gpsLoading}
+                                onClick={handleCaptureGps}
+                                className="bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                              >
+                                <i
+                                  className={`ph ${
+                                    gpsLoading ? 'ph-spinner animate-spin' : 'ph-crosshair'
+                                  }`}
+                                ></i>
+                                {completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              disabled={!isActualStatus || gpsLoading}
-                              onClick={handleCaptureGps}
-                              className="bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
-                            >
-                              <i
-                                className={`ph ${
-                                  gpsLoading ? 'ph-spinner animate-spin' : 'ph-crosshair'
-                                }`}
-                              ></i>
-                              {completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
-                            </button>
+                            {showGpsOption && (
+                              <div className="text-xs text-slate-700 pl-6">
+                                {completedGps ? (
+                                  <span className="text-emerald-700 font-semibold block">
+                                    Zapisano współrzędne: {completedGps.lat.toFixed(5)},{' '}
+                                    {completedGps.lng.toFixed(5)} (±{completedGps.accuracy} m)
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 block">
+                                    Opcjonalne potwierdzenie obecności serwisanta na obiekcie
+                                  </span>
+                                )}
+                                {gpsError && (
+                                  <span className="text-amber-700 font-medium block mt-0.5">
+                                    {gpsError}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Sekcja F-Gazy (HVAC / Pompy ciepła / Klimatyzacja) — widoczna dla profilu HVAC lub maszyn z czynnikiem, aktywna WYŁĄCZNIE gdy Krok 4 jest aktywnym etapem */}
@@ -1338,6 +1402,7 @@ export default function PlannedMaintenanceTimeline({
                           {/* Podpis cyfrowy klienta / odbierającego */}
                           <SignaturePad
                             label={profileConfig.clientSignatureLabel}
+                            collapsible={true}
                             disabled={!isActualStatus || isCompleted}
                             value={clientSignature}
                             signerName={clientSignerName}

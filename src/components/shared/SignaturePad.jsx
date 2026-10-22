@@ -21,16 +21,22 @@ export default function SignaturePad({
   onChange,
   disabled = false,
   label = 'Podpis potwierdzający odbiór prac (Klient / Odbierający)',
+  collapsible = false,
+  defaultExpanded = false,
 }) {
   const canvasRef = useRef(null);
   const lastDataUrlRef = useRef(value || '');
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(Boolean(value));
+  const [isExpanded, setIsExpanded] = useState(
+    !collapsible || defaultExpanded || Boolean(value)
+  );
 
   useEffect(() => {
     if (value !== undefined && value !== null) {
       lastDataUrlRef.current = value;
       setHasSignature(Boolean(value));
+      if (value) setIsExpanded(true);
     }
   }, [value]);
 
@@ -48,8 +54,10 @@ export default function SignaturePad({
   }, []);
 
   useEffect(() => {
-    initCanvas();
-  }, [initCanvas]);
+    if (isExpanded) {
+      initCanvas();
+    }
+  }, [initCanvas, isExpanded]);
 
   const getCoordinates = e => {
     const canvas = canvasRef.current;
@@ -138,73 +146,124 @@ export default function SignaturePad({
 
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-          <i className="ph ph-signature text-base text-blue-600"></i>
-          <span>{label}</span>
-        </label>
-        {hasSignature && !disabled && (
-          <button
-            type="button"
-            onClick={handleClear}
-            data-testid="signature-clear-btn"
-            className="text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <i className="ph ph-eraser"></i> Wyczyść podpis
-          </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {collapsible ? (
+          <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={isExpanded}
+              data-testid="signature-optional-toggle"
+              onChange={e => {
+                const next = e.target.checked;
+                setIsExpanded(next);
+                if (!next && hasSignature) {
+                  handleClear();
+                }
+              }}
+              className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer"
+            />
+            <i className="ph ph-signature text-base text-blue-600"></i>
+            <span>{label}</span>
+            <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
+              Opcja
+            </span>
+          </label>
+        ) : (
+          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i className="ph ph-signature text-base text-blue-600"></i>
+            <span>{label}</span>
+            <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
+              Opcja
+            </span>
+          </label>
         )}
-      </div>
 
-      <div>
-        <input
-          type="text"
-          disabled={disabled}
-          value={signerName}
-          onChange={e => {
-            const nextName = e.target.value;
-            if (onSignerNameChange) onSignerNameChange(nextName);
-            if (onChange && hasSignature) {
-              onChange({
-                signatureDataUrl: lastDataUrlRef.current || value || '',
-                signerName: nextName,
-                signedAt: new Date().toISOString(),
-              });
-            }
-          }}
-          placeholder="Imię i nazwisko osoby podpisującej (np. Jan Kowalski - Klient / Mistrz)"
-          data-testid="signature-signer-input"
-          className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
-        />
-      </div>
-
-      <div className="relative rounded-lg border-2 border-dashed border-slate-300 bg-white overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={480}
-          height={140}
-          data-testid="signature-canvas"
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
-          className={`w-full h-[110px] block touch-none ${
-            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-crosshair'
-          }`}
-        />
-        {!hasSignature && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-400 italic select-none">
-            Złóż podpis palcem lub myszką tutaj...
-          </div>
-        )}
-      </div>
-
-      {hasSignature && (
-        <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-          <i className="ph ph-check-circle"></i> Podpis cyfrowy zostanie dołączony do protokołu PDF.
+        <div className="flex items-center gap-2">
+          {hasSignature && !disabled && (
+            <button
+              type="button"
+              onClick={handleClear}
+              data-testid="signature-clear-btn"
+              className="text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <i className="ph ph-eraser"></i> Wyczyść podpis
+            </button>
+          )}
+          {collapsible && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                const next = !isExpanded;
+                setIsExpanded(next);
+                if (!next && hasSignature) {
+                  handleClear();
+                }
+              }}
+              className="text-[11px] font-bold text-blue-700 hover:text-blue-800 bg-white border border-slate-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+            >
+              <i className={`ph ${isExpanded ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
+              {isExpanded ? 'Zwiń' : 'Dodaj podpis'}
+            </button>
+          )}
         </div>
+      </div>
+
+      {isExpanded && (
+        <>
+          <div>
+            <input
+              type="text"
+              disabled={disabled}
+              value={signerName}
+              onChange={e => {
+                const nextName = e.target.value;
+                if (onSignerNameChange) onSignerNameChange(nextName);
+                if (onChange && hasSignature) {
+                  onChange({
+                    signatureDataUrl: lastDataUrlRef.current || value || '',
+                    signerName: nextName,
+                    signedAt: new Date().toISOString(),
+                  });
+                }
+              }}
+              placeholder="Imię i nazwisko osoby podpisującej (np. Jan Kowalski - Klient / Mistrz)"
+              data-testid="signature-signer-input"
+              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="relative rounded-lg border-2 border-dashed border-slate-300 bg-white overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              width={480}
+              height={140}
+              data-testid="signature-canvas"
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className={`w-full h-[110px] block touch-none ${
+                disabled ? 'cursor-not-allowed opacity-60' : 'cursor-crosshair'
+              }`}
+            />
+            {!hasSignature && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-400 italic select-none">
+                Złóż podpis palcem lub myszką tutaj...
+              </div>
+            )}
+          </div>
+
+          {hasSignature && (
+            <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+              <i className="ph ph-check-circle"></i> Podpis cyfrowy zostanie dołączony do protokołu PDF.
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -217,4 +276,6 @@ SignaturePad.propTypes = {
   onChange: PropTypes.func,
   disabled: PropTypes.bool,
   label: PropTypes.string,
+  collapsible: PropTypes.bool,
+  defaultExpanded: PropTypes.bool,
 };

@@ -941,5 +941,96 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const source = fs.readFileSync(qrServicePath, 'utf8');
       expect(source).toContain("doc(db, 'tenants', tenantId, 'settings', 'qr_access')");
     });
+
+    it('w Kroku 4: traktuje GPS i podpis mistrza jako opcję, ukrywa nr uprawnień w profilu industrial oraz wymaga numeru uprawnień w profilach HVAC i facility', () => {
+      const ticketInStep4 = { id: 't-step4', machineId: 'm1', status: 4 };
+      const handleUpdate = vi.fn();
+
+      // 1) Profil INDUSTRIAL (Stocznia) -> brak pola nr uprawnień, GPS i podpis zwinięte jako opcja
+      const { unmount: unmountInd } = render(
+        <TicketMainColumnStepper
+          currentTicket={ticketInStep4}
+          user={{ role: 'admin', name: 'Mistrz' }}
+          loading={false}
+          isArchive={false}
+          selectedService="Mechanicy"
+          setSelectedService={vi.fn()}
+          services={[]}
+          etr={null}
+          comment=""
+          setComment={vi.fn()}
+          handleUpdate={handleUpdate}
+          handleArchiveTicket={vi.fn()}
+          handleDeleteTicket={vi.fn()}
+          allowTicketDeletion={false}
+          uploadedPhotos={[]}
+          setUploadedPhotos={vi.fn()}
+          uploadError={null}
+          branding={{ industryProfile: 'industrial' }}
+          setIsPartModalOpen={vi.fn()}
+          isUploading={false}
+          uploadProgress=""
+        />
+      );
+
+      expect(screen.queryByTestId('ticket-inspector-license-input')).toBeNull();
+      expect(screen.getByTestId('ticket-gps-optional-toggle')).toBeTruthy();
+      expect(screen.getByTestId('signature-optional-toggle')).toBeTruthy();
+      expect(screen.queryByTestId('signature-canvas')).toBeNull();
+
+      // Kliknięcie opcji podpisu rozwija canvas
+      fireEvent.click(screen.getByTestId('signature-optional-toggle'));
+      expect(screen.getByTestId('signature-canvas')).toBeTruthy();
+      unmountInd();
+
+      // 2) Profil FACILITY / HVAC -> pole nr uprawnień jest widoczne i wymagane przed zakończeniem
+      const { unmount: unmountFac } = render(
+        <TicketMainColumnStepper
+          currentTicket={ticketInStep4}
+          user={{ role: 'admin', name: 'Inspektor', licenseNumber: '' }}
+          loading={false}
+          isArchive={false}
+          selectedService="Inspektorzy"
+          setSelectedService={vi.fn()}
+          services={[]}
+          etr={null}
+          comment=""
+          setComment={vi.fn()}
+          handleUpdate={handleUpdate}
+          handleArchiveTicket={vi.fn()}
+          handleDeleteTicket={vi.fn()}
+          allowTicketDeletion={false}
+          uploadedPhotos={[]}
+          setUploadedPhotos={vi.fn()}
+          uploadError={null}
+          branding={{ industryProfile: 'facility' }}
+          setIsPartModalOpen={vi.fn()}
+          isUploading={false}
+          uploadProgress=""
+        />
+      );
+
+      const licInput = screen.getByTestId('ticket-inspector-license-input');
+      expect(licInput).toBeTruthy();
+
+      // Próba zakończenia bez wpisania nr uprawnień -> blokuje i wyświetla komunikat błędu
+      fireEvent.click(screen.getByText('Zakończ Naprawę'));
+      expect(handleUpdate).not.toHaveBeenCalled();
+      expect(screen.getByTestId('ticket-inspector-license-error')).toBeTruthy();
+
+      // Po wpisaniu nr uprawnień -> pozwala zakończyć naprawę
+      fireEvent.change(licInput, { target: { value: 'POM/0999/PBKb/22' } });
+      fireEvent.click(screen.getByText('Zakończ Naprawę'));
+      expect(handleUpdate).toHaveBeenCalledWith(
+        't-step4',
+        5,
+        expect.anything(),
+        null,
+        [],
+        expect.anything(),
+        expect.objectContaining({ inspectorLicense: 'POM/0999/PBKb/22' })
+      );
+      unmountFac();
+    });
   });
 });

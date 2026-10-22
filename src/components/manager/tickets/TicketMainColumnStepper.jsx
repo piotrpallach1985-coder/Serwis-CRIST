@@ -6,9 +6,11 @@ import SignaturePad from '../../shared/SignaturePad';
 import { useManagerStore } from '../../../store/managerStore';
 import {
   REFRIGERANT_TYPES,
-   formatFGasSummary,
+  formatFGasSummary,
   formatGpsCheckIn,
+  formatGeolocationError,
   getIndustryProfileConfig,
+  isInspectorLicenseRequired,
 } from '../../../utils/fieldServiceHelpers';
 
 export default function TicketMainColumnStepper({
@@ -47,8 +49,11 @@ export default function TicketMainColumnStepper({
   const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const [completedGps, setCompletedGps] = useState(currentTicket?.completedGps || null);
+  const [showGpsOption, setShowGpsOption] = useState(Boolean(currentTicket?.completedGps));
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
+  const [licenseError, setLicenseError] = useState('');
+  const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
   const [showFGasSection, setShowFGasSection] = useState(false);
   const [refrigerantType, setRefrigerantType] = useState('');
   const [leakTestResult, setLeakTestResult] = useState('');
@@ -129,6 +134,7 @@ export default function TicketMainColumnStepper({
   }, [currentTicket.assignedTo, setSelectedService]);
 
   const handleCaptureGps = () => {
+    setShowGpsOption(true);
     if (!navigator.geolocation) {
       setGpsError('Geolokalizacja GPS nie jest wspierana przez tę przeglądarkę.');
       return;
@@ -146,7 +152,7 @@ export default function TicketMainColumnStepper({
         setGpsLoading(false);
       },
       err => {
-        setGpsError(err?.message || 'Nie udało się pobrać lokalizacji GPS.');
+        setGpsError(formatGeolocationError(err));
         setGpsLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -609,58 +615,110 @@ export default function TicketMainColumnStepper({
                                 !isActualStatus ? 'opacity-60 pointer-events-none' : ''
                               }`}
                             >
-                              <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl p-2.5">
-                                <div className="text-xs">
-                                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                              <div className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      disabled={!isActualStatus}
+                                      checked={showGpsOption}
+                                      data-testid="ticket-gps-optional-toggle"
+                                      onChange={e => {
+                                        const next = e.target.checked;
+                                        setShowGpsOption(next);
+                                        if (!next) {
+                                          setCompletedGps(null);
+                                          setGpsError('');
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 cursor-pointer"
+                                    />
                                     <i className="ph ph-map-pin-line text-emerald-600 text-base"></i>
-                                    Potwierdzenie obecności GPS
-                                  </span>
-                                  {completedGps ? (
-                                    <span className="text-emerald-700 font-semibold block mt-0.5">
-                                      Zapisano GPS: {formatGpsCheckIn(completedGps)}
+                                    <span>Potwierdzenie obecności GPS</span>
+                                    <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                                      Opcja
                                     </span>
-                                  ) : (
-                                    <span className="text-slate-400 text-[11px] block">
-                                      Opcjonalny znacznik lokalizacji do protokołu PDF
-                                    </span>
-                                  )}
-                                  {gpsError && (
-                                    <span className="text-red-600 text-[11px] block">
-                                      {gpsError}
-                                    </span>
-                                  )}
+                                  </label>
+                                  <button
+                                    type="button"
+                                    disabled={!isActualStatus || gpsLoading}
+                                    onClick={handleCaptureGps}
+                                    data-testid="ticket-capture-gps-btn"
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <i className="ph ph-crosshair"></i>
+                                    {gpsLoading
+                                      ? 'Pobieranie...'
+                                      : completedGps
+                                      ? 'Odśwież GPS'
+                                      : 'Pobierz GPS'}
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  disabled={!isActualStatus || gpsLoading}
-                                  onClick={handleCaptureGps}
-                                  data-testid="ticket-capture-gps-btn"
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
-                                >
-                                  <i className="ph ph-crosshair"></i>
-                                  {gpsLoading
-                                    ? 'Pobieranie...'
-                                    : completedGps
-                                    ? 'Odśwież GPS'
-                                    : 'Pobierz GPS'}
-                                </button>
+                                {showGpsOption && (
+                                  <div className="text-xs pl-6">
+                                    {completedGps ? (
+                                      <span className="text-emerald-700 font-semibold block">
+                                        Zapisano GPS: {formatGpsCheckIn(completedGps)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 text-[11px] block">
+                                        Opcjonalny znacznik lokalizacji do protokołu PDF
+                                      </span>
+                                    )}
+                                    {gpsError && (
+                                      <span className="text-amber-700 text-[11px] block">
+                                        {gpsError}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
-                              {/* Nr uprawnień kontrolującego / inspektora */}
-                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                                <label className="block text-xs font-bold text-slate-700 mb-1">
-                                  Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)
-                                </label>
-                                <input
-                                  type="text"
-                                  disabled={!isActualStatus}
-                                  data-testid="ticket-inspector-license-input"
-                                  value={inspectorLicense}
-                                  onChange={e => setInspectorLicense(e.target.value)}
-                                  placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
-                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-slate-100"
-                                />
-                              </div>
+                              {/* Nr uprawnień kontrolującego / inspektora — wymagany przy HVAC i Facility (c-KOB) */}
+                              {requiresInspectorLicense && (
+                                <div
+                                  className={`border rounded-xl p-2.5 ${
+                                    licenseError
+                                      ? 'bg-red-50/70 border-red-300'
+                                      : 'bg-amber-50/50 border-amber-200'
+                                  }`}
+                                >
+                                  <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between gap-2">
+                                    <span>
+                                      Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz){' '}
+                                      <span className="text-red-600">*</span>
+                                    </span>
+                                    <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                                      Wymagane
+                                    </span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    disabled={!isActualStatus}
+                                    data-testid="ticket-inspector-license-input"
+                                    value={inspectorLicense}
+                                    onChange={e => {
+                                      setInspectorLicense(e.target.value);
+                                      if (licenseError) setLicenseError('');
+                                    }}
+                                    placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+                                    className={`w-full p-2 border rounded-lg text-xs bg-white focus:ring-2 outline-none disabled:bg-slate-100 ${
+                                      licenseError
+                                        ? 'border-red-400 focus:ring-red-500'
+                                        : 'border-slate-300 focus:ring-amber-500'
+                                    }`}
+                                  />
+                                  {licenseError && (
+                                    <p
+                                      data-testid="ticket-inspector-license-error"
+                                      className="text-[11px] font-bold text-red-600 mt-1"
+                                    >
+                                      {licenseError}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Protokół F-Gaz / Szczelność (widoczny dla branży HVAC lub urządzeń z czynnikiem, aktywny WYŁĄCZNIE gdy etap 4 jest aktywnym etapem) */}
                               {canShowFGasSection && (
@@ -773,6 +831,7 @@ export default function TicketMainColumnStepper({
 
                               <SignaturePad
                                 label={profileConfig.clientSignatureLabel}
+                                collapsible={true}
                                 value={clientSignature}
                                 signerName={clientSignerName}
                                 onSignerNameChange={setClientSignerName}
@@ -791,6 +850,13 @@ export default function TicketMainColumnStepper({
                                 type="button"
                                 disabled={!isActualStatus || loading}
                                 onClick={() => {
+                                  if (requiresInspectorLicense && !inspectorLicense.trim()) {
+                                    setLicenseError(
+                                      'Podaj numer uprawnień kontrolującego / inspektora (wymagane dla profilu HVAC i Facility c-KOB).'
+                                    );
+                                    return;
+                                  }
+                                  setLicenseError('');
                                   const chosenRefType =
                                     refrigerantType || currentMachine?.refrigerantType || '';
                                   const fGasProtocol =

@@ -97,12 +97,13 @@ export const INDUSTRY_PROFILES = {
     ticketPdfTitle: 'Karta Zgłoszenia Awarii (UR)',
     serviceCardTitle: 'Karta Serwisu Planowanego (Prewencja UR)',
     servicePdfTitle: 'Karta Serwisu Planowanego (UR)',
-    clientSignatureLabel: 'Podpis Odbierającego (Mistrz zmiany / Operator UR)',
+    clientSignatureLabel: 'Podpis Odbierającego (Mistrz zmiany / Operator UR) — Opcjonalnie',
     techSignatureLabel: 'Podpis Wykonawcy / Mechanika UR',
     showFGasByDefault: false,
     showCkobSection: false,
     showIndustrialRbgSection: true,
     showHvacCustomerSection: false,
+    requireInspectorLicense: false,
   },
   facility: {
     id: 'facility',
@@ -121,12 +122,13 @@ export const INDUSTRY_PROFILES = {
     ticketPdfTitle: 'Karta Usterki Obiektu (Facility / c-KOB)',
     serviceCardTitle: 'Protokół Przeglądu Okresowego Obiektu (c-KOB art. 62)',
     servicePdfTitle: 'Protokół Przeglądu Technicznego Obiektu (c-KOB)',
-    clientSignatureLabel: 'Podpis Zarządcy Nieruchomości / Odbierającego',
+    clientSignatureLabel: 'Podpis Zarządcy Nieruchomości / Odbierającego (Opcjonalnie)',
     techSignatureLabel: 'Podpis Inspektora / Konserwatora Obiektu',
     showFGasByDefault: false,
     showCkobSection: true,
     showIndustrialRbgSection: false,
     showHvacCustomerSection: false,
+    requireInspectorLicense: true,
   },
   hvac: {
     id: 'hvac',
@@ -145,14 +147,23 @@ export const INDUSTRY_PROFILES = {
     ticketPdfTitle: 'Protokół Naprawy Serwisowej HVAC / F-Gaz',
     serviceCardTitle: 'Protokół Przeglądu i Szczelności HVAC / F-Gaz (CRO)',
     servicePdfTitle: 'Protokół Serwisowy HVAC / F-Gaz (CRO)',
-    clientSignatureLabel: 'Podpis Klienta / Inwestora (Potwierdzenie gwarancji)',
+    clientSignatureLabel: 'Podpis Klienta / Inwestora (Opcjonalnie)',
     techSignatureLabel: 'Podpis Uprawnionego Serwisanta F-Gaz',
     showFGasByDefault: true,
     showCkobSection: false,
     showIndustrialRbgSection: false,
     showHvacCustomerSection: true,
+    requireInspectorLicense: true,
   },
 };
+
+/**
+ * Sprawdza, czy dla danego profilu firmy wymagany jest numer uprawnień kontrolującego / inspektora.
+ * Wymagany dla profili 'facility' (c-KOB art. 62 PB) oraz 'hvac' (F-Gaz / CRO).
+ */
+export function isInspectorLicenseRequired(industryProfile) {
+  return industryProfile === 'facility' || industryProfile === 'hvac';
+}
 
 /**
  * Zwraca konfigurację profilu branżowego firmy (domyślnie 'industrial').
@@ -528,6 +539,23 @@ export function formatGpsCheckIn(gpsObj) {
 }
 
 /**
+ * Tłumaczy błędy Geolocation API (np. "User denied geolocation prompt") na czytelny komunikat po polsku.
+ */
+export function formatGeolocationError(err) {
+  const msg = String(err?.message || '');
+  if (err?.code === 1 || /denied/i.test(msg)) {
+    return 'Odmowa dostępu do lokalizacji GPS w przeglądarce (pole opcjonalne — możesz kontynuować bez GPS).';
+  }
+  if (err?.code === 2 || /unavailable/i.test(msg)) {
+    return 'Sygnał GPS jest chwilowo niedostępny (pole opcjonalne).';
+  }
+  if (err?.code === 3 || /timeout/i.test(msg)) {
+    return 'Przekroczono czas oczekiwania na sygnał GPS (pole opcjonalne).';
+  }
+  return msg || 'Nie udało się pobrać lokalizacji GPS (pole opcjonalne).';
+}
+
+/**
  * Pobiera bieżącą pozycję GPS z przeglądarki / urządzenia mobilnego (Check-in serwisanta).
  */
 export function captureCurrentGpsPosition(options = { enableHighAccuracy: true, timeout: 10000 }) {
@@ -546,7 +574,7 @@ export function captureCurrentGpsPosition(options = { enableHighAccuracy: true, 
         });
       },
       err => {
-        reject(new Error(err?.message || 'Nie udało się pobrać lokalizacji GPS.'));
+        reject(new Error(formatGeolocationError(err)));
       },
       options
     );

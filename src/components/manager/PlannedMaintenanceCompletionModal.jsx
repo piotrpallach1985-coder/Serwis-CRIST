@@ -9,7 +9,9 @@ import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSumm
 import {
   formatFGasSummary,
   formatGpsCheckIn,
+  formatGeolocationError,
   getIndustryProfileConfig,
+  isInspectorLicenseRequired,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceCompletionModal({
@@ -38,6 +40,7 @@ export default function PlannedMaintenanceCompletionModal({
 
   // Field Service / HVAC F-Gaz / GPS Check-in / Podpis cyfrowy
   const [completedGps, setCompletedGps] = useState(null);
+  const [showGpsOption, setShowGpsOption] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
   const [showFGasSection, setShowFGasSection] = useState(false);
@@ -47,6 +50,8 @@ export default function PlannedMaintenanceCompletionModal({
   const [clientSignature, setClientSignature] = useState('');
   const [clientSignerName, setClientSignerName] = useState('');
   const [inspectorLicense, setInspectorLicense] = useState('');
+  const [licenseError, setLicenseError] = useState('');
+  const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
 
   const parts = useManagerStore(state => state.parts || []);
 
@@ -115,6 +120,7 @@ export default function PlannedMaintenanceCompletionModal({
   const getMachine = id => machines.find(m => m.id === id);
 
   const handleCaptureGps = () => {
+    setShowGpsOption(true);
     if (!navigator.geolocation) {
       setGpsError('Geolokalizacja GPS nie jest wspierana przez tę przeglądarkę.');
       return;
@@ -132,7 +138,7 @@ export default function PlannedMaintenanceCompletionModal({
         setGpsLoading(false);
       },
       err => {
-        setGpsError(err?.message || 'Nie udało się pobrać lokalizacji GPS.');
+        setGpsError(formatGeolocationError(err));
         setGpsLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -161,6 +167,13 @@ export default function PlannedMaintenanceCompletionModal({
 
   const handleSubmit = async e => {
     e.preventDefault();
+    if (requiresInspectorLicense && !inspectorLicense.trim()) {
+      setLicenseError(
+        'Podaj numer uprawnień kontrolującego / inspektora (wymagane dla profilu HVAC i Facility c-KOB).'
+      );
+      return;
+    }
+    setLicenseError('');
     try {
       let nextPlanData = null;
       if (createNewPlan) {
@@ -383,7 +396,11 @@ export default function PlannedMaintenanceCompletionModal({
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div
+          className={`mb-4 grid grid-cols-1 ${
+            requiresInspectorLicense ? 'sm:grid-cols-2' : ''
+          } gap-3`}
+        >
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">
               Czas pracy (RBG / Godziny)
@@ -397,19 +414,43 @@ export default function PlannedMaintenanceCompletionModal({
               placeholder="np. 2.5"
             />
           </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)
-            </label>
-            <input
-              type="text"
-              data-testid="modal-inspector-license-input"
-              className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500"
-              value={inspectorLicense}
-              onChange={e => setInspectorLicense(e.target.value)}
-              placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
-            />
-          </div>
+          {requiresInspectorLicense && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center justify-between gap-2">
+                <span>
+                  Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz){' '}
+                  <span className="text-red-600">*</span>
+                </span>
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                  Wymagane
+                </span>
+              </label>
+              <input
+                type="text"
+                required
+                data-testid="modal-inspector-license-input"
+                className={`w-full p-2 border rounded-lg text-sm focus:ring-2 ${
+                  licenseError
+                    ? 'border-red-400 focus:ring-red-500'
+                    : 'border-slate-300 focus:ring-amber-500'
+                }`}
+                value={inspectorLicense}
+                onChange={e => {
+                  setInspectorLicense(e.target.value);
+                  if (licenseError) setLicenseError('');
+                }}
+                placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/..."
+              />
+              {licenseError && (
+                <p
+                  data-testid="modal-inspector-license-error"
+                  className="text-[11px] font-bold text-red-600 mt-1"
+                >
+                  {licenseError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mb-4">
@@ -560,35 +601,56 @@ export default function PlannedMaintenanceCompletionModal({
           </div>
         </div>
 
-        {/* Sekcja: Check-in GPS oraz Protokół F-Gaz (HVAC) */}
+        {/* Sekcja: Check-in GPS (Opcjonalnie) oraz Protokół F-Gaz (HVAC) */}
         <div className="mb-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-            <div className="text-xs">
-              <span className="font-bold text-slate-700 flex items-center gap-1">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showGpsOption}
+                  data-testid="modal-gps-optional-toggle"
+                  onChange={e => {
+                    const next = e.target.checked;
+                    setShowGpsOption(next);
+                    if (!next) {
+                      setCompletedGps(null);
+                      setGpsError('');
+                    }
+                  }}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 cursor-pointer"
+                />
                 <i className="ph ph-map-pin-line text-emerald-600 text-base"></i>
-                Potwierdzenie obecności GPS (Field Service)
-              </span>
-              {completedGps ? (
-                <span className="text-emerald-700 font-semibold block mt-0.5">
-                  Zapisano GPS: {formatGpsCheckIn(completedGps)}
+                <span>Potwierdzenie obecności GPS</span>
+                <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
+                  Opcja
                 </span>
-              ) : (
-                <span className="text-slate-400 text-[11px] block">
-                  Opcjonalny znacznik lokalizacji do protokołu PDF
-                </span>
-              )}
-              {gpsError && <span className="text-red-600 text-[11px] block">{gpsError}</span>}
+              </label>
+              <button
+                type="button"
+                onClick={handleCaptureGps}
+                disabled={gpsLoading}
+                data-testid="capture-gps-btn"
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
+              >
+                <i className="ph ph-crosshair"></i>
+                {gpsLoading ? 'Pobieranie...' : completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleCaptureGps}
-              disabled={gpsLoading}
-              data-testid="capture-gps-btn"
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
-            >
-              <i className="ph ph-crosshair"></i>
-              {gpsLoading ? 'Pobieranie...' : completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
-            </button>
+            {showGpsOption && (
+              <div className="text-xs pl-6">
+                {completedGps ? (
+                  <span className="text-emerald-700 font-semibold block">
+                    Zapisano GPS: {formatGpsCheckIn(completedGps)}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 text-[11px] block">
+                    Opcjonalny znacznik lokalizacji do protokołu PDF
+                  </span>
+                )}
+                {gpsError && <span className="text-amber-700 text-[11px] block">{gpsError}</span>}
+              </div>
+            )}
           </div>
 
           {/* Protokół F-Gaz / Próba szczelności (widoczny dla branży HVAC lub urządzeń z czynnikiem) */}
@@ -668,6 +730,7 @@ export default function PlannedMaintenanceCompletionModal({
           {/* Podpis cyfrowy klienta / odbierającego na ekranie */}
           <SignaturePad
             label={profileConfig.clientSignatureLabel}
+            collapsible={true}
             value={clientSignature}
             signerName={clientSignerName}
             onSignerNameChange={setClientSignerName}
