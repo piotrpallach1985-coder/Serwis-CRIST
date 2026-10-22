@@ -53,7 +53,15 @@ export default function TicketMainColumn({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
-  const handleUploadAndUpdate = async (ticketId, newStatus, actionText, newEtr, files, noteText) => {
+  const handleUploadAndUpdate = async (
+    ticketId,
+    newStatus,
+    actionText,
+    newEtr,
+    files,
+    noteText,
+    extraData = null
+  ) => {
     let finalUrls = [];
     if (files && files.length > 0 && files[0] instanceof File) {
       setIsUploading(true);
@@ -89,7 +97,7 @@ export default function TicketMainColumn({
     setIsUploading(false);
     setUploadProgress("");
     
-    return handleUpdate(ticketId, newStatus, actionText, newEtr, finalUrls, noteText);
+    return handleUpdate(ticketId, newStatus, actionText, newEtr, finalUrls, noteText, extraData);
   };
 
   const [isPartModalOpen, setIsPartModalOpen] = useState(false);

@@ -420,7 +420,7 @@ export default function PlannedMaintenanceInfo({
                       Licznik Maszyny (RBG)
                     </span>
                     <span className="font-extrabold text-slate-800 mt-0.5 block">
-                      {machine?.operatingHours ?? 0} RBG
+                      {machine?.currentWorkHours ?? machine?.operatingHours ?? 0} RBG
                     </span>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200">
@@ -428,10 +428,20 @@ export default function PlannedMaintenanceInfo({
                       Cykl odnawiania prewencji
                     </span>
                     <span className="font-extrabold text-slate-800 mt-0.5 block">
-                      {srv.intervalDays ? `Co ${srv.intervalDays} dni` : ''}
-                      {srv.intervalDays && srv.intervalHours ? ' / ' : ''}
-                      {srv.intervalHours ? `Co ${srv.intervalHours} RBG` : ''}
-                      {!srv.intervalDays && !srv.intervalHours ? 'Wg harmonogramu DTR' : ''}
+                      {srv.calendarIntervalDays ?? srv.intervalDays
+                        ? `Co ${srv.calendarIntervalDays ?? srv.intervalDays} dni`
+                        : ''}
+                      {(srv.calendarIntervalDays ?? srv.intervalDays) &&
+                      (srv.hoursInterval ?? srv.intervalHours)
+                        ? ' / '
+                        : ''}
+                      {srv.hoursInterval ?? srv.intervalHours
+                        ? `Co ${srv.hoursInterval ?? srv.intervalHours} RBG`
+                        : ''}
+                      {!(srv.calendarIntervalDays ?? srv.intervalDays) &&
+                      !(srv.hoursInterval ?? srv.intervalHours)
+                        ? 'Wg harmonogramu DTR'
+                        : ''}
                     </span>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200">
@@ -439,8 +449,16 @@ export default function PlannedMaintenanceInfo({
                       Roboczogodziny UR (Wykonanie)
                     </span>
                     <span className="font-extrabold text-slate-800 mt-0.5 block">
-                      {srv.manHours ?? srv.completionDetails?.manHours
-                        ? `${srv.manHours ?? srv.completionDetails?.manHours} RBG`
+                      {srv.manHours ??
+                      srv.actualManHours ??
+                      srv.completionDetails?.manHours ??
+                      srv.history?.[srv.history.length - 1]?.manHours
+                        ? `${
+                            srv.manHours ??
+                            srv.actualManHours ??
+                            srv.completionDetails?.manHours ??
+                            srv.history?.[srv.history.length - 1]?.manHours
+                          } RBG`
                         : 'W trakcie rozliczania'}
                     </span>
                   </div>

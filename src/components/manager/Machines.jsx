@@ -5,7 +5,10 @@ import { useManagerStore } from '../../store/managerStore';
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
-import { filterMachinesForFieldTechnician } from '../../utils/fieldServiceHelpers';
+import {
+  filterMachinesForFieldTechnician,
+  filterTasksForFieldTechnician,
+} from '../../utils/fieldServiceHelpers';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import {
   collection,
@@ -113,20 +116,20 @@ export default function Machines({
   } = usePagination(filteredMachines, 50, [searchQuery, filterRegion]);
 
   useEffect(() => {
-    if (initialMachineId && machines.length > 0) {
-      const targetMachine = machines.find(m => m.id === initialMachineId);
+    if (initialMachineId && visibleMachines.length > 0) {
+      const targetMachine = visibleMachines.find(m => m.id === initialMachineId);
       if (targetMachine) {
         handleViewMachine(targetMachine, true);
         if (onClearMachineId) onClearMachineId();
       }
     }
-  }, [initialMachineId, machines, onClearMachineId]);
+  }, [initialMachineId, visibleMachines, onClearMachineId]);
 
   useEffect(() => {
-    if (!initialOpenProcessed && machines.length > 0) {
+    if (!initialOpenProcessed && visibleMachines.length > 0) {
       const openMachineId = searchParams.get('openMachine');
       if (openMachineId) {
-        const targetMachine = machines.find(
+        const targetMachine = visibleMachines.find(
           m =>
             m.id === openMachineId ||
             (m.qrCode && m.qrCode === openMachineId) ||
@@ -318,7 +321,7 @@ export default function Machines({
     }
 
     // Synchroniczna pre-populacja z pamięci store zapobiega mignięciu ramek przy otwarciu detali
-    const localTickets = (tickets || [])
+    const localTickets = filterTasksForFieldTechnician(tickets || [], user, onlyAssignedTasks)
       .filter(
         tk =>
           tk.machineId === m.id ||
@@ -330,7 +333,11 @@ export default function Machines({
         const dB = safeParseDate(b.createdAt)?.getTime() || 0;
         return dB - dA;
       });
-    const localServices = (plannedServices || [])
+    const localServices = filterTasksForFieldTechnician(
+      plannedServices || [],
+      user,
+      onlyAssignedTasks
+    )
       .filter(s => s.machineId === m.id)
       .slice()
       .sort((a, b) => {
@@ -344,7 +351,11 @@ export default function Machines({
     setIsFromQRScan(fromQR);
     setLoadingHistory(false);
     try {
-      let machineTickets = await fetchMachineTickets(m.id, m.name);
+      let machineTickets = filterTasksForFieldTechnician(
+        await fetchMachineTickets(m.id, m.name),
+        user,
+        onlyAssignedTasks
+      );
 
       // Sortuj zgloszenia od najnowszych
       machineTickets.sort((a, b) => {
@@ -354,7 +365,11 @@ export default function Machines({
       });
 
       // 2. Pobierz wszystkie serwisy
-      let machineServices = await fetchMachineServices(m.id);
+      let machineServices = filterTasksForFieldTechnician(
+        await fetchMachineServices(m.id),
+        user,
+        onlyAssignedTasks
+      );
 
       // Sortuj serwisy od najnowszych
       machineServices.sort((a, b) => {
@@ -407,7 +422,7 @@ export default function Machines({
       return;
     }
 
-    const found = machines.find(
+    const found = visibleMachines.find(
       m =>
         m.id === machineId ||
         (m.qrCode && (m.qrCode === machineId || m.qrCode === originalRaw)) ||

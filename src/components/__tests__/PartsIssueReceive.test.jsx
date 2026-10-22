@@ -39,7 +39,12 @@ vi.mock('firebase/firestore', () => {
     serverTimestamp: vi.fn(),
     runTransaction: vi.fn(),
     addDoc: vi.fn(),
-    collection: vi.fn()
+    getDoc: vi.fn(() => Promise.resolve({ exists: () => false })),
+    getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+    query: vi.fn(),
+    where: vi.fn(),
+    updateDoc: vi.fn(),
+    setDoc: vi.fn(),
   };
 });
 

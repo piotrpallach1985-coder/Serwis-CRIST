@@ -5,9 +5,14 @@ import { CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineC
 import { computeClientPlannedKPIStats, fetchServerPlannedKPIStats } from '../../services/kpi.service';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTileGrid';
+import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function PlannedKPIDashboard() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const roles = useManagerStore(state => state.roles || []);
+  const { onlyAssignedTasks } = usePermissions(user, roles);
   const machines = useManagerStore(state => state.machines || []);
   const plannedWarningDays = useManagerStore(state => state.plannedWarningDays || 7);
   const [period, setPeriod] = useState('30');
@@ -20,7 +25,13 @@ export default function PlannedKPIDashboard() {
     const fetchKPI = async () => {
       setLoading(true);
       try {
-        let data = await computeClientPlannedKPIStats(period, machines, plannedWarningDays);
+        let data = await computeClientPlannedKPIStats(
+          period,
+          machines,
+          plannedWarningDays,
+          user,
+          onlyAssignedTasks
+        );
 
         if (
           active &&
@@ -49,7 +60,7 @@ export default function PlannedKPIDashboard() {
     return () => {
       active = false;
     };
-  }, [period, machines, plannedWarningDays]);
+  }, [period, machines, plannedWarningDays, user, onlyAssignedTasks]);
 
   const {
     totalServicesCount = 0,

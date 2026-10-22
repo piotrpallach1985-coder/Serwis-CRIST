@@ -248,7 +248,7 @@ export default function TicketMainColumnHeader({
                   Licznik motogodzin (RBG)
                 </span>
                 <span className="font-extrabold text-slate-800 mt-0.5 block">
-                  {machineObj?.operatingHours ?? 0} RBG
+                  {machineObj?.currentWorkHours ?? machineObj?.operatingHours ?? 0} RBG
                 </span>
               </div>
               <div className="bg-white p-2.5 rounded-lg border border-slate-200">

@@ -431,7 +431,7 @@ export default function PlannedMaintenance({
           canEditPlanned={canEditPlanned}
           canDeletePlanned={canDeletePlanned}
           getMachineRegionName={getMachineRegionName}
-          machines={machines}
+          machines={scopedMachines}
           regions={regions}
           onBack={() => {
             setRecentlyCompletedService(null);
@@ -590,7 +590,7 @@ export default function PlannedMaintenance({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         editingService={editingService}
-        machines={machines}
+        machines={scopedMachines}
       />
     </div>
   );

@@ -6,9 +6,14 @@ import { computeClientKPIStats, fetchServerKPIStats } from '../../services/kpi.s
 import { getTicketStatusConfig } from '../../utils/statusConfigs';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTileGrid';
+import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function KPIDashboard() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const roles = useManagerStore(state => state.roles || []);
+  const { onlyAssignedTasks } = usePermissions(user, roles);
   const machines = useManagerStore(state => state.machines || []);
   const [period, setPeriod] = useState('30');
   const [kpiStats, setKpiStats] = useState(null);
@@ -20,7 +25,7 @@ export default function KPIDashboard() {
     const fetchKPIs = async () => {
       setLoadingHistory(true);
       try {
-        let data = await computeClientKPIStats(period, machines);
+        let data = await computeClientKPIStats(period, machines, user, onlyAssignedTasks);
 
         if (
           active &&
@@ -49,7 +54,7 @@ export default function KPIDashboard() {
     return () => {
       active = false;
     };
-  }, [period, machines]);
+  }, [period, machines, user, onlyAssignedTasks]);
 
   const totalTickets = kpiStats?.totalTickets || 0;
   const closedTicketsCount = kpiStats?.closedTicketsCount || 0;

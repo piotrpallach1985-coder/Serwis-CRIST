@@ -16,7 +16,8 @@ const n = (text) => {
   if (text === null || text === undefined) return '';
   return text.toString()
     .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z')
-    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z');
+    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z')
+    .replace(/[\u2013\u2014]/g, '-').replace(/\u00b1/g, '+/-').replace(/\u00b2/g, '2').replace(/\u00b3/g, '3');
 };
 
 const getImageDimensions = (base64) => {
@@ -515,7 +516,8 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       doc.text(n('Brak zaplanowanych lub zrealizowanych serwisow dla tej maszyny.'), 14, currentY);
     }
 
-    await savePdfWithPrompt(doc, n(`Karta_Urzadzenia_PDF_${(machine.name || machine.qrCode || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`));
+    const safeMachineFileName = n(machine.name || machine.qrCode || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await savePdfWithPrompt(doc, `Karta_Urzadzenia_PDF_${safeMachineFileName}.pdf`);
   } catch (error) {
     console.error('Błąd generowania PDF:', error);
     alert('Wystąpił błąd podczas generowania dokumentu.');

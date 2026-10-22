@@ -65,7 +65,13 @@ export function useManagerData() {
         r => r.id === user.role || r.name === user.role
       );
       const perms = roleConfig?.permissions || user.permissions || [];
-      return Boolean(perms.includes('only_assigned_tasks') || user.onlyAssignedTasks);
+      const hasDedicatedService = Boolean(
+        (user.assignedService && String(user.assignedService).trim()) ||
+          (Array.isArray(user.dedicatedServices) && user.dedicatedServices.length > 0)
+      );
+      return Boolean(
+        perms.includes('only_assigned_tasks') || user.onlyAssignedTasks || hasDedicatedService
+      );
     };
 
     const syncFilteredDataToStore = () => {
@@ -171,24 +177,11 @@ export function useManagerData() {
 
     // 2. DANE W CZASIE RZECZYWISTYM (REAL-TIME ONSNAPSHOT)
     
-    // --- Tickets (aktywne, nie-zarchiwizowane; z filtrem assignedTo na poziomie zapytania dla only_assigned_tasks) ---
-    const isDirectRestricted = Boolean(
-      user &&
-        user.role !== 'admin' &&
-        user.role !== 'superadmin' &&
-        (user.onlyAssignedTasks || (user.permissions || []).includes('only_assigned_tasks'))
+    // --- Tickets (aktywne, nie-zarchiwizowane; filtrowane w syncFilteredDataToStore z uwzględnieniem user.name i user.assignedService) ---
+    const qTickets = query(
+      collection(db, 'tenants', tenantId, 'tickets'),
+      where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new'])
     );
-
-    const qTickets = isDirectRestricted && user?.name
-      ? query(
-          collection(db, 'tenants', tenantId, 'tickets'),
-          where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new']),
-          where('assignedTo', '==', user.name)
-        )
-      : query(
-          collection(db, 'tenants', tenantId, 'tickets'),
-          where('status', 'in', [1, 2, 3, 4, '1', '2', '3', '4', 'new'])
-        );
 
     const unsubTickets = onSnapshot(qTickets, (snapshot) => {
       rawTickets = snapshot.docs
@@ -253,7 +246,14 @@ export function useManagerData() {
       unsubNotifications();
       unsubActionItems();
     };
-  }, [tenantId, user?.uid, user?.role, user?.name, user?.onlyAssignedTasks]);
+  }, [
+    tenantId,
+    user?.uid,
+    user?.role,
+    user?.name,
+    user?.onlyAssignedTasks,
+    user?.assignedService,
+  ]);
 
   return null;
 }

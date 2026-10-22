@@ -194,35 +194,45 @@ export default function MachineForm({
 
     const effectiveRefType = allowFGas ? refrigerantType || '' : '';
     const extraPayload = {
-      contactPerson: allowContact ? contactPerson.trim() : '',
-      contactPhone: allowContact ? formatPhoneXxx(contactPhone) : '',
-      accessNotes: allowContact ? accessNotes.trim() : '',
-      inspectionCategory: allowCkob ? inspectionCategory || '' : '',
-      buildingType: allowCkob ? buildingType.trim() : '',
-      constructionYear: allowCkob ? constructionYear.trim() : '',
-      usableAreaM2:
-        allowCkob && usableAreaM2 !== '' && !isNaN(Number(usableAreaM2))
-          ? Number(usableAreaM2)
-          : '',
-      cubatureM3:
-        allowCkob && cubatureM3 !== '' && !isNaN(Number(cubatureM3))
-          ? Number(cubatureM3)
-          : '',
-      floorsCount:
-        allowCkob && floorsCount !== '' && !isNaN(Number(floorsCount))
-          ? Number(floorsCount)
-          : '',
-      hasAsbestos: allowCkob ? hasAsbestos || 'Brak' : 'Brak',
-      pinbAuthority: allowCkob ? pinbAuthority.trim() : '',
-      legalTitleDoc: allowCkob ? legalTitleDoc.trim() : '',
-      refrigerantType: effectiveRefType,
-      refrigerantChargeKg:
-        effectiveRefType && refrigerantChargeKg !== '' && Number(refrigerantChargeKg) > 0
-          ? Number(refrigerantChargeKg)
-          : null,
-      co2EquivalentTons:
-        effectiveRefType && fGasCalc.co2EquivalentTons > 0 ? fGasCalc.co2EquivalentTons : null,
-      requiresCroCard: effectiveRefType ? fGasCalc.requiresCroCard : false,
+      ...(allowContact
+        ? {
+            contactPerson: contactPerson.trim(),
+            contactPhone: formatPhoneXxx(contactPhone),
+            accessNotes: accessNotes.trim(),
+          }
+        : !editingMachine
+        ? { contactPerson: '', contactPhone: '', accessNotes: '' }
+        : {}),
+      ...(allowCkob
+        ? {
+            inspectionCategory: inspectionCategory || '',
+            buildingType: buildingType.trim(),
+            constructionYear: constructionYear.trim(),
+            usableAreaM2:
+              usableAreaM2 !== '' && !isNaN(Number(usableAreaM2)) ? Number(usableAreaM2) : '',
+            cubatureM3:
+              cubatureM3 !== '' && !isNaN(Number(cubatureM3)) ? Number(cubatureM3) : '',
+            floorsCount:
+              floorsCount !== '' && !isNaN(Number(floorsCount)) ? Number(floorsCount) : '',
+            hasAsbestos: hasAsbestos || 'Brak',
+            pinbAuthority: pinbAuthority.trim(),
+            legalTitleDoc: legalTitleDoc.trim(),
+          }
+        : {}),
+      ...(allowFGas
+        ? {
+            refrigerantType: effectiveRefType,
+            refrigerantChargeKg:
+              effectiveRefType && refrigerantChargeKg !== '' && Number(refrigerantChargeKg) > 0
+                ? Number(refrigerantChargeKg)
+                : null,
+            co2EquivalentTons:
+              effectiveRefType && fGasCalc.co2EquivalentTons > 0
+                ? fGasCalc.co2EquivalentTons
+                : null,
+            requiresCroCard: effectiveRefType ? fGasCalc.requiresCroCard : false,
+          }
+        : {}),
     };
 
     try {

@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { db } from '../../firebase';
-import { doc, writeBatch } from 'firebase/firestore';
+import { doc, writeBatch, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { TICKET_STATUS, USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
@@ -15,13 +15,15 @@ import {
   filterMachinesForFieldTechnician,
 } from '../../utils/fieldServiceHelpers';
 
+const EMPTY_ARRAY = [];
+
 export default function NotificationCenter({
   onNavigate,
-  tickets = [],
-  plannedServices = [],
-  machines = [],
-  reporters = [],
-  actionItems = [],
+  tickets = EMPTY_ARRAY,
+  plannedServices = EMPTY_ARRAY,
+  machines = EMPTY_ARRAY,
+  reporters = EMPTY_ARRAY,
+  actionItems = EMPTY_ARRAY,
   align = 'left'
 }) {
   const { t, i18n } = useTranslation();
@@ -37,19 +39,58 @@ export default function NotificationCenter({
   const branding = useManagerStore(state => state.branding || {});
   const industryProfile = branding?.industryProfile || 'industrial';
   const { onlyAssignedTasks } = usePermissions(user, roles);
+  const [completedCkobServices, setCompletedCkobServices] = useState([]);
+
+  useEffect(() => {
+    if (industryProfile !== 'facility' || typeof getDocs !== 'function') {
+      setCompletedCkobServices(prev => (prev.length ? EMPTY_ARRAY : prev));
+      return;
+    }
+    let cancelled = false;
+    const loadCompletedForCkob = async () => {
+      try {
+        const tenantId = getCurrentTenant();
+        if (!tenantId || !db) return;
+        const q = query(
+          collection(db, 'tenants', tenantId, 'planned_services'),
+          where('status', '==', 'completed'),
+          limit(100)
+        );
+        const snap = await getDocs(q);
+        if (!cancelled && snap?.docs) {
+          setCompletedCkobServices(
+            snap.docs
+              .map(d => ({ id: d.id, ...d.data() }))
+              .filter(s => !s.isDeleted && s.ckobEntered !== true)
+          );
+        }
+      } catch {
+        // Ignoruj w środowisku testowym lub przy braku połączenia
+      }
+    };
+    loadCompletedForCkob();
+    return () => {
+      cancelled = true;
+    };
+  }, [industryProfile, plannedServices.length]);
 
   const relevantNotifications = useMemo(() => {
     const list = [];
     const isUrModule = currentModule === 'ur' || currentModule === 'tickets' || currentModule === 'planned_maintenance' || currentModule === 'master_data';
+    const mergedPlannedServices = [
+      ...plannedServices,
+      ...completedCkobServices.filter(cs => !plannedServices.some(ps => ps.id === cs.id)),
+    ];
     const visibleTickets = filterTasksForFieldTechnician(tickets, user, onlyAssignedTasks);
-    const visibleServices = filterTasksForFieldTechnician(plannedServices, user, onlyAssignedTasks);
+    const visibleServices = filterTasksForFieldTechnician(mergedPlannedServices, user, onlyAssignedTasks);
     const visibleMachines = filterMachinesForFieldTechnician(
       machines,
       tickets,
-      plannedServices,
+      mergedPlannedServices,
       user,
       onlyAssignedTasks
     );
+    const visibleMachineIds = new Set(visibleMachines.map(m => m.id));
 
     if (isUrModule || currentModule === 'tickets') {
       visibleTickets.filter(tk => Number(tk.status) !== TICKET_STATUS.CLOSED).forEach(tk => {
@@ -83,6 +124,7 @@ export default function NotificationCenter({
     notifications.forEach(n => {
       if (!n.title && !n.message) return;
       if (n.ticketId || n.linkTo === 'planned_maintenance') return;
+      if (onlyAssignedTasks && n.machineId && !visibleMachineIds.has(n.machineId)) return;
       const isCrit = !!n.isCritical;
       list.push({
         ...n,
@@ -248,7 +290,7 @@ export default function NotificationCenter({
       const dB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
       return dB - dA;
     });
-  }, [tickets, plannedServices, machines, actionItems, notifications, currentModule, user, reporters, parts, plannedWarningDays, t, onlyAssignedTasks, industryProfile]);
+  }, [tickets, plannedServices, completedCkobServices, machines, actionItems, notifications, currentModule, user, reporters, parts, plannedWarningDays, t, onlyAssignedTasks, industryProfile]);
 
   const unreadCount = relevantNotifications.filter(n => !n.read).length;
 

@@ -18,6 +18,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTileGrid';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function TicketDetails({
   currentTicket,
@@ -40,7 +41,8 @@ export default function TicketDetails({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { machines, regions, services, branding, parts = [] } = useManagerStore();
+  const { machines, regions, services, branding, parts = [], roles = [] } = useManagerStore();
+  const { canManageDtr, canDeleteTechNotes } = usePermissions(user, roles);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -190,16 +192,8 @@ export default function TicketDetails({
           <MachineDTR
             machine={machine}
             user={user}
-            canManage={
-              user?.role === 'manager' ||
-              user?.role === USER_ROLES.ADMIN ||
-              user?.role === USER_ROLES.SUPERADMIN
-            }
-            canDeleteNotes={
-              user?.role === 'admin' ||
-              user?.role === 'superadmin' ||
-              (user?.permissions || []).includes('delete_tech_notes')
-            }
+            canManage={canManageDtr}
+            canDeleteNotes={canDeleteTechNotes}
           />
         ),
       });

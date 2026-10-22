@@ -33,6 +33,8 @@ vi.mock('../../../utils/reports/pdfMachineCard', () => ({
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(), query: vi.fn(), where: vi.fn(), 
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })), 
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => true, data: () => ({ qrKey: 'test-qr-key' }) })),
+  setDoc: vi.fn(),
   deleteDoc: vi.fn(), doc: vi.fn(), updateDoc: vi.fn(), serverTimestamp: vi.fn(), 
   writeBatch: vi.fn(), arrayUnion: vi.fn()
 }));

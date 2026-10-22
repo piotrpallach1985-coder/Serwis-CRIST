@@ -18,6 +18,7 @@ import CustomizableTileGrid, { TileLayoutButton } from '../shared/CustomizableTi
 import { USER_ROLES } from '../../utils/constants';
 import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function PlannedMaintenanceDetails({
   srv,
@@ -54,6 +55,8 @@ export default function PlannedMaintenanceDetails({
   const setServiceInProgressAction = useManagerStore(state => state.setServiceInProgressAction);
   const setServicePendingAction = useManagerStore(state => state.setServicePendingAction);
   const parts = useManagerStore(state => state.parts || []);
+  const roles = useManagerStore(state => state.roles || []);
+  const { canManageDtr, canDeleteTechNotes } = usePermissions(user, roles);
 
   const [partTransactions, setPartTransactions] = useState([]);
   const [isPartUsageModalOpen, setIsPartUsageModalOpen] = useState(false);
@@ -175,16 +178,8 @@ export default function PlannedMaintenanceDetails({
           <MachineDTR
             machine={targetMachine}
             user={user}
-            canManage={
-              user?.role === 'manager' ||
-              user?.role === USER_ROLES.ADMIN ||
-              user?.role === USER_ROLES.SUPERADMIN
-            }
-            canDeleteNotes={
-              user?.role === 'admin' ||
-              user?.role === 'superadmin' ||
-              (user?.permissions || []).includes('delete_tech_notes')
-            }
+            canManage={canManageDtr}
+            canDeleteNotes={canDeleteTechNotes}
           />
         ),
       });

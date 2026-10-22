@@ -8,6 +8,7 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import {
   filterTasksForFieldTechnician,
   filterMachinesForFieldTechnician,
+  isTaskAssignedToUser,
 } from '../../../utils/fieldServiceHelpers';
 
 export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
@@ -51,8 +52,10 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const actionItems = React.useMemo(() => {
     if (!onlyAssignedTasks) return rawActionItems;
     const allowedMachineIds = new Set(machines.map(m => m.id));
-    return rawActionItems.filter(i => allowedMachineIds.has(i.machineId));
-  }, [rawActionItems, machines, onlyAssignedTasks]);
+    return rawActionItems.filter(
+      i => allowedMachineIds.has(i.machineId) || isTaskAssignedToUser(i, user)
+    );
+  }, [rawActionItems, machines, onlyAssignedTasks, user]);
 
   const hasLowStockAlarm = React.useMemo(() => {
     if (!parts || parts.length === 0) return false;

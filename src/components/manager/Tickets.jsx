@@ -183,6 +183,7 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         ...(extraData?.fGasProtocol ? { fGasProtocol: extraData.fGasProtocol } : {}),
         ...(extraData?.completedGps ? { completedGps: extraData.completedGps } : {}),
         ...(extraData?.clientSignerName ? { clientSignerName: extraData.clientSignerName } : {}),
+        ...(extraData?.inspectorLicense ? { inspectorLicense: extraData.inspectorLicense } : {}),
       };
 
       const updateData = {
@@ -196,6 +197,8 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
           updateData.clientSignature = extraData.clientSignature;
         if (extraData.clientSignerName !== undefined)
           updateData.clientSignerName = extraData.clientSignerName;
+        if (extraData.inspectorLicense !== undefined)
+          updateData.inspectorLicense = extraData.inspectorLicense;
       }
 
       if (photoUrls.length > 0) updateData.photos = arrayUnion(...photoUrls);

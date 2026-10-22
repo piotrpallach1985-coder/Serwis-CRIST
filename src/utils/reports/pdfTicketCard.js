@@ -16,7 +16,8 @@ const n = (text) => {
   if (text === null || text === undefined) return '';
   return text.toString()
     .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z')
-    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z');
+    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z')
+    .replace(/[\u2013\u2014]/g, '-').replace(/\u00b1/g, '+/-').replace(/\u00b2/g, '2').replace(/\u00b3/g, '3');
 };
 
 const STATUSES = {
@@ -189,7 +190,7 @@ export const generateTicketPDF = async (ticket) => {
         head: [[n('Parametry Techniczne Utrzymania Ruchu (Przemysl / UR)'), '']],
         body: [
           [n('Status Ruchu Maszyny:'), n(ticket.isCritical ? 'POSTOJ AWARYJNY (STOP)' : 'PRACA Z OGRANICZENIEM')],
-          [n('Stan Licznika (RBG):'), n(`${machineObj?.operatingHours ?? 0} RBG`)],
+          [n('Stan Licznika (RBG):'), n(`${machineObj?.currentWorkHours ?? machineObj?.operatingHours ?? 0} RBG`)],
           [n('Kategoria / Zespol UR:'), n(ticket.assignedTo || machineObj?.category || 'Utrzymanie Ruchu')],
         ],
         theme: 'grid',
@@ -198,14 +199,27 @@ export const generateTicketPDF = async (ticket) => {
       });
       currentY = doc.lastAutoTable.finalY + 10;
     } else if (industryProfile === 'facility') {
+      const facilityTicketBody = [
+        [n('Kategoria c-KOB (art. 62 PB):'), n(ckobStr || 'Instalacja / czesc wspolna budynku')],
+        [n('Lokator / Administrator:'), n(`${machineObj?.contactPerson || ticket.reportedBy || '-'} ${machineObj?.contactPhone || ticket.reporterPhone ? '(' + (machineObj?.contactPhone || ticket.reporterPhone) + ')' : ''}`)],
+        [n('Kod domofonu / Dostep:'), n(machineObj?.accessNotes || 'Dostep wg administracji obiektu')],
+      ];
+      if (machineObj?.buildingType || machineObj?.usableAreaM2 || machineObj?.cubatureM3 || machineObj?.floorsCount) {
+        const metricsParts = [
+          machineObj.buildingType,
+          machineObj.usableAreaM2 ? `Pow: ${machineObj.usableAreaM2} m2` : null,
+          machineObj.cubatureM3 ? `Kub: ${machineObj.cubatureM3} m3` : null,
+          machineObj.floorsCount ? `Kondygnacje: ${machineObj.floorsCount}` : null,
+        ].filter(Boolean);
+        facilityTicketBody.push([n('Metryczka obiektu (art. 60j PB):'), n(metricsParts.join(' | '))]);
+      }
+      if (machineObj?.pinbAuthority) {
+        facilityTicketBody.push([n('Wlasciwy organ PINB:'), n(machineObj.pinbAuthority)]);
+      }
       autoTable(doc, {
         startY: currentY,
         head: [[n('Dane Administracyjne Obiektu i Lokalu (Facility / c-KOB)'), '']],
-        body: [
-          [n('Kategoria c-KOB (art. 62 PB):'), n(ckobStr || 'Instalacja / czesc wspolna budynku')],
-          [n('Lokator / Administrator:'), n(`${machineObj?.contactPerson || ticket.reportedBy || '-'} ${machineObj?.contactPhone || ticket.reporterPhone ? '(' + (machineObj?.contactPhone || ticket.reporterPhone) + ')' : ''}`)],
-          [n('Kod domofonu / Dostep:'), n(machineObj?.accessNotes || 'Dostep wg administracji obiektu')],
-        ],
+        body: facilityTicketBody,
         theme: 'grid',
         headStyles: { fillColor: [217, 119, 6] },
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },

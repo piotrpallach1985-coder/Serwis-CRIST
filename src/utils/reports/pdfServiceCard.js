@@ -16,7 +16,8 @@ const n = (text) => {
   if (text === null || text === undefined) return '';
   return text.toString()
     .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z')
-    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z');
+    .replace(/Ą/g, 'A').replace(/Ć/g, 'C').replace(/Ę/g, 'E').replace(/Ł/g, 'L').replace(/Ń/g, 'N').replace(/Ó/g, 'O').replace(/Ś/g, 'S').replace(/Ź/g, 'Z').replace(/Ż/g, 'Z')
+    .replace(/[\u2013\u2014]/g, '-').replace(/\u00b1/g, '+/-').replace(/\u00b2/g, '2').replace(/\u00b3/g, '3');
 };
 
 const fetchPhotoData = async (url) => {
@@ -183,12 +184,14 @@ export const generateServicePDF = async (service, machine) => {
 
     // Dedykowana sekcja branżowa na karcie serwisu PDF
     if (industryProfile === 'industrial') {
+      const intDays = service.calendarIntervalDays ?? service.intervalDays;
+      const intHours = service.hoursInterval ?? service.intervalHours;
       autoTable(doc, {
         startY: currentY,
         head: [[n('Parametry Prewencji Utrzymania Ruchu (Przemysl / UR)'), '']],
         body: [
-          [n('Aktualny licznik maszyny (RBG):'), n(`${machine?.operatingHours ?? 0} RBG`)],
-          [n('Interwal odnawiania:'), n(`${service.intervalDays ? 'Co ' + service.intervalDays + ' dni' : ''} ${service.intervalHours ? '/ Co ' + service.intervalHours + ' RBG' : ''}`.trim() || 'Wg DTR')],
+          [n('Aktualny licznik maszyny (RBG):'), n(`${machine?.currentWorkHours ?? machine?.operatingHours ?? 0} RBG`)],
+          [n('Interwal odnawiania:'), n(`${intDays ? 'Co ' + intDays + ' dni' : ''} ${intHours ? '/ Co ' + intHours + ' RBG' : ''}`.trim() || 'Wg DTR')],
           [n('Planowany czas przestoju:'), n(`${service.estimatedDowntimeHours || 0} h`)],
         ],
         theme: 'grid',
@@ -197,14 +200,30 @@ export const generateServicePDF = async (service, machine) => {
       });
       currentY = doc.lastAutoTable.finalY + 10;
     } else if (industryProfile === 'facility') {
+      const facilityBody = [
+        [n('Kategoria przegladu c-KOB:'), n(ckobStr || 'Przeglad okresowy instalacji budynku (art. 62 PB)')],
+        [n('Zarzadca / Kontakt / Domofon:'), n(`${machine?.contactPerson || 'Administracja obiektu'} ${machine?.accessNotes ? '(' + machine.accessNotes + ')' : ''}`)],
+        [n('Orzeczenie techniczne c-KOB:'), n(isCompleted ? 'DOPUSZCZONO DO DALSZEJ EKSPLOATACJI' : 'W TRAKCIE PRZEGLADU')],
+      ];
+      if (machine?.buildingType || machine?.usableAreaM2 || machine?.cubatureM3 || machine?.floorsCount) {
+        const metricsParts = [
+          machine.buildingType,
+          machine.usableAreaM2 ? `Pow: ${machine.usableAreaM2} m2` : null,
+          machine.cubatureM3 ? `Kub: ${machine.cubatureM3} m3` : null,
+          machine.floorsCount ? `Kondygnacje: ${machine.floorsCount}` : null,
+        ].filter(Boolean);
+        facilityBody.push([n('Metryczka obiektu (art. 60j PB):'), n(metricsParts.join(' | '))]);
+      }
+      if (machine?.pinbAuthority) {
+        facilityBody.push([n('Wlasciwy organ PINB:'), n(machine.pinbAuthority)]);
+      }
+      if (machine?.hasAsbestos) {
+        facilityBody.push([n('Wyroby zawierajace azbest:'), n(machine.hasAsbestos === true || machine.hasAsbestos === 'Występuje' ? 'WYSTEPUJE' : 'Brak')]);
+      }
       autoTable(doc, {
         startY: currentY,
         head: [[n('Protokol Przegladu Okresowego Obiektu Budowlanego (c-KOB art. 62)'), '']],
-        body: [
-          [n('Kategoria przegladu c-KOB:'), n(ckobStr || 'Przeglad okresowy instalacji budynku (art. 62 PB)')],
-          [n('Zarzadca / Kontakt / Domofon:'), n(`${machine?.contactPerson || 'Administracja obiektu'} ${machine?.accessNotes ? '(' + machine.accessNotes + ')' : ''}`)],
-          [n('Orzeczenie techniczne c-KOB:'), n(isCompleted ? 'DOPUSZCZONO DO DALSZEJ EKSPLOATACJI' : 'W TRAKCIE PRZEGLADU')],
-        ],
+        body: facilityBody,
         theme: 'grid',
         headStyles: { fillColor: [217, 119, 6] },
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
@@ -496,7 +515,8 @@ export const generateServicePDF = async (service, machine) => {
       currentY + 27
     );
 
-    await savePdfWithPrompt(doc, n(`Serwis_${service.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Planowany'}.pdf`));
+    const safeServiceFileName = n(service.name || 'Planowany').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await savePdfWithPrompt(doc, `Serwis_${safeServiceFileName}.pdf`);
   } catch (error) {
     console.error('Błąd generowania PDF serwisu:', error);
     alert('Wystąpił błąd podczas generowania raportu PDF.');

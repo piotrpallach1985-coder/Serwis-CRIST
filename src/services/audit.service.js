@@ -63,7 +63,21 @@ const FIELD_TRANSLATION_MAP = {
   co2EquivalentTons: 'Ekwiwalent CO2 (t)',
   requiresCroCard: 'Wymóg karty CRO',
   gpsLat: 'Szerokość GPS',
-  gpsLng: 'Długość GPS'
+  gpsLng: 'Długość GPS',
+  inspectorLicense: 'Nr uprawnień kontrolującego',
+  licenseNumber: 'Nr uprawnień / kwalifikacji',
+  ckobEntered: 'Wpisano do rządowego c-KOB',
+  ckobEnteredAt: 'Data wpisu c-KOB',
+  ckobEnteredBy: 'Wprowadził do c-KOB',
+  buildingType: 'Rodzaj i funkcja obiektu',
+  constructionYear: 'Rok oddania do użytkowania',
+  usableAreaM2: 'Powierzchnia użytkowa (m²)',
+  cubatureM3: 'Kubatura (m³)',
+  floorsCount: 'Liczba kondygnacji',
+  hasAsbestos: 'Wyroby zawierające azbest',
+  pinbAuthority: 'Właściwy organ PINB',
+  legalTitleDoc: 'Tytuł prawny / KW',
+  additionalDescription: 'Dodatkowy opis'
 };
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;

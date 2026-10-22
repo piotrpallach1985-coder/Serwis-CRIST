@@ -91,7 +91,9 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
   const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceId);
   const safeCompletion = sanitizeForFirestore(completionData || {});
   const historyEntry = safeCompletion.historyEntry;
+  const sig = safeCompletion.clientSignature || null;
   delete safeCompletion.historyEntry;
+  delete safeCompletion.clientSignature;
   
   const payload = {
     status: SERVICE_STATUS.COMPLETED,
@@ -99,10 +101,12 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
     completedAt: serverTimestamp(),
     completedBy: safeCompletion.completedBy || 'System',
     completionNotes: safeCompletion.notes || '',
+    manHours: safeCompletion.manHours ?? historyEntry?.manHours ?? null,
     completedGps: safeCompletion.completedGps || null,
     fGasProtocol: safeCompletion.fGasProtocol || null,
-    clientSignature: safeCompletion.clientSignature || null,
+    clientSignature: sig,
     clientSignerName: safeCompletion.clientSignerName || null,
+    inspectorLicense: safeCompletion.inspectorLicense || null,
     completionDetails: safeCompletion
   };
   
@@ -459,7 +463,9 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
     // Aktualizacja statusu serwisu
     const safeCompletion = sanitizeForFirestore(completionData || {});
     const safeHistoryEntry = safeCompletion.historyEntry;
+    const sig = safeCompletion.clientSignature || null;
     delete safeCompletion.historyEntry;
+    delete safeCompletion.clientSignature;
 
     const payload = {
       status: SERVICE_STATUS.COMPLETED,
@@ -467,9 +473,10 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
       completedAt: serverTimestamp(),
       completedBy: safeCompletion.completedBy || 'System',
       completionNotes: safeCompletion.notes || '',
+      manHours: safeCompletion.manHours ?? safeHistoryEntry?.manHours ?? null,
       completedGps: safeCompletion.completedGps || null,
       fGasProtocol: safeCompletion.fGasProtocol || null,
-      clientSignature: safeCompletion.clientSignature || null,
+      clientSignature: sig,
       clientSignerName: safeCompletion.clientSignerName || null,
       inspectorLicense: safeCompletion.inspectorLicense || null,
       completionDetails: safeCompletion

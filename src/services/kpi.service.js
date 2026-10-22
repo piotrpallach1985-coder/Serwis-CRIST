@@ -5,6 +5,7 @@ import { TICKET_STATUS } from '../utils/constants';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import { safeParseDate } from '../utils/dateHelpers';
 import { checkServiceUrgency } from '../utils/logicHelpers';
+import { filterTasksForFieldTechnician } from '../utils/fieldServiceHelpers';
 
 export const fetchHistoricalTickets = async () => {
   const tenantId = getCurrentTenant();
@@ -47,14 +48,20 @@ export const fetchServerPlannedKPIStats = async (period) => {
  * Oblicza wskaźniki KPI awarii bezpośrednio z kolekcji Firestore dzierżawcy
  * (odporne na brak pola isDeleted w dokumentach).
  */
-export const computeClientKPIStats = async (period = 'all', machinesList = []) => {
+export const computeClientKPIStats = async (
+  period = 'all',
+  machinesList = [],
+  user = null,
+  onlyAssignedTasks = false
+) => {
   const tenantId = getCurrentTenant();
   if (!tenantId) return null;
 
   const snap = await getDocs(collection(db, 'tenants', tenantId, 'tickets'));
-  const allTickets = snap.docs
+  const rawTickets = snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(t => t.isDeleted !== true);
+  const allTickets = filterTasksForFieldTechnician(rawTickets, user, onlyAssignedTasks);
 
   const now = new Date();
   let startDate = null;
@@ -139,15 +146,18 @@ export const computeClientKPIStats = async (period = 'all', machinesList = []) =
 export const computeClientPlannedKPIStats = async (
   period = 'all',
   machinesList = [],
-  plannedWarningDays = 7
+  plannedWarningDays = 7,
+  user = null,
+  onlyAssignedTasks = false
 ) => {
   const tenantId = getCurrentTenant();
   if (!tenantId) return null;
 
   const snap = await getDocs(collection(db, 'tenants', tenantId, 'planned_services'));
-  const allServices = snap.docs
+  const rawServices = snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(s => s.isDeleted !== true);
+  const allServices = filterTasksForFieldTechnician(rawServices, user, onlyAssignedTasks);
 
   const now = new Date();
   let startDate = null;

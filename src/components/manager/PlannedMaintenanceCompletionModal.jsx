@@ -196,6 +196,8 @@ export default function PlannedMaintenanceCompletionModal({
           otherTools: serviceToComplete.otherTools || '',
           requiredParts: serviceToComplete.requiredParts || [],
           futureNotes: serviceToComplete.futureNotes || [],
+          assignedService: serviceToComplete.assignedService || serviceToComplete.assignedTo || '',
+          additionalDescription: serviceToComplete.additionalDescription || '',
         };
         if (
           serviceToComplete.triggerType === 'calendar' ||
@@ -286,6 +288,7 @@ export default function PlannedMaintenanceCompletionModal({
       const completionData = {
         completedBy: user?.name || 'System',
         notes: completionNotes,
+        manHours: actualManHours ? Number(actualManHours) : null,
         checklistResponses,
         historyEntry,
         partsUsed,

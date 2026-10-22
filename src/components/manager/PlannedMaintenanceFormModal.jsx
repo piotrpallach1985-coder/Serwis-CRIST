@@ -169,10 +169,16 @@ export default function PlannedMaintenanceFormModal({
     if (triggerType === 'calendar' || triggerType === 'mixed') {
       serviceData.calendarIntervalDays = Number(calendarIntervalDays);
       serviceData.nextDate = nextDate ? new Date(nextDate) : null;
+    } else {
+      serviceData.calendarIntervalDays = null;
+      serviceData.nextDate = null;
     }
     if (triggerType === 'hours' || triggerType === 'mixed') {
       serviceData.hoursInterval = Number(hoursInterval);
       serviceData.targetWorkHours = Number(targetWorkHours);
+    } else {
+      serviceData.hoursInterval = null;
+      serviceData.targetWorkHours = null;
     }
 
     const historyEntry = {

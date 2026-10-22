@@ -314,6 +314,8 @@ export default function PlannedMaintenanceTimeline({
           otherTools: srv.otherTools || '',
           requiredParts: srv.requiredParts || [],
           futureNotes: srv.futureNotes || [],
+          assignedService: srv.assignedService || selectedService || '',
+          additionalDescription: srv.additionalDescription || '',
         };
         if (srv.triggerType === 'calendar' || srv.triggerType === 'mixed') {
           nextPlanData.calendarIntervalDays = srv.calendarIntervalDays;
@@ -349,6 +351,7 @@ export default function PlannedMaintenanceTimeline({
       const fGasProtocol = showFGasSection
         ? buildFGasServiceEntry({
             refrigerantType: refrigerantType || currentMachine?.refrigerantType,
+            refrigerantChargeKg: currentMachine?.refrigerantChargeKg || null,
             addedKg: addedRefrigerantKg,
             recoveredKg: recoveredRefrigerantKg,
             leakTestResult,
@@ -374,6 +377,7 @@ export default function PlannedMaintenanceTimeline({
       const completionData = {
         completedBy: user?.name || 'System',
         notes: summaryNotes,
+        manHours: summaryManHours ? Number(summaryManHours) : null,
         checklistResponses,
         historyEntry,
         partsUsed: summaryPartsUsed,
