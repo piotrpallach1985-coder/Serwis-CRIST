@@ -67,6 +67,17 @@ export default function PlannedMaintenanceInfo({
       setLocalCkobEntered(true);
       setLocalCkobEnteredAt(nowIso);
       setLocalCkobEnteredBy(enteredBy);
+      const storeState = useManagerStore.getState?.();
+      if (storeState?.markCkobEnteredInStore) {
+        storeState.markCkobEnteredInStore(srv.id, nowIso, enteredBy);
+      }
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(
+          new CustomEvent('vexont:ckob-entered', {
+            detail: { serviceId: srv.id, ckobEnteredAt: nowIso, ckobEnteredBy: enteredBy },
+          })
+        );
+      }
     } catch (err) {
       console.error('Błąd zapisu potwierdzenia wpisu c-KOB:', err);
     } finally {

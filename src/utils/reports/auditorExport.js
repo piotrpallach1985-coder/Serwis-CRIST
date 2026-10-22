@@ -2,6 +2,11 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { safeParseDate } from '../dateHelpers';
 import { TICKET_STATUS_LABELS, ACTION_ITEM_STATUS_LABELS } from '../constants';
+import {
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+  isTaskAssignedToUser,
+} from '../fieldServiceHelpers';
 
 const applyWorksheetFormatting = (ws, rows) => {
   if (!ws || !rows || rows.length === 0) return;
@@ -23,7 +28,11 @@ const applyWorksheetFormatting = (ws, rows) => {
   });
 };
 
-export const generateAuditorReport = async (tenantId) => {
+export const generateAuditorReport = async (
+  tenantId,
+  user = null,
+  onlyAssignedTasks = false
+) => {
   const XLSX = await import('xlsx');
 
   try {
@@ -33,10 +42,26 @@ export const generateAuditorReport = async (tenantId) => {
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     };
 
-    const tickets = await fetchCol('tickets');
-    const machines = await fetchCol('machines');
-    const planned = await fetchCol('planned_services');
-    const actions = await fetchCol('action_items');
+    const rawTickets = await fetchCol('tickets');
+    const rawMachines = await fetchCol('machines');
+    const rawPlanned = await fetchCol('planned_services');
+    const rawActions = await fetchCol('action_items');
+
+    const tickets = filterTasksForFieldTechnician(rawTickets, user, onlyAssignedTasks);
+    const planned = filterTasksForFieldTechnician(rawPlanned, user, onlyAssignedTasks);
+    const machines = filterMachinesForFieldTechnician(
+      rawMachines,
+      rawTickets,
+      rawPlanned,
+      user,
+      onlyAssignedTasks
+    );
+    const allowedMachineIds = new Set(machines.map(m => m.id));
+    const actions = onlyAssignedTasks
+      ? rawActions.filter(
+          a => allowedMachineIds.has(a.machineId) || isTaskAssignedToUser(a, user)
+        )
+      : rawActions;
 
     const machineMap = machines.reduce((acc, m) => { acc[m.id] = m.name; return acc; }, {});
     

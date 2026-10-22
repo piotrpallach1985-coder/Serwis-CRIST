@@ -146,7 +146,7 @@ export default function MachineInfoCard({
           </div>
           <div className="flex items-center gap-2">
             <div className="font-semibold text-gray-800 text-base">
-              {machine.currentWorkHours || 0} {t('machines.details.rbg')}
+              {machine.currentWorkHours ?? machine.operatingHours ?? 0} {t('machines.details.rbg')}
             </div>
             <button
               onClick={() => setIsWorkHoursModalOpen(true)}

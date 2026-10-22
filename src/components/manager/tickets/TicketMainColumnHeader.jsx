@@ -215,6 +215,17 @@ export default function TicketMainColumnHeader({
                 <i className="ph ph-snowflake mr-1"></i> {fGasSummaryStr}
               </div>
             )}
+            {(currentTicket.inspectorLicense ||
+              currentTicket.history?.[currentTicket.history.length - 1]?.inspectorLicense) && (
+              <div
+                data-testid="ticket-inspector-license-badge"
+                className="mt-2 text-xs font-semibold text-violet-800 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1"
+              >
+                <i className="ph ph-certificate"></i> Uprawnienia:{' '}
+                {currentTicket.inspectorLicense ||
+                  currentTicket.history?.[currentTicket.history.length - 1]?.inspectorLicense}
+              </div>
+            )}
           </div>
         </div>
 

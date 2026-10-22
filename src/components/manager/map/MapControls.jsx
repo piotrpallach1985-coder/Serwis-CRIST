@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { USER_ROLES, PIN_STATUS } from '../../../utils/constants';
 import { useTranslation } from 'react-i18next';
 import { clampZoom } from './InteractiveGoogleMap';
+import { usePermissions } from '../../../hooks/usePermissions';
+import { useManagerStore } from '../../../store/managerStore';
 
 export default function MapControls({
   mode,
@@ -57,6 +59,8 @@ export default function MapControls({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const roles = useManagerStore(state => state.roles || []);
+  const { canEditMap } = usePermissions(user, roles);
 
   const [tabType, setTabType] = useState(activeMapType || 'image');
   const activeTabObj =
@@ -78,11 +82,6 @@ export default function MapControls({
   const parentSubmapId = breadcrumbPath.length > 1 ? breadcrumbPath[breadcrumbPath.length - 2].id : null;
   const currentRegionName =
     breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1].name : t('map_component.main_map', 'Mapa Główna');
-
-  const canEditMap =
-    user?.role === USER_ROLES.ADMIN ||
-    user?.role === USER_ROLES.SUPERADMIN ||
-    user?.permissions?.includes('edit_map');
 
   const currentLat = draftGoogleView?.lat ?? activeGoogleLat ?? 54.5364;
   const currentLng = draftGoogleView?.lng ?? activeGoogleLng ?? 18.5469;

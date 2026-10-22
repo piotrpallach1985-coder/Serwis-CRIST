@@ -5,8 +5,12 @@ import { safeParseDate } from '../../../utils/dateHelpers';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
+import {
+  filterTasksForFieldTechnician,
+  filterMachinesForFieldTechnician,
+} from '../../../utils/fieldServiceHelpers';
 
-export default function KPIReportPanel({ machines }) {
+export default function KPIReportPanel({ machines, user = null, onlyAssignedTasks = false }) {
   const { t } = useTranslation();
   const [reportPeriod, setReportPeriod] = useState('30'); // '30', '90', 'all'
   const [loading, setLoading] = useState(false);
@@ -15,10 +19,19 @@ export default function KPIReportPanel({ machines }) {
     setLoading(true);
     try {
       const ticketsSnap = await getDocs(collection(db, 'tenants', getCurrentTenant(), 'tickets'));
-      const tickets = ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted);
+      const rawTickets = ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(item => !item.isDeleted);
+      const tickets = filterTasksForFieldTechnician(rawTickets, user, onlyAssignedTasks);
 
       const plannedSnap = await getDocs(collection(db, 'tenants', getCurrentTenant(), 'planned_services'));
-      const plannedServices = plannedSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
+      const rawServices = plannedSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.isDeleted);
+      const plannedServices = filterTasksForFieldTechnician(rawServices, user, onlyAssignedTasks);
+      const visibleMachines = filterMachinesForFieldTechnician(
+        machines || [],
+        rawTickets,
+        rawServices,
+        user,
+        onlyAssignedTasks
+      );
 
       const now = new Date();
       let filteredTickets = tickets;
@@ -44,7 +57,7 @@ export default function KPIReportPanel({ machines }) {
           : t('planned.dashboard.periods.90days', 'Ostatnie 90 dni');
       }
 
-      await generateKPIReportPDF(filteredTickets, filteredServices, machines, title);
+      await generateKPIReportPDF(filteredTickets, filteredServices, visibleMachines, title);
     } catch (err) {
       console.error(err);
       alert('Błąd podczas generowania raportu PDF: ' + err.message);

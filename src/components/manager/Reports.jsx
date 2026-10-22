@@ -7,10 +7,15 @@ import ApiSettingsPanel from './reports/ApiSettingsPanel';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
+import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function Reports() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const machines = useManagerStore(state => state.machines);
+  const roles = useManagerStore(state => state.roles || []);
+  const { isAdmin, onlyAssignedTasks } = usePermissions(user, roles);
 
   const [loading, setLoading] = useState(false);
   const [plannedWarningDays, setPlannedWarningDaysState] = useState(30);
@@ -30,7 +35,7 @@ export default function Reports() {
   const handleGenerateAuditorReport = async () => {
     setLoading(true);
     try {
-      await generateAuditorReport(getCurrentTenant());
+      await generateAuditorReport(getCurrentTenant(), user, onlyAssignedTasks);
     } catch (err) {
       alert('Błąd podczas generowania raportu: ' + err.message);
     } finally {
@@ -59,8 +64,12 @@ export default function Reports() {
 
       <div className="flex flex-col gap-4 sm:gap-6 min-w-0">
         {/* Panel PDF */}
-        <KPIReportPanel machines={machines} />
-        <ApiSettingsPanel />
+        <KPIReportPanel
+          machines={machines}
+          user={user}
+          onlyAssignedTasks={onlyAssignedTasks}
+        />
+        {isAdmin && <ApiSettingsPanel />}
 
         {/* Raport Audytorski */}
         <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">

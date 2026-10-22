@@ -16,6 +16,9 @@ import {
 } from '../../utils/fieldServiceHelpers';
 
 const EMPTY_ARRAY = [];
+let inFlightCkobFetch = null;
+let cachedCkobKey = '';
+let cachedCkobList = EMPTY_ARRAY;
 
 export default function NotificationCenter({
   onNavigate,
@@ -37,9 +40,21 @@ export default function NotificationCenter({
   const markAsRead = useManagerStore(state => state.markAsRead);
   const roles = useManagerStore(state => state.roles || []);
   const branding = useManagerStore(state => state.branding || {});
+  const ckobRefreshVersion = useManagerStore(state => state.ckobRefreshVersion || 0);
   const industryProfile = branding?.industryProfile || 'industrial';
   const { onlyAssignedTasks } = usePermissions(user, roles);
-  const [completedCkobServices, setCompletedCkobServices] = useState([]);
+  const [completedCkobServices, setCompletedCkobServices] = useState(EMPTY_ARRAY);
+
+  useEffect(() => {
+    const handleCkobEntered = e => {
+      const serviceId = e?.detail?.serviceId;
+      if (!serviceId) return;
+      cachedCkobList = cachedCkobList.filter(s => s.id !== serviceId);
+      setCompletedCkobServices(prev => prev.filter(s => s.id !== serviceId));
+    };
+    window.addEventListener('vexont:ckob-entered', handleCkobEntered);
+    return () => window.removeEventListener('vexont:ckob-entered', handleCkobEntered);
+  }, []);
 
   useEffect(() => {
     if (industryProfile !== 'facility' || typeof getDocs !== 'function') {
@@ -51,18 +66,38 @@ export default function NotificationCenter({
       try {
         const tenantId = getCurrentTenant();
         if (!tenantId || !db) return;
-        const q = query(
-          collection(db, 'tenants', tenantId, 'planned_services'),
-          where('status', '==', 'completed'),
-          limit(100)
-        );
-        const snap = await getDocs(q);
-        if (!cancelled && snap?.docs) {
-          setCompletedCkobServices(
-            snap.docs
-              .map(d => ({ id: d.id, ...d.data() }))
-              .filter(s => !s.isDeleted && s.ckobEntered !== true)
+        const fetchKey = `${tenantId}:${plannedServices.length}:${ckobRefreshVersion}`;
+        if (cachedCkobKey === fetchKey && !inFlightCkobFetch) {
+          if (!cancelled) setCompletedCkobServices(cachedCkobList);
+          return;
+        }
+        if (!inFlightCkobFetch || cachedCkobKey !== fetchKey) {
+          cachedCkobKey = fetchKey;
+          const q = query(
+            collection(db, 'tenants', tenantId, 'planned_services'),
+            where('status', '==', 'completed'),
+            limit(200)
           );
+          inFlightCkobFetch = getDocs(q)
+            .then(snap => {
+              const items = (snap?.docs || [])
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(s => !s.isDeleted && s.ckobEntered !== true)
+                .sort((a, b) => {
+                  const dA = safeParseDate(a.completedAt)?.getTime() || 0;
+                  const dB = safeParseDate(b.completedAt)?.getTime() || 0;
+                  return dB - dA;
+                });
+              cachedCkobList = items;
+              return items;
+            })
+            .finally(() => {
+              inFlightCkobFetch = null;
+            });
+        }
+        const items = await inFlightCkobFetch;
+        if (!cancelled && Array.isArray(items)) {
+          setCompletedCkobServices(items);
         }
       } catch {
         // Ignoruj w środowisku testowym lub przy braku połączenia
@@ -72,7 +107,7 @@ export default function NotificationCenter({
     return () => {
       cancelled = true;
     };
-  }, [industryProfile, plannedServices.length]);
+  }, [industryProfile, plannedServices.length, ckobRefreshVersion]);
 
   const relevantNotifications = useMemo(() => {
     const list = [];

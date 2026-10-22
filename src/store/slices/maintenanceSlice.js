@@ -6,11 +6,24 @@ export const createMaintenanceSlice = (set, get) => ({
   plannedServices: [],
   actionItems: [],
   plannedWarningDays: 30,
+  completedCkobServices: [],
+  ckobRefreshVersion: 0,
   
   setServices: (services) => set({ services }),
   setPlannedServices: (plannedServices) => set({ plannedServices }),
   setActionItems: (actionItems) => set({ actionItems }),
   setPlannedWarningDays: (plannedWarningDays) => set({ plannedWarningDays }),
+  setCompletedCkobServices: (completedCkobServices) => set({ completedCkobServices }),
+  markCkobEnteredInStore: (serviceId, nowIso, enteredBy) =>
+    set((state) => ({
+      ckobRefreshVersion: (state.ckobRefreshVersion || 0) + 1,
+      completedCkobServices: (state.completedCkobServices || []).filter((s) => s.id !== serviceId),
+      plannedServices: (state.plannedServices || []).map((s) =>
+        s.id === serviceId
+          ? { ...s, ckobEntered: true, ckobEnteredAt: nowIso, ckobEnteredBy: enteredBy }
+          : s
+      ),
+    })),
 
   // --- Akcje asynchroniczne zintegrowane ze stanem (eliminacja prop drillingu) ---
   deletePlannedServiceAction: async (id) => {

@@ -222,6 +222,8 @@ export default function TicketDetails({
     isUploading,
     uploadProgress,
     machine,
+    canManageDtr,
+    canDeleteTechNotes,
     t,
   ]);
 

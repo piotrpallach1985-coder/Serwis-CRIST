@@ -199,6 +199,8 @@ export default function PlannedMaintenanceDetails({
     canDeletePlanned,
     isArchive,
     allowTicketDeletion,
+    canManageDtr,
+    canDeleteTechNotes,
     t,
   ]);
 

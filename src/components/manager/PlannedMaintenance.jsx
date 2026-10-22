@@ -98,6 +98,27 @@ export default function PlannedMaintenance({
     }
   }, [isArchive]);
 
+  useEffect(() => {
+    const handleCkobEntered = e => {
+      const { serviceId, ckobEnteredAt, ckobEnteredBy } = e?.detail || {};
+      if (!serviceId) return;
+      setInternalArchive(prev =>
+        prev.map(item =>
+          item.id === serviceId
+            ? { ...item, ckobEntered: true, ckobEnteredAt, ckobEnteredBy }
+            : item
+        )
+      );
+      setRecentlyCompletedService(prev =>
+        prev && prev.id === serviceId
+          ? { ...prev, ckobEntered: true, ckobEnteredAt, ckobEnteredBy }
+          : prev
+      );
+    };
+    window.addEventListener('vexont:ckob-entered', handleCkobEntered);
+    return () => window.removeEventListener('vexont:ckob-entered', handleCkobEntered);
+  }, []);
+
   const fetchArchive = async (loadMore = false) => {
     if (loadingArchive || (!hasMoreArchive && loadMore)) return;
     setLoadingArchive(true);

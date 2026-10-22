@@ -21,10 +21,8 @@ export default function HomeDashboard({ onLogout }) {
   const roles = useManagerStore(state => state.roles) || [];
   const branding = useManagerStore(state => state.branding);
 
-  const { isAdmin, canManageUsers, canManageRoles, canViewReports } = usePermissions(
-    user,
-    roles
-  );
+  const { isAdmin, canManageUsers, canManageRoles, canViewReports, canAccessCompanyAdmin, canAccessTab } =
+    usePermissions(user, roles);
 
   const [isScanning, setIsScanning] = useState(false);
   const [isScannerSelectOpen, setIsScannerSelectOpen] = useState(false);
@@ -78,7 +76,8 @@ export default function HomeDashboard({ onLogout }) {
     navigate(`/manager/${moduleName}/${defaultTab}`);
   };
 
-  const canAccessCompanyAdmin = isAdmin || canManageUsers || canManageRoles || canViewReports;
+  const firstAdminTab =
+    ['users', 'roles', 'reports', 'audit', 'ai_stats'].find(tab => canAccessTab(tab)) || 'users';
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-slate-50 text-slate-800">
@@ -266,7 +265,7 @@ export default function HomeDashboard({ onLogout }) {
             {canAccessCompanyAdmin ? (
               <button
                 type="button"
-                onClick={() => navigateToModule('company_admin', 'users')}
+                onClick={() => navigateToModule('company_admin', firstAdminTab)}
                 className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
               >
                 <i className="ph ph-desktop text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
