@@ -1,6 +1,6 @@
 export const initDB = () => {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('CristOfflineDB', 1);
+    const request = indexedDB.open('VexoNTOfflineDB', 1);
     
     request.onupgradeneeded = (event) => {
       const db = event.target.result;

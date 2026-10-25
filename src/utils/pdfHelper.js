@@ -3,7 +3,7 @@ export const savePdfWithPrompt = async (doc, defaultFilename) => {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: defaultFilename,
-        id: 'crist-cmms-pdf-dir', // Tells the browser to remember the directory
+        id: 'vexont-cmms-pdf-dir', // Tells the browser to remember the directory
         types: [{
           description: 'Plik PDF',
           accept: { 'application/pdf': ['.pdf'] }

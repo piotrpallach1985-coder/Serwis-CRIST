@@ -103,7 +103,7 @@ export const TIME_THRESHOLDS = Object.freeze({
 });
 
 /**
- * Statusy pinesek na mapie stoczni / maszyn.
+ * Statusy pinesek na mapie obiektów / urządzeń.
  * @readonly
  * @enum {string}
  */

@@ -82,9 +82,9 @@ export function getDtrDocCategoryInfo(docCategory) {
 export const INDUSTRY_PROFILES = {
   industrial: {
     id: 'industrial',
-    name: 'Przemysł / Produkcja / Stocznia',
+    name: 'Przemysł / Produkcja / Zakład UR',
     shortName: 'Przemysł / UR',
-    description: 'Zakłady produkcyjne, stocznie i hale: maszyny, liczniki RBG, przestoje i magazyn części UR.',
+    description: 'Zakłady produkcyjne, hale przemysłowe i infrastruktura techniczna: urządzenia, liczniki RBG, przestoje i magazyn części UR.',
     icon: 'ph-factory',
     badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
     bannerClass: 'bg-slate-900 text-white border-slate-800',

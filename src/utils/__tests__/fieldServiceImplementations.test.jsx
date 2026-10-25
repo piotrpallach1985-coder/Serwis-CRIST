@@ -381,7 +381,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(formatted).not.toContain('clientSignature');
     });
 
-    it('wyświetla przycisk Nawiguj GPS, dane F-Gaz (CRO) i dane klienta w MachineInfoCard dla profilu hvac oraz blokuje F-Gaz i c-KOB dla profilu industrial (stocznia)', () => {
+    it('wyświetla przycisk Nawiguj GPS, dane F-Gaz (CRO) i dane klienta w MachineInfoCard dla profilu hvac oraz blokuje F-Gaz i c-KOB dla profilu industrial (przemysł)', () => {
       const machine = {
         id: 'm-hvac-1',
         name: 'Pompa Ciepła Daikin Altherma',
@@ -452,9 +452,9 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByTestId('machine-fgas-badge')).toBeNull();
       unmountFacility();
 
-      // C. Profil INDUSTRIAL (Stocznia / Przemysł) -> blokuje zarówno F-Gazy, jak i przeglądy c-KOB w karcie i formularzu urządzenia
+      // C. Profil INDUSTRIAL (Przemysł / Produkcja) -> blokuje zarówno F-Gazy, jak i przeglądy c-KOB w karcie i formularzu urządzenia
       useManagerStore.getState().setBranding({
-        companyName: 'Stocznia CRIST',
+        companyName: 'Zakład Produkcyjny Demo',
         industryProfile: 'industrial',
       });
 
@@ -562,7 +562,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       // 1. INDUSTRIAL
       useManagerStore.getState().setBranding({
-        companyName: 'Stocznia',
+        companyName: 'Zakład Produkcyjny',
         industryProfile: 'industrial',
       });
       const { unmount: u1 } = render(
@@ -963,7 +963,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const ticketInStep4 = { id: 't-step4', machineId: 'm1', status: 4 };
       const handleUpdate = vi.fn();
 
-      // 1) Profil INDUSTRIAL (Stocznia) -> brak pola nr uprawnień, GPS i podpis zwinięte jako opcja
+      // 1) Profil INDUSTRIAL (Przemysł / Produkcja) -> brak pola nr uprawnień, GPS i podpis zwinięte jako opcja
       const { unmount: unmountInd } = render(
         <TicketMainColumnStepper
           currentTicket={ticketInStep4}

@@ -119,7 +119,7 @@ export default function Reporters() {
               value={position} 
               onChange={(e) => setPosition(e.target.value)} 
               className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-900 outline-none" 
-              placeholder="np. Operator suwnicy" 
+              placeholder="np. Konserwator / Operator urządzenia" 
               required
             />
           </div>

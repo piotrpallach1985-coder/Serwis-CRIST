@@ -5,7 +5,7 @@ import { exportToExcel } from '../utils/reports/excelExport';
  * useMachines — hook do zarządzania rejestrem maszyn, filtrowaniem po nazwie i rejonie oraz eksportem.
  * 
  * @param {Array<Object>} [machines=[]] Lista maszyn z bazy danych
- * @param {Array<Object>} [regions=[]] Lista rejonów stoczni
+ * @param {Array<Object>} [regions=[]] Lista rejonów / miejsc montażu
  * @returns {Object} Stan i metody filtrowania maszyn
  */
 export function useMachines(machines = [], regions = []) {

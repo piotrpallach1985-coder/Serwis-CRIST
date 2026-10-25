@@ -184,7 +184,7 @@ export default function MachineInfoCard({
         </div>
       </div>
 
-      {/* DANE BRANŻOWE: ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) — w Przemysł/Stocznia (industrial) c-KOB i F-Gazy są zablokowane */}
+      {/* DANE BRANŻOWE: ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) — w Przemysł/Produkcja (industrial) c-KOB i F-Gazy są zablokowane */}
       {hasExtendedInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-2.5">
           {(geo.hasAddress ||

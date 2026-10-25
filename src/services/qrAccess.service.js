@@ -2,7 +2,17 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { safeParseDate } from '../utils/dateHelpers';
 
-const QR_BASE_URL = 'https://piotrpallach1985-coder.github.io/Serwis-CRIST';
+const getQrBaseUrl = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PUBLIC_APP_URL) {
+    return String(import.meta.env.VITE_PUBLIC_APP_URL).replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${window.location.pathname || ''}`
+      .replace(/\/index\.html$/, '')
+      .replace(/\/+$/, '');
+  }
+  return 'https://app.vexont.pl';
+};
 const STORAGE_PREFIX = 'vexont_qr_key_';
 
 export const PART_QR_IN_MACHINE_SCANNER_MSG =
@@ -166,7 +176,7 @@ export const buildMachineQrValue = (arg1, arg2, qrKey, meta) => {
     if (tenantName) params.push(`tn=${encodeURIComponent(tenantName)}`);
     if (machineName) params.push(`mn=${encodeURIComponent(machineName)}`);
     if (dateStr && dateStr !== '-') params.push(`dt=${encodeURIComponent(dateStr)}`);
-    return `${QR_BASE_URL}/?${params.join('&')}`;
+    return `${getQrBaseUrl()}/?${params.join('&')}`;
   }
 
   if (isFirstArgMachineObj) {
@@ -176,7 +186,7 @@ export const buildMachineQrValue = (arg1, arg2, qrKey, meta) => {
     if (tenantName) params.push(`tn=${encodeURIComponent(tenantName)}`);
     if (machineName) params.push(`mn=${encodeURIComponent(machineName)}`);
     if (dateStr) params.push(`dt=${encodeURIComponent(dateStr)}`);
-    return `${QR_BASE_URL}/?${params.join('&')}`;
+    return `${getQrBaseUrl()}/?${params.join('&')}`;
   }
 
   return params.join('&');
@@ -205,7 +215,7 @@ export const buildPartQrValue = (partOrTenantId, arg2, meta = {}) => {
   if (partName) params.push(`pn=${encodeURIComponent(partName)}`);
   if (dateStr && dateStr !== '-') params.push(`dt=${encodeURIComponent(dateStr)}`);
 
-  return `${QR_BASE_URL}/?${params.join('&')}`;
+  return `${getQrBaseUrl()}/?${params.join('&')}`;
 };
 
 export const parseQrPayload = (rawText) => {

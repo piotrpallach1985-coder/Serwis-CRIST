@@ -68,7 +68,7 @@ describeEmu('Izolacja operatora QR (anon_sessions + klucz QR firmy)', () => {
       await db.doc('anon_sessions/anonA').set({ tenantId: 'tenant-A', qrKey: KEY_A });
       await db.doc('tenants/tenant-A/machines/mA').set({ name: 'Dźwig A', isDeleted: false });
       await db.doc('tenants/tenant-B/machines/mB').set({ name: 'Dźwig B', isDeleted: false });
-      await db.doc('tenants/crist/machines/mC').set({ name: 'Dźwig CRIST', isDeleted: false });
+      await db.doc('tenants/default/machines/mC').set({ name: 'Urządzenie Domyślne', isDeleted: false });
       await db.doc('users/adminA').set({ tenantId: 'tenant-A', role: 'admin' });
       await db.doc('users/techA').set({ tenantId: 'tenant-A', role: 'tech' });
       await db.doc('users/operA').set({ tenantId: 'tenant-A', role: 'operator' });
@@ -108,9 +108,9 @@ describeEmu('Izolacja operatora QR (anon_sessions + klucz QR firmy)', () => {
       await assertFails(anonA().doc('tenants/tenant-B/machines/mB').get());
     });
 
-    it('anonim bez sesji NIE czyta niczego (także CRIST – fallback legacy usunięty)', async () => {
+    it('anonim bez sesji NIE czyta niczego (fallback legacy usunięty)', async () => {
       await assertFails(fresh().doc('tenants/tenant-A/machines/mA').get());
-      await assertFails(fresh().doc('tenants/crist/machines/mC').get());
+      await assertFails(fresh().doc('tenants/default/machines/mC').get());
     });
 
     it('stara sesja bez klucza (sprzed zmiany) traci dostęp', async () => {

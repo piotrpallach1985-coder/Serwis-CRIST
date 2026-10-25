@@ -27,9 +27,9 @@ describe('qrAccess.service', () => {
   });
 
   it('buduje i parsuje treść QR z kluczem', () => {
-    const v = buildMachineQrValue('crist', 'm123', 'abc_DEF-123');
-    expect(v).toBe('tenant=crist&machine=m123&k=abc_DEF-123');
-    expect(parseQrPayload(v)).toEqual({ tenantId: 'crist', machineId: 'm123', key: 'abc_DEF-123' });
+    const v = buildMachineQrValue('firma-demo', 'm123', 'abc_DEF-123');
+    expect(v).toBe('tenant=firma-demo&machine=m123&k=abc_DEF-123');
+    expect(parseQrPayload(v)).toEqual({ tenantId: 'firma-demo', machineId: 'm123', key: 'abc_DEF-123' });
   });
 
   it('parsuje pełny URL oraz URL z hashem', () => {
@@ -38,7 +38,7 @@ describe('qrAccess.service', () => {
   });
 
   it('stary format bez klucza i samo ID maszyny', () => {
-    expect(parseQrPayload('tenant=crist&machine=m9')).toEqual({ tenantId: 'crist', machineId: 'm9', key: null });
+    expect(parseQrPayload('tenant=firma-demo&machine=m9')).toEqual({ tenantId: 'firma-demo', machineId: 'm9', key: null });
     expect(parseQrPayload('m9')).toEqual({ tenantId: null, machineId: 'm9', key: null });
   });
 

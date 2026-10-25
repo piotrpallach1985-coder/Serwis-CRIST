@@ -201,7 +201,7 @@ export default function PlannedMaintenanceInfo({
               </div>
             </div>
 
-            {/* Dane klienta / c-KOB / F-Gazy / Potwierdzenie GPS (w Przemysł/Stocznia c-KOB i F-Gazy są zablokowane) */}
+            {/* Dane klienta / c-KOB / F-Gazy / Potwierdzenie GPS (w Przemysł/Produkcja c-KOB i F-Gazy są zablokowane) */}
             {((industryProfile !== 'industrial' &&
               (machine?.contactPerson ||
                 machine?.contactPhone ||
@@ -430,7 +430,7 @@ export default function PlannedMaintenanceInfo({
               >
                 <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2.5">
                   <i className="ph ph-factory text-slate-700 text-base"></i>
-                  <span>Karta Techniczna Prewencji UR (Przemysł / Stocznia)</span>
+                  <span>Karta Techniczna Prewencji UR (Przemysł / Produkcja)</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200">

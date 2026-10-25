@@ -368,8 +368,8 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
       <SuperAdminTenantTable
         tenantsWithTokens={[
           {
-            id: 'crist',
-            name: 'CRIST S.A.',
+            id: 'firma-demo',
+            name: 'VexoNT Demo Sp. z o.o.',
             isActive: true,
             modules: { planned_services: true, inventory: true },
             totalTokens: 0,

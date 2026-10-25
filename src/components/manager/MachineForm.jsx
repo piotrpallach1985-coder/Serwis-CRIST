@@ -302,7 +302,7 @@ export default function MachineForm({
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-blue-500"
-                placeholder={t('machines.form.machineNamePlaceholder', 'np. Klimatyzator Split / Pompa / Suwnica')}
+                placeholder={t('machines.form.machineNamePlaceholder', 'np. Klimatyzator Split / Pompa ciepła / Centrala K-01')}
                 required
               />
             </div>
@@ -385,7 +385,7 @@ export default function MachineForm({
               </p>
             </div>
 
-            {/* Sekcja branżowa (wyłącznie dla profili Facility / c-KOB oraz HVAC / F-Gazy — zablokowana dla Przemysłu / Stoczni) */}
+            {/* Sekcja branżowa (wyłącznie dla profili Facility / c-KOB oraz HVAC / F-Gazy — zablokowana dla Przemysłu / Produkcji) */}
             {industryProfile !== 'industrial' && (
               <div
                 data-testid="machine-form-domain-section"

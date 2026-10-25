@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-export const DEFAULT_LAT = 54.5364; // Gdynia / Trójmiasto domyślnie
+export const DEFAULT_LAT = 54.5364; // Domyślne współrzędne początkowe mapy
 export const DEFAULT_LNG = 18.5469;
 export const DEFAULT_ZOOM = 17;
 

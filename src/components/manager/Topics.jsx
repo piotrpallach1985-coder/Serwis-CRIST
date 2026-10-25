@@ -16,7 +16,7 @@ export default function Topics() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, 'tenants', getCurrentTenant(), 'topics'), (snapshot) => {
       setTopics(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.isDeleted));
     });
     return () => unsubscribe();
@@ -29,9 +29,9 @@ export default function Topics() {
     setLoading(true);
     try {
       if (editingId) {
-        updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics', editingId), { text: newTopic.trim() });
+        updateDoc(doc(db, 'tenants', getCurrentTenant(), 'topics', editingId), { text: newTopic.trim() });
       } else {
-        const newTopicRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'));
+        const newTopicRef = doc(collection(db, 'tenants', getCurrentTenant(), 'topics'));
         setDoc(newTopicRef, {
           text: newTopic.trim(),
         }).catch(err => console.error(err));
@@ -49,7 +49,7 @@ export default function Topics() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten temat z listy podpowiedzi?')) {
-      await updateDoc(doc(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
     }
   };
 
@@ -71,7 +71,7 @@ export default function Topics() {
       "Wymiana części eksploatacyjnych"
     ];
     for (const text of defaults) {
-      const newDocRef = doc(collection(db, 'tenants', (useManagerStore.getState().tenantId || import.meta.env.VITE_DEFAULT_TENANT || 'crist'), 'topics'));
+      const newDocRef = doc(collection(db, 'tenants', getCurrentTenant(), 'topics'));
       setDoc(newDocRef, { text }).catch(err => console.error(err));
     }
   };

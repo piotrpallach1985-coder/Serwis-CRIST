@@ -53,7 +53,7 @@ vi.mock('../../hooks/useAuth', () => ({
 }));
 
 vi.mock('../../utils/tenantHelper', () => ({
-  getCurrentTenant: vi.fn(() => 'crist')
+  getCurrentTenant: vi.fn(() => 'default')
 }));
 
 describe('PartsIssueReceive - Szybkie Wydania i Przyjęcia (Integration)', () => {

@@ -255,7 +255,7 @@ export default function MapEditModal({
                       handleSearchAddress();
                     }
                   }}
-                  placeholder={t('map_component.address_placeholder', 'np. Gdańsk, ul. Długa 10 / Gdynia, Cechowa 5')}
+                  placeholder={t('map_component.address_placeholder', 'np. Warszawa, ul. Prosta 10 / Gdańsk, ul. Długa 10')}
                   className="flex-1 p-2.5 text-xs md:text-sm border border-emerald-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 <button

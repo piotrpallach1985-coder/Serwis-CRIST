@@ -100,7 +100,7 @@ export default function SuperAdminTenantModal({
                 value={formData.id} 
                 onChange={e => setFormData({...formData, id: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')})} 
                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 font-mono text-sm"
-                placeholder={t("dashboards.superadmin.company_id_placeholder", "np. gdynia, stocznia")}
+                placeholder={t("dashboards.superadmin.company_id_placeholder", "np. firma-serwis, osiedle-park")}
                 required 
                 disabled={isEditing}
               />
