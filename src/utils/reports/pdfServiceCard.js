@@ -10,6 +10,7 @@ import {
   getCkobCategoryLabel,
   getIndustryProfileConfig,
   calculateCo2Equivalent,
+  calculateWorkAndTravelMetrics,
 } from '../fieldServiceHelpers';
 
 const n = (text) => {
@@ -181,6 +182,63 @@ export const generateServicePDF = async (service, machine) => {
     });
 
     currentY = doc.lastAutoTable.finalY + 8;
+
+    // Weryfikacja Czasu Pracy, Dojazdu i Obecnosci GPS na Obiekcie
+    const allRegions = state.regions || [];
+    const workMetrics = calculateWorkAndTravelMetrics(service, machine, allRegions);
+    if (
+      workMetrics.travelDurationMinutes !== null ||
+      workMetrics.stopwatchWorkMinutes !== null ||
+      workMetrics.declaredManHours !== null ||
+      service.workStartGps ||
+      service.completedGps ||
+      service.completionDetails?.completedGps
+    ) {
+      const gpsVer =
+        workMetrics.endGpsVerification.status !== 'no_worker_gps'
+          ? workMetrics.endGpsVerification
+          : workMetrics.startGpsVerification;
+      const verificationRows = [
+        [
+          n('Czas dojazdu na obiekt:'),
+          n(workMetrics.travelDurationMinutes !== null ? `${workMetrics.travelDurationMinutes} min` : '-'),
+        ],
+        [
+          n('Rzeczywisty czas pracy (Stoper):'),
+          n(
+            workMetrics.stopwatchWorkMinutes !== null
+              ? `${workMetrics.stopwatchWorkMinutes} min (${workMetrics.stopwatchWorkHours} h)${
+                  workMetrics.isSuspiciouslyShort ? ' (UWAGA: Przeglad < 5 min!)' : ''
+                }`
+              : '-'
+          ),
+        ],
+        [
+          n('Zadeklarowane RBG przez wykonawce:'),
+          n(workMetrics.declaredManHours !== null ? `${workMetrics.declaredManHours} h` : '-'),
+        ],
+        [
+          n('Bilans / Odchylka RBG vs Stoper:'),
+          n(
+            workMetrics.discrepancyHours !== null
+              ? `${workMetrics.discrepancyHours > 0 ? '+' : ''}${workMetrics.discrepancyHours} h${
+                  workMetrics.isTimeInflated ? ' (UWAGA: Nadwyzka RBG > 15 min!)' : ' (W normie)'
+                }`
+              : '-'
+          ),
+        ],
+        [n('Weryfikacja Geofencingu GPS (<=300m):'), n(gpsVer.label)],
+      ];
+      autoTable(doc, {
+        startY: currentY,
+        head: [[n('Weryfikacja Czasu Pracy, Dojazdu i Obecnosci GPS na Obiekcie'), '']],
+        body: verificationRows,
+        theme: 'grid',
+        headStyles: { fillColor: [67, 56, 202] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 65 } },
+      });
+      currentY = doc.lastAutoTable.finalY + 8;
+    }
 
     // Dedykowana sekcja branżowa na karcie serwisu PDF
     if (industryProfile === 'industrial') {

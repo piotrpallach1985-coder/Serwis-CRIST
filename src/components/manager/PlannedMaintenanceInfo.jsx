@@ -592,6 +592,14 @@ export default function PlannedMaintenanceInfo({
                       ⚠️ Odchyłka RBG vs Stoper: +{workMetrics.discrepancyHours} h (sprawdź liczbę osób lub czas na miejscu)
                     </span>
                   )}
+                  {workMetrics.isSuspiciouslyShort && (
+                    <span
+                      data-testid="service-suspiciously-short-badge"
+                      className="bg-red-100 text-red-900 border border-red-300 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
+                    >
+                      🚨 Przegląd trwał poniżej 5 min ({workMetrics.stopwatchWorkMinutes} min) — zweryfikuj rzetelność kontroli!
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">

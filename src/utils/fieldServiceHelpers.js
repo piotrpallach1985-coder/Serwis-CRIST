@@ -1056,6 +1056,11 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
       : null;
 
   const isTimeInflated = Boolean(discrepancyHours !== null && discrepancyHours > 0.25);
+  const isSuspiciouslyShort = Boolean(
+    stopwatchWorkMinutes !== null &&
+      stopwatchWorkMinutes < 5 &&
+      Boolean(safeTask.triggerType || safeTask.checklist)
+  );
   const isMultiDayOrPaused = Boolean(stopwatchWorkHours !== null && stopwatchWorkHours > 12);
 
   const effectiveMachine =
@@ -1089,6 +1094,7 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
     declaredManHours,
     discrepancyHours,
     isTimeInflated,
+    isSuspiciouslyShort,
     isMultiDayOrPaused,
     startGpsVerification,
     endGpsVerification,

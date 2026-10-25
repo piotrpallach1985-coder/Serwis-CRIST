@@ -1101,9 +1101,33 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       );
       expect(indoorVerify.status).toBe('on_site');
       expect(indoorVerify.isOnSite).toBe(true);
+
+      // Dziedziczenie googleLat / googleLng z rejonu budynku (Facility Management / Wspólnoty)
+      const regionsWithGoogleCoords = [
+        {
+          id: 'reg-wspolnota-1',
+          name: 'Wspólnota Mieszkaniowa ul. Słoneczna 12',
+          mapType: 'google',
+          googleLat: 54.5189,
+          googleLng: 18.5305,
+          submapConfigured: true,
+        },
+      ];
+      const apartmentVentilation = {
+        id: 'm-vent-lokal4',
+        name: 'Wentylacja i kominy - Lokal nr 4',
+        regionId: 'reg-wspolnota-1',
+      };
+      const buildingInheritedVerify = verifyOnSiteGps(
+        { lat: 54.519, lng: 18.5306 },
+        apartmentVentilation,
+        regionsWithGoogleCoords
+      );
+      expect(buildingInheritedVerify.status).toBe('on_site');
+      expect(buildingInheritedVerify.isOnSite).toBe(true);
     });
 
-    it('oblicza czas dojazdu, stoper pracy na miejscu oraz odchyłkę zadeklarowanych RBG (calculateWorkAndTravelMetrics)', () => {
+    it('oblicza czas dojazdu, stoper pracy na miejscu, odchyłkę RBG oraz wykrywa przegląd okresowy wykonany poniżej 5 minut (isSuspiciouslyShort)', () => {
       const machine = { id: 'm1', name: 'Klimatyzator Daikin', lat: 54.5189, lng: 18.5305 };
       const task = {
         id: 't-100',
@@ -1121,12 +1145,33 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(metrics.declaredManHours).toBe(3);
       expect(metrics.discrepancyHours).toBe(1.5);
       expect(metrics.isTimeInflated).toBe(true);
+      expect(metrics.isSuspiciouslyShort).toBe(false);
       expect(metrics.isMultiDayOrPaused).toBe(false);
       expect(metrics.endGpsVerification.status).toBe('on_site');
+
+      // Przegląd okresowy c-KOB zamknięty po 2 minutach ("zza biurka") -> isSuspiciouslyShort: true
+      const fastInspection = {
+        id: 'srv-fast-1',
+        triggerType: 'calendar',
+        workStartedAt: '2026-10-25T11:00:00.000Z',
+        completedAt: '2026-10-25T11:02:00.000Z', // 2 minuty
+        manHours: 1.0,
+      };
+      const fastMetrics = calculateWorkAndTravelMetrics(fastInspection, machine, []);
+      expect(fastMetrics.stopwatchWorkMinutes).toBe(2);
+      expect(fastMetrics.isSuspiciouslyShort).toBe(true);
+      expect(fastMetrics.isTimeInflated).toBe(true);
     });
 
-    it('wyświetla sekcję weryfikacji czasu i GPS w nagłówku awarii oraz panel porównawczy serwisantów w raportach', () => {
-      const machine = { id: 'm1', name: 'Pompa Ciepła B1', lat: 54.5189, lng: 18.5305 };
+    it('wyświetla sekcję weryfikacji czasu i GPS w nagłówku awarii i przeglądu (w tym alert <5 min) oraz tabelę rozliczenia budynków/wspólnot w raportach', () => {
+      const regions = [{ id: 'reg-b1', name: 'Budynek Wspólnoty B1', lat: 54.5189, lng: 18.5305 }];
+      const machine = {
+        id: 'm1',
+        name: 'Pompa Ciepła B1',
+        regionId: 'reg-b1',
+        lat: 54.5189,
+        lng: 18.5305,
+      };
       const ticketWithMetrics = {
         id: 't-ver-1',
         topic: 'Awaria sprężarki',
@@ -1141,19 +1186,41 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         completedGps: { lat: 54.352, lng: 18.6466 }, // poza obiektem
       };
 
+      const shortPlannedService = {
+        id: 'srv-ver-2',
+        name: 'Przegląd roczny kominiarski (art. 62 PB)',
+        machineId: 'm1',
+        machineName: 'Pompa Ciepła B1',
+        assignedService: 'Jan Serwisant',
+        triggerType: 'calendar',
+        status: 'completed',
+        workStartedAt: '2026-10-25T10:00:00.000Z',
+        completedAt: '2026-10-25T10:03:00.000Z', // 3 minuty (< 5 min!)
+        manHours: 1.0,
+        completedGps: { lat: 54.5189, lng: 18.5305 },
+      };
+
       const { unmount } = render(
         <>
           <TicketMainColumnHeader
             currentTicket={ticketWithMetrics}
             STATUSES={{ 5: { label: 'Zakończone', color: 'bg-green-100 text-green-800' } }}
             machines={[machine]}
-            regions={[]}
+            regions={regions}
+          />
+          <PlannedMaintenanceInfo
+            srv={shortPlannedService}
+            machine={machine}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Budynek Wspólnoty B1'}
+            regions={regions}
           />
           <TechnicianPerformancePanel
             tickets={[ticketWithMetrics]}
-            plannedServices={[]}
+            plannedServices={[shortPlannedService]}
             machines={[machine]}
-            regions={[]}
+            regions={regions}
             services={[{ id: 's1', name: 'Jan Serwisant' }]}
           />
         </>
@@ -1163,11 +1230,19 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('ticket-time-inflated-badge').textContent).toContain('+1.5 h');
       expect(screen.getByTestId('ticket-gps-geofence-badge').textContent).toContain('POZA OBIEKTEM');
 
+      expect(screen.getByTestId('service-work-gps-verification-box')).toBeTruthy();
+      expect(screen.getByTestId('service-suspiciously-short-badge').textContent).toContain(
+        'Przegląd trwał poniżej 5 min (3 min)'
+      );
+
       const summaryTable = screen.getByTestId('tech-performance-summary-table');
       expect(summaryTable.textContent).toContain('Jan Serwisant');
       expect(summaryTable.textContent).toContain('25 min');
-      expect(summaryTable.textContent).toContain('2.5 h');
-      expect(summaryTable.textContent).toContain('+1.5 h');
+      expect(summaryTable.textContent).toContain('3.5 h'); // 2.5h + 1.0h
+
+      const regionsTable = screen.getByTestId('tech-performance-regions-table');
+      expect(regionsTable.textContent).toContain('Budynek Wspólnoty B1');
+      expect(regionsTable.textContent).toContain('3.5 h');
 
       unmount();
     });
