@@ -314,9 +314,13 @@ export default function Regions() {
       if (editingId === 'main_map') {
         const mainMapUpdate = {
           description: description.trim(),
-          mapType: mapType === 'google' ? 'google' : 'image',
-          ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
-          ...(mapType === 'google'
+          mapType: effectiveMapType === 'google' ? 'google' : 'image',
+          ...(finalImageUrl
+            ? { mapUrl: finalImageUrl, imageUrl: finalImageUrl }
+            : effectiveMapType === 'image' && !finalImageUrl
+              ? { mapUrl: '', imageUrl: '' }
+              : {}),
+          ...(effectiveMapType === 'google'
             ? {
                 googleQuery:
                   resolvedAddress ||
@@ -408,9 +412,10 @@ export default function Regions() {
   const handleEditMainMap = (initialTab = null) => {
     skipSuggestRef.current = true;
     const ms = mainMapSettings || {};
+    const mainImg = ms.mapUrl || ms.imageUrl || '';
     const effectiveTab =
       initialTab ||
-      (ms.mapType === 'google' ? 'google' : ms.imageUrl ? 'image' : 'google');
+      (ms.mapType === 'google' ? 'google' : mainImg ? 'image' : 'google');
     setName('MAPA GŁÓWNA');
     setDescription(
       ms.description || 'Główna mapa zakładu / obiektów (nadrzędna dla wszystkich rejonów)'
@@ -422,7 +427,7 @@ export default function Regions() {
         id: 'default',
         name: 'Mapa Główna',
         mapType: effectiveTab === 'google' ? 'google' : 'image',
-        mapImageUrl: ms.imageUrl || '',
+        mapImageUrl: mainImg,
         file: null,
       },
     ]);
@@ -440,7 +445,7 @@ export default function Regions() {
     setGoogleMapStyle(ms.googleMapStyle || 'k');
     setAddressSuggestions([]);
     setEditingId('main_map');
-    setMapImageUrl(ms.imageUrl || '');
+    setMapImageUrl(mainImg);
     setMapFile(null);
     setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1004,9 +1009,11 @@ export default function Regions() {
                     (m.regionId === 'main_map' || !m.regionId) && !m.isDeleted && !m.parentId
                 );
                 const topRegions = regions.filter(c => !c.parentId && !c.isDeleted);
-                const mainReady = Boolean(
-                  mainMapSettings?.mapType === 'google' || mainMapSettings?.imageUrl
-                );
+                const mainMapImageUrl = mainMapSettings?.mapUrl || mainMapSettings?.imageUrl || '';
+                const isMainGoogle =
+                  mainMapSettings?.mapType === 'google' ||
+                  Boolean(!mainMapImageUrl && (mainMapSettings?.googleFrameSaved || mainMapSettings?.googleQuery));
+                const mainReady = Boolean(isMainGoogle || mainMapImageUrl);
                 return (
                   <div className="bg-blue-50/40 p-3 rounded-xl shadow-sm border-2 border-blue-200 flex flex-col">
                     <div className="flex justify-between items-start mb-2">
@@ -1025,23 +1032,32 @@ export default function Regions() {
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        {mainReady && mainMapSettings?.mapType === 'google' ? (
+                        {mainReady && isMainGoogle ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                             <i className="ph ph-globe-hemisphere-west"></i> Google Maps
                           </span>
-                        ) : mainReady && mainMapSettings?.imageUrl ? (
-                          <a
-                            href={mainMapSettings.imageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200"
-                          >
-                            <img
-                              src={mainMapSettings.imageUrl}
-                              alt="Mapa Główna"
-                              className="w-full h-full object-cover"
-                            />
-                          </a>
+                        ) : mainReady && mainMapImageUrl ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              onClick={() => handleEditMainMap('image')}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold cursor-pointer transition-colors"
+                              title="Ustawiono własną mapę graficzną (inną niż Google Maps)"
+                            >
+                              <i className="ph ph-image"></i> Mapa graficzna (JPG/PNG)
+                            </span>
+                            <a
+                              href={mainMapImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200"
+                            >
+                              <img
+                                src={mainMapImageUrl}
+                                alt="Mapa Główna"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                          </div>
                         ) : (
                           <button
                             type="button"
@@ -1218,9 +1234,11 @@ export default function Regions() {
                       (m.regionId === 'main_map' || !m.regionId) && !m.isDeleted && !m.parentId
                   );
                   const topRegions = regions.filter(c => !c.parentId && !c.isDeleted);
-                  const mainReady = Boolean(
-                    mainMapSettings?.mapType === 'google' || mainMapSettings?.imageUrl
-                  );
+                  const mainMapImageUrl = mainMapSettings?.mapUrl || mainMapSettings?.imageUrl || '';
+                  const isMainGoogle =
+                    mainMapSettings?.mapType === 'google' ||
+                    Boolean(!mainMapImageUrl && (mainMapSettings?.googleFrameSaved || mainMapSettings?.googleQuery));
+                  const mainReady = Boolean(isMainGoogle || mainMapImageUrl);
                   return (
                     <tr className="bg-blue-50/40 hover:bg-blue-50/70 border-b-2 border-blue-100">
                       <td className="px-6 py-4">
@@ -1264,7 +1282,7 @@ export default function Regions() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          {mainReady && mainMapSettings?.mapType === 'google' ? (
+                          {mainReady && isMainGoogle ? (
                             <span
                               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold"
                               title={mainMapSettings.googleQuery}
@@ -1272,23 +1290,32 @@ export default function Regions() {
                               <i className="ph ph-globe-hemisphere-west text-sm"></i> Google (
                               {mainMapSettings.googleQuery || 'Mapa Główna'})
                             </span>
-                          ) : mainReady && mainMapSettings?.imageUrl ? (
-                            <a
-                              href={mainMapSettings.imageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="shrink-0 w-16 h-10 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors shadow-sm relative group block"
-                              title="Kliknij by powiększyć Mapę Główną"
-                            >
-                              <img
-                                src={mainMapSettings.imageUrl}
-                                alt="Mapa Główna"
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <i className="ph ph-magnifying-glass-plus text-white"></i>
-                              </div>
-                            </a>
+                          ) : mainReady && mainMapImageUrl ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span
+                                onClick={() => handleEditMainMap('image')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold cursor-pointer transition-colors"
+                                title="Ustawiono własną mapę graficzną (inną niż Google Maps) — kliknij, aby edytować"
+                              >
+                                <i className="ph ph-image text-sm"></i> Mapa graficzna (JPG/PNG)
+                              </span>
+                              <a
+                                href={mainMapImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 w-16 h-10 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors shadow-sm relative group block"
+                                title="Kliknij by powiększyć Mapę Główną"
+                              >
+                                <img
+                                  src={mainMapImageUrl}
+                                  alt="Mapa Główna"
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <i className="ph ph-magnifying-glass-plus text-white"></i>
+                                </div>
+                              </a>
+                            </div>
                           ) : (
                             <button
                               type="button"
@@ -1432,6 +1459,13 @@ export default function Regions() {
                             const imgUrl = configuredSubs[0]?.mapImageUrl || r.mapImageUrl;
                             return (
                               <div className="flex flex-col items-center gap-1">
+                                <span
+                                  onClick={() => handleEdit(r, 'image')}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold cursor-pointer transition-colors"
+                                  title="Ustawiono własną mapę graficzną (inną niż Google Maps) — kliknij, aby edytować"
+                                >
+                                  <i className="ph ph-image text-sm"></i> Mapa graficzna (JPG/PNG)
+                                </span>
                                 <a
                                   href={imgUrl}
                                   target="_blank"

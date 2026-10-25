@@ -64,8 +64,8 @@ export default function ShipyardMap({
       if (docSnap.exists()) {
         const data = docSnap.data();
         setMapConfig({
-          url: data.mapUrl || '',
-          mapType: data.mapType || (data.googleQuery && !data.mapUrl ? 'google' : 'image'),
+          url: data.mapUrl || data.imageUrl || '',
+          mapType: data.mapType || (data.googleQuery && !(data.mapUrl || data.imageUrl) ? 'google' : 'image'),
           googleFrameSaved: Boolean(
             data.mapType === 'google' ||
               data.googleLat != null ||
@@ -614,7 +614,7 @@ export default function ShipyardMap({
               });
             }
           } else {
-            await updateMapSettings({ mapUrl: url, mapType: 'image' });
+            await updateMapSettings({ mapUrl: url, imageUrl: url, mapType: 'image' });
           }
           setIsFramingGoogleMap(false);
         } catch (err) {
