@@ -8,6 +8,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import {
   filterMachinesForFieldTechnician,
   filterTasksForFieldTechnician,
+  findMachineByIdentifierOrPlate,
 } from '../../utils/fieldServiceHelpers';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import {
@@ -129,11 +130,10 @@ export default function Machines({
     if (!initialOpenProcessed && visibleMachines.length > 0) {
       const openMachineId = searchParams.get('openMachine');
       if (openMachineId) {
-        const targetMachine = visibleMachines.find(
-          m =>
-            m.id === openMachineId ||
-            (m.qrCode && m.qrCode === openMachineId) ||
-            (m.internalId && m.internalId.toLowerCase() === openMachineId.toLowerCase())
+        const targetMachine = findMachineByIdentifierOrPlate(
+          visibleMachines,
+          openMachineId,
+          openMachineId
         );
 
         if (targetMachine) {
@@ -422,16 +422,16 @@ export default function Machines({
       return;
     }
 
-    const found = visibleMachines.find(
-      m =>
-        m.id === machineId ||
-        (m.qrCode && (m.qrCode === machineId || m.qrCode === originalRaw)) ||
-        (m.internalId && m.internalId.toLowerCase() === machineId.toLowerCase())
-    );
+    const found = findMachineByIdentifierOrPlate(visibleMachines, machineId, originalRaw);
 
     if (found) {
       handleViewMachine(found, true);
-      showToast(t('machines.toasts.machineLoaded') + found.name, 'success');
+      showToast(
+        t('machines.toasts.machineLoaded') +
+          found.name +
+          (found.licensePlate ? ` (${found.licensePlate})` : ''),
+        'success'
+      );
     } else {
       showToast(t('machines.toasts.machineNotFound') + machineId, 'error');
     }

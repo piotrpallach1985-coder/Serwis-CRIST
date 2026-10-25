@@ -1327,3 +1327,163 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
     endGpsVerification,
   };
 }
+
+/**
+ * Normalizuje numer tablicy rejestracyjnej lub VIN (usuwa spacje, myślniki, kropki i zamienia na wielkie litery).
+ * Np. "gd 12-345" -> "GD12345"
+ */
+export function normalizeLicensePlate(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .toUpperCase()
+    .trim()
+    .replace(/^PL\s+(?=[A-Z]{1,3}[\s-]*[A-Z0-9])/i, '')
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Zamienia znaki często mylone przez OCR (O<->0, I<->1, S<->5, B<->8, Z<->2) do porównania rozmytego z bazą pojazdów.
+ */
+function normalizeOcrPlateFuzzy(raw) {
+  return normalizeLicensePlate(raw)
+    .replace(/O/g, '0')
+    .replace(/I/g, '1')
+    .replace(/S/g, '5')
+    .replace(/B/g, '8')
+    .replace(/Z/g, '2');
+}
+
+/**
+ * Wyszukuje urządzenie lub pojazd po ID, kodzie QR, numerze wewnętrznym, tablicy rejestracyjnej (np. "GD 12345" / "gd12345") lub numerze VIN.
+ */
+export function findMachineByIdentifierOrPlate(machines = [], rawQuery = '', rawOriginal = '') {
+  if (!Array.isArray(machines) || machines.length === 0) return null;
+  const queryStr = String(rawQuery || '').trim();
+  const origStr = String(rawOriginal || queryStr).trim();
+  if (!queryStr) return null;
+
+  const queryLower = queryStr.toLowerCase();
+  const normPlateQuery = normalizeLicensePlate(queryStr);
+
+  // 1. Dokładne dopasowanie po ID, kodzie QR, numerze wewnętrznym, tablicy rejestracyjnej lub VIN
+  const exactMatch = machines.find(m => {
+    if (!m || m.isDeleted) return false;
+    if (m.id === queryStr) return true;
+    if (m.qrCode && (m.qrCode === queryStr || m.qrCode === origStr)) return true;
+    if (m.internalId && m.internalId.toLowerCase() === queryLower) return true;
+    if (m.licensePlate && normPlateQuery.length >= 3) {
+      if (normalizeLicensePlate(m.licensePlate) === normPlateQuery) return true;
+    }
+    if (m.vinNumber && normPlateQuery.length >= 6) {
+      if (normalizeLicensePlate(m.vinNumber) === normPlateQuery) return true;
+    }
+    return false;
+  });
+
+  if (exactMatch) return exactMatch;
+
+  // 2. Dopasowanie rozmyte OCR dla tablic rejestracyjnych (np. GD1234S -> GD 12345)
+  if (normPlateQuery.length >= 4) {
+    const fuzzyQuery = normalizeOcrPlateFuzzy(normPlateQuery);
+    const fuzzyMatch = machines.find(m => {
+      if (!m || m.isDeleted || !m.licensePlate) return false;
+      return normalizeOcrPlateFuzzy(m.licensePlate) === fuzzyQuery;
+    });
+    if (fuzzyMatch) return fuzzyMatch;
+  }
+
+  return null;
+}
+
+/**
+ * Wyodrębnia numer tablicy rejestracyjnej z surowego tekstu OCR kamery i dopasowuje do bazy pojazdów.
+ */
+export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
+  if (!rawText) return { plate: '', matchedMachine: null };
+  const cleanedLines = String(rawText)
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const fullNormalized = normalizeLicensePlate(rawText);
+  const fullFuzzy = normalizeOcrPlateFuzzy(rawText);
+
+  // 1. Sprawdź czy w tekście z kamery znajduje się tablica któregokolwiek pojazdu z bazy firmy
+  if (Array.isArray(machines) && machines.length > 0 && fullNormalized.length >= 4) {
+    for (const m of machines) {
+      if (!m || m.isDeleted || !m.licensePlate) continue;
+      const mNorm = normalizeLicensePlate(m.licensePlate);
+      if (mNorm.length >= 4 && fullNormalized.includes(mNorm)) {
+        return { plate: m.licensePlate, matchedMachine: m };
+      }
+    }
+    for (const m of machines) {
+      if (!m || m.isDeleted || !m.licensePlate) continue;
+      const mFuzzy = normalizeOcrPlateFuzzy(m.licensePlate);
+      if (mFuzzy.length >= 4 && fullFuzzy.includes(mFuzzy)) {
+        return { plate: m.licensePlate, matchedMachine: m };
+      }
+    }
+  }
+
+  // 2. Wyodrębnienie wzorca tablicy rejestracyjnej PL / UE (np. GD 12345, WE 9876A, GDA 45678, KR 12345)
+  const joinedText = cleanedLines.join(' ');
+  const plateRegex = /\b([A-Z]{1,3})[\s-]?([A-Z0-9]{3,6})\b/g;
+  let match;
+  while ((match = plateRegex.exec(joinedText)) !== null) {
+    const prefix = match[1];
+    const suffix = match[2];
+    // Tablica musi zawierać przynajmniej jedną cyfrę w drugim członie (odrzuca zwykłe słowa)
+    if (/\d/.test(suffix) && (prefix.length + suffix.length) >= 4 && (prefix.length + suffix.length) <= 9) {
+      const candidatePlate = `${prefix} ${suffix}`;
+      const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+      return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
+    }
+  }
+
+  return { plate: '', matchedMachine: null };
+}
+
+/**
+ * Przechwytuje klatkę z elementu <video> skanera i odczytuje tablicę rejestracyjną (ANPR / OCR).
+ */
+export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = [], customDetector = null) {
+  if (!videoEl && !customDetector) {
+    return { plate: '', matchedMachine: null, error: 'Brak aktywnego obrazu z kamery.' };
+  }
+
+  try {
+    if (typeof customDetector === 'function') {
+      const rawText = await customDetector(videoEl);
+      return extractLicensePlateFromOcrText(rawText, machines);
+    }
+
+    if (customDetector && typeof customDetector.detect === 'function') {
+      const blocks = await customDetector.detect(videoEl);
+      const rawText = (blocks || []).map(b => b.rawValue || b.text || '').join(' ');
+      return extractLicensePlateFromOcrText(rawText, machines);
+    }
+
+    if (typeof window !== 'undefined' && 'TextDetector' in window && videoEl) {
+      const detector = new window.TextDetector();
+      const blocks = await detector.detect(videoEl);
+      const rawText = (blocks || []).map(b => b.rawValue || '').join(' ');
+      const res = extractLicensePlateFromOcrText(rawText, machines);
+      if (res.plate) return res;
+    }
+
+    return {
+      plate: '',
+      matchedMachine: null,
+      error:
+        'Przeglądarka nie wykryła automatycznie napisu na tablicy — wpisz lub wybierz numer rejestracyjny poniżej.',
+    };
+  } catch (err) {
+    return {
+      plate: '',
+      matchedMachine: null,
+      error: err?.message || 'Nie udało się odczytać tablicy z kadru kamery.',
+    };
+  }
+}

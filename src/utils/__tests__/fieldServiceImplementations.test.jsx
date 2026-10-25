@@ -22,11 +22,17 @@ import {
   isVehicleAsset,
   getMachineCounterUnit,
   checkVehicleDatesStatus,
+  normalizeLicensePlate,
+  findMachineByIdentifierOrPlate,
+  extractLicensePlateFromOcrText,
+  recognizeLicensePlateFromVideoFrame,
 } from '../fieldServiceHelpers';
 import { checkServiceUrgency } from '../logicHelpers';
 import fs from 'fs';
 import path from 'path';
 import SignaturePad from '../../components/shared/SignaturePad';
+import QRScannerModal from '../../components/shared/QRScannerModal';
+import OperatorScanner from '../../components/operator/OperatorScanner';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
 import MachineForm from '../../components/manager/MachineForm';
 import MachineDTR from '../../components/manager/MachineDTR';
@@ -1533,6 +1539,98 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('GD 12345');
 
       unmountCards();
+    });
+
+    it('odnajduje pojazd po numerze tablicy rejestracyjnej (dokładnie, bez spacji/myślników, po VIN oraz z korektą OCR ANPR) w QRScannerModal i OperatorScanner', async () => {
+      const fleetMachines = [
+        {
+          id: 'veh-master',
+          name: 'Renault Master Bus Serwisowy #1',
+          assetCategory: 'vehicle',
+          licensePlate: 'GD 12345',
+          vinNumber: 'VF1MA000087654321',
+          qrCode: 'QR-MASTER-01',
+        },
+        {
+          id: 'veh-transit',
+          name: 'Ford Transit Pogotowie Techniczne',
+          assetCategory: 'vehicle',
+          licensePlate: 'WE 9876A',
+          vinNumber: 'WF0XXXTTGX1234567',
+          qrCode: 'QR-TRANSIT-02',
+        },
+      ];
+
+      // 1) Normalizacja tablic rejestracyjnych
+      expect(normalizeLicensePlate('gd 12-345')).toBe('GD12345');
+      expect(normalizeLicensePlate('PL GD 12345')).toBe('GD12345');
+
+      // 2) Dopasowanie po tablicy (z odstępem, bez odstępu, z małych liter), VIN, QR oraz z korektą OCR (S <-> 5, O <-> 0)
+      expect(findMachineByIdentifierOrPlate(fleetMachines, 'GD 12345')?.id).toBe('veh-master');
+      expect(findMachineByIdentifierOrPlate(fleetMachines, 'gd12345')?.id).toBe('veh-master');
+      expect(findMachineByIdentifierOrPlate(fleetMachines, 'GD-1234S')?.id).toBe('veh-master'); // S zamiast 5 z OCR!
+      expect(findMachineByIdentifierOrPlate(fleetMachines, 'VF1MA000087654321')?.id).toBe(
+        'veh-master'
+      );
+      expect(findMachineByIdentifierOrPlate(fleetMachines, 'QR-TRANSIT-02')?.id).toBe(
+        'veh-transit'
+      );
+
+      // 3) Ekstrakcja tablicy z tekstu OCR (z tablicą z bazy oraz ogólny wzorzec tablicy)
+      const ocrKnown = extractLicensePlateFromOcrText('RENAULT MASTER PL GD 12345', fleetMachines);
+      expect(ocrKnown.matchedMachine?.id).toBe('veh-master');
+      expect(ocrKnown.plate).toBe('GD 12345');
+
+      const ocrGeneric = extractLicensePlateFromOcrText('AUTO SERWIS KR 4567C', fleetMachines);
+      expect(ocrGeneric.plate).toBe('KR 4567C');
+      expect(ocrGeneric.matchedMachine).toBeNull();
+
+      // 4) Rozpoznanie z ramki wideo przy użyciu detektora ANPR
+      const fakeVideoEl = { videoWidth: 1280, videoHeight: 720 };
+      const fakeDetector = {
+        detect: vi.fn().mockResolvedValue([{ rawValue: 'PL WE 9876A' }]),
+      };
+      const frameResult = await recognizeLicensePlateFromVideoFrame(
+        fakeVideoEl,
+        fleetMachines,
+        fakeDetector
+      );
+      expect(frameResult.matchedMachine?.id).toBe('veh-transit');
+      expect(frameResult.plate).toBe('WE 9876A');
+
+      // 5) Interakcja w QRScannerModal (wyszukanie po tablicy + kliknięcie sugestii)
+      useManagerStore.getState().setMachines(fleetMachines);
+      const onModalScan = vi.fn();
+      const onModalClose = vi.fn();
+
+      const { unmount: unmountQrModal } = render(
+        <QRScannerModal
+          isOpen={true}
+          onClose={onModalClose}
+          onScanSuccess={onModalScan}
+          title="Skanuj QR lub tablicę"
+        />
+      );
+
+      expect(screen.getByTestId('scanner-license-plate-section')).toBeTruthy();
+      const plateInput = screen.getByTestId('scanner-plate-input');
+      fireEvent.change(plateInput, { target: { value: 'gd12345' } });
+      fireEvent.click(screen.getByTestId('scanner-plate-submit-btn'));
+
+      expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
+      unmountQrModal();
+
+      // 6) Interakcja w OperatorScanner (zgłaszanie usterki po tablicy rejestracyjnej)
+      const onOperatorScan = vi.fn();
+      const { unmount: unmountOpScanner } = render(
+        <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} />
+      );
+
+      expect(screen.getByTestId('operator-license-plate-section')).toBeTruthy();
+      fireEvent.click(screen.getByTestId('operator-plate-suggestion-veh-transit'));
+      expect(onOperatorScan).toHaveBeenCalledWith('veh-transit', 'WE 9876A');
+
+      unmountOpScanner();
     });
   });
 });

@@ -330,8 +330,8 @@
       "print_alert": "Wybierz przynajmniej jedno urządzenie do druku."
     },
     "scanner": {
-      "qrTitle": "Skanuj kod QR (Baza Urządzeń)",
-      "qrSubtitle": "Skieruj aparat na kod QR urządzenia, aby otworzyć jego detale.",
+      "qrTitle": "Skanuj kod QR lub tablicę rejestracyjną (Baza Urządzeń)",
+      "qrSubtitle": "Skieruj aparat na kod QR lub tablicę rejestracyjną pojazdu (ANPR), albo wpisz numer rejestracyjny / VIN poniżej.",
       "nfcTitle": "Odczyt NFC (Baza Urządzeń)"
     },
     "buttons": {
@@ -367,7 +367,7 @@
     "filters": {
       "title": "Baza Urządzeń",
       "subtitle": "Zarządzaj bazą urządzeń i przeglądaj historię serwisów",
-      "searchPlaceholder": "Szukaj (nazwa, nr wew.)...",
+      "searchPlaceholder": "Szukaj (nazwa, nr rej., VIN, nr wew.)...",
       "allRegions": "Wszystkie miejsca montażu",
       "noRegion": "Bez miejsca montażu"
     },

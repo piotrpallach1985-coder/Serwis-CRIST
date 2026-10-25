@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { exportToExcel } from '../utils/reports/excelExport';
+import { normalizeLicensePlate } from '../utils/fieldServiceHelpers';
 
 /**
- * useMachines — hook do zarządzania rejestrem maszyn, filtrowaniem po nazwie i rejonie oraz eksportem.
- * 
+ * useMachines — hook do zarządzania rejestrem maszyn/pojazdów, filtrowaniem po nazwie, nr rej., VIN, kierowcy i rejonie oraz eksportem.
+ *
  * @param {Array<Object>} [machines=[]] Lista maszyn z bazy danych
  * @param {Array<Object>} [regions=[]] Lista rejonów / miejsc montażu
  * @returns {Object} Stan i metody filtrowania maszyn
@@ -13,7 +14,7 @@ export function useMachines(machines = [], regions = []) {
   const [filterRegion, setFilterRegion] = useState('');
   const [expandedNodes, setExpandedNodes] = useState(new Set());
 
-  const toggleNode = (id) => {
+  const toggleNode = id => {
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) newSet.delete(id);
@@ -24,7 +25,7 @@ export function useMachines(machines = [], regions = []) {
 
   const filteredMachines = useMemo(() => {
     const activeMachines = machines.filter(m => !m.isDeleted);
-    
+
     const sortFn = (a, b) => {
       const aVerify = (a.name || '').includes('(DO WERYFIKACJI)');
       const bVerify = (b.name || '').includes('(DO WERYFIKACJI)');
@@ -36,7 +37,8 @@ export function useMachines(machines = [], regions = []) {
     const byId = new Set(activeMachines.map(m => m.id));
     const childrenByParent = new Map();
     activeMachines.forEach(m => {
-      const pKey = (m.parentId && byId.has(m.parentId) && m.parentId !== m.id) ? m.parentId : '__root__';
+      const pKey =
+        m.parentId && byId.has(m.parentId) && m.parentId !== m.id ? m.parentId : '__root__';
       if (!childrenByParent.has(pKey)) childrenByParent.set(pKey, []);
       childrenByParent.get(pKey).push(m);
     });
@@ -53,25 +55,21 @@ export function useMachines(machines = [], regions = []) {
         result.push({
           ...m,
           depth,
-          children: buildTree(m.id, depth + 1)
+          children: buildTree(m.id, depth + 1),
         });
       }
       return result;
     };
 
-    const flattenTree = (nodes) => {
+    const flattenTree = nodes => {
       let flat = [];
       nodes.forEach(n => {
         const hasChildren = n.children && n.children.length > 0;
-        
-        // If there's an active search, we temporarily force expand everything
-        // so users can see the matched nested items. Otherwise, rely on expandedNodes.
         const isSearching = searchQuery.trim() !== '' || filterRegion !== '';
         const isExpanded = isSearching || expandedNodes.has(n.id);
-        
-        // We pass isCollapsed for the UI (so it knows which icon to show)
+
         flat.push({ ...n, hasChildren, isCollapsed: !isExpanded });
-        
+
         if (hasChildren && isExpanded) {
           flat = flat.concat(flattenTree(n.children));
         }
@@ -79,51 +77,76 @@ export function useMachines(machines = [], regions = []) {
       return flat;
     };
 
-    let flatMachines = flattenTree(buildTree(null, 0));
+    const flatMachines = flattenTree(buildTree(null, 0));
 
     return flatMachines.filter(m => {
-        const queryLower = searchQuery.toLowerCase().trim();
-        const isNoRegionQuery = queryLower === 'bez rejonu';
-        
-        let matchName = true;
-        if (isNoRegionQuery) {
-          matchName = !m.regionId || m.regionId === '';
-        } else if (queryLower) {
-          matchName = (m.name && m.name.toLowerCase().includes(queryLower)) || 
-                      (m.internalId && m.internalId.toLowerCase().includes(queryLower));
-        }
+      const queryLower = searchQuery.toLowerCase().trim();
+      const normPlateQuery = normalizeLicensePlate(searchQuery);
+      const isNoRegionQuery = queryLower === 'bez rejonu';
 
-        let matchRegion = true;
-        if (filterRegion === 'bez_rejonu') {
-          matchRegion = !m.regionId || m.regionId === '';
-        } else if (filterRegion) {
-          matchRegion = m.regionId === filterRegion;
-        }
+      let matchName = true;
+      if (isNoRegionQuery) {
+        matchName = !m.regionId || m.regionId === '';
+      } else if (queryLower) {
+        const matchByPlate =
+          m.licensePlate &&
+          (m.licensePlate.toLowerCase().includes(queryLower) ||
+            (normPlateQuery.length >= 2 &&
+              normalizeLicensePlate(m.licensePlate).includes(normPlateQuery)));
+        const matchByVin =
+          m.vinNumber &&
+          (m.vinNumber.toLowerCase().includes(queryLower) ||
+            (normPlateQuery.length >= 3 &&
+              normalizeLicensePlate(m.vinNumber).includes(normPlateQuery)));
+        const matchByDriver =
+          m.assignedDriver && m.assignedDriver.toLowerCase().includes(queryLower);
 
-        return matchName && matchRegion;
-      });
+        matchName =
+          Boolean(m.name && m.name.toLowerCase().includes(queryLower)) ||
+          Boolean(m.internalId && m.internalId.toLowerCase().includes(queryLower)) ||
+          Boolean(matchByPlate) ||
+          Boolean(matchByVin) ||
+          Boolean(matchByDriver);
+      }
+
+      let matchRegion = true;
+      if (filterRegion === 'bez_rejonu') {
+        matchRegion = !m.regionId || m.regionId === '';
+      } else if (filterRegion) {
+        matchRegion = m.regionId === filterRegion;
+      }
+
+      return matchName && matchRegion;
+    });
   }, [machines, searchQuery, filterRegion, expandedNodes]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredMachines.map(m => ({
-      'ID': m.id,
-      'Nazwa Maszyny': m.name || '-',
-      'Rejon':
+      ID: m.id,
+      'Nazwa Urządzenia / Pojazdu': m.name || '-',
+      'Nr Rejestracyjny': m.licensePlate || '-',
+      'Numer VIN': m.vinNumber || '-',
+      Rejon:
         m.regionId === 'main_map'
           ? 'Mapa Główna'
           : regions.find(r => r.id === m.regionId)?.name || 'Bez rejonu',
-      'Nr Seryjny / Wewnetrzny': m.internalId || '-',
-      'Obecne RBG': m.currentWorkHours || 0,
-      'Zapasowy Opis': m.additionalDescription || '-'
+      'Nr Seryjny / Wewnętrzny': m.internalId || '-',
+      'Stan Licznika': `${m.currentWorkHours || 0} ${m.counterUnit === 'km' ? 'km' : 'RBG'}`,
+      'Badanie SKP': m.techInspectionDate || '-',
+      'Polisa OC/AC': m.insuranceExpiryDate || '-',
+      'Kierowca / Opiekun': m.assignedDriver || '-',
+      'Dodatkowy Opis': m.additionalDescription || '-',
     }));
-    exportToExcel(dataToExport, 'Rejestr_Maszyn');
+    exportToExcel(dataToExport, 'Rejestr_Urzadzen_i_Floty');
   };
 
   return {
-    searchQuery, setSearchQuery,
-    filterRegion, setFilterRegion,
+    searchQuery,
+    setSearchQuery,
+    filterRegion,
+    setFilterRegion,
     filteredMachines,
     handleExportExcel,
-    toggleNode
+    toggleNode,
   };
 }

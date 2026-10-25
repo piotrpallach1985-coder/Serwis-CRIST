@@ -21,6 +21,7 @@ import {
   saveOperatorQrKey,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../services/qrAccess.service';
+import { findMachineByIdentifierOrPlate } from '../utils/fieldServiceHelpers';
 import OperatorForm from './OperatorForm';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -103,12 +104,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setBindNonce(n => n + 1);
     }
 
-    let targetMachine = machines.find(
-      m =>
-        m.id === mId ||
-        (m.qrCode && (m.qrCode === mId || m.qrCode === decodedText)) ||
-        (m.internalId && m.internalId.toLowerCase() === String(mId).toLowerCase())
-    );
+    let targetMachine = findMachineByIdentifierOrPlate(machines, mId, decodedText);
 
     if (!targetMachine && mId && tenantId) {
       // Sprawdź w bazie czy zeskanowany identyfikator nie jest częścią zamienną (starsze naklejki QR z samym ID części)
@@ -217,15 +213,11 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
               setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
               if (urlMachineId && !urlMachineResolvedRef.current) {
-                const target = snapshot.docs
-                  .map(d => ({ id: d.id, ...d.data() }))
-                  .find(
-                    m =>
-                      m.id === urlMachineId ||
-                      (m.qrCode && m.qrCode === urlMachineId) ||
-                      (m.internalId &&
-                        m.internalId.toLowerCase() === urlMachineId.toLowerCase())
-                  );
+                const target = findMachineByIdentifierOrPlate(
+                  snapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+                  urlMachineId,
+                  urlMachineId
+                );
                 if (target) {
                   setSelectedMachine(target);
                   urlMachineResolvedRef.current = true;
@@ -386,7 +378,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           </div>
         )}
 
-        {step === 'scan' && <OperatorScanner onScanSuccess={handleScanSuccess} />}
+        {step === 'scan' && <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} />}
 
         {step === 'form' && !selectedMachine && needsQr && (
           <div className="bg-white p-8 rounded-lg shadow-sm border border-amber-200 text-center flex flex-col items-center justify-center">

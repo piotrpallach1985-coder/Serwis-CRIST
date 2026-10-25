@@ -330,8 +330,8 @@
       "print_alert": "Select at least one machine to print."
     },
     "scanner": {
-      "qrTitle": "Scan QR code (Equipment Base)",
-      "qrSubtitle": "Point the camera at the machine's QR code to open its details.",
+      "qrTitle": "Scan QR code or license plate (Equipment Base)",
+      "qrSubtitle": "Point the camera at the QR code or vehicle license plate (ANPR), or enter the license plate / VIN below.",
       "nfcTitle": "NFC Read (Equipment Base)"
     },
     "buttons": {
@@ -367,7 +367,7 @@
     "filters": {
       "title": "Machines Base",
       "subtitle": "Manage the machine park and view service history",
-      "searchPlaceholder": "Search (name, int. no.)...",
+      "searchPlaceholder": "Search (name, plate no., VIN, int. no.)...",
       "allRegions": "All Regions",
       "noRegion": "No region"
     },

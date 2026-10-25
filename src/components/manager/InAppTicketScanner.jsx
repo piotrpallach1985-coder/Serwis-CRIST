@@ -14,6 +14,7 @@ import {
   parseQrPayload,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../../services/qrAccess.service';
+import { findMachineByIdentifierOrPlate } from '../../utils/fieldServiceHelpers';
 
 export default function InAppTicketScanner() {
   const { t } = useTranslation();
@@ -73,12 +74,10 @@ export default function InAppTicketScanner() {
       return;
     }
 
-    let targetMachine = machines.find(
-      m =>
-        m.id === machineId ||
-        (m.qrCode &&
-          (m.qrCode === machineId || m.qrCode === decodedText || m.qrCode === rawQr)) ||
-        (m.internalId && m.internalId.toLowerCase() === String(machineId).toLowerCase())
+    let targetMachine = findMachineByIdentifierOrPlate(
+      machines,
+      machineId,
+      rawQr || decodedText
     );
 
     if (!targetMachine && machineId) {
@@ -134,7 +133,7 @@ export default function InAppTicketScanner() {
       </div>
       {step === 'scan' && (
         <div className="w-full flex-1 flex flex-col">
-          <OperatorScanner onScanSuccess={handleScanSuccess} />
+          <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} />
         </div>
       )}
 
