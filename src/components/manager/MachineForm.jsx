@@ -317,6 +317,7 @@ export default function MachineForm({
                   required
                 >
                   <option value="">{t('machines.form.selectRegion', '-- Wybierz miejsce montażu --')}</option>
+                  <option value="main_map">{t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
                   {regions.map(r => (
                     <option key={r.id} value={r.id}>
                       {r.name}

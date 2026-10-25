@@ -118,7 +118,9 @@ export default function MapEditModal({
     } else {
       const mainMachines = machines.filter(m => (!m.parentId || m.parentId === '') && !m.isDeleted);
       if (currentSubmapId !== null) {
-        const inRegion = mainMachines.filter(m => !m.regionId || m.regionId === currentSubmapId);
+        const inRegion = mainMachines.filter(
+          m => (!m.regionId || m.regionId === currentSubmapId) && m.regionId !== 'main_map'
+        );
         return {
           unpinned: inRegion.filter(m => !hasCoords(m)),
           pinned: inRegion.filter(

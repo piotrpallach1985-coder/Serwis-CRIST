@@ -52,6 +52,7 @@ export default function MachineFilters({
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 appearance-none cursor-pointer transition-all"
           >
             <option value="">{t('machines.filters.allRegions')}</option>
+            <option value="main_map">{t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
             <option value="bez_rejonu">{t('machines.filters.noRegion')}</option>
             {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>

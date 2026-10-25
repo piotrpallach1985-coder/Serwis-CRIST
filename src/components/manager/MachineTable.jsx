@@ -52,7 +52,7 @@ export default function MachineTable({
       accessor: 'regionId',
       render: (m) => (
         <span className="text-gray-600">
-          {regions.find(r => r.id === m.regionId)?.name || '-'}
+          {m.regionId === 'main_map' ? t('machines.form.mainMapRegion', 'Mapa Główna') : regions.find(r => r.id === m.regionId)?.name || '-'}
           {m.bay && ` / ${m.bay}`}
         </span>
       )

@@ -1105,7 +1105,7 @@
       "edit": "Edytuj",
       "delete": "Usuń",
       "description": "Opis",
-      "submap": "Podmapa",
+      "submap": "MAPA",
       "actions": "Akcje",
       "empty_list": "Brak zdefiniowanych miejsc montażu.",
       "without_name": "Bez nazwy",
@@ -1269,7 +1269,7 @@
     "save_pin": "Zapisz pinezkę na mapie",
     "browse": "Przeglądaj",
     "open_region_map": "Otwórz podmapę",
-    "setup_region_map": "Ustaw podmapę",
+    "setup_region_map": "Ustaw mapę rejonu",
     "or_set_google_map": "(lub ustaw Mapę Google w Opcjach Mapy)",
     "framing_hint": "Przesuń mapę myszką i przybliż płynnie rolką w wybrane miejsce",
     "save_google_view": "Wgraj ustawiony widok mapy",
@@ -1303,7 +1303,7 @@
     "select_scan_method": "Wybierz metodę skanowania",
     "camera_qr": "Kamera (QR)",
     "contactless_nfc": "Zbliżeniowo (NFC)",
-    "footer_subtitle": "VexoNT • System Obsługi Awarii & Serwisu",
+    "footer_subtitle": "© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu",
     "exit": "Wyjdź",
     "control_room": "Dyspozytornia"
   }

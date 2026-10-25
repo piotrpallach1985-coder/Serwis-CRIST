@@ -41,7 +41,9 @@ export default function MachineDetails({
   const { canManageDtr, canDeleteTechNotes } = usePermissions(user);
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
   const regionName =
-    regions.find(r => r.id === machine.regionId)?.name || t('machines.details.unknownRegion');
+    machine.regionId === 'main_map'
+      ? t('machines.form.mainMapRegion', 'Mapa Główna')
+      : regions.find(r => r.id === machine.regionId)?.name || t('machines.details.unknownRegion');
   const currentTenantId = getCurrentTenant();
   const [partTransactions, setPartTransactions] = useState([]);
 

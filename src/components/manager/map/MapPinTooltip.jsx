@@ -177,7 +177,7 @@ export default function MapPinTooltip({
               className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 md:py-2 rounded-lg text-[9px] md:text-xs transition-colors shadow flex items-center justify-center gap-2"
             >
               <i className="ph ph-map-trifold text-sm md:text-base"></i>{' '}
-              {t('map_component.setup_region_map', 'Ustaw podmapę')}
+              {t('map_component.setup_region_map', 'Ustaw mapę rejonu')}
             </button>
           )
         )}

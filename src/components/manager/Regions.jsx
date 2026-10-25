@@ -7,6 +7,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { useAuth } from '../../hooks/useAuth';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { addRegion, updateRegion, checkRegionInUse } from '../../services/dictionary.service';
+import { updateMapSettings, subscribeToMapSettings } from '../../services/machines.service';
 import { getRegionSubmaps, isRegionMapConfigured } from '../../hooks/useMapPins';
 import InteractiveGoogleMap, {
   geocodeAddressQuery,
@@ -44,6 +45,16 @@ export default function Regions() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDeleted] = useState(false);
+  const [mainMapSettings, setMainMapSettings] = useState(null);
+
+  useEffect(() => {
+    const unsub = subscribeToMapSettings(snap => {
+      setMainMapSettings(snap.exists() ? snap.data() : {});
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isFormOpen) return;
@@ -300,7 +311,25 @@ export default function Regions() {
           : {}),
       };
 
-      if (editingId) {
+      if (editingId === 'main_map') {
+        const mainMapUpdate = {
+          description: description.trim(),
+          mapType: mapType === 'google' ? 'google' : 'image',
+          ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
+          ...(mapType === 'google'
+            ? {
+                googleQuery:
+                  resolvedAddress ||
+                  `${Number(googleLat).toFixed(5)}, ${Number(googleLng).toFixed(5)}`,
+                googleLat: Number(googleLat) || 54.5364,
+                googleLng: Number(googleLng) || 18.5469,
+                googleZoom: Number(googleZoom) || 16,
+                googleMapStyle: googleMapStyle || 'k',
+              }
+            : {}),
+        };
+        await updateMapSettings(mainMapUpdate);
+      } else if (editingId) {
         const existing = regions.find(r => r.id === editingId);
         if (existing && (existing.parentId || null) !== (parentId || null)) {
           payload.xPercent = null;
@@ -376,6 +405,56 @@ export default function Regions() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleEditMainMap = (initialTab = null) => {
+    skipSuggestRef.current = true;
+    const ms = mainMapSettings || {};
+    const effectiveTab =
+      initialTab ||
+      (ms.mapType === 'google' ? 'google' : ms.imageUrl ? 'image' : 'google');
+    setName('MAPA GŁÓWNA');
+    setDescription(
+      ms.description || 'Główna mapa zakładu / obiektów (nadrzędna dla wszystkich rejonów)'
+    );
+    setParentId('');
+    setMapType(effectiveTab);
+    setSubmapsDraft([
+      {
+        id: 'default',
+        name: 'Mapa Główna',
+        mapType: effectiveTab === 'google' ? 'google' : 'image',
+        mapImageUrl: ms.imageUrl || '',
+        file: null,
+      },
+    ]);
+    setActiveDraftTabId('default');
+    setSubmapNameInput('Mapa Główna');
+    const initLat = Number(ms.googleLat) || 54.5364;
+    const initLng = Number(ms.googleLng) || 18.5469;
+    setGoogleQuery(ms.googleQuery || '');
+    setGoogleLat(initLat);
+    setGoogleLng(initLng);
+    setPinLat(initLat);
+    setPinLng(initLng);
+    setHasPinOnMap(false);
+    setGoogleZoom(Number(ms.googleZoom) || 16);
+    setGoogleMapStyle(ms.googleMapStyle || 'k');
+    setAddressSuggestions([]);
+    setEditingId('main_map');
+    setMapImageUrl(ms.imageUrl || '');
+    setMapFile(null);
+    setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAddSubmapForRegion = parentRegion => {
+    resetForm();
+    setName('');
+    setDescription('');
+    setParentId(parentRegion && parentRegion.id !== 'main_map' ? parentRegion.id : '');
+    setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleDelete = async (id) => {
     try {
       const { inUse, count } = await checkRegionInUse(id);
@@ -430,9 +509,11 @@ export default function Regions() {
                   <h2 className="text-lg md:text-xl font-extrabold text-gray-800 flex items-center gap-2">
                     <i className="ph ph-map-pin-line text-blue-600 text-2xl"></i>
                     <span>
-                      {editingId
-                        ? t('admin.regions.edit_region', 'Edytuj miejsce montażu / rejon')
-                        : t('admin.regions.add_new_region', 'Dodaj nowy rejon / miejsce montażu')}
+                      {editingId === 'main_map'
+                        ? 'Edytuj Mapę Główną'
+                        : editingId
+                          ? t('admin.regions.edit_region', 'Edytuj miejsce montażu / rejon')
+                          : t('admin.regions.add_new_region', 'Dodaj nowy rejon / miejsce montażu')}
                     </span>
                   </h2>
                   <button
@@ -455,7 +536,10 @@ export default function Regions() {
                           type="text"
                           value={name}
                           onChange={e => setName(e.target.value)}
-                          className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          disabled={editingId === 'main_map'}
+                          className={`w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm ${
+                            editingId === 'main_map' ? 'bg-slate-100 font-bold text-slate-600' : ''
+                          }`}
                           placeholder="np. Osiedle Słoneczne / Budynek A / Hala K3"
                           required
                         />
@@ -480,7 +564,10 @@ export default function Regions() {
                         <select
                           value={parentId}
                           onChange={e => setParentId(e.target.value)}
-                          className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                          disabled={editingId === 'main_map'}
+                          className={`w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm ${
+                            editingId === 'main_map' ? 'bg-slate-100 text-slate-500' : ''
+                          }`}
                         >
                           <option value="">— Mapa Główna (Miejsce główne) —</option>
                           {(() => {
@@ -911,12 +998,103 @@ export default function Regions() {
 
           <div className="overflow-x-auto">
             <div className="lg:hidden flex flex-col gap-1.5 p-2">
-              {hierarchicalRegions.length === 0 ? (
-                <div className="p-4 bg-white rounded-xl text-center text-slate-500 shadow-sm border border-slate-100">
-                  {t('admin.regions.no_data')}
-                </div>
-              ) : (
-                hierarchicalRegions.map(item => {
+              {(() => {
+                const mainMapMachines = machines.filter(
+                  m =>
+                    (m.regionId === 'main_map' || !m.regionId) && !m.isDeleted && !m.parentId
+                );
+                const topRegions = regions.filter(c => !c.parentId && !c.isDeleted);
+                const mainReady = Boolean(
+                  mainMapSettings?.mapType === 'google' || mainMapSettings?.imageUrl
+                );
+                return (
+                  <div className="bg-blue-50/40 p-3 rounded-xl shadow-sm border-2 border-blue-200 flex flex-col">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-black text-[#002b5e] text-lg flex items-center gap-1.5">
+                          <i className="ph-fill ph-map-trifold text-blue-600"></i>
+                          <span>MAPA GŁÓWNA</span>
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                            Domyślna
+                          </span>
+                        </h4>
+                        {topRegions.length > 0 && (
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Podmiejsca ({topRegions.length}): {topRegions.map(c => c.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {mainReady && mainMapSettings?.mapType === 'google' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                            <i className="ph ph-globe-hemisphere-west"></i> Google Maps
+                          </span>
+                        ) : mainReady && mainMapSettings?.imageUrl ? (
+                          <a
+                            href={mainMapSettings.imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200"
+                          >
+                            <img
+                              src={mainMapSettings.imageUrl}
+                              alt="Mapa Główna"
+                              className="w-full h-full object-cover"
+                            />
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleEditMainMap('google')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold transition-colors"
+                          >
+                            <i className="ph ph-map-trifold"></i> Ustaw mapę rejonu
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleAddSubmapForRegion({ id: 'main_map' })}
+                          className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          + Dodaj podmapę
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-1">
+                      {mainMapSettings?.description ||
+                        'Główna mapa zakładu / obiektów (nadrzędna dla wszystkich rejonów)'}
+                    </p>
+                    <div className="text-xs text-gray-500 mb-2 font-bold uppercase">
+                      {t('admin.regions.machines_in_region', 'Urządzenia w miejscu montażu')}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {mainMapMachines.length > 0 ? (
+                        mainMapMachines.map(m => (
+                          <span
+                            key={m.id}
+                            className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs border border-blue-100"
+                          >
+                            {m.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic">
+                          {t('admin.regions.no_machines_assigned', 'Brak przypisanych urządzeń')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex gap-1.5 justify-end border-t border-blue-100 pt-2">
+                      <button
+                        onClick={() => handleEditMainMap()}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-1.5 px-3 rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 text-xs"
+                      >
+                        <i className="ph ph-pencil-simple text-sm"></i> {t('admin.regions.edit')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+              {hierarchicalRegions.map(item => {
                   const parentRegion = item.parentId ? regions.find(p => p.id === item.parentId) : null;
                   const submapReady = isRegionSubmapConfigured(item);
                   return (
@@ -940,28 +1118,37 @@ export default function Regions() {
                             </span>
                           )}
                         </div>
-                        {submapReady && item.mapType === 'google' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                            <i className="ph ph-globe-hemisphere-west"></i> Google Maps
-                          </span>
-                        ) : submapReady && item.mapImageUrl ? (
-                          <a
-                            href={item.mapImageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200"
-                          >
-                            <img src={item.mapImageUrl} alt="Podmapa" className="w-full h-full object-cover" />
-                          </a>
-                        ) : (
+                        <div className="flex flex-col items-end gap-1">
+                          {submapReady && item.mapType === 'google' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                              <i className="ph ph-globe-hemisphere-west"></i> Google Maps
+                            </span>
+                          ) : submapReady && item.mapImageUrl ? (
+                            <a
+                              href={item.mapImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 w-12 h-8 rounded-md overflow-hidden border border-gray-200"
+                            >
+                              <img src={item.mapImageUrl} alt="Mapa" className="w-full h-full object-cover" />
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(item, 'google')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold transition-colors"
+                            >
+                              <i className="ph ph-map-trifold"></i> Ustaw mapę rejonu
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => handleEdit(item, 'google')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold transition-colors"
+                            onClick={() => handleAddSubmapForRegion(item)}
+                            className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                           >
-                            <i className="ph ph-map-trifold"></i> Ustaw podmapę
+                            + Dodaj podmapę
                           </button>
-                        )}
+                        </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-1">{item.description || '-'}</p>
                       <div className="text-xs text-gray-500 mb-2 font-bold uppercase">
@@ -1001,8 +1188,7 @@ export default function Regions() {
                       </div>
                     </div>
                   );
-                })
-              )}
+                })}
             </div>
 
             <table className="w-full text-left hidden lg:table border-collapse relative">
@@ -1018,7 +1204,7 @@ export default function Regions() {
                     {t('admin.regions.machines_in_region', 'Urządzenia w miejscu montażu')}
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    {t('admin.regions.submap')}
+                    {t('admin.regions.submap', 'MAPA')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
                     {t('admin.regions.actions')}
@@ -1026,6 +1212,114 @@ export default function Regions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
+                {(() => {
+                  const mainMapMachines = machines.filter(
+                    m =>
+                      (m.regionId === 'main_map' || !m.regionId) && !m.isDeleted && !m.parentId
+                  );
+                  const topRegions = regions.filter(c => !c.parentId && !c.isDeleted);
+                  const mainReady = Boolean(
+                    mainMapSettings?.mapType === 'google' || mainMapSettings?.imageUrl
+                  );
+                  return (
+                    <tr className="bg-blue-50/40 hover:bg-blue-50/70 border-b-2 border-blue-100">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col items-start">
+                          <div className="font-black text-[#002b5e] flex items-center gap-2">
+                            <i className="ph-fill ph-map-trifold text-blue-600 text-lg"></i>
+                            <span>MAPA GŁÓWNA</span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                              Domyślna
+                            </span>
+                          </div>
+                          {topRegions.length > 0 && (
+                            <div className="text-[11px] text-slate-500 mt-1">
+                              Podmiejsca ({topRegions.length}):{' '}
+                              {topRegions.map(c => c.name).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">
+                        {mainMapSettings?.description ||
+                          'Główna mapa zakładu / obiektów (nadrzędna dla wszystkich rejonów)'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {mainMapMachines.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {mainMapMachines.map(m => (
+                              <span
+                                key={m.id}
+                                className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100"
+                              >
+                                {m.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic">
+                            {t('admin.regions.no_machines_assigned', 'Brak przypisanych urządzeń')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          {mainReady && mainMapSettings?.mapType === 'google' ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold"
+                              title={mainMapSettings.googleQuery}
+                            >
+                              <i className="ph ph-globe-hemisphere-west text-sm"></i> Google (
+                              {mainMapSettings.googleQuery || 'Mapa Główna'})
+                            </span>
+                          ) : mainReady && mainMapSettings?.imageUrl ? (
+                            <a
+                              href={mainMapSettings.imageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 w-16 h-10 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors shadow-sm relative group block"
+                              title="Kliknij by powiększyć Mapę Główną"
+                            >
+                              <img
+                                src={mainMapSettings.imageUrl}
+                                alt="Mapa Główna"
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i className="ph ph-magnifying-glass-plus text-white"></i>
+                              </div>
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleEditMainMap('image')}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              <i className="ph ph-map-trifold text-sm"></i> Ustaw mapę rejonu
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleAddSubmapForRegion({ id: 'main_map' })}
+                            className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                          >
+                            + Dodaj podmapę
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => handleEditMainMap()}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold py-1.5 px-3 rounded transition-colors inline-flex items-center gap-1 text-sm"
+                          >
+                            <i className="ph ph-pencil-simple"></i> {t('admin.users.edit')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })()}
                 {hierarchicalRegions.map(r => {
                   const regionMachines = machines.filter(m => m.regionId === r.id && !m.isDeleted && !m.parentId);
                   const parentRegion = r.parentId ? regions.find(p => p.id === r.parentId) : null;
@@ -1105,6 +1399,13 @@ export default function Regions() {
                                     </span>
                                   ))}
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSubmapForRegion(r)}
+                                  className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                                >
+                                  + Dodaj podmapę
+                                </button>
                               </div>
                             );
                           }
@@ -1119,7 +1420,7 @@ export default function Regions() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleEdit(r)}
+                                  onClick={() => handleAddSubmapForRegion(r)}
                                   className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   + Dodaj podmapę
@@ -1138,14 +1439,14 @@ export default function Regions() {
                                   className="shrink-0 w-16 h-10 rounded-md overflow-hidden border border-gray-200 hover:border-blue-500 transition-colors shadow-sm relative group block"
                                   title="Kliknij by powiększyć mapę"
                                 >
-                                  <img src={imgUrl} alt="Podmapa" className="w-full h-full object-cover" />
+                                  <img src={imgUrl} alt="Mapa" className="w-full h-full object-cover" />
                                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <i className="ph ph-magnifying-glass-plus text-white"></i>
                                   </div>
                                 </a>
                                 <button
                                   type="button"
-                                  onClick={() => handleEdit(r)}
+                                  onClick={() => handleAddSubmapForRegion(r)}
                                   className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
                                 >
                                   + Dodaj podmapę
@@ -1154,13 +1455,22 @@ export default function Regions() {
                             );
                           }
                           return (
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(r, 'image')}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              <i className="ph ph-map-trifold text-sm"></i> Ustaw podmapę
-                            </button>
+                            <div className="flex flex-col items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(r, 'image')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                <i className="ph ph-map-trifold text-sm"></i> Ustaw mapę rejonu
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAddSubmapForRegion(r)}
+                                className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                              >
+                                + Dodaj podmapę
+                              </button>
+                            </div>
                           );
                         })()}
                       </td>

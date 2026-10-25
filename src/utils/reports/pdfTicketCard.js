@@ -73,9 +73,13 @@ export const generateTicketPDF = async (ticket) => {
     const profileConfig = getIndustryProfileConfig(industryProfile);
 
     const machineObj = allMachines.find(m => m.id === ticket.machineId);
-    const regionObj = allRegions.find(r => r.id === (ticket.regionId || machineObj?.regionId));
+    const resolvedRegionId = ticket.regionId || machineObj?.regionId;
+    const regionObj = allRegions.find(r => r.id === resolvedRegionId);
     const machineName = ticket.machineName || machineObj?.name || 'Nieznana';
-    const regionName = ticket.regionName || regionObj?.name || 'Brak';
+    const regionName =
+      ticket.regionName ||
+      regionObj?.name ||
+      (resolvedRegionId === 'main_map' ? 'Mapa Glowna' : 'Brak');
 
     let ticketTransactions = [];
     try {
@@ -456,6 +460,19 @@ export const generateTicketPDF = async (ticket) => {
       115,
       currentY + 27
     );
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        n(`Wygenerowano z systemu VexoNT © 2026 | Strona ${i} z ${pageCount}`),
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: 'center' }
+      );
+    }
 
     await savePdfWithPrompt(doc, n(`Zgłoszenie_T${ticket.id?.slice(0, 4).toUpperCase() || '1'}.pdf`));
   } catch (error) {

@@ -108,7 +108,10 @@ export function useMachines(machines = [], regions = []) {
     const dataToExport = filteredMachines.map(m => ({
       'ID': m.id,
       'Nazwa Maszyny': m.name || '-',
-      'Rejon': (regions.find(r => r.id === m.regionId)?.name || 'Bez rejonu'),
+      'Rejon':
+        m.regionId === 'main_map'
+          ? 'Mapa Główna'
+          : regions.find(r => r.id === m.regionId)?.name || 'Bez rejonu',
       'Nr Seryjny / Wewnetrzny': m.internalId || '-',
       'Obecne RBG': m.currentWorkHours || 0,
       'Zapasowy Opis': m.additionalDescription || '-'

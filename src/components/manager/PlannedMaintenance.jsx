@@ -155,6 +155,7 @@ export default function PlannedMaintenance({
   const getMachineName = id => getMachine(id)?.name || 'Nieznana maszyna';
   const getMachineRegionName = regionId => {
     if (!regionId) return '-';
+    if (regionId === 'main_map') return t('machines.form.mainMapRegion', 'Mapa Główna');
     const found = regions.find(r => r.id === regionId || r.name === regionId);
     return found ? found.name : regionId;
   };

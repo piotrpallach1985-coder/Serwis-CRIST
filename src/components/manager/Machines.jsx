@@ -488,7 +488,10 @@ export default function Machines({
             generateMachineHistoryPDF(
               {
                 ...selectedMachine,
-                regionName: regions.find(r => r.id === selectedMachine.regionId)?.name,
+                regionName:
+                  selectedMachine.regionId === 'main_map'
+                    ? t('machines.form.mainMapRegion', 'Mapa Główna')
+                    : regions.find(r => r.id === selectedMachine.regionId)?.name,
               },
               machineHistory.tickets,
               machineHistory.services

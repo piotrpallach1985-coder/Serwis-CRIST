@@ -289,7 +289,7 @@ export default function HomeDashboard({ onLogout }) {
 
       {/* STOPKA PULPITU */}
       <footer className="py-4 text-center text-[10px] sm:text-xs font-medium text-slate-400 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-        {t('login.footer_subtitle', 'VexoNT • System Obsługi Awarii & Serwisu')}
+        {t('login.footer_subtitle', '© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu')}
       </footer>
     </div>
   );

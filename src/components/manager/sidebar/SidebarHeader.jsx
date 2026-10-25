@@ -29,7 +29,7 @@ export default function SidebarHeader({
           ) : branding?.companyLogoUrl ? (
             <img src={branding.companyLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
           ) : (
-            branding?.companyName?.charAt(0) || 'C'
+            branding?.companyName?.charAt(0) || 'V'
           )}
         </div>
         

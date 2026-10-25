@@ -146,7 +146,11 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         machineName: selectedMachine.name,
         bay: selectedMachine.bay || '',
         regionId: selectedMachine.regionId || '',
-        regionName: regionObj ? regionObj.name : '',
+        regionName: regionObj
+          ? regionObj.name
+          : selectedMachine.regionId === 'main_map'
+            ? 'Mapa Główna'
+            : '',
         topic,
         description,
         isCritical,

@@ -316,7 +316,7 @@ export function useMapPins({
           m =>
             ((m.xPercent !== undefined && m.xPercent !== null) ||
               (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null)) &&
-            (!m.regionId || m.pinnedOnMap === 'main')
+            (!m.regionId || m.regionId === 'main_map' || m.pinnedOnMap === 'main')
         )
       : currentSubmapHasMap
       ? validMachines.filter(m => {
@@ -387,9 +387,9 @@ export function useMapPins({
         const hasPinOnMain =
           ((m.xPercent !== undefined && m.xPercent !== null) ||
             (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null)) &&
-          (!m.regionId || m.pinnedOnMap === 'main');
+          (!m.regionId || m.regionId === 'main_map' || m.pinnedOnMap === 'main');
         if (hasPinOnMain) return false;
-        if (!m.regionId) return true;
+        if (!m.regionId || m.regionId === 'main_map') return true;
         if (unpinnedRegionIds.has(m.regionId)) return true;
         return false;
       });

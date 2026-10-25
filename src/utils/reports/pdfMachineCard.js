@@ -516,6 +516,19 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       doc.text(n('Brak zaplanowanych lub zrealizowanych serwisow dla tej maszyny.'), 14, currentY);
     }
 
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        n(`Wygenerowano z systemu VexoNT © 2026 | Strona ${i} z ${pageCount}`),
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: 'center' }
+      );
+    }
+
     const safeMachineFileName = n(machine.name || machine.qrCode || 'Nieznana').replace(/[^a-zA-Z0-9_-]/g, '_');
     await savePdfWithPrompt(doc, `Karta_Urzadzenia_PDF_${safeMachineFileName}.pdf`);
   } catch (error) {

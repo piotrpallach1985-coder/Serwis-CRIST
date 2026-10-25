@@ -42,7 +42,12 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
         </div>
         
         <div className="text-xs text-slate-500 space-y-1">
-          <div className="flex items-center gap-1"><i className="ph ph-map-pin"></i> {t('machines.card.region')}{regions.find(r => r.id === machine.regionId)?.name || '-'}</div>
+          <div className="flex items-center gap-1">
+            <i className="ph ph-map-pin"></i> {t('machines.card.region')}
+            {machine.regionId === 'main_map'
+              ? t('machines.form.mainMapRegion', 'Mapa Główna')
+              : regions.find(r => r.id === machine.regionId)?.name || '-'}
+          </div>
           <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> {t('machines.card.bay')}{machine.bay || '-'}</div>
           <div className="flex items-center gap-1"><i className="ph ph-hourglass"></i> {t('machines.card.rbg')}{machine.currentWorkHours || 0}</div>
         </div>

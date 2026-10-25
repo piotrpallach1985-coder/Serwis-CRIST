@@ -305,7 +305,10 @@ export default function ShipyardMap({
     let uMachines = [];
     if (currentSubmapId !== null) {
       uMachines = mainMachines.filter(
-        m => (!m.regionId || m.regionId === currentSubmapId) && !hasCoords(m)
+        m =>
+          (!m.regionId || m.regionId === currentSubmapId) &&
+          m.regionId !== 'main_map' &&
+          !hasCoords(m)
       );
     } else {
       uMachines = mainMachines.filter(m => !hasCoords(m));
@@ -1134,6 +1137,11 @@ export default function ShipyardMap({
         if (currentSubmapId !== null) {
           updateData.regionId = currentSubmapId;
           updateData.submapTabId = activeSubmapObj?.id || currentSubmapTabId || 'default';
+        } else {
+          const targetMachine = machines.find(m => m.id === editingId);
+          if (!targetMachine?.regionId) {
+            updateData.regionId = 'main_map';
+          }
         }
         await updateMachineRegion(editingId, updateData);
       } else {

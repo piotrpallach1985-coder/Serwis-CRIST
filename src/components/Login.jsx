@@ -569,6 +569,12 @@ export default function Login({ onLogin, currentUser }) {
           </div>
         </div>
       )}
+      <div className="mt-8 pb-4 text-center text-[11px] font-medium text-slate-400">
+        {t(
+          'login.footer_subtitle',
+          '© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu'
+        )}
+      </div>
     </div>
   );
 }

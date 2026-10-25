@@ -515,6 +515,19 @@ export const generateServicePDF = async (service, machine) => {
       currentY + 27
     );
 
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        n(`Wygenerowano z systemu VexoNT © 2026 | Strona ${i} z ${pageCount}`),
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: 'center' }
+      );
+    }
+
     const safeServiceFileName = n(service.name || 'Planowany').replace(/[^a-zA-Z0-9_-]/g, '_');
     await savePdfWithPrompt(doc, `Serwis_${safeServiceFileName}.pdf`);
   } catch (error) {

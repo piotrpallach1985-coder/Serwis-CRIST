@@ -1105,7 +1105,7 @@
       "edit": "Edit",
       "delete": "Delete",
       "description": "Description",
-      "submap": "Submap",
+      "submap": "MAP",
       "actions": "Actions",
       "empty_list": "No regions defined.",
       "without_name": "Without name",
@@ -1302,7 +1302,7 @@
     "select_scan_method": "Select scanning method",
     "camera_qr": "Camera (QR)",
     "contactless_nfc": "Contactless (NFC)",
-    "footer_subtitle": "VexoNT • Breakdown & Maintenance Management System",
+    "footer_subtitle": "© 2026 VexoNT. All rights reserved. • Breakdown & Maintenance Management System",
     "exit": "Exit",
     "control_room": "Control Room"
   }

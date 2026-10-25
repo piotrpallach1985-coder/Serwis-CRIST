@@ -216,7 +216,7 @@ export const generateKPIReportPDF = async (tickets = [], services = [], machines
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text(
-        n(`Wygenerowano z systemu VexoNT (Modul Zarzadczy) | Strona ${i} z ${pageCount}`), 
+        n(`Wygenerowano z systemu VexoNT © 2026 | Strona ${i} z ${pageCount}`), 
         doc.internal.pageSize.getWidth() / 2, 
         doc.internal.pageSize.getHeight() - 10,
         { align: 'center' }
