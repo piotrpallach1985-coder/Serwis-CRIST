@@ -182,6 +182,13 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         photos: photoUrls,
         ...(extraData?.fGasProtocol ? { fGasProtocol: extraData.fGasProtocol } : {}),
         ...(extraData?.completedGps ? { completedGps: extraData.completedGps } : {}),
+        ...(extraData?.travelStartedAt ? { travelStartedAt: extraData.travelStartedAt } : {}),
+        ...(extraData?.travelStartGps ? { travelStartGps: extraData.travelStartGps } : {}),
+        ...(extraData?.workStartedAt ? { workStartedAt: extraData.workStartedAt } : {}),
+        ...(extraData?.workStartGps ? { workStartGps: extraData.workStartGps } : {}),
+        ...(extraData?.manHours !== undefined && extraData?.manHours !== null
+          ? { manHours: extraData.manHours }
+          : {}),
         ...(extraData?.clientSignerName ? { clientSignerName: extraData.clientSignerName } : {}),
         ...(extraData?.inspectorLicense ? { inspectorLicense: extraData.inspectorLicense } : {}),
       };
@@ -192,6 +199,17 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
 
       if (extraData && typeof extraData === 'object') {
         if (extraData.completedGps !== undefined) updateData.completedGps = extraData.completedGps;
+        if (extraData.travelStartedAt !== undefined)
+          updateData.travelStartedAt = extraData.travelStartedAt;
+        if (extraData.travelStartGps !== undefined)
+          updateData.travelStartGps = extraData.travelStartGps;
+        if (extraData.workStartedAt !== undefined)
+          updateData.workStartedAt = extraData.workStartedAt;
+        if (extraData.workStartGps !== undefined)
+          updateData.workStartGps = extraData.workStartGps;
+        if (extraData.inProgressAt !== undefined)
+          updateData.inProgressAt = extraData.inProgressAt;
+        if (extraData.manHours !== undefined) updateData.manHours = extraData.manHours;
         if (extraData.fGasProtocol !== undefined) updateData.fGasProtocol = extraData.fGasProtocol;
         if (extraData.clientSignature !== undefined)
           updateData.clientSignature = extraData.clientSignature;
@@ -208,7 +226,11 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
         updateData.completedBy = user.name;
       }
       if (newStatus === 4 && (!currentData.inProgressAt || currentData.status < 4)) {
-        updateData.inProgressAt = new Date().toISOString();
+        const nowIso = extraData?.workStartedAt || new Date().toISOString();
+        updateData.inProgressAt = extraData?.inProgressAt || nowIso;
+        if (!updateData.workStartedAt) {
+          updateData.workStartedAt = nowIso;
+        }
       }
       if (selectedService && selectedService !== currentData.assignedTo) {
         updateData.assignedTo = selectedService;

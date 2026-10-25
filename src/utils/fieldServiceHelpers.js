@@ -807,3 +807,290 @@ export function recordQrSubmissionTimestamp(nowMs = Date.now()) {
     // ignore storage errors
   }
 }
+
+function isValidNumericCoord(val) {
+  return (
+    val !== null &&
+    val !== undefined &&
+    val !== '' &&
+    typeof val !== 'boolean' &&
+    Number.isFinite(Number(val))
+  );
+}
+
+function parseTaskTimestampMs(raw) {
+  if (!raw) return null;
+  if (raw instanceof Date) {
+    const ms = raw.getTime();
+    return Number.isNaN(ms) ? null : ms;
+  }
+  if (typeof raw?.toDate === 'function') {
+    const d = raw.toDate();
+    const ms = d instanceof Date ? d.getTime() : NaN;
+    return Number.isNaN(ms) ? null : ms;
+  }
+  if (typeof raw?.seconds === 'number') {
+    return raw.seconds * 1000;
+  }
+  const d = new Date(raw);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * Oblicza odległość w linii prostej (w metrach) pomiędzy dwoma punktami GPS za pomocą wzoru Haversine.
+ * Zwraca liczbę całkowitą (zaokrągloną w metrach) lub `null`, jeśli brakuje poprawnych współrzędnych.
+ */
+export function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
+  if (
+    !isValidNumericCoord(lat1) ||
+    !isValidNumericCoord(lng1) ||
+    !isValidNumericCoord(lat2) ||
+    !isValidNumericCoord(lng2)
+  ) {
+    return null;
+  }
+
+  const nLat1 = Number(lat1);
+  const nLng1 = Number(lng1);
+  const nLat2 = Number(lat2);
+  const nLng2 = Number(lng2);
+
+  if (
+    Math.abs(nLat1) > 90 ||
+    Math.abs(nLat2) > 90 ||
+    Math.abs(nLng1) > 180 ||
+    Math.abs(nLng2) > 180
+  ) {
+    return null;
+  }
+
+  const toRad = deg => (deg * Math.PI) / 180;
+  const R = 6371000; // promień Ziemi w metrach
+  const dLat = toRad(nLat2 - nLat1);
+  const dLng = toRad(nLng2 - nLng1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(nLat1)) *
+      Math.cos(toRad(nLat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+/**
+ * Pomocniczy fallback wyciągający współrzędne GPS docelowego obiektu z maszyny lub hierarchii rejonów
+ * (np. gdy urządzenie ma pinezkę na rzucie JPG kondygnacji wewnątrz budynku, który posiada współrzędne GPS na mapie nadrzędnej).
+ */
+function resolveTargetGpsCoordinates(machine, regions = []) {
+  const geo = resolveMachineGeoLocation(machine, regions);
+  if (geo.hasCoordinates && isValidNumericCoord(geo.lat) && isValidNumericCoord(geo.lng)) {
+    return { lat: Number(geo.lat), lng: Number(geo.lng) };
+  }
+
+  if (!machine) return null;
+
+  const mLat = machine.gpsLat ?? (machine.pinnedOnMapType !== 'image' ? machine.lat ?? machine.mapLat : null);
+  const mLng = machine.gpsLng ?? (machine.pinnedOnMapType !== 'image' ? machine.lng ?? machine.mapLng : null);
+  if (isValidNumericCoord(mLat) && isValidNumericCoord(mLng)) {
+    return { lat: Number(mLat), lng: Number(mLng) };
+  }
+
+  const visited = new Set();
+  let currentRegion = (regions || []).find(
+    r => r.id === machine.regionId || (machine.regionName && r.name === machine.regionName)
+  );
+
+  while (currentRegion && !visited.has(currentRegion.id)) {
+    visited.add(currentRegion.id);
+    const rLat =
+      currentRegion.gpsLat ??
+      (currentRegion.pinnedOnMapType !== 'image' ? currentRegion.lat ?? currentRegion.mapLat : null) ??
+      currentRegion.googleLat ??
+      null;
+    const rLng =
+      currentRegion.gpsLng ??
+      (currentRegion.pinnedOnMapType !== 'image' ? currentRegion.lng ?? currentRegion.mapLng : null) ??
+      currentRegion.googleLng ??
+      null;
+    if (isValidNumericCoord(rLat) && isValidNumericCoord(rLng)) {
+      return { lat: Number(rLat), lng: Number(rLng) };
+    }
+    currentRegion = currentRegion.parentId
+      ? (regions || []).find(r => r.id === currentRegion.parentId)
+      : null;
+  }
+
+  return null;
+}
+
+/**
+ * Weryfikuje obecność serwisanta na obiekcie (Geofencing GPS) względem współrzędnych maszyny/rejonu.
+ */
+export function verifyOnSiteGps(workerGps, machine, regions = [], thresholdMeters = 300) {
+  const targetCoords = resolveTargetGpsCoordinates(machine, regions);
+  if (!targetCoords) {
+    return {
+      status: 'no_target_coords',
+      distanceMeters: null,
+      isOnSite: null,
+      label: 'Brak współrzędnych obiektu',
+    };
+  }
+
+  if (
+    !workerGps ||
+    typeof workerGps !== 'object' ||
+    !isValidNumericCoord(workerGps.lat) ||
+    !isValidNumericCoord(workerGps.lng)
+  ) {
+    return {
+      status: 'no_worker_gps',
+      distanceMeters: null,
+      isOnSite: null,
+      label: 'Brak odczytu GPS serwisanta',
+    };
+  }
+
+  const distanceMeters = calculateDistanceMeters(
+    workerGps.lat,
+    workerGps.lng,
+    targetCoords.lat,
+    targetCoords.lng
+  );
+
+  if (distanceMeters === null) {
+    return {
+      status: 'no_worker_gps',
+      distanceMeters: null,
+      isOnSite: null,
+      label: 'Brak odczytu GPS serwisanta',
+    };
+  }
+
+  const isOnSite = distanceMeters <= thresholdMeters;
+  const formattedDist =
+    distanceMeters >= 1000
+      ? `${(distanceMeters / 1000).toFixed(1)} km`
+      : `${distanceMeters} m`;
+
+  return {
+    status: isOnSite ? 'on_site' : 'off_site',
+    distanceMeters,
+    isOnSite,
+    label: isOnSite
+      ? `Na miejscu (${distanceMeters} m od obiektu)`
+      : `POZA OBIEKTEM (${formattedDist} od obiektu!)`,
+  };
+}
+
+/**
+ * Uniwersalna funkcja wyliczająca metryki czasu dojazdu, czasu pracy na miejscu (stoper vs deklarowane RBG)
+ * oraz weryfikację geofencingu GPS dla zgłoszenia awarii (`ticket`) lub serwisu planowanego (`planned_service`).
+ * Wyliczenia oparte wyłącznie na czystej matematyce (znaczniki czasu + wzór Haversine).
+ */
+export function calculateWorkAndTravelMetrics(task, machine = null, regions = []) {
+  const safeTask = task || {};
+
+  const travelStartedAt = safeTask.travelStartedAt || null;
+  const workStartedAt = safeTask.workStartedAt || safeTask.inProgressAt || null;
+  const completedAt =
+    safeTask.closedAt ||
+    safeTask.completedAt ||
+    safeTask.completionDetails?.completedAt ||
+    null;
+
+  const travelStartMs = parseTaskTimestampMs(travelStartedAt);
+  const workStartMs = parseTaskTimestampMs(workStartedAt);
+  const completedMs = parseTaskTimestampMs(completedAt);
+
+  const travelDurationMinutes =
+    travelStartMs !== null && workStartMs !== null && workStartMs > travelStartMs
+      ? Math.round((workStartMs - travelStartMs) / 60000)
+      : null;
+
+  const stopwatchWorkMinutes =
+    workStartMs !== null && completedMs !== null && completedMs > workStartMs
+      ? Math.round((completedMs - workStartMs) / 60000)
+      : null;
+
+  const stopwatchWorkHours =
+    stopwatchWorkMinutes !== null ? Number((stopwatchWorkMinutes / 60).toFixed(2)) : null;
+
+  let rawDeclared =
+    safeTask.manHours ??
+    safeTask.actualManHours ??
+    safeTask.completionDetails?.manHours ??
+    safeTask.completionDetails?.historyEntry?.manHours ??
+    null;
+
+  if (
+    (rawDeclared === null || rawDeclared === undefined || rawDeclared === '') &&
+    Array.isArray(safeTask.history)
+  ) {
+    for (let i = safeTask.history.length - 1; i >= 0; i -= 1) {
+      const h = safeTask.history[i];
+      if (h && h.manHours !== undefined && h.manHours !== null && h.manHours !== '') {
+        rawDeclared = h.manHours;
+        break;
+      }
+    }
+  }
+
+  const declaredManHours =
+    rawDeclared !== null &&
+    rawDeclared !== undefined &&
+    rawDeclared !== '' &&
+    typeof rawDeclared !== 'boolean' &&
+    Number.isFinite(Number(rawDeclared)) &&
+    Number(rawDeclared) >= 0
+      ? Number(Number(rawDeclared).toFixed(2))
+      : null;
+
+  const discrepancyHours =
+    declaredManHours !== null && stopwatchWorkHours !== null
+      ? Number((declaredManHours - stopwatchWorkHours).toFixed(2))
+      : null;
+
+  const isTimeInflated = Boolean(discrepancyHours !== null && discrepancyHours > 0.25);
+  const isMultiDayOrPaused = Boolean(stopwatchWorkHours !== null && stopwatchWorkHours > 12);
+
+  const effectiveMachine =
+    machine ||
+    (safeTask.regionId || safeTask.regionName || safeTask.address
+      ? {
+          regionId: safeTask.regionId,
+          regionName: safeTask.regionName,
+          address: safeTask.address,
+        }
+      : null);
+
+  const startGpsVerification = verifyOnSiteGps(
+    safeTask.workStartGps,
+    effectiveMachine,
+    regions
+  );
+  const endGpsVerification = verifyOnSiteGps(
+    safeTask.completedGps || safeTask.completionDetails?.completedGps,
+    effectiveMachine,
+    regions
+  );
+
+  return {
+    travelStartedAt,
+    workStartedAt,
+    completedAt,
+    travelDurationMinutes,
+    stopwatchWorkMinutes,
+    stopwatchWorkHours,
+    declaredManHours,
+    discrepancyHours,
+    isTimeInflated,
+    isMultiDayOrPaused,
+    startGpsVerification,
+    endGpsVerification,
+  };
+}

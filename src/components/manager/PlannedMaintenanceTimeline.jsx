@@ -21,6 +21,7 @@ import {
   getIndustryProfileConfig,
   isInspectorLicenseRequired,
 } from '../../utils/fieldServiceHelpers';
+import { safeParseDate } from '../../utils/dateHelpers';
 
 export default function PlannedMaintenanceTimeline({
   srv,
@@ -101,6 +102,10 @@ export default function PlannedMaintenanceTimeline({
   );
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
+  const [travelStarting, setTravelStarting] = useState(false);
+  const [workStarting, setWorkStarting] = useState(false);
+  const [localTravelStartedAt, setLocalTravelStartedAt] = useState(srv.travelStartedAt || null);
+  const [localWorkStartedAt, setLocalWorkStartedAt] = useState(srv.workStartedAt || null);
   const [licenseError, setLicenseError] = useState('');
   const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
   const [leakTestResult, setLeakTestResult] = useState('not_applicable');
@@ -190,7 +195,9 @@ export default function PlannedMaintenanceTimeline({
     if (srv.assignedService || srv.assignedTo) {
       setSelectedService(srv.assignedService || srv.assignedTo);
     }
-  }, [srv.assignedService, srv.assignedTo]);
+    setLocalTravelStartedAt(srv.travelStartedAt || null);
+    setLocalWorkStartedAt(srv.workStartedAt || null);
+  }, [srv.id, srv.assignedService, srv.assignedTo, srv.travelStartedAt, srv.workStartedAt]);
 
   // Określenie naturalnego kroku (1 do 5)
   let naturalStepNum = 1;
@@ -230,8 +237,9 @@ export default function PlannedMaintenanceTimeline({
   const handleConfirmContractor = async () => {
     if (!selectedService) return;
     try {
+      const nowIso = new Date().toISOString();
       const historyEntry = {
-        date: new Date().toISOString(),
+        date: nowIso,
         user: user?.name || 'System',
         action: 'Przekazano do: ' + selectedService,
         note: '',
@@ -240,6 +248,7 @@ export default function PlannedMaintenanceTimeline({
       await updatePlannedService(srv.id, {
         assignedService: selectedService,
         status: 'in_progress',
+        inProgressAt: srv.inProgressAt || nowIso,
         currentStep: 3,
         history: newHistory,
       });
@@ -247,6 +256,73 @@ export default function PlannedMaintenanceTimeline({
     } catch (err) {
       console.error('Błąd zatwierdzenia wykonawcy:', err);
       setTimelineUploadError('Błąd: ' + err.message);
+    }
+  };
+
+  // Start dojazdu do obiektu (Field Service)
+  const handleStartTravel = async () => {
+    setTravelStarting(true);
+    try {
+      let coords = null;
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        coords = await captureCurrentGpsPosition({
+          enableHighAccuracy: true,
+          timeout: 4000,
+        }).catch(() => null);
+      }
+      const nowIso = new Date().toISOString();
+      setLocalTravelStartedAt(nowIso);
+      const historyEntry = {
+        date: nowIso,
+        user: user?.name || 'System',
+        action: 'Rozpoczęto dojazd do obiektu',
+        note: '',
+        ...(coords ? { travelStartGps: coords } : {}),
+      };
+      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
+      await updatePlannedService(srv.id, {
+        travelStartedAt: nowIso,
+        travelStartGps: coords || null,
+        history: newHistory,
+      });
+    } catch (err) {
+      console.error('Błąd startu dojazdu:', err);
+    } finally {
+      setTravelStarting(false);
+    }
+  };
+
+  // Start pracy na miejscu (Stoper i GPS)
+  const handleStartWorkOnSite = async () => {
+    setWorkStarting(true);
+    try {
+      let coords = null;
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        coords = await captureCurrentGpsPosition({
+          enableHighAccuracy: true,
+          timeout: 4000,
+        }).catch(() => null);
+      }
+      const nowIso = new Date().toISOString();
+      setLocalWorkStartedAt(nowIso);
+      const historyEntry = {
+        date: nowIso,
+        user: user?.name || 'System',
+        action: 'Rozpoczęto pracę na miejscu (Start stopera)',
+        note: '',
+        ...(coords ? { workStartGps: coords } : {}),
+      };
+      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
+      await updatePlannedService(srv.id, {
+        workStartedAt: nowIso,
+        inProgressAt: srv.inProgressAt || nowIso,
+        workStartGps: coords || null,
+        history: newHistory,
+      });
+    } catch (err) {
+      console.error('Błąd startu pracy na miejscu:', err);
+    } finally {
+      setWorkStarting(false);
     }
   };
 
@@ -723,6 +799,77 @@ export default function PlannedMaintenanceTimeline({
                                 {t('tickets.details.assignedContractor', 'Wyznaczony wykonawca')}:{' '}
                                 <strong className="font-bold">{srv.assignedService}</strong>
                               </span>
+                            </div>
+                          )}
+
+                          {/* Przyciski Dojazdu i Startu Pracy na miejscu (Stoper + GPS) */}
+                          {!isCompleted && srv.status !== 'completed' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {srv.travelStartedAt || localTravelStartedAt ? (
+                                <div
+                                  data-testid="planned-travel-started-badge"
+                                  className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl font-bold flex items-center gap-2"
+                                >
+                                  <i className="ph ph-car-profile text-base text-emerald-600"></i>
+                                  <span>
+                                    Dojazd rozpoczęty o godz.{' '}
+                                    {safeParseDate(
+                                      srv.travelStartedAt || localTravelStartedAt
+                                    )?.toLocaleTimeString('pl-PL', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }) || '-'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  data-testid="planned-start-travel-btn"
+                                  disabled={!isActualStatus || travelStarting}
+                                  onClick={handleStartTravel}
+                                  className="bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-800 border border-indigo-200 px-3 py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <i className="ph ph-car-profile text-base text-indigo-600"></i>
+                                  <span>
+                                    {travelStarting
+                                      ? 'Rejestrowanie...'
+                                      : '🚗 Rozpocznij dojazd do obiektu (Start GPS)'}
+                                  </span>
+                                </button>
+                              )}
+
+                              {srv.workStartedAt || localWorkStartedAt ? (
+                                <div
+                                  data-testid="planned-work-started-badge"
+                                  className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl font-bold flex items-center gap-2"
+                                >
+                                  <i className="ph ph-timer text-base text-emerald-600"></i>
+                                  <span>
+                                    Praca na miejscu od godz.{' '}
+                                    {safeParseDate(
+                                      srv.workStartedAt || localWorkStartedAt
+                                    )?.toLocaleTimeString('pl-PL', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }) || '-'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  data-testid="planned-start-work-btn"
+                                  disabled={!isActualStatus || workStarting}
+                                  onClick={handleStartWorkOnSite}
+                                  className="bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-200 px-3 py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <i className="ph ph-wrench text-base text-emerald-600"></i>
+                                  <span>
+                                    {workStarting
+                                      ? 'Uruchamianie stopera...'
+                                      : '🔧 Rozpocznij pracę na miejscu (Start stopera i GPS)'}
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           )}
 

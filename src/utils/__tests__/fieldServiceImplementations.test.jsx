@@ -16,6 +16,9 @@ import {
   getIndustryProfileConfig,
   checkCkob7DaysDeadline,
   getDtrDocCategoryInfo,
+  calculateDistanceMeters,
+  verifyOnSiteGps,
+  calculateWorkAndTravelMetrics,
 } from '../fieldServiceHelpers';
 import fs from 'fs';
 import path from 'path';
@@ -28,6 +31,7 @@ import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdmi
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
+import TechnicianPerformancePanel from '../../components/manager/reports/TechnicianPerformancePanel';
 import MachineCard from '../../components/manager/MachineCard';
 import { useManagerStore } from '../../store/managerStore';
 import { formatDetails } from '../../services/audit.service';
@@ -1031,6 +1035,141 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         expect.objectContaining({ inspectorLicense: 'POM/0999/PBKb/22' })
       );
       unmountFac();
+    });
+  });
+
+  describe('10. Ewidencja Czasu Dojazdu, Pracy (Stoper vs RBG), Geofencing GPS (Haversine) i Porównanie Serwisantów', () => {
+    it('oblicza odległość Haversine w metrach (calculateDistanceMeters) i weryfikuje geofencing GPS (verifyOnSiteGps)', () => {
+      // Ten sam punkt -> 0 m
+      expect(calculateDistanceMeters(54.5189, 18.5305, 54.5189, 18.5305)).toBe(0);
+      // Brak współrzędnych -> null
+      expect(calculateDistanceMeters(null, 18.5305, 54.5189, 18.5305)).toBeNull();
+      expect(calculateDistanceMeters('', 18.5305, 54.5189, 18.5305)).toBeNull();
+
+      // Odległość ~110 m w Gdyni
+      const distNear = calculateDistanceMeters(54.5189, 18.5305, 54.5198, 18.5312);
+      expect(distNear).toBeGreaterThan(80);
+      expect(distNear).toBeLessThan(150);
+
+      const targetMachine = {
+        id: 'm-hvac-1',
+        name: 'Pompa ciepła Budynek A',
+        lat: 54.5189,
+        lng: 18.5305,
+      };
+
+      // Serwisant na miejscu (~110 m <= 300 m)
+      const onSiteRes = verifyOnSiteGps({ lat: 54.5198, lng: 18.5312 }, targetMachine, []);
+      expect(onSiteRes.status).toBe('on_site');
+      expect(onSiteRes.isOnSite).toBe(true);
+      expect(onSiteRes.label).toContain('Na miejscu (');
+
+      // Serwisant poza obiektem (~19.5 km w Gdańsku)
+      const offSiteRes = verifyOnSiteGps({ lat: 54.352, lng: 18.6466 }, targetMachine, []);
+      expect(offSiteRes.status).toBe('off_site');
+      expect(offSiteRes.isOnSite).toBe(false);
+      expect(offSiteRes.label).toContain('POZA OBIEKTEM (');
+      expect(offSiteRes.label).toContain('km od obiektu!)');
+
+      // Fallback dla urządzenia przypiętego na rzucie JPG kondygnacji wewnątrz budynku posiadającego GPS na rejonie
+      const regionsWithBuildingGps = [
+        {
+          id: 'reg-osiedle',
+          name: 'Osiedle Nadmorskie',
+          lat: 54.5189,
+          lng: 18.5305,
+        },
+        {
+          id: 'reg-piwnica',
+          name: 'Kondygnacja -1 (Rzut JPG)',
+          parentId: 'reg-osiedle',
+          mapType: 'image',
+          mapImageUrl: 'https://example.com/piwnica.png',
+          submapConfigured: true,
+        },
+      ];
+      const indoorBoiler = {
+        id: 'm-boiler',
+        name: 'Kocioł gazowy Viessmann',
+        regionId: 'reg-piwnica',
+        pinnedOnMapType: 'image',
+      };
+      const indoorVerify = verifyOnSiteGps(
+        { lat: 54.5191, lng: 18.5307 },
+        indoorBoiler,
+        regionsWithBuildingGps
+      );
+      expect(indoorVerify.status).toBe('on_site');
+      expect(indoorVerify.isOnSite).toBe(true);
+    });
+
+    it('oblicza czas dojazdu, stoper pracy na miejscu oraz odchyłkę zadeklarowanych RBG (calculateWorkAndTravelMetrics)', () => {
+      const machine = { id: 'm1', name: 'Klimatyzator Daikin', lat: 54.5189, lng: 18.5305 };
+      const task = {
+        id: 't-100',
+        travelStartedAt: '2026-10-25T08:00:00.000Z',
+        workStartedAt: '2026-10-25T08:30:00.000Z', // 30 min dojazdu
+        closedAt: '2026-10-25T10:00:00.000Z', // 90 min (1.50 h) pracy wg stopera
+        manHours: 3.0, // zadeklarowano 3.0 h -> nadwyżka +1.50 h (> 0.25h)
+        completedGps: { lat: 54.519, lng: 18.5306 },
+      };
+
+      const metrics = calculateWorkAndTravelMetrics(task, machine, []);
+      expect(metrics.travelDurationMinutes).toBe(30);
+      expect(metrics.stopwatchWorkMinutes).toBe(90);
+      expect(metrics.stopwatchWorkHours).toBe(1.5);
+      expect(metrics.declaredManHours).toBe(3);
+      expect(metrics.discrepancyHours).toBe(1.5);
+      expect(metrics.isTimeInflated).toBe(true);
+      expect(metrics.isMultiDayOrPaused).toBe(false);
+      expect(metrics.endGpsVerification.status).toBe('on_site');
+    });
+
+    it('wyświetla sekcję weryfikacji czasu i GPS w nagłówku awarii oraz panel porównawczy serwisantów w raportach', () => {
+      const machine = { id: 'm1', name: 'Pompa Ciepła B1', lat: 54.5189, lng: 18.5305 };
+      const ticketWithMetrics = {
+        id: 't-ver-1',
+        topic: 'Awaria sprężarki',
+        machineId: 'm1',
+        machineName: 'Pompa Ciepła B1',
+        assignedTo: 'Jan Serwisant',
+        status: 5,
+        travelStartedAt: '2026-10-25T08:00:00.000Z',
+        workStartedAt: '2026-10-25T08:25:00.000Z',
+        closedAt: '2026-10-25T09:25:00.000Z', // 60 min = 1.0 h
+        manHours: 2.5, // +1.5 h nadwyżki
+        completedGps: { lat: 54.352, lng: 18.6466 }, // poza obiektem
+      };
+
+      const { unmount } = render(
+        <>
+          <TicketMainColumnHeader
+            currentTicket={ticketWithMetrics}
+            STATUSES={{ 5: { label: 'Zakończone', color: 'bg-green-100 text-green-800' } }}
+            machines={[machine]}
+            regions={[]}
+          />
+          <TechnicianPerformancePanel
+            tickets={[ticketWithMetrics]}
+            plannedServices={[]}
+            machines={[machine]}
+            regions={[]}
+            services={[{ id: 's1', name: 'Jan Serwisant' }]}
+          />
+        </>
+      );
+
+      expect(screen.getByTestId('ticket-work-gps-verification-box')).toBeTruthy();
+      expect(screen.getByTestId('ticket-time-inflated-badge').textContent).toContain('+1.5 h');
+      expect(screen.getByTestId('ticket-gps-geofence-badge').textContent).toContain('POZA OBIEKTEM');
+
+      const summaryTable = screen.getByTestId('tech-performance-summary-table');
+      expect(summaryTable.textContent).toContain('Jan Serwisant');
+      expect(summaryTable.textContent).toContain('25 min');
+      expect(summaryTable.textContent).toContain('2.5 h');
+      expect(summaryTable.textContent).toContain('+1.5 h');
+
+      unmount();
     });
   });
 });

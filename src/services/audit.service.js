@@ -77,7 +77,14 @@ const FIELD_TRANSLATION_MAP = {
   hasAsbestos: 'Wyroby zawierające azbest',
   pinbAuthority: 'Właściwy organ PINB',
   legalTitleDoc: 'Tytuł prawny / KW',
-  additionalDescription: 'Dodatkowy opis'
+  additionalDescription: 'Dodatkowy opis',
+  travelStartedAt: 'Rozpoczęto dojazd',
+  travelStartGps: 'GPS startu dojazdu',
+  workStartedAt: 'Rozpoczęto pracę na miejscu',
+  workStartGps: 'GPS startu pracy',
+  completedGps: 'GPS zakończenia pracy',
+  manHours: 'Zadeklarowane RBG (h)',
+  actualManHours: 'Zadeklarowane RBG (h)'
 };
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;

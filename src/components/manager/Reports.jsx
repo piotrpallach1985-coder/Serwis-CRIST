@@ -4,6 +4,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
 import ApiSettingsPanel from './reports/ApiSettingsPanel';
+import TechnicianPerformancePanel from './reports/TechnicianPerformancePanel';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
@@ -69,6 +70,7 @@ export default function Reports() {
           user={user}
           onlyAssignedTasks={onlyAssignedTasks}
         />
+        {!onlyAssignedTasks && <TechnicianPerformancePanel />}
         {isAdmin && <ApiSettingsPanel />}
 
         {/* Raport Audytorski */}

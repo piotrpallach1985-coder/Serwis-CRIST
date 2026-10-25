@@ -9,14 +9,14 @@ import { getCurrentTenant } from '../utils/tenantHelper';
 
 /**
  * Dodaje nowy plan serwisowy do bazy danych.
- * 
- * @param {Object} serviceData Dane definiujÄ…ce plan serwisowy
- * @param {string} serviceData.name Nazwa przeglÄ…du/serwisu
+ *
+ * @param {Object} serviceData Dane definiujące plan serwisowy
+ * @param {string} serviceData.name Nazwa przeglądu/serwisu
  * @param {string} serviceData.machineId ID przypisanej maszyny
  * @param {string} [serviceData.triggerType='calendar'] Typ wyzwalacza: 'calendar' | 'hours' | 'mixed'
- * @param {string} [serviceData.nextDate] Kolejna data przeglÄ…du
+ * @param {string} [serviceData.nextDate] Kolejna data przeglądu
  * @param {number} [serviceData.targetWorkHours] Docelowa liczba rbg
- * @param {Array<Object>} [serviceData.history] Historia wykonanych przeglÄ…dĂłw
+ * @param {Array<Object>} [serviceData.history] Historia wykonanych przeglądów
  * @returns {Promise<import('firebase/firestore').DocumentReference>} Referencja do utworzonego dokumentu
  */
 export const addPlannedService = async (serviceData) => {
@@ -63,10 +63,10 @@ export const deletePlannedService = async (serviceId) => {
 };
 
 /**
- * Oznacza serwis jako zrealizowany, zapisuje historiÄ™ oraz opcjonalnie planuje kolejny cykl.
- * 
+ * Oznacza serwis jako zrealizowany, zapisuje historię oraz opcjonalnie planuje kolejny cykl.
+ *
  * @param {string} serviceId Identyfikator realizowanego serwisu
- * @param {Object} completionData SzczegĂłĹ‚y wykonania (data, wykonawca, notatki, protokĂłĹ‚)
+ * @param {Object} completionData Szczegóły wykonania (data, wykonawca, notatki, protokół)
  * @param {Object} [nextPlanData=null] Dane dla automatycznego zaplanowania kolejnego cyklu
  * @param {Object} [actionItemData=null] Opcjonalne dodatkowe zadanie do realizacji (Action Item)
  * @returns {Promise<void>}
@@ -131,7 +131,7 @@ export const markServiceCompleted = async (serviceId, completionData, nextPlanDa
     batch.set(newServiceRef, nextDataObj);
   }
 
-  // Generujemy action item (tematy do realizacji), jeĹ›li dodano podczas odbioru
+  // Generujemy action item (tematy do realizacji), jeśli dodano podczas odbioru
   if (actionItemData) {
     const newActionItemRef = doc(collection(db, 'tenants', getCurrentTenant(), 'action_items'));
     batch.set(newActionItemRef, actionItemData);
