@@ -19,7 +19,11 @@ import {
   calculateDistanceMeters,
   verifyOnSiteGps,
   calculateWorkAndTravelMetrics,
+  isVehicleAsset,
+  getMachineCounterUnit,
+  checkVehicleDatesStatus,
 } from '../fieldServiceHelpers';
+import { checkServiceUrgency } from '../logicHelpers';
 import fs from 'fs';
 import path from 'path';
 import SignaturePad from '../../components/shared/SignaturePad';
@@ -1374,6 +1378,161 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByTestId('privacy-policy-modal')).toBeNull();
 
       unmount();
+    });
+
+    it('obsługuje oba rozwiązania Floty Samochodowej: profil VexoNT Fleet (industryProfile="fleet") oraz hybrydowy przełącznik Pojazd / Środek transportu w każdym profilu', () => {
+      // 1) Sprawdzenie 4. profilu branżowego 'fleet' oraz modułu 'fleet' w SuperAdminTenantModal
+      const formData = {
+        id: 'trans-logist',
+        name: 'Trans-Logist Sp. z o.o.',
+        industryProfile: 'fleet',
+        maxUsers: 25,
+        maxMachines: 100,
+        modules: {
+          tickets: true,
+          planned: true,
+          parts: true,
+          fleet: true,
+          aiDtr: true,
+          voiceDictation: true,
+        },
+        aiTier: 'standard',
+      };
+      const setFormData = vi.fn();
+
+      const { unmount: unmountModal } = render(
+        <SuperAdminTenantModal
+          isModalOpen={true}
+          setIsModalOpen={vi.fn()}
+          isEditing={false}
+          formData={formData}
+          setFormData={setFormData}
+          handleSave={vi.fn(e => e.preventDefault())}
+          fileInputRef={{ current: null }}
+          processCompanyLogo={vi.fn()}
+          uploadingLogo={false}
+        />
+      );
+
+      expect(screen.getByTestId('industry-profile-option-fleet')).toBeTruthy();
+      expect(screen.getByTestId('superadmin-module-fleet-checkbox').checked).toBe(true);
+      unmountModal();
+
+      // 2) Hybrydowy przełącznik w MachineForm dla firmy np. HVAC (bus serwisowy jako Pojazd)
+      useManagerStore.getState().setBranding({
+        companyName: 'Klima-Serwis Mobilny',
+        industryProfile: 'hvac',
+      });
+
+      const { unmount: unmountForm } = render(
+        <MachineForm
+          isOpen={true}
+          onClose={vi.fn()}
+          editingMachine={null}
+          initialParentId=""
+          regions={[{ id: 'r-baza', name: 'Baza Serwisowa Gdynia' }]}
+          onSaved={vi.fn()}
+          onError={vi.fn()}
+        />
+      );
+
+      // Domyślnie w profilu HVAC wybrany jest zasób typu 'device'
+      expect(screen.queryByTestId('machine-form-fleet-section')).toBeNull();
+
+      // Kliknięcie przełącznika "Pojazd / Środek transportu — Flota (km / RBG)"
+      fireEvent.click(screen.getByTestId('asset-category-vehicle-btn'));
+      expect(screen.getByTestId('machine-form-fleet-section')).toBeTruthy();
+      expect(screen.getByTestId('fleet-license-plate-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-vin-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-counter-unit-select').value).toBe('km');
+      expect(screen.getByTestId('fleet-tech-inspection-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-insurance-expiry-input')).toBeTruthy();
+      unmountForm();
+
+      // 3) Karta pojazdu w MachineInfoCard, PlannedMaintenanceInfo i TicketMainColumnHeader + alerty SKP / OC + próg 1000 km
+      const serviceVan = {
+        id: 'van-1',
+        name: 'Renault Master Bus Serwisowy #1',
+        assetCategory: 'vehicle',
+        counterUnit: 'km',
+        currentWorkHours: 149200,
+        licensePlate: 'GD 12345',
+        vinNumber: 'VF1MA000087654321',
+        fuelType: 'Diesel (ON)',
+        assignedDriver: 'Jan Serwisant',
+        techInspectionDate: '2026-11-05', // za 11 dni względem 2026-10-25
+        insuranceExpiryDate: '2026-10-10', // 15 dni po terminie względem 2026-10-25
+        regionId: 'r-baza',
+      };
+
+      expect(isVehicleAsset(serviceVan, 'hvac')).toBe(true);
+      expect(getMachineCounterUnit(serviceVan, 'hvac')).toBe('km');
+
+      const datesCheck = checkVehicleDatesStatus(serviceVan, 30, '2026-10-25T12:00:00Z');
+      expect(datesCheck.techInspectionStatus).toBe('upcoming');
+      expect(datesCheck.techInspectionDaysLeft).toBe(11);
+      expect(datesCheck.insuranceStatus).toBe('overdue');
+      expect(datesCheck.insuranceDaysLeft).toBe(-15);
+
+      // Sprawdzenie progu 1000 km w checkServiceUrgency (zostało 800 km do 150 000 km -> isUpcoming = true!)
+      const oilServicePlan = {
+        id: 'srv-oil-1',
+        name: 'Wymiana oleju i filtrów co 15 000 km',
+        machineId: 'van-1',
+        triggerType: 'hours',
+        hoursInterval: 15000,
+        targetWorkHours: 150000,
+        status: 'pending',
+      };
+      const urgencyKm = checkServiceUrgency(oilServicePlan, serviceVan, 30);
+      expect(urgencyKm.isUpcoming).toBe(true);
+      expect(urgencyKm.isOverdue).toBe(false);
+      expect(urgencyKm.message).toContain('zostało 800 km');
+
+      const { unmount: unmountCards } = render(
+        <>
+          <MachineInfoCard
+            machine={serviceVan}
+            parentMachine={null}
+            childMachines={[]}
+            regions={[{ id: 'r-baza', name: 'Baza Gdynia' }]}
+            regionName="Baza Gdynia"
+            totalPartsCost={1250}
+            setIsWorkHoursModalOpen={vi.fn()}
+            onViewRelatedMachine={vi.fn()}
+            onAddChildMachine={vi.fn()}
+            parts={[]}
+          />
+          <PlannedMaintenanceInfo
+            srv={oilServicePlan}
+            machine={serviceVan}
+            parts={[]}
+            actualPartsUsed={[]}
+            getMachineRegionName={() => 'Baza Gdynia'}
+            regions={[{ id: 'r-baza', name: 'Baza Gdynia' }]}
+          />
+          <TicketMainColumnHeader
+            currentTicket={{
+              id: 't-van-1',
+              topic: 'Świeci kontrolka klocków hamulcowych',
+              machineId: 'van-1',
+              machineName: serviceVan.name,
+              status: 2,
+            }}
+            STATUSES={{ 2: { label: 'W realizacji', color: 'bg-blue-100' } }}
+            machines={[serviceVan]}
+            regions={[{ id: 'r-baza', name: 'Baza Gdynia' }]}
+          />
+        </>
+      );
+
+      expect(screen.getByTestId('machine-license-plate-badge').textContent).toBe('GD 12345');
+      expect(screen.getByTestId('machine-counter-value').textContent).toContain('149200 km');
+      expect(screen.getByTestId('machine-fleet-card').textContent).toContain('VF1MA000087654321');
+      expect(screen.getByTestId('service-domain-fleet').textContent).toContain('GD 12345');
+      expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('GD 12345');
+
+      unmountCards();
     });
   });
 });

@@ -72,6 +72,22 @@ export const DTR_DOC_CATEGORIES = [
     shortLabel: 'Dok. powykonawcza',
     badgeClass: 'bg-slate-100 text-slate-800 border-slate-200',
   },
+  {
+    id: 'DOWOD_POLISA_FLOTA',
+    label: 'Dowód rejestracyjny / Polisa OC/AC / Karta pojazdu',
+    shortLabel: 'Dowód / OC/AC',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+];
+
+export const FUEL_TYPES = [
+  { id: '', label: '-- Wybierz rodzaj napędu / paliwa --' },
+  { id: 'Diesel (ON)', label: 'Diesel (ON)' },
+  { id: 'Benzyna (PB)', label: 'Benzyna (PB)' },
+  { id: 'Benzyna + LPG', label: 'Benzyna + LPG' },
+  { id: 'Hybryda (HEV/PHEV)', label: 'Hybryda (HEV / PHEV)' },
+  { id: 'Elektryczny (EV)', label: 'Elektryczny (EV)' },
+  { id: 'Inny / Sprzęt roboczy', label: 'Inny / Sprzęt roboczy' },
 ];
 
 export function getDtrDocCategoryInfo(docCategory) {
@@ -155,7 +171,130 @@ export const INDUSTRY_PROFILES = {
     showHvacCustomerSection: true,
     requireInspectorLicense: true,
   },
+  fleet: {
+    id: 'fleet',
+    name: 'Flota Samochodowa / Pojazdy i Sprzęt Mobilny (VexoNT Fleet)',
+    shortName: 'VexoNT Fleet (Pojazdy)',
+    description:
+      'Samochody służbowe, busy serwisowe, transport i sprzęt kołowy: przebiegi (km / mth), polisy OC/AC, badania techniczne SKP i koszty TCO.',
+    icon: 'ph-truck',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+    bannerClass: 'bg-emerald-900 text-white border-emerald-800',
+    machineLabel: 'Pojazd / Urządzenie',
+    regionLabel: 'Baza / Lokalizacja',
+    bayLabel: 'Informacja dodatkowa',
+    machineCardTitle: 'Karta Pojazdu / Środka Transportu (VexoNT Fleet)',
+    machinePdfTitle: 'Karta Pojazdu / Srodka Transportu (VexoNT Fleet)',
+    ticketCardTitle: 'Karta Zgłoszenia Usterki / Szkody Pojazdu (VexoNT Fleet)',
+    ticketPdfTitle: 'Karta Usterki / Szkody Pojazdu (VexoNT Fleet)',
+    serviceCardTitle: 'Karta Serwisu Eksploatacyjnego Pojazdu (Olej / SKP / OC)',
+    servicePdfTitle: 'Karta Serwisu Eksploatacyjnego Pojazdu (VexoNT Fleet)',
+    clientSignatureLabel: 'Podpis Kierowcy / Odbierającego Pojazd (Opcjonalnie)',
+    techSignatureLabel: 'Podpis Mechanika / Serwisanta Floty',
+    showFGasByDefault: false,
+    showCkobSection: false,
+    showIndustrialRbgSection: false,
+    showHvacCustomerSection: false,
+    showFleetSection: true,
+    requireInspectorLicense: false,
+  },
 };
+
+/**
+ * Sprawdza, czy dany zasób jest Pojazdem / Środkiem transportu (Flota).
+ * Działa zarówno dla 4. profilu branżowego ('fleet'), jak i dla pojazdów dodanych w profilach industrial/facility/hvac.
+ */
+export function isVehicleAsset(machine, industryProfile = 'industrial') {
+  if (!machine) return industryProfile === 'fleet';
+  if (machine.assetCategory === 'vehicle') return true;
+  if (machine.assetCategory === 'device') return false;
+  if (
+    machine.licensePlate ||
+    machine.vinNumber ||
+    machine.techInspectionDate ||
+    machine.insuranceExpiryDate ||
+    machine.counterUnit === 'km'
+  ) {
+    return true;
+  }
+  return industryProfile === 'fleet';
+}
+
+/**
+ * Zwraca jednostkę licznika dla danego urządzenia/pojazdu ('km' lub 'RBG').
+ */
+export function getMachineCounterUnit(machine, industryProfile = 'industrial') {
+  if (machine?.counterUnit === 'km') return 'km';
+  if (machine?.counterUnit === 'RBG' || machine?.counterUnit === 'mth') return 'RBG';
+  return isVehicleAsset(machine, industryProfile) ? 'km' : 'RBG';
+}
+
+/**
+ * Weryfikuje status dat badania technicznego (SKP) oraz polisy ubezpieczeniowej (OC/AC) pojazdu.
+ */
+export function checkVehicleDatesStatus(machine, warningDays = 30, nowDate = new Date()) {
+  const nowObj = nowDate instanceof Date ? nowDate : new Date(nowDate);
+  const nowTime = isNaN(nowObj.getTime()) ? Date.now() : nowObj.getTime();
+  const emptyCheck = {
+    dateStr: '',
+    daysLeft: null,
+    isOverdue: false,
+    isUpcoming: false,
+    status: 'none',
+    statusLabel: 'Brak daty',
+  };
+
+  const evaluateDate = (rawDate, labelPrefix) => {
+    if (!rawDate || String(rawDate).trim() === '') return { ...emptyCheck };
+    const parsed = new Date(rawDate);
+    if (isNaN(parsed.getTime())) return { ...emptyCheck };
+    const diffMs = parsed.getTime() - nowTime;
+    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const dateStr = String(rawDate).split('T')[0];
+
+    if (daysLeft < 0) {
+      return {
+        dateStr,
+        daysLeft,
+        isOverdue: true,
+        isUpcoming: false,
+        status: 'overdue',
+        statusLabel: `${labelPrefix} po terminie (${Math.abs(daysLeft)} dni temu!)`,
+      };
+    }
+    if (daysLeft <= warningDays) {
+      return {
+        dateStr,
+        daysLeft,
+        isOverdue: false,
+        isUpcoming: true,
+        status: 'upcoming',
+        statusLabel: `${labelPrefix} kończy się za ${daysLeft} dni (${dateStr})`,
+      };
+    }
+    return {
+      dateStr,
+      daysLeft,
+      isOverdue: false,
+      isUpcoming: false,
+      status: 'ok',
+      statusLabel: `Ważne do ${dateStr} (${daysLeft} dni)`,
+    };
+  };
+
+  const skp = evaluateDate(machine?.techInspectionDate, 'Badanie SKP');
+  const oc = evaluateDate(machine?.insuranceExpiryDate, 'Polisa OC/AC');
+
+  return {
+    skp,
+    oc,
+    techInspectionStatus: skp.status,
+    techInspectionDaysLeft: skp.daysLeft,
+    insuranceStatus: oc.status,
+    insuranceDaysLeft: oc.daysLeft,
+    hasAnyAlert: Boolean(skp.isOverdue || skp.isUpcoming || oc.isOverdue || oc.isUpcoming),
+  };
+}
 
 /**
  * Sprawdza, czy dla danego profilu firmy wymagany jest numer uprawnień kontrolującego / inspektora.
@@ -678,6 +817,19 @@ export function filterMachinesForFieldTechnician(
   [...myTickets, ...myServices].forEach(item => {
     if (item.machineId) allowedMachineIds.add(item.machineId);
     if (item.machineName) allowedMachineNames.add(String(item.machineName).trim().toLowerCase());
+  });
+
+  machines.forEach(m => {
+    if (!m) return;
+    if (
+      (m.assignedDriver || m.assignedService) &&
+      isTaskAssignedToUser(
+        { assignedTo: m.assignedDriver, assignedService: m.assignedService },
+        user
+      )
+    ) {
+      allowedMachineIds.add(m.id);
+    }
   });
 
   return machines.filter(m => {

@@ -12,6 +12,9 @@ import {
   getCkobCategoryLabel,
   calculateCo2Equivalent,
   calculateWorkAndTravelMetrics,
+  isVehicleAsset,
+  getMachineCounterUnit,
+  checkVehicleDatesStatus,
 } from '../../../utils/fieldServiceHelpers';
 
 export default function TicketMainColumnHeader({
@@ -44,6 +47,9 @@ export default function TicketMainColumnHeader({
     currentTicket.fGasProtocol?.refrigerantChargeKg || machineObj?.refrigerantChargeKg
   );
   const ckobLabel = getCkobCategoryLabel(machineObj?.inspectionCategory);
+  const isVehicle = isVehicleAsset(machineObj, industryProfile);
+  const counterUnit = getMachineCounterUnit(machineObj, industryProfile);
+  const vehicleDates = isVehicle ? checkVehicleDatesStatus(machineObj) : null;
   const workMetrics = calculateWorkAndTravelMetrics(currentTicket, machineObj, regions);
   const showWorkVerificationBox =
     workMetrics.travelDurationMinutes !== null ||
@@ -366,6 +372,47 @@ export default function TicketMainColumnHeader({
                 <span className="font-bold text-slate-800 mt-0.5 block">
                   {machineObj?.contactPerson || currentTicket.reportedBy || '-'}
                   {geo.address ? ` · ${geo.address}` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(industryProfile === 'fleet' || isVehicle) && (
+          <div
+            data-testid="ticket-domain-fleet"
+            className="mt-4 pt-4 border-t border-emerald-200 bg-emerald-50/50 rounded-xl p-4 border"
+          >
+            <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-3">
+              <i className="ph ph-truck text-emerald-700 text-base"></i>
+              <span>Karta Pojazdu / Floty Samochodowej (VexoNT Fleet)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                  Nr rejestracyjny / VIN
+                </span>
+                <span className="font-extrabold text-slate-800 mt-0.5 block font-mono">
+                  {machineObj?.licensePlate || 'Brak nr rej.'}
+                  {machineObj?.vinNumber ? ` · ${machineObj.vinNumber}` : ''}
+                </span>
+              </div>
+              <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                  Przebieg / Kierowca
+                </span>
+                <span className="font-extrabold text-slate-800 mt-0.5 block">
+                  {machineObj?.currentWorkHours ?? machineObj?.operatingHours ?? 0} {counterUnit}
+                  {machineObj?.assignedDriver ? ` · ${machineObj.assignedDriver}` : ''}
+                </span>
+              </div>
+              <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                  Ważność SKP / Polisa OC/AC
+                </span>
+                <span className="font-bold text-slate-800 mt-0.5 block">
+                  SKP: {machineObj?.techInspectionDate || '-'} · OC:{' '}
+                  {machineObj?.insuranceExpiryDate || '-'}
                 </span>
               </div>
             </div>

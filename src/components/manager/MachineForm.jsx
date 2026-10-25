@@ -7,6 +7,7 @@ import { addMachine, updateMachine } from '../../services/machines.service';
 import {
   REFRIGERANT_TYPES,
   CKOB_CATEGORIES,
+  FUEL_TYPES,
   calculateCo2Equivalent,
 } from '../../utils/fieldServiceHelpers';
 
@@ -52,6 +53,16 @@ export default function MachineForm({
   const [pinbAuthority, setPinbAuthority] = useState('');
   const [legalTitleDoc, setLegalTitleDoc] = useState('');
   const [showExtendedFields, setShowExtendedFields] = useState(false);
+
+  // Pola Floty Samochodowej i Sprzętu Mobilnego (VexoNT Fleet & Hybrydowy Typ Zasobu)
+  const [assetCategory, setAssetCategory] = useState('device'); // 'device' | 'vehicle'
+  const [licensePlate, setLicensePlate] = useState('');
+  const [vinNumber, setVinNumber] = useState('');
+  const [counterUnit, setCounterUnit] = useState('RBG'); // 'km' | 'RBG'
+  const [fuelType, setFuelType] = useState('');
+  const [techInspectionDate, setTechInspectionDate] = useState('');
+  const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
+  const [assignedDriver, setAssignedDriver] = useState('');
 
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
@@ -106,6 +117,26 @@ export default function MachineForm({
       );
       setPinbAuthority(editingMachine.pinbAuthority || '');
       setLegalTitleDoc(editingMachine.legalTitleDoc || '');
+
+      const isExistingVehicle =
+        editingMachine.assetCategory === 'vehicle' ||
+        Boolean(
+          editingMachine.licensePlate ||
+            editingMachine.vinNumber ||
+            editingMachine.techInspectionDate ||
+            editingMachine.insuranceExpiryDate
+        ) ||
+        (industryProfile === 'fleet' && editingMachine.assetCategory !== 'device');
+
+      setAssetCategory(isExistingVehicle ? 'vehicle' : 'device');
+      setLicensePlate(editingMachine.licensePlate || '');
+      setVinNumber(editingMachine.vinNumber || '');
+      setCounterUnit(editingMachine.counterUnit || (isExistingVehicle ? 'km' : 'RBG'));
+      setFuelType(editingMachine.fuelType || '');
+      setTechInspectionDate(editingMachine.techInspectionDate || '');
+      setInsuranceExpiryDate(editingMachine.insuranceExpiryDate || '');
+      setAssignedDriver(editingMachine.assignedDriver || '');
+
       setShowExtendedFields(
         industryProfile === 'hvac' ||
           industryProfile === 'facility' ||
@@ -120,6 +151,7 @@ export default function MachineForm({
           )
       );
     } else {
+      const defaultIsVehicle = industryProfile === 'fleet';
       setName('');
       setInternalId('');
       setAdditionalDescription('');
@@ -137,6 +169,15 @@ export default function MachineForm({
       setHasAsbestos('Brak');
       setPinbAuthority('');
       setLegalTitleDoc('');
+
+      setAssetCategory(defaultIsVehicle ? 'vehicle' : 'device');
+      setLicensePlate('');
+      setVinNumber('');
+      setCounterUnit(defaultIsVehicle ? 'km' : 'RBG');
+      setFuelType('');
+      setTechInspectionDate('');
+      setInsuranceExpiryDate('');
+      setAssignedDriver('');
 
       if (initialParentId) {
         setParentId(initialParentId);
@@ -190,10 +231,35 @@ export default function MachineForm({
     const allowFGas =
       industryProfile === 'hvac' ||
       (industryProfile === 'facility' && inspectionCategory === 'hvac_kotlownia');
-    const allowContact = industryProfile === 'facility' || industryProfile === 'hvac';
+    const allowContact =
+      industryProfile === 'facility' ||
+      industryProfile === 'hvac' ||
+      industryProfile === 'fleet';
+    const isVehicleSelected = assetCategory === 'vehicle';
 
     const effectiveRefType = allowFGas ? refrigerantType || '' : '';
     const extraPayload = {
+      assetCategory: isVehicleSelected ? 'vehicle' : 'device',
+      counterUnit: isVehicleSelected ? counterUnit || 'km' : 'RBG',
+      ...(isVehicleSelected
+        ? {
+            licensePlate: licensePlate.trim().toUpperCase(),
+            vinNumber: vinNumber.trim().toUpperCase(),
+            fuelType: fuelType || '',
+            techInspectionDate: techInspectionDate || '',
+            insuranceExpiryDate: insuranceExpiryDate || '',
+            assignedDriver: assignedDriver.trim(),
+          }
+        : !editingMachine
+        ? {
+            licensePlate: '',
+            vinNumber: '',
+            fuelType: '',
+            techInspectionDate: '',
+            insuranceExpiryDate: '',
+            assignedDriver: '',
+          }
+        : {}),
       ...(allowContact
         ? {
             contactPerson: contactPerson.trim(),
@@ -293,23 +359,73 @@ export default function MachineForm({
         </div>
         <div className="p-6 overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* Przełącznik Typu Zasobu (Urządzenie / Instalacja vs Pojazd / Flota) */}
+            <div
+              data-testid="machine-asset-category-switcher"
+              className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col sm:flex-row gap-2"
+            >
+              <button
+                type="button"
+                data-testid="asset-category-device-btn"
+                onClick={() => {
+                  setAssetCategory('device');
+                  setCounterUnit('RBG');
+                }}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  assetCategory === 'device'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <i className="ph ph-gear-six text-base"></i>
+                Urządzenie / Instalacja / Sprzęt (RBG)
+              </button>
+              <button
+                type="button"
+                data-testid="asset-category-vehicle-btn"
+                onClick={() => {
+                  setAssetCategory('vehicle');
+                  if (!counterUnit || counterUnit === 'RBG') setCounterUnit('km');
+                }}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  assetCategory === 'vehicle'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <i className="ph ph-truck text-base"></i>
+                Pojazd / Środek transportu — Flota (km / RBG)
+              </button>
+            </div>
+
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
-                {t('machines.form.machineName', 'Nazwa urządzenia *')}
+                {assetCategory === 'vehicle'
+                  ? 'Nazwa / Marka i model pojazdu *'
+                  : t('machines.form.machineName', 'Nazwa urządzenia *')}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-blue-500"
-                placeholder={t('machines.form.machineNamePlaceholder', 'np. Klimatyzator Split / Pompa ciepła / Centrala K-01')}
+                placeholder={
+                  assetCategory === 'vehicle'
+                    ? 'np. Renault Master Bus Serwisowy / Toyota Proace / Wózek widłowy Linde'
+                    : t(
+                        'machines.form.machineNamePlaceholder',
+                        'np. Klimatyzator Split / Pompa ciepła / Centrala K-01'
+                      )
+                }
                 required
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">
-                  {t('machines.form.region', 'Miejsce montażu *')}
+                  {assetCategory === 'vehicle'
+                    ? 'Baza / Oddział macierzysty *'
+                    : t('machines.form.region', 'Miejsce montażu *')}
                 </label>
                 <select
                   value={regionId}
@@ -365,7 +481,7 @@ export default function MachineForm({
                   .filter(m => m.id !== (editingMachine ? editingMachine.id : null))
                   .map(m => (
                     <option key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name} {m.licensePlate ? `[${m.licensePlate}]` : ''}
                     </option>
                   ))}
               </select>
@@ -385,8 +501,126 @@ export default function MachineForm({
               </p>
             </div>
 
+            {/* Sekcja Floty Samochodowej i Sprzętu Mobilnego (VexoNT Fleet / Pojazd) */}
+            {assetCategory === 'vehicle' && (
+              <div
+                data-testid="machine-form-fleet-section"
+                className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between border-b border-emerald-200/70 pb-2">
+                  <div className="flex items-center gap-2">
+                    <i className="ph ph-truck text-lg text-emerald-700"></i>
+                    <span className="text-sm font-extrabold text-emerald-950">
+                      Parametry Pojazdu / Floty Samochodowej (Przebieg, SKP, Polisa OC/AC, Kierowca)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                    VexoNT Fleet
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Numer rejestracyjny
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-license-plate-input"
+                      value={licensePlate}
+                      onChange={e => setLicensePlate(e.target.value.toUpperCase())}
+                      placeholder="np. GD 12345"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono font-bold uppercase bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Numer nadwozia (VIN)
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-vin-input"
+                      value={vinNumber}
+                      onChange={e => setVinNumber(e.target.value.toUpperCase())}
+                      placeholder="np. VF1MA000012345678"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono uppercase bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Jednostka licznika
+                    </label>
+                    <select
+                      data-testid="fleet-counter-unit-select"
+                      value={counterUnit}
+                      onChange={e => setCounterUnit(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="km">Kilometry (km) — Samochody / Busy</option>
+                      <option value="RBG">Roboczogodziny (RBG) — Wózki / Sprzęt</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Rodzaj paliwa / napędu
+                    </label>
+                    <select
+                      data-testid="fleet-fuel-type-select"
+                      value={fuelType}
+                      onChange={e => setFuelType(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {FUEL_TYPES.map(ft => (
+                        <option key={ft.id} value={ft.id}>
+                          {ft.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Ważność badania tech. (SKP / UDT)
+                    </label>
+                    <input
+                      type="date"
+                      data-testid="fleet-tech-inspection-input"
+                      value={techInspectionDate}
+                      onChange={e => setTechInspectionDate(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Ważność polisy (OC / AC)
+                    </label>
+                    <input
+                      type="date"
+                      data-testid="fleet-insurance-expiry-input"
+                      value={insuranceExpiryDate}
+                      onChange={e => setInsuranceExpiryDate(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Przypisany kierowca / Opiekun pojazdu
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-assigned-driver-input"
+                      value={assignedDriver}
+                      onChange={e => setAssignedDriver(e.target.value)}
+                      placeholder="np. Jan Nowak (serwisant mobilny / kierowca)"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Sekcja branżowa (wyłącznie dla profili Facility / c-KOB oraz HVAC / F-Gazy — zablokowana dla Przemysłu / Produkcji) */}
-            {industryProfile !== 'industrial' && (
+            {(industryProfile === 'facility' || industryProfile === 'hvac') && (
               <div
                 data-testid="machine-form-domain-section"
                 className={`border rounded-xl overflow-hidden ${

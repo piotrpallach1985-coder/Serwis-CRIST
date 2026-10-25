@@ -1,4 +1,4 @@
-﻿import { safeParseDate } from './dateHelpers';
+import { safeParseDate } from './dateHelpers';
 
 // 1. Ujednolicenie stanow niskich i brakow (Source of Truth)
 export const checkInventoryStatus = (part, totalReserved = 0) => {
@@ -54,13 +54,16 @@ export const checkServiceUrgency = (service, machine, customWarningDays = 30) =>
     if (service.targetWorkHours && machine?.currentWorkHours !== undefined) {
       const hLeft = service.targetWorkHours - machine.currentWorkHours;
       hoursLeft = hLeft;
-      
+      const isKmCounter = machine?.counterUnit === 'km';
+      const unitLabel = isKmCounter ? 'km' : 'rbg';
+      const warningThreshold = isKmCounter ? 1000 : 50;
+
       if (hoursLeft < 0) {
         isOverdue = true;
-        message = `Przekroczono o ${Math.abs(hoursLeft)} rbg!`;
-      } else if (hoursLeft <= 50) {
+        message = `Przekroczono o ${Math.abs(hoursLeft)} ${unitLabel}!`;
+      } else if (hoursLeft <= warningThreshold) {
         isUpcoming = true;
-        message = `Zbliża się termin (zostało ${hoursLeft} rbg)`;
+        message = `Zbliża się termin (zostało ${hoursLeft} ${unitLabel})`;
       }
     }
   }

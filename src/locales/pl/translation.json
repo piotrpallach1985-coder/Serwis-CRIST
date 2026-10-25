@@ -1002,6 +1002,8 @@
       "purchased_modules": "Zakupione Moduły",
       "opt_planned_dtr": "Opcja: Panel Serwisu (DTR)",
       "opt_inventory": "Opcja: Magazyn części zamiennych",
+      "opt_fleet": "Opcja: Zarządzanie Flotą Pojazdów (OC/AC, SKP, Przebiegi km)",
+      "mod_fleet": "Moduł Floty Pojazdów",
       "cancel": "Anuluj",
       "save_changes": "Zapisz Zmiany",
       "create_company": "Utwórz Firmę",
@@ -1027,9 +1029,12 @@
       "profile_facility_desc": "Wspólnoty mieszkaniowe, biurowce i osiedla: budynki, klatki/lokale, przeglądy budowlane c-KOB (art. 62), domofony.",
       "profile_hvac_title": "Serwis Mobilny HVAC / Pompy Ciepła (Field Service)",
       "profile_hvac_desc": "Instalatorzy i serwis mobilny: pompy ciepła, klimatyzatory, kotłownie, protokoły F-Gaz (CRO), nawigacja GPS do klienta.",
+      "profile_fleet_title": "Flota Samochodowa / Pojazdy i Sprzęt Mobilny (VexoNT Fleet)",
+      "profile_fleet_desc": "Samochody służbowe, busy serwisowe, transport i sprzęt kołowy: przebiegi (km / mth), polisy OC/AC, badania techniczne SKP i koszty TCO.",
       "profile_short_industrial": "Przemysł / UR",
       "profile_short_facility": "Facility / Osiedla (c-KOB)",
-      "profile_short_hvac": "Serwis HVAC (F-Gazy / CRO)"
+      "profile_short_hvac": "Serwis HVAC (F-Gazy / CRO)",
+      "profile_short_fleet": "VexoNT Fleet (Pojazdy)"
     }
   },
   "superadmin": {},

@@ -1,18 +1,32 @@
 import { useTranslation } from 'react-i18next';
 /**
- * PlannedMaintenanceRbgModal — Modal aktualizacji licznika roboczogodzin maszyny.
+ * PlannedMaintenanceRbgModal — Modal aktualizacji licznika roboczogodzin / przebiegu (km).
  */
-export default function PlannedMaintenanceRbgModal({ rbgUpdateModal, newRbgValue, setNewRbgValue, onSubmit, onClose }) {
+export default function PlannedMaintenanceRbgModal({
+  rbgUpdateModal,
+  newRbgValue,
+  setNewRbgValue,
+  onSubmit,
+  onClose,
+}) {
   const { t } = useTranslation();
   if (!rbgUpdateModal) return null;
+  const isKm = rbgUpdateModal.counterUnit === 'km';
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-scale-in">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">{t('planned.update_machine_counter')}</h3>
+      <form
+        onSubmit={onSubmit}
+        className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-scale-in"
+      >
+        <h3 className="text-lg font-bold text-slate-800 mb-4">
+          {isKm ? 'Aktualizacja przebiegu pojazdu (km)' : t('planned.update_machine_counter')}
+        </h3>
         <p className="text-sm text-slate-600 mb-4">{rbgUpdateModal.name}</p>
         <div className="mb-6">
-          <label className="block text-sm font-bold text-slate-700 mb-1">{t('planned.new_counter_state')}</label>
+          <label className="block text-sm font-bold text-slate-700 mb-1">
+            {isKm ? 'Nowy stan licznika (km):' : t('planned.new_counter_state')}
+          </label>
           <input
             type="number"
             value={newRbgValue}

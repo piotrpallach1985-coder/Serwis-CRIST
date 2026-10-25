@@ -42,6 +42,14 @@ export default function SuperAdminTenantModal({
       desc: t('dashboards.superadmin.profile_hvac_desc', INDUSTRY_PROFILES.hvac.description),
       activeColor: 'border-cyan-600 bg-cyan-50/60 ring-2 ring-cyan-500/20',
       iconColor: 'text-cyan-700 bg-cyan-100'
+    },
+    {
+      id: 'fleet',
+      icon: 'ph-truck',
+      title: t('dashboards.superadmin.profile_fleet_title', INDUSTRY_PROFILES.fleet.name),
+      desc: t('dashboards.superadmin.profile_fleet_desc', INDUSTRY_PROFILES.fleet.description),
+      activeColor: 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20',
+      iconColor: 'text-emerald-700 bg-emerald-100'
     }
   ];
 
@@ -206,6 +214,20 @@ export default function SuperAdminTenantModal({
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm font-semibold text-gray-700">{t("dashboards.superadmin.opt_inventory", "Opcja: Magazyn części zamiennych")}</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-blue-100 sm:col-span-2">
+                <input 
+                  type="checkbox" 
+                  data-testid="superadmin-module-fleet-checkbox"
+                  checked={Boolean(formData.modules?.fleet || selectedProfile === 'fleet')}
+                  disabled={selectedProfile === 'fleet'}
+                  onChange={e => setFormData({...formData, modules: {...formData.modules, fleet: e.target.checked}})}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm font-semibold text-gray-700">
+                  {t("dashboards.superadmin.opt_fleet", "Opcja: Zarządzanie Flotą Pojazdów (OC/AC, SKP, Przebiegi km)")}
+                </span>
               </label>
             </div>
           </div>

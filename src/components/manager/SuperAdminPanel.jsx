@@ -47,7 +47,7 @@ export default function SuperAdminPanel({ onNavigate }) {
     groqApiKey: '',
     companyLogoUrl: '',
     companyLogoBase64: '',
-    modules: { tickets: true, planned_services: true, map: true, kpi: true, inventory: false }
+    modules: { tickets: true, planned_services: true, map: true, kpi: true, inventory: false, fleet: false }
   };
   
   const [formData, setFormData] = useState(initialFormState);

@@ -8,6 +8,9 @@ import {
   calculateCo2Equivalent,
   getCkobCategoryLabel,
   getIndustryProfileConfig,
+  isVehicleAsset,
+  getMachineCounterUnit,
+  checkVehicleDatesStatus,
 } from '../../../utils/fieldServiceHelpers';
 
 export default function MachineInfoCard({
@@ -35,7 +38,14 @@ export default function MachineInfoCard({
   const showFGas =
     industryProfile === 'hvac' ||
     (industryProfile === 'facility' && machine?.inspectionCategory === 'hvac_kotlownia');
-  const showContact = industryProfile === 'facility' || industryProfile === 'hvac';
+  const showContact =
+    industryProfile === 'facility' ||
+    industryProfile === 'hvac' ||
+    industryProfile === 'fleet';
+
+  const isVehicle = isVehicleAsset(machine, industryProfile);
+  const counterUnit = getMachineCounterUnit(machine, industryProfile);
+  const vehicleDates = isVehicle ? checkVehicleDatesStatus(machine) : null;
 
   const fGasCalc =
     showFGas && machine?.refrigerantType
@@ -56,7 +66,8 @@ export default function MachineInfoCard({
     industryProfile !== 'industrial' && (industryProfile === 'facility' || hasCkobMetricData);
 
   const hasExtendedInfo = Boolean(
-    geo.hasAddress ||
+    isVehicle ||
+      geo.hasAddress ||
       (showContact &&
         (machine?.contactPerson || machine?.contactPhone || machine?.accessNotes)) ||
       ckobLabel ||
@@ -81,8 +92,12 @@ export default function MachineInfoCard({
       <div className="p-4 md:p-6 flex flex-col gap-2">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl shrink-0">
-            <i className="ph ph-engine"></i>
+          <div
+            className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 ${
+              isVehicle ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'
+            }`}
+          >
+            <i className={`ph ${isVehicle ? 'ph-truck' : 'ph-engine'}`}></i>
           </div>
           <div className="min-w-0">
             {parentMachine && (
@@ -94,7 +109,17 @@ export default function MachineInfoCard({
                 {parentMachine.name}
               </div>
             )}
-            <h1 className="text-2xl font-black text-gray-900 break-words">{machine.name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-black text-gray-900 break-words">{machine.name}</h1>
+              {machine.licensePlate && (
+                <span
+                  data-testid="machine-license-plate-badge"
+                  className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-mono text-xs font-extrabold tracking-wider border-2 border-blue-500 shadow-sm"
+                >
+                  {machine.licensePlate}
+                </span>
+              )}
+            </div>
             <div className="text-gray-400 font-mono text-sm">
               {t('machines.details.id')}
               {machine.id}
@@ -120,7 +145,7 @@ export default function MachineInfoCard({
       <div className="grid grid-cols-2 gap-x-2 gap-y-3">
         <div>
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">
-            {t('machines.details.regionLabel')}
+            {isVehicle ? 'Baza / Oddział:' : t('machines.details.regionLabel')}
           </div>
           <div className="font-semibold text-gray-800 text-base">{regionName}</div>
           {regions.find(r => r.id === machine.regionId)?.mapImageUrl && (
@@ -142,16 +167,17 @@ export default function MachineInfoCard({
         </div>
         <div>
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">
-            {t('machines.details.workHoursLabel')}
+            {counterUnit === 'km' ? 'Przebieg licznika (km):' : t('machines.details.workHoursLabel')}
           </div>
           <div className="flex items-center gap-2">
-            <div className="font-semibold text-gray-800 text-base">
-              {machine.currentWorkHours ?? machine.operatingHours ?? 0} {t('machines.details.rbg')}
+            <div className="font-semibold text-gray-800 text-base" data-testid="machine-counter-value">
+              {machine.currentWorkHours ?? machine.operatingHours ?? 0}{' '}
+              {counterUnit === 'km' ? 'km' : t('machines.details.rbg')}
             </div>
             <button
               onClick={() => setIsWorkHoursModalOpen(true)}
               className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-1 rounded transition-colors"
-              title={`Aktualizuj ${t('machines.details.rbg')}`}
+              title={`Aktualizuj ${counterUnit === 'km' ? 'km' : t('machines.details.rbg')}`}
             >
               <i className="ph ph-pencil-simple"></i>
             </button>
@@ -184,9 +210,130 @@ export default function MachineInfoCard({
         </div>
       </div>
 
-      {/* DANE BRANŻOWE: ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) — w Przemysł/Produkcja (industrial) c-KOB i F-Gazy są zablokowane */}
+      {/* DANE BRANŻOWE: FLOTA SAMOCHODOWA (POJAZD), ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) */}
       {hasExtendedInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-2.5">
+          {isVehicle && (
+            <div
+              data-testid="machine-fleet-card"
+              className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3 text-xs space-y-2.5"
+            >
+              <div className="font-extrabold text-emerald-950 uppercase tracking-wider text-[11px] flex items-center justify-between gap-2 border-b border-emerald-200/70 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <i className="ph ph-truck text-emerald-700 text-base"></i>
+                  <span>Metryczka Pojazdu / Floty (Przebieg, SKP, Polisa OC/AC, Kierowca)</span>
+                </div>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                  Licznik: {counterUnit}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Nr rejestracyjny
+                  </span>
+                  <span className="font-mono font-extrabold text-slate-900">
+                    {machine?.licensePlate || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Numer VIN
+                  </span>
+                  <span className="font-mono font-bold text-slate-700 break-all">
+                    {machine?.vinNumber || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Rodzaj paliwa / napędu
+                  </span>
+                  <span className="font-bold">{machine?.fuelType || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Przypisany kierowca
+                  </span>
+                  <span className="font-bold">{machine?.assignedDriver || '-'}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <div
+                  data-testid="machine-fleet-skp-status"
+                  className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                    vehicleDates?.techInspectionStatus === 'overdue'
+                      ? 'bg-red-50 border-red-300 text-red-900'
+                      : vehicleDates?.techInspectionStatus === 'upcoming'
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-white border-emerald-200 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <span className="text-[10px] font-bold uppercase opacity-75 block">
+                      Badanie techniczne (SKP / UDT)
+                    </span>
+                    <span className="font-bold">{machine?.techInspectionDate || 'Nie podano'}</span>
+                  </div>
+                  {machine?.techInspectionDate && (
+                    <span
+                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        vehicleDates?.techInspectionStatus === 'overdue'
+                          ? 'bg-red-600 text-white'
+                          : vehicleDates?.techInspectionStatus === 'upcoming'
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {vehicleDates?.techInspectionStatus === 'overdue'
+                        ? `PO TERMINIE (${Math.abs(vehicleDates.techInspectionDaysLeft)} dni)!`
+                        : vehicleDates?.techInspectionStatus === 'upcoming'
+                        ? `Za ${vehicleDates.techInspectionDaysLeft} dni`
+                        : 'Aktualne'}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  data-testid="machine-fleet-oc-status"
+                  className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                    vehicleDates?.insuranceStatus === 'overdue'
+                      ? 'bg-red-50 border-red-300 text-red-900'
+                      : vehicleDates?.insuranceStatus === 'upcoming'
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-white border-emerald-200 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <span className="text-[10px] font-bold uppercase opacity-75 block">
+                      Polisa ubezpieczeniowa (OC / AC)
+                    </span>
+                    <span className="font-bold">
+                      {machine?.insuranceExpiryDate || 'Nie podano'}
+                    </span>
+                  </div>
+                  {machine?.insuranceExpiryDate && (
+                    <span
+                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        vehicleDates?.insuranceStatus === 'overdue'
+                          ? 'bg-red-600 text-white'
+                          : vehicleDates?.insuranceStatus === 'upcoming'
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {vehicleDates?.insuranceStatus === 'overdue'
+                        ? `PO TERMINIE (${Math.abs(vehicleDates.insuranceDaysLeft)} dni)!`
+                        : vehicleDates?.insuranceStatus === 'upcoming'
+                        ? `Za ${vehicleDates.insuranceDaysLeft} dni`
+                        : 'Aktualna'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {(geo.hasAddress ||
             (showContact &&
               (machine.contactPerson || machine.contactPhone || machine.accessNotes))) && (

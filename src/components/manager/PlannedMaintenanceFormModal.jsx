@@ -27,6 +27,8 @@ export default function PlannedMaintenanceFormModal({
       ? 'ckob_annual'
       : industryProfile === 'hvac'
       ? 'fgas_leak_check'
+      : industryProfile === 'fleet'
+      ? 'fleet_oil_service'
       : 'preventive';
 
   const defaultMachineStatusByProfile =
@@ -34,14 +36,23 @@ export default function PlannedMaintenanceFormModal({
       ? 'Bez wpływu'
       : industryProfile === 'hvac'
       ? 'Tryb serwisowy HVAC'
+      : industryProfile === 'fleet'
+      ? 'Postój w warsztacie / SKP'
       : 'LOTO';
 
   const defaultIntervalDaysByProfile =
-    industryProfile === 'facility' || industryProfile === 'hvac' ? 365 : 30;
+    industryProfile === 'facility' || industryProfile === 'hvac' || industryProfile === 'fleet'
+      ? 365
+      : 30;
 
   const [name, setName] = useState('');
   const [machineId, setMachineId] = useState('');
   const [assignedService, setAssignedService] = useState('');
+
+  const selectedMachineObj = (machines || []).find(m => m.id === machineId) || null;
+  const isKmCounter =
+    selectedMachineObj?.counterUnit === 'km' ||
+    (industryProfile === 'fleet' && selectedMachineObj?.counterUnit !== 'RBG');
 
   const [machineSearchName, setMachineSearchName] = useState('');
   useEffect(() => {
@@ -300,6 +311,8 @@ export default function PlannedMaintenanceFormModal({
                   ? 'np. Roczny przegląd instalacji elektrycznej i kominowej (art. 62 PB)'
                   : industryProfile === 'hvac'
                   ? 'np. Okresowa kontrola szczelności F-Gaz i czyszczenie wymiennika'
+                  : industryProfile === 'fleet' || isKmCounter
+                  ? 'np. Przegląd olejowo-filtrowy co 15 000 km / Badanie techniczne SKP'
                   : 'np. Wymiana oleju - Serwis 500h'
               }
               className="w-full p-2 border border-gray-300 rounded outline-none"
@@ -355,6 +368,23 @@ export default function PlannedMaintenanceFormModal({
                     Kontrola UDT urządzeń ciśnieniowych / Audyt energetyczny
                   </option>
                 </>
+              ) : industryProfile === 'fleet' || isKmCounter ? (
+                <>
+                  <option value="fleet_oil_service">
+                    Przegląd olejowo-filtrowy / Eksploatacyjny (co X km lub 1 rok)
+                  </option>
+                  <option value="fleet_skp">
+                    Badanie techniczne rejestracyjne (SKP) / Przegląd UDT (winda / HDS)
+                  </option>
+                  <option value="fleet_tires">
+                    Sezonowa wymiana opon i kontrola układu hamulcowego
+                  </option>
+                  <option value="fleet_insurance">
+                    Wznowienie polisy ubezpieczeniowej (OC / AC / Assistance)
+                  </option>
+                  <option value="preventive">Serwis Planowany / Prewencyjny (PM)</option>
+                  <option value="bhp_audit">Legalizacja gaśnicy / Tachografu / BHP</option>
+                </>
               ) : (
                 <>
                   <option value="preventive">Serwis Planowany / Prewencyjny (PM)</option>
@@ -388,6 +418,15 @@ export default function PlannedMaintenanceFormModal({
                   </option>
                   <option value="Krytyczny">
                     Krytyczny (Ustawowy termin CRO F-Gaz / Chłodzenie krytyczne)
+                  </option>
+                </>
+              ) : industryProfile === 'fleet' || isKmCounter ? (
+                <>
+                  <option value="NieKrytyczny">
+                    Standardowy (Przegląd eksploatacyjny / Opony / Filtry)
+                  </option>
+                  <option value="Krytyczny">
+                    Krytyczny (Ważność badania SKP / Polisa OC / Układ hamulcowy)
                   </option>
                 </>
               ) : (
@@ -441,6 +480,18 @@ export default function PlannedMaintenanceFormModal({
                     Normalna praca układu (czyszczenie / wymiana filtrów)
                   </option>
                 </>
+              ) : industryProfile === 'fleet' || isKmCounter ? (
+                <>
+                  <option value="Postój w warsztacie / SKP">
+                    Postój w warsztacie serwisowym / Stacji Kontroli Pojazdów (SKP)
+                  </option>
+                  <option value="Auto zastępcze wymagane">
+                    Pojazd wyłączony z trasy (wymagane auto zastępcze)
+                  </option>
+                  <option value="Bez wpływu">
+                    Szybka obsługa w bazie (bez wyłączenia z trasy)
+                  </option>
+                </>
               ) : (
                 <>
                   <option value="LOTO">LOTO (Całkowicie odłączone, Lockout/Tagout)</option>
@@ -472,6 +523,8 @@ export default function PlannedMaintenanceFormModal({
                 ? 'Kalendarzowy / Ustawowy (c-KOB art. 62 PB)'
                 : industryProfile === 'hvac'
                 ? 'Kalendarzowy (Okresowy CRO / Gwarancja)'
+                : industryProfile === 'fleet' || isKmCounter
+                ? 'Kalendarzowy (SKP / Polisa OC / Roczny)'
                 : 'Kalendarzowy'}
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -482,7 +535,9 @@ export default function PlannedMaintenanceFormModal({
                 checked={triggerType === 'hours'}
                 onChange={() => setTriggerType('hours')}
               />
-              {industryProfile === 'hvac'
+              {isKmCounter
+                ? 'Przebieg licznika (Kilometry — km)'
+                : industryProfile === 'hvac'
                 ? 'Godziny pracy sprężarki / agregatu (RBG)'
                 : industryProfile === 'facility'
                 ? 'Licznikowy (Godziny pracy dźwigu / kotła)'
@@ -496,13 +551,18 @@ export default function PlannedMaintenanceFormModal({
                 checked={triggerType === 'mixed'}
                 onChange={() => setTriggerType('mixed')}
               />
-              {industryProfile === 'hvac'
+              {isKmCounter
+                ? 'Mieszany (Przebieg km LUB Kalendarz — co nastąpi pierwsze)'
+                : industryProfile === 'hvac'
                 ? 'Mieszany (Kalendarz lub Godziny pracy)'
                 : 'Mieszany'}
             </label>
           </div>
           {(triggerType === 'calendar' || triggerType === 'mixed') &&
-            (industryProfile === 'facility' || industryProfile === 'hvac') && (
+            (industryProfile === 'facility' ||
+              industryProfile === 'hvac' ||
+              industryProfile === 'fleet' ||
+              isKmCounter) && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold text-slate-600">Szybki interwał:</span>
                 {industryProfile === 'facility' ? (
@@ -526,7 +586,7 @@ export default function PlannedMaintenanceFormModal({
                       </button>
                     ))}
                   </>
-                ) : (
+                ) : industryProfile === 'hvac' ? (
                   <>
                     {[
                       { label: 'Co 3 mies. (90 dni - ≥500t CO2e)', days: 90 },
@@ -541,6 +601,27 @@ export default function PlannedMaintenanceFormModal({
                           Number(calendarIntervalDays) === preset.days
                             ? 'bg-cyan-600 text-white border-cyan-600'
                             : 'bg-white text-cyan-800 border-cyan-300 hover:bg-cyan-50'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { label: 'Sezonowy / Opony (180 dni)', days: 180 },
+                      { label: 'Roczny — SKP / OC / Olej (365 dni)', days: 365 },
+                      { label: '2-letni (730 dni)', days: 730 },
+                    ].map(preset => (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        onClick={() => setCalendarIntervalDays(preset.days)}
+                        className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${
+                          Number(calendarIntervalDays) === preset.days
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
                         }`}
                       >
                         {preset.label}
@@ -579,9 +660,28 @@ export default function PlannedMaintenanceFormModal({
             )}
             {(triggerType === 'hours' || triggerType === 'mixed') && (
               <div className="space-y-3 pt-3 md:pt-0">
+                {isKmCounter && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-600">Szybki przebieg:</span>
+                    {[10000, 15000, 30000, 60000].map(kmVal => (
+                      <button
+                        key={kmVal}
+                        type="button"
+                        onClick={() => {
+                          setHoursInterval(kmVal);
+                          const currentKm = Number(selectedMachineObj?.currentWorkHours || 0);
+                          setTargetWorkHours(currentKm + kmVal);
+                        }}
+                        className="px-2 py-0.5 rounded text-[11px] font-bold border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50"
+                      >
+                        Co {kmVal.toLocaleString('pl-PL')} km
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Interwał pracy (co ile rbg)
+                    {isKmCounter ? 'Interwał przebiegu (co ile km)' : 'Interwał pracy (co ile rbg)'}
                   </label>
                   <input
                     type="number"
@@ -592,14 +692,16 @@ export default function PlannedMaintenanceFormModal({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Docelowy stan licznika (rbg)
+                    {isKmCounter
+                      ? 'Docelowy stan licznika przebiegu (km)'
+                      : 'Docelowy stan licznika (rbg)'}
                   </label>
                   <input
                     type="number"
                     value={targetWorkHours}
                     onChange={e => setTargetWorkHours(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded text-sm"
-                    placeholder="np. 1500"
+                    placeholder={isKmCounter ? 'np. 165000' : 'np. 1500'}
                   />
                 </div>
               </div>

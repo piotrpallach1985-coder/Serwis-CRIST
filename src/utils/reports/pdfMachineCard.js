@@ -10,6 +10,8 @@ import {
   REFRIGERANT_TYPES,
   getIndustryProfileConfig,
   getDtrDocCategoryInfo,
+  isVehicleAsset,
+  getMachineCounterUnit,
 } from '../fieldServiceHelpers';
 
 const n = (text) => {
@@ -134,8 +136,13 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       showFGas && machine.refrigerantType
         ? REFRIGERANT_TYPES[machine.refrigerantType]?.name || machine.refrigerantType
         : null;
+    const counterUnit = getMachineCounterUnit(machine, industryProfile);
+    const isVehicle = isVehicleAsset(machine, industryProfile);
     const baseInfoRows = [
-      [n(`${profileConfig.machineLabel}:`), n(machine.name || 'Brak')],
+      [
+        n(`${profileConfig.machineLabel}:`),
+        n(`${machine.name || 'Brak'}${machine.licensePlate ? ' [' + machine.licensePlate + ']' : ''}`),
+      ],
       [
         n('Numer Wewnetrzny / ID QR:'),
         n(`${machine.internalId || '-'} / ${machine.qrCode || machine.id || '-'}`),
@@ -152,10 +159,28 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
             : 'Brak (Urzadzenie glowne)'
         ),
       ],
-      [n('Aktualny Stan Licznika:'), n(`${machine.currentWorkHours || 0} RBG`)],
+      [n('Aktualny Stan Licznika:'), n(`${machine.currentWorkHours || 0} ${counterUnit}`)],
       [n('Laczny Koszt Zuzytych Czesci (TCO):'), n(`${totalPartsCost.toFixed(2)} PLN`)],
       [n('Dodatkowy Opis:'), n(machine.additionalDescription || machine.description || '-')],
     ];
+    if (isVehicle) {
+      baseInfoRows.push([
+        n('Dane Pojazdu (Nr rej. / VIN / Paliwo):'),
+        n(
+          `${machine.licensePlate || '-'} | VIN: ${machine.vinNumber || '-'} | Paliwo: ${
+            machine.fuelType || '-'
+          }`
+        ),
+      ]);
+      baseInfoRows.push([
+        n('Terminy Pojazdu (SKP / Polisa OC/AC / Kierowca):'),
+        n(
+          `SKP: ${machine.techInspectionDate || '-'} | OC/AC: ${
+            machine.insuranceExpiryDate || '-'
+          } | Kierowca: ${machine.assignedDriver || '-'}`
+        ),
+      ]);
+    }
     if (machine.address || machine.mapAddress || (machine.gpsLat && machine.gpsLng)) {
       const gpsSuffix =
         machine.gpsLat && machine.gpsLng

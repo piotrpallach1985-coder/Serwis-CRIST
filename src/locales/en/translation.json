@@ -1002,6 +1002,8 @@
       "purchased_modules": "Purchased Modules",
       "opt_planned_dtr": "Option: Service Panel (DTR)",
       "opt_inventory": "Option: Spare Parts Warehouse",
+      "opt_fleet": "Option: Vehicle Fleet Management (Insurance, Inspection, Mileage km)",
+      "mod_fleet": "Vehicle Fleet Module",
       "cancel": "Cancel",
       "save_changes": "Save Changes",
       "create_company": "Create Company",
@@ -1027,9 +1029,12 @@
       "profile_facility_desc": "Housing communities, office buildings and estates: buildings, staircases/units, c-KOB building inspections (Art. 62), intercom access.",
       "profile_hvac_title": "Mobile HVAC Service / Heat Pumps (Field Service)",
       "profile_hvac_desc": "Installers and field service: heat pumps, air conditioners, boiler rooms, F-Gas leak test protocols (CRO), GPS client navigation.",
+      "profile_fleet_title": "Vehicle Fleet & Mobile Equipment (VexoNT Fleet)",
+      "profile_fleet_desc": "Company cars, service vans, transport and wheeled equipment: mileage (km / mth), insurance policies, technical inspections and TCO costs.",
       "profile_short_industrial": "Industrial / Maintenance",
       "profile_short_facility": "Facility / Estates (c-KOB)",
-      "profile_short_hvac": "HVAC Service (F-Gas / CRO)"
+      "profile_short_hvac": "HVAC Service (F-Gas / CRO)",
+      "profile_short_fleet": "VexoNT Fleet (Vehicles)"
     }
   },
   "superadmin": {},

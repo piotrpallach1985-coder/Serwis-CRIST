@@ -34,6 +34,11 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
             </button>
           )}
           <span className={machine.hasChildren ? 'cursor-pointer hover:text-blue-600' : ''}>{machine.name}</span>
+          {machine.licensePlate && (
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[10px] font-bold">
+              {machine.licensePlate}
+            </span>
+          )}
         </h4>
         <p className="text-xs font-mono text-gray-400 mb-1">{t('machines.card.id')}{machine.id}</p>
         
@@ -49,7 +54,12 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
               : regions.find(r => r.id === machine.regionId)?.name || '-'}
           </div>
           <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> {t('machines.card.bay')}{machine.bay || '-'}</div>
-          <div className="flex items-center gap-1"><i className="ph ph-hourglass"></i> {t('machines.card.rbg')}{machine.currentWorkHours || 0}</div>
+          <div className="flex items-center gap-1">
+            <i className={`ph ${machine.counterUnit === 'km' ? 'ph-gauge' : 'ph-hourglass'}`}></i>{' '}
+            {machine.counterUnit === 'km'
+              ? `Przebieg: ${machine.currentWorkHours || 0} km`
+              : `${t('machines.card.rbg')}${machine.currentWorkHours || 0}`}
+          </div>
         </div>
         {handleCopyNfc && (
           <button 

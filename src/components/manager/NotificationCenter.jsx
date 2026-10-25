@@ -13,6 +13,8 @@ import {
   checkCkob7DaysDeadline,
   filterTasksForFieldTechnician,
   filterMachinesForFieldTechnician,
+  checkVehicleDatesStatus,
+  isVehicleAsset,
 } from '../../utils/fieldServiceHelpers';
 
 const EMPTY_ARRAY = [];
@@ -296,6 +298,71 @@ export default function NotificationCenter({
     }
 
     if (isUrModule || currentModule === 'master_data' || (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.SUPERADMIN)) {
+      visibleMachines.forEach(m => {
+        if (!isVehicleAsset(m, industryProfile)) return;
+        const vStatus = checkVehicleDatesStatus(m, plannedWarningDays);
+        const plateInfo = m.licensePlate ? ` [${m.licensePlate}]` : '';
+
+        if (
+          vStatus.techInspectionStatus === 'overdue' ||
+          vStatus.techInspectionStatus === 'upcoming'
+        ) {
+          const isOver = vStatus.techInspectionStatus === 'overdue';
+          list.push({
+            id: 'dyn_fleet_skp_' + m.id,
+            title: isOver
+              ? 'PRZETERMINOWANE BADANIE TECHNICZNE (SKP)!'
+              : 'ZBLIŻA SIĘ TERMIN BADANIA TECHNICZNEGO (SKP)',
+            message: `Pojazd: ${m.name}${plateInfo} — ${
+              isOver
+                ? `badanie SKP po terminie o ${Math.abs(vStatus.techInspectionDaysLeft)} dni (${m.techInspectionDate})`
+                : `ważność badania SKP kończy się za ${vStatus.techInspectionDaysLeft} dni (${m.techInspectionDate})`
+            }`,
+            isCritical: isOver,
+            priorityRank: isOver ? 2 : 4,
+            icon: 'ph-truck',
+            colorClass: isOver ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700',
+            badge: isOver ? 'SKP PILNE' : 'SKP ZBLIŻA SIĘ',
+            badgeClass: isOver
+              ? 'bg-red-600 text-white font-bold animate-pulse'
+              : 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
+            read: false,
+            linkTo: 'machines',
+            machineId: m.id,
+            createdAt: { toDate: () => safeParseDate(m.techInspectionDate) || new Date() },
+            isDynamic: true,
+          });
+        }
+
+        if (vStatus.insuranceStatus === 'overdue' || vStatus.insuranceStatus === 'upcoming') {
+          const isOver = vStatus.insuranceStatus === 'overdue';
+          list.push({
+            id: 'dyn_fleet_oc_' + m.id,
+            title: isOver
+              ? 'WYGASŁA POLISA UBEZPIECZENIOWA (OC/AC)!'
+              : 'ZBLIŻA SIĘ KONIEC POLISY UBEZPIECZENIOWEJ (OC/AC)',
+            message: `Pojazd: ${m.name}${plateInfo} — ${
+              isOver
+                ? `polisa OC/AC wygasła ${Math.abs(vStatus.insuranceDaysLeft)} dni temu (${m.insuranceExpiryDate})`
+                : `polisa OC/AC kończy się za ${vStatus.insuranceDaysLeft} dni (${m.insuranceExpiryDate})`
+            }`,
+            isCritical: isOver,
+            priorityRank: isOver ? 2 : 4,
+            icon: 'ph-shield-warning',
+            colorClass: isOver ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700',
+            badge: isOver ? 'OC/AC PILNE' : 'OC/AC ZBLIŻA SIĘ',
+            badgeClass: isOver
+              ? 'bg-red-600 text-white font-bold animate-pulse'
+              : 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
+            read: false,
+            linkTo: 'machines',
+            machineId: m.id,
+            createdAt: { toDate: () => safeParseDate(m.insuranceExpiryDate) || new Date() },
+            isDynamic: true,
+          });
+        }
+      });
+
       visibleMachines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {
         list.push({
           id: 'dyn_verif_machine_' + m.id,

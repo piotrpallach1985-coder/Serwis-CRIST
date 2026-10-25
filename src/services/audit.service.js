@@ -84,7 +84,15 @@ const FIELD_TRANSLATION_MAP = {
   workStartGps: 'GPS startu pracy',
   completedGps: 'GPS zakończenia pracy',
   manHours: 'Zadeklarowane RBG (h)',
-  actualManHours: 'Zadeklarowane RBG (h)'
+  actualManHours: 'Zadeklarowane RBG (h)',
+  assetCategory: 'Typ zasobu (Urządzenie/Pojazd)',
+  counterUnit: 'Jednostka licznika (km/RBG)',
+  licensePlate: 'Nr rejestracyjny',
+  vinNumber: 'Numer VIN',
+  fuelType: 'Rodzaj paliwa / napędu',
+  techInspectionDate: 'Ważność badania SKP',
+  insuranceExpiryDate: 'Ważność polisy OC/AC',
+  assignedDriver: 'Przypisany kierowca'
 };
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;

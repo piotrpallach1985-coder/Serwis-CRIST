@@ -30,7 +30,7 @@ export default function MachineTable({
               ) : (
                 <span className="w-6"></span>
               )}
-              <span>{m.name}</span>
+              <span>{m.name}</span>{m.licensePlate && <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[10px] font-bold">{m.licensePlate}</span>}
             </div>
           </div>
           <div className="text-xs font-mono text-gray-400 mt-1">ID: {m.id}</div>

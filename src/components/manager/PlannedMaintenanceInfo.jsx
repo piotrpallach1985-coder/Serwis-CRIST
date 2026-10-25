@@ -15,6 +15,9 @@ import {
   calculateCo2Equivalent,
   checkCkob7DaysDeadline,
   calculateWorkAndTravelMetrics,
+  isVehicleAsset,
+  getMachineCounterUnit,
+  checkVehicleDatesStatus,
 } from '../../utils/fieldServiceHelpers';
 
 export default function PlannedMaintenanceInfo({
@@ -115,6 +118,10 @@ export default function PlannedMaintenanceInfo({
   const clientSignerName =
     srv.clientSignerName || srv.completionDetails?.clientSignerName || '';
   const workMetrics = calculateWorkAndTravelMetrics(srv, machine, regions);
+  const isVehicle = isVehicleAsset(machine, industryProfile);
+  const counterUnit = getMachineCounterUnit(machine, industryProfile);
+  const counterUnitLower = counterUnit === 'km' ? 'km' : 'rbg';
+  const vehicleDates = isVehicle ? checkVehicleDatesStatus(machine) : null;
   const showWorkVerificationBox =
     workMetrics.travelDurationMinutes !== null ||
     workMetrics.stopwatchWorkMinutes !== null ||
@@ -375,14 +382,16 @@ export default function PlannedMaintenanceInfo({
                   {srv.triggerType === 'calendar'
                     ? t('planned.info.calendar', 'Kalendarz')
                     : srv.triggerType === 'hours'
-                    ? 'RBG'
+                    ? counterUnit
                     : t('planned.info.mixed', 'Mieszany')}
                 </div>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
                   <i className="ph ph-calendar-blank text-base"></i>{' '}
-                  {t('planned.info.dueOrHours', 'Termin / RBG')}
+                  {counterUnit === 'km'
+                    ? 'Termin / Przebieg (km)'
+                    : t('planned.info.dueOrHours', 'Termin / RBG')}
                 </div>
                 <div className="font-bold text-slate-800 text-sm">
                   {srv.triggerType === 'calendar'
@@ -391,11 +400,11 @@ export default function PlannedMaintenanceInfo({
                       : '-'
                     : srv.triggerType === 'hours'
                     ? srv.targetWorkHours
-                      ? `${srv.targetWorkHours} rbg`
+                      ? `${srv.targetWorkHours} ${counterUnitLower}`
                       : '-'
                     : `${
                         srv.nextDate ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-' : '-'
-                      } / ${srv.targetWorkHours ? srv.targetWorkHours + ' rbg' : '-'}`}
+                      } / ${srv.targetWorkHours ? srv.targetWorkHours + ' ' + counterUnitLower : '-'}`}
                 </div>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
@@ -567,6 +576,46 @@ export default function PlannedMaintenanceInfo({
                     </span>
                     <span className="font-bold text-slate-800 mt-0.5 block">
                       {fGasSummaryStr || 'Wykonać próbę szczelności przy zamknięciu serwisu'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(industryProfile === 'fleet' || isVehicle) && (
+              <div
+                data-testid="service-domain-fleet"
+                className="mt-4 bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5"
+              >
+                <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2.5">
+                  <i className="ph ph-truck text-emerald-700 text-base"></i>
+                  <span>Karta Obsługi Technicznej Pojazdu / Floty (Przebieg, SKP, Polisa OC/AC)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                    <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                      Pojazd / Nr rej. / VIN
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {machine?.licensePlate ? `[${machine.licensePlate}] ` : ''}
+                      {machine?.vinNumber ? `VIN: ${machine.vinNumber}` : 'Zasób mobilny'}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                    <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                      Aktualny przebieg / Interwał
+                    </span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">
+                      {machine?.currentWorkHours ?? machine?.operatingHours ?? 0} {counterUnit}
+                      {srv.hoursInterval ? ` (Co ${srv.hoursInterval} ${counterUnit})` : ''}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
+                    <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
+                      Badanie SKP / Polisa OC/AC
+                    </span>
+                    <span className="font-bold text-slate-800 mt-0.5 block">
+                      SKP: {machine?.techInspectionDate || '-'} · OC: {machine?.insuranceExpiryDate || '-'}
                     </span>
                   </div>
                 </div>

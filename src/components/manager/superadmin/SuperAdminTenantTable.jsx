@@ -53,9 +53,11 @@ export default function SuperAdminTenantTable({
                 {tenantsWithTokens.filter(tenantItem => tenantItem.id !== '_global_settings_').map(tenant => {
                   const hasPlannedDtr = tenant.modules?.planned_services !== false;
                   const hasInventory = tenant.modules?.inventory !== false;
+                  const hasFleet = Boolean(tenant.modules?.fleet || tenant.industryProfile === 'fleet');
                   const activeModules = [
                     ...(hasPlannedDtr ? [t("dashboards.superadmin.mod_planned_dtr", "Panel Serwisu (DTR)")] : []),
-                    ...(hasInventory ? [t("dashboards.superadmin.mod_inventory", "Magazyn części zamiennych")] : [])
+                    ...(hasInventory ? [t("dashboards.superadmin.mod_inventory", "Magazyn części zamiennych")] : []),
+                    ...(hasFleet ? [t("dashboards.superadmin.mod_fleet", "Moduł Floty Pojazdów")] : [])
                   ];
 
                   const clientAiCost = (
