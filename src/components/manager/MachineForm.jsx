@@ -58,6 +58,8 @@ export default function MachineForm({
   const [assetCategory, setAssetCategory] = useState('device'); // 'device' | 'vehicle'
   const [licensePlate, setLicensePlate] = useState('');
   const [vinNumber, setVinNumber] = useState('');
+  const [firstRegistrationDate, setFirstRegistrationDate] = useState('');
+  const [initialCounterValue, setInitialCounterValue] = useState('');
   const [counterUnit, setCounterUnit] = useState('RBG'); // 'km' | 'RBG'
   const [fuelType, setFuelType] = useState('');
   const [techInspectionDate, setTechInspectionDate] = useState('');
@@ -131,6 +133,12 @@ export default function MachineForm({
       setAssetCategory(isExistingVehicle ? 'vehicle' : 'device');
       setLicensePlate(editingMachine.licensePlate || '');
       setVinNumber(editingMachine.vinNumber || '');
+      setFirstRegistrationDate(editingMachine.firstRegistrationDate || '');
+      setInitialCounterValue(
+        editingMachine.currentWorkHours !== undefined && editingMachine.currentWorkHours !== null
+          ? String(editingMachine.currentWorkHours)
+          : '0'
+      );
       setCounterUnit(editingMachine.counterUnit || (isExistingVehicle ? 'km' : 'RBG'));
       setFuelType(editingMachine.fuelType || '');
       setTechInspectionDate(editingMachine.techInspectionDate || '');
@@ -173,6 +181,8 @@ export default function MachineForm({
       setAssetCategory(defaultIsVehicle ? 'vehicle' : 'device');
       setLicensePlate('');
       setVinNumber('');
+      setFirstRegistrationDate('');
+      setInitialCounterValue('');
       setCounterUnit(defaultIsVehicle ? 'km' : 'RBG');
       setFuelType('');
       setTechInspectionDate('');
@@ -236,6 +246,12 @@ export default function MachineForm({
       industryProfile === 'hvac' ||
       industryProfile === 'fleet';
     const isVehicleSelected = assetCategory === 'vehicle';
+    const parsedCounter =
+      initialCounterValue !== '' &&
+      !isNaN(Number(initialCounterValue)) &&
+      Number(initialCounterValue) >= 0
+        ? Number(initialCounterValue)
+        : 0;
 
     const effectiveRefType = allowFGas ? refrigerantType || '' : '';
     const extraPayload = {
@@ -245,15 +261,25 @@ export default function MachineForm({
         ? {
             licensePlate: licensePlate.trim().toUpperCase(),
             vinNumber: vinNumber.trim().toUpperCase(),
+            firstRegistrationDate: firstRegistrationDate || '',
             fuelType: fuelType || '',
             techInspectionDate: techInspectionDate || '',
             insuranceExpiryDate: insuranceExpiryDate || '',
             assignedDriver: assignedDriver.trim(),
+            ...(initialCounterValue !== ''
+              ? {
+                  currentWorkHours: parsedCounter,
+                  ...(parsedCounter !== Number(editingMachine?.currentWorkHours || 0)
+                    ? { lastHoursUpdate: new Date().toISOString() }
+                    : {}),
+                }
+              : {}),
           }
         : !editingMachine
         ? {
             licensePlate: '',
             vinNumber: '',
+            firstRegistrationDate: '',
             fuelType: '',
             techInspectionDate: '',
             insuranceExpiryDate: '',
@@ -312,7 +338,7 @@ export default function MachineForm({
           bay: bay.trim(),
           regionId,
           internalId: internalId.trim(),
-          parentId: parentId || null,
+          parentId: isVehicleSelected ? null : parentId || null,
           additionalDescription: additionalDescription.trim(),
           ...extraPayload,
           qrCreatedAt: serverTimestamp(),
@@ -325,11 +351,11 @@ export default function MachineForm({
           bay: bay.trim(),
           regionId,
           internalId: internalId.trim(),
-          parentId: parentId || null,
+          parentId: isVehicleSelected ? null : parentId || null,
           additionalDescription: additionalDescription.trim(),
-          ...extraPayload,
           isDeleted: false,
-          currentWorkHours: 0,
+          currentWorkHours: isVehicleSelected ? parsedCounter : 0,
+          ...extraPayload,
         });
         onSaved(t('machines.toasts.machineAdded'), res.id);
       }
@@ -428,13 +454,22 @@ export default function MachineForm({
                     : t('machines.form.region', 'Miejsce montażu *')}
                 </label>
                 <select
+                  data-testid="machine-form-region-select"
                   value={regionId}
                   onChange={e => setRegionId(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-blue-500"
                   required
                 >
-                  <option value="">{t('machines.form.selectRegion', '-- Wybierz miejsce montażu --')}</option>
-                  <option value="main_map">{t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
+                  <option value="">
+                    {assetCategory === 'vehicle'
+                      ? '-- Wybierz bazę / oddział --'
+                      : t('machines.form.selectRegion', '-- Wybierz miejsce montażu --')}
+                  </option>
+                  <option value="main_map">
+                    {assetCategory === 'vehicle' || industryProfile === 'fleet'
+                      ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+                      : t('machines.form.mainMapRegion', 'Mapa Główna')}
+                  </option>
                   {regions.map(r => (
                     <option key={r.id} value={r.id}>
                       {r.name}
@@ -467,25 +502,27 @@ export default function MachineForm({
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">
-                {t('machines.form.parentMachine', 'Urządzenie nadrzędne (Opcjonalnie)')}
-              </label>
-              <select
-                value={parentId}
-                onChange={handleParentChange}
-                className="w-full p-2 border border-gray-300 rounded outline-none bg-white"
-              >
-                <option value="">{t('machines.form.noParent', '-- Brak (Urządzenie główne) --')}</option>
-                {machines
-                  .filter(m => m.id !== (editingMachine ? editingMachine.id : null))
-                  .map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} {m.licensePlate ? `[${m.licensePlate}]` : ''}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            {assetCategory !== 'vehicle' && (
+              <div data-testid="machine-form-parent-field">
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  {t('machines.form.parentMachine', 'Urządzenie nadrzędne (Opcjonalnie)')}
+                </label>
+                <select
+                  value={parentId}
+                  onChange={handleParentChange}
+                  className="w-full p-2 border border-gray-300 rounded outline-none bg-white"
+                >
+                  <option value="">{t('machines.form.noParent', '-- Brak (Urządzenie główne) --')}</option>
+                  {machines
+                    .filter(m => m.id !== (editingMachine ? editingMachine.id : null))
+                    .map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.licensePlate ? `[${m.licensePlate}]` : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
                 {t('machines.form.additionalDescription', 'Dodatkowy opis (Opcjonalnie)')}
@@ -548,6 +585,38 @@ export default function MachineForm({
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Data pierwszej rejestracji
+                    </label>
+                    <input
+                      type="date"
+                      data-testid="fleet-first-registration-input"
+                      value={firstRegistrationDate}
+                      onChange={e => setFirstRegistrationDate(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Aktualny stan licznika (startowy)
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        data-testid="fleet-initial-counter-input"
+                        value={initialCounterValue}
+                        onChange={e => setInitialCounterValue(e.target.value)}
+                        placeholder={`np. 125000`}
+                        className="w-full p-2 pr-12 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <span className="absolute right-2.5 text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded pointer-events-none">
+                        {counterUnit}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Jednostka licznika
                     </label>
                     <select
@@ -602,7 +671,7 @@ export default function MachineForm({
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-2 lg:col-span-4">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Przypisany kierowca / Opiekun pojazdu
                     </label>

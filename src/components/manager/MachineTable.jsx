@@ -3,6 +3,7 @@ import React from 'react';
 import MachineCard from './MachineCard';
 import DataTable from '../shared/DataTable';
 import PropTypes from 'prop-types';
+import { isVehicleAsset } from '../../utils/fieldServiceHelpers';
 
 export default function MachineTable({
   filteredMachines, // Not used strictly anymore, currentItems represents the data to show
@@ -52,7 +53,7 @@ export default function MachineTable({
       accessor: 'regionId',
       render: (m) => (
         <span className="text-gray-600">
-          {m.regionId === 'main_map' ? t('machines.form.mainMapRegion', 'Mapa Główna') : regions.find(r => r.id === m.regionId)?.name || '-'}
+          {m.regionId === 'main_map' ? (isVehicleAsset(m) ? t('machines.form.wholeCompanyRegion', 'Cała Firma') : t('machines.form.mainMapRegion', 'Mapa Główna')) : regions.find(r => r.id === m.regionId)?.name || '-'}
           {m.bay && ` / ${m.bay}`}
         </span>
       )

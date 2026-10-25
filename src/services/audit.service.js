@@ -89,6 +89,7 @@ const FIELD_TRANSLATION_MAP = {
   counterUnit: 'Jednostka licznika (km/RBG)',
   licensePlate: 'Nr rejestracyjny',
   vinNumber: 'Numer VIN',
+  firstRegistrationDate: 'Data pierwszej rejestracji',
   fuelType: 'Rodzaj paliwa / napędu',
   techInspectionDate: 'Ważność badania SKP',
   insuranceExpiryDate: 'Ważność polisy OC/AC',

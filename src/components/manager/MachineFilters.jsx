@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import React from 'react';
 import DebouncedInput from './DebouncedInput';
+import { useManagerStore } from '../../store/managerStore';
 
 export default function MachineFilters({
   searchQuery,
@@ -13,6 +14,11 @@ export default function MachineFilters({
   onAddMachine
 }) {
   const { t } = useTranslation();
+  const branding = useManagerStore(state => state.branding);
+  const machines = useManagerStore(state => state.machines || []);
+  const hasVehiclesOrFleet =
+    branding?.industryProfile === 'fleet' ||
+    machines.some(m => !m.isDeleted && (m.assetCategory === 'vehicle' || m.licensePlate));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 mb-4">
@@ -52,7 +58,7 @@ export default function MachineFilters({
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 appearance-none cursor-pointer transition-all"
           >
             <option value="">{t('machines.filters.allRegions')}</option>
-            <option value="main_map">{t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
+            <option value="main_map">{branding?.industryProfile === 'fleet' ? t('machines.form.wholeCompanyRegion', 'Cała Firma') : hasVehiclesOrFleet ? `${t('machines.form.mainMapRegion', 'Mapa Główna')} / Cała Firma` : t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
             <option value="bez_rejonu">{t('machines.filters.noRegion')}</option>
             {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>

@@ -10,6 +10,7 @@ import { getCurrentTenant } from '../../utils/tenantHelper';
 import { getOrCreateQrKey, getCachedQrKey, buildMachineQrValue } from '../../services/qrAccess.service';
 import { useTileLayout } from '../../hooks/useTileLayout';
 import { usePermissions } from '../../hooks/usePermissions';
+import { isVehicleAsset } from '../../utils/fieldServiceHelpers';
 import CustomizableTileGrid from '../shared/CustomizableTileGrid';
 
 import MachineHeader from './machines/MachineHeader';
@@ -40,9 +41,13 @@ export default function MachineDetails({
   const { user } = useAuth();
   const { canManageDtr, canDeleteTechNotes } = usePermissions(user);
   const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
+  const branding = useManagerStore(state => state.branding);
+  const isVehicle = isVehicleAsset(machine, branding?.industryProfile);
   const regionName =
     machine.regionId === 'main_map'
-      ? t('machines.form.mainMapRegion', 'Mapa Główna')
+      ? isVehicle
+        ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+        : t('machines.form.mainMapRegion', 'Mapa Główna')
       : regions.find(r => r.id === machine.regionId)?.name || t('machines.details.unknownRegion');
   const currentTenantId = getCurrentTenant();
   const [partTransactions, setPartTransactions] = useState([]);
@@ -57,7 +62,6 @@ export default function MachineDetails({
   const tickets = useManagerStore(state => state.tickets || []);
   const plannedServices = useManagerStore(state => state.plannedServices || []);
   const machines = useManagerStore(state => state.machines || []);
-  const branding = useManagerStore(state => state.branding);
 
   const parentMachine = machine.parentId ? machines.find(m => m.id === machine.parentId) : null;
   const childMachines = machines.filter(m => m.parentId === machine.id);

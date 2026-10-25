@@ -1444,12 +1444,20 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       // Domyślnie w profilu HVAC wybrany jest zasób typu 'device'
       expect(screen.queryByTestId('machine-form-fleet-section')).toBeNull();
+      expect(screen.getByTestId('machine-form-parent-field')).toBeTruthy();
+      expect(screen.getByTestId('machine-form-region-select').textContent).toContain('Mapa Główna');
 
       // Kliknięcie przełącznika "Pojazd / Środek transportu — Flota (km / RBG)"
       fireEvent.click(screen.getByTestId('asset-category-vehicle-btn'));
       expect(screen.getByTestId('machine-form-fleet-section')).toBeTruthy();
+      // Przy dodawaniu samochodu "Urządzenie nadrzędne (Opcjonalnie)" nie jest wymagane i jest ukryte
+      expect(screen.queryByTestId('machine-form-parent-field')).toBeNull();
+      // W bazie zamiast "Mapa Główna" widnieje "Cała Firma"
+      expect(screen.getByTestId('machine-form-region-select').textContent).toContain('Cała Firma');
       expect(screen.getByTestId('fleet-license-plate-input')).toBeTruthy();
       expect(screen.getByTestId('fleet-vin-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-first-registration-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-initial-counter-input')).toBeTruthy();
       expect(screen.getByTestId('fleet-counter-unit-select').value).toBe('km');
       expect(screen.getByTestId('fleet-tech-inspection-input')).toBeTruthy();
       expect(screen.getByTestId('fleet-insurance-expiry-input')).toBeTruthy();
@@ -1464,11 +1472,12 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         currentWorkHours: 149200,
         licensePlate: 'GD 12345',
         vinNumber: 'VF1MA000087654321',
+        firstRegistrationDate: '2022-05-18',
         fuelType: 'Diesel (ON)',
         assignedDriver: 'Jan Serwisant',
         techInspectionDate: '2026-11-05', // za 11 dni względem 2026-10-25
         insuranceExpiryDate: '2026-10-10', // 15 dni po terminie względem 2026-10-25
-        regionId: 'r-baza',
+        regionId: 'main_map',
       };
 
       expect(isVehicleAsset(serviceVan, 'hvac')).toBe(true);
@@ -1535,6 +1544,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('machine-license-plate-badge').textContent).toBe('GD 12345');
       expect(screen.getByTestId('machine-counter-value').textContent).toContain('149200 km');
       expect(screen.getByTestId('machine-fleet-card').textContent).toContain('VF1MA000087654321');
+      expect(screen.getByTestId('machine-fleet-first-reg').textContent).toBe('2022-05-18');
       expect(screen.getByTestId('service-domain-fleet').textContent).toContain('GD 12345');
       expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('GD 12345');
 

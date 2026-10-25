@@ -147,7 +147,11 @@ export default function MachineInfoCard({
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">
             {isVehicle ? 'Baza / Oddział:' : t('machines.details.regionLabel')}
           </div>
-          <div className="font-semibold text-gray-800 text-base">{regionName}</div>
+          <div className="font-semibold text-gray-800 text-base">
+            {isVehicle && (machine?.regionId === 'main_map' || regionName === 'Mapa Główna')
+              ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+              : regionName}
+          </div>
           {regions.find(r => r.id === machine.regionId)?.mapImageUrl && (
             <a
               href={regions.find(r => r.id === machine.regionId).mapImageUrl}
@@ -228,7 +232,7 @@ export default function MachineInfoCard({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-800">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800">
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">
                     Nr rejestracyjny
@@ -243,6 +247,17 @@ export default function MachineInfoCard({
                   </span>
                   <span className="font-mono font-bold text-slate-700 break-all">
                     {machine?.vinNumber || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Data 1. rejestracji
+                  </span>
+                  <span
+                    data-testid="machine-fleet-first-reg"
+                    className="font-bold text-slate-800"
+                  >
+                    {machine?.firstRegistrationDate || '-'}
                   </span>
                 </div>
                 <div>

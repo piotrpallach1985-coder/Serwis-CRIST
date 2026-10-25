@@ -165,11 +165,11 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
     ];
     if (isVehicle) {
       baseInfoRows.push([
-        n('Dane Pojazdu (Nr rej. / VIN / Paliwo):'),
+        n('Dane Pojazdu (Nr rej. / VIN / 1. Rej. / Paliwo):'),
         n(
-          `${machine.licensePlate || '-'} | VIN: ${machine.vinNumber || '-'} | Paliwo: ${
-            machine.fuelType || '-'
-          }`
+          `${machine.licensePlate || '-'} | VIN: ${machine.vinNumber || '-'} | 1. Rej.: ${
+            machine.firstRegistrationDate || '-'
+          } | Paliwo: ${machine.fuelType || '-'}`
         ),
       ]);
       baseInfoRows.push([

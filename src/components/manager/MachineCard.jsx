@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
 import React from 'react';
+import { isVehicleAsset } from '../../utils/fieldServiceHelpers';
 
 export default function MachineCard({ machine, regions, onClick, onPrintQR, onShowQR, handleCopyNfc, toggleNode }) {
   const { t } = useTranslation();
+  const isVehicle = isVehicleAsset(machine);
 
   return (
     <div 
@@ -50,7 +52,9 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
           <div className="flex items-center gap-1">
             <i className="ph ph-map-pin"></i> {t('machines.card.region')}
             {machine.regionId === 'main_map'
-              ? t('machines.form.mainMapRegion', 'Mapa Główna')
+              ? isVehicle
+                ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+                : t('machines.form.mainMapRegion', 'Mapa Główna')
               : regions.find(r => r.id === machine.regionId)?.name || '-'}
           </div>
           <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> {t('machines.card.bay')}{machine.bay || '-'}</div>

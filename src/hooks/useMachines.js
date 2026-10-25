@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { exportToExcel } from '../utils/reports/excelExport';
-import { normalizeLicensePlate } from '../utils/fieldServiceHelpers';
+import { normalizeLicensePlate, isVehicleAsset } from '../utils/fieldServiceHelpers';
 
 /**
  * useMachines — hook do zarządzania rejestrem maszyn/pojazdów, filtrowaniem po nazwie, nr rej., VIN, kierowcy i rejonie oraz eksportem.
@@ -126,9 +126,12 @@ export function useMachines(machines = [], regions = []) {
       'Nazwa Urządzenia / Pojazdu': m.name || '-',
       'Nr Rejestracyjny': m.licensePlate || '-',
       'Numer VIN': m.vinNumber || '-',
+      'Data 1. Rejestracji': m.firstRegistrationDate || '-',
       Rejon:
         m.regionId === 'main_map'
-          ? 'Mapa Główna'
+          ? isVehicleAsset(m)
+            ? 'Cała Firma'
+            : 'Mapa Główna'
           : regions.find(r => r.id === m.regionId)?.name || 'Bez rejonu',
       'Nr Seryjny / Wewnętrzny': m.internalId || '-',
       'Stan Licznika': `${m.currentWorkHours || 0} ${m.counterUnit === 'km' ? 'km' : 'RBG'}`,

@@ -9,6 +9,7 @@ import {
   filterMachinesForFieldTechnician,
   filterTasksForFieldTechnician,
   findMachineByIdentifierOrPlate,
+  isVehicleAsset,
 } from '../../utils/fieldServiceHelpers';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import {
@@ -490,7 +491,9 @@ export default function Machines({
                 ...selectedMachine,
                 regionName:
                   selectedMachine.regionId === 'main_map'
-                    ? t('machines.form.mainMapRegion', 'Mapa Główna')
+                    ? isVehicleAsset(selectedMachine, branding?.industryProfile)
+                      ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+                      : t('machines.form.mainMapRegion', 'Mapa Główna')
                     : regions.find(r => r.id === selectedMachine.regionId)?.name,
               },
               machineHistory.tickets,
