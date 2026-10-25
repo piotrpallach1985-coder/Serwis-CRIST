@@ -26,6 +26,7 @@ export default function Login({ onLogin, currentUser }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [partScanAlert, setPartScanAlert] = useState(null);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   const currentLang = (i18n.language || 'pl').startsWith('pl') ? 'pl' : 'en';
   const toggleLanguage = () => {
@@ -569,12 +570,374 @@ export default function Login({ onLogin, currentUser }) {
           </div>
         </div>
       )}
-      <div className="mt-8 pb-4 text-center text-[11px] font-medium text-slate-400">
-        {t(
-          'login.footer_subtitle',
-          '© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu'
-        )}
+      <div className="mt-8 pb-4 text-center text-[11px] font-medium text-slate-400 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+        <span>
+          {t(
+            'login.footer_subtitle',
+            '© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu'
+          )}
+        </span>
+        <span className="hidden sm:inline text-slate-300">•</span>
+        <button
+          type="button"
+          data-testid="privacy-policy-open-btn"
+          onClick={() => setIsPrivacyModalOpen(true)}
+          className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 font-semibold underline decoration-slate-300 hover:decoration-blue-500 underline-offset-2 transition-colors cursor-pointer"
+        >
+          <i className="ph ph-shield-check text-sm text-blue-600"></i>
+          <span>
+            {currentLang === 'pl'
+              ? 'Polityka Prywatności, RODO i AI'
+              : 'Privacy Policy, GDPR & AI Notice'}
+          </span>
+        </button>
       </div>
+
+      {isPrivacyModalOpen && (
+        <div
+          data-testid="privacy-policy-modal"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-5 animate-fade-in"
+          onClick={() => setIsPrivacyModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col border border-slate-200 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <i className="ph-fill ph-shield-check text-2xl"></i>
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
+                    {currentLang === 'pl'
+                      ? 'Polityka Prywatności, Ochrona Danych (RODO) i Informacja o AI'
+                      : 'Privacy Policy, Data Protection (GDPR) & AI Transparency Notice'}
+                  </h2>
+                  <p className="text-xs font-bold text-blue-600 mt-0.5">
+                    {currentLang === 'pl'
+                      ? 'Platforma SaaS VexoNT™ (CMMS / Field Service / Facility Management)'
+                      : 'VexoNT™ SaaS Platform (CMMS / Field Service / Facility Management)'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="privacy-policy-close-btn"
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
+                aria-label="Zamknij"
+              >
+                <i className="ph ph-x text-xl"></i>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+              {currentLang === 'pl' ? (
+                <>
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-buildings text-blue-600 text-base"></i>
+                      <span>
+                        1. Kto jest Administratorem Twoich danych osobowych? (Model SaaS)
+                      </span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        W zakresie danych wprowadzanych do systemu w ramach obsługi zakładu
+                        przemysłowego, nieruchomości (c-KOB) lub serwisu mobilnego (HVAC) —{' '}
+                        <strong>Administratorem Danych Osobowych (ADO)</strong> w rozumieniu art. 4
+                        pkt 7 RODO jest podmiot (Pracodawca, Zarządca Nieruchomości lub Firma
+                        Serwisowa), który wykupił licencję i udostępnił Ci dostęp lub kod QR/NFC do
+                        systemu.
+                      </li>
+                      <li>
+                        Dostawca platformy <strong>VexoNT™</strong> działa wyłącznie jako{' '}
+                        <strong>Podmiot Przetwarzający (Procesor)</strong> na podstawie art. 28
+                        RODO, zapewniając bezpieczną, odizolowaną infrastrukturę chmurową
+                        (Multi-Tenant).
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-files text-indigo-600 text-base"></i>
+                      <span>2. Zakres, cel i podstawa prawna przetwarzania danych</span>
+                    </h3>
+                    <p className="mb-2">
+                      System przetwarza dane niezbędne do utrzymania ciągłości ruchu, realizacji
+                      przeglądów ustawowych (w tym art. 62 Prawa budowlanego / c-KOB oraz Rozp.
+                      F-Gazowego UE 2024/573 / CRO) i rozliczania zleceń:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 mb-2">
+                      <li>
+                        <strong>Dane identyfikacyjne i kontaktowe użytkowników</strong> (imię,
+                        nazwisko, służbowy adres e-mail, telefon, rola systemowa, opcjonalnie nr
+                        uprawnień budowlanych/kwalifikacyjnych PIIB/SEP/F-Gaz) — w celu autoryzacji
+                        i prowadzenia rozliczalnego Dziennika Zdarzeń (Audit Trail wg ISO 55000 oraz
+                        wymogów cyberbezpieczeństwa NIS2).
+                      </li>
+                      <li>
+                        <strong>Dane zgłaszających z kodów QR/NFC</strong> (opis usterki, zdjęcia,
+                        opcjonalny numer telefonu kontaktowego oraz techniczny identyfikator sesji
+                        urządzenia służący ochronie antyspamowej).
+                      </li>
+                      <li>
+                        <strong>Dane klientów i lokatorów</strong> (adres wykonania usługi, osoba
+                        kontaktowa, telefon, podpis cyfrowy na ekranie urządzenia potwierdzający
+                        odbiór prac) — objęte ścisłą izolacją uprawnień RODO B2C (widoczne wyłącznie
+                        dla przypisanego wykonawcy).
+                      </li>
+                    </ul>
+                    <p className="text-[11px] sm:text-xs text-slate-600">
+                      Podstawą prawną przetwarzania jest art. 6 ust. 1 lit. b, c oraz f RODO
+                      (wykonanie umowy/obowiązków służbowych, wypełnienie obowiązków prawnych
+                      ciążących na Administratorze oraz prawnie uzasadniony interes polegający na
+                      zabezpieczeniu mienia, ciągłości pracy i dochodzeniu roszczeń gwarancyjnych).
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                    <h3 className="font-extrabold text-emerald-950 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-map-pin text-emerald-600 text-base"></i>
+                      <span>
+                        3. Punktowa weryfikacja lokalizacji GPS (Brak ciągłego śledzenia w tle)
+                      </span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5 text-emerald-950">
+                      <li>
+                        W modułach serwisów mobilnych (Field Service) oraz obsługi nieruchomości
+                        aplikacja może pobierać współrzędne geolokalizacyjne GPS{' '}
+                        <strong>wyłącznie punktowo</strong> — w momencie świadomego kliknięcia przez
+                        serwisanta przycisków statusu (np. „Rozpocznij dojazd”, „Rozpocznij pracę na
+                        obiekcie”, „Pobierz GPS” / „Zatwierdź Wykonanie”).
+                      </li>
+                      <li>
+                        Aplikacja VexoNT™ <strong>NIE śledzi trasy pracownika w sposób ciągły w tle</strong>{' '}
+                        ani poza czasem realizacji zlecenia. Punktowy odczyt GPS oraz stoper czasu
+                        trwania zlecenia służą wyłącznie do potwierdzenia obecności na obiekcie
+                        klienta, weryfikacji rzetelności przeglądów technicznych i rozliczenia czasu
+                        pracy.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200">
+                    <h3 className="font-extrabold text-amber-950 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-sparkle text-amber-600 text-base"></i>
+                      <span>
+                        4. Przejrzystość Sztucznej Inteligencji (Zgodność z EU AI Act — Art. 50)
+                      </span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5 text-amber-950">
+                      <li>
+                        Funkcje głosowe (AI voice to text / Smart AI) oraz Asystent Dokumentacji DTR
+                        wykorzystują modele sztucznej inteligencji Google Cloud Vertex AI oraz
+                        Speech-to-Text przetwarzane w certyfikowanych centrach danych na terenie
+                        Europejskiego Obszaru Gospodarczego (UE: Warszawa / Frankfurt / Holandia).
+                      </li>
+                      <li>
+                        Nagrania głosowe są przetwarzane wyłącznie w celu zamiany mowy na tekst
+                        techniczny i nie są wykorzystywane do trenowania publicznych modeli AI.
+                      </li>
+                      <li>
+                        <strong>Nadzór człowieka (Human-in-the-loop):</strong> System AI pełni
+                        wyłącznie rolę pomocniczą (kategoria niskiego ryzyka). Każda wygenerowana
+                        przez AI notatka lub odpowiedź wymaga weryfikacji i ręcznego zatwierdzenia
+                        przez uprawnionego pracownika. System VexoNT™{' '}
+                        <strong>
+                          nie wykorzystuje sztucznej inteligencji do automatycznego profilowania ani
+                          oceniania pracowników
+                        </strong>
+                        .
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-lock-key text-slate-700 text-base"></i>
+                      <span>5. Bezpieczeństwo, pamięć techniczna (Offline PWA) i prawa osób</span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        Komunikacja jest szyfrowana protokołem TLS/HTTPS, a dane są przechowywane na
+                        serwerach Google Cloud w Unii Europejskiej (zgodność z RODO, ISO/IEC 27001
+                        oraz SOC 2).
+                      </li>
+                      <li>
+                        Aplikacja <strong>NIE wykorzystuje zewnętrznych plików cookies</strong> o
+                        charakterze reklamowym ani śledzącym. Wykorzystywana jest wyłącznie
+                        techniczna pamięć przeglądarki (LocalStorage oraz baza IndexedDB) niezbędna
+                        do utrzymania sesji logowania, zapamiętania wybranego języka/układu okienek
+                        oraz działania w trybie Offline (kolejkowanie zdjęć awarii w miejscach bez
+                        zasięgu sieci).
+                      </li>
+                      <li>
+                        Każdej osobie, której dane dotyczą, przysługuje prawo dostępu do swoich
+                        danych, ich sprostowania, ograniczenia przetwarzania oraz wniesienia skargi
+                        do Prezesa Urzędu Ochrony Danych Osobowych (UODO). Wnioski dotyczące danych
+                        operacyjnych należy kierować do Administratora (właściciela/zarządcy danego
+                        zakładu lub firmy serwisowej).
+                      </li>
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-buildings text-blue-600 text-base"></i>
+                      <span>1. Who is the Data Controller of your personal data? (SaaS Model)</span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        For data entered into the system within industrial plant maintenance,
+                        property management (c-KOB), or mobile field service (HVAC) — the{' '}
+                        <strong>Data Controller</strong> under Art. 4(7) GDPR is the entity
+                        (Employer, Property Manager, or Service Company) that subscribed to the
+                        license and granted you access or QR/NFC codes.
+                      </li>
+                      <li>
+                        The <strong>VexoNT™</strong> platform provider acts solely as a{' '}
+                        <strong>Data Processor</strong> under Art. 28 GDPR, providing a secure,
+                        isolated multi-tenant cloud infrastructure.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-files text-indigo-600 text-base"></i>
+                      <span>2. Scope, Purpose & Legal Basis of Data Processing</span>
+                    </h3>
+                    <p className="mb-2">
+                      The system processes data strictly required for operational continuity,
+                      statutory inspections (including Construction Law Art. 62 / c-KOB and EU F-Gas
+                      Regulation 2024/573), and work order settlement:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 mb-2">
+                      <li>
+                        <strong>User identification & contact data</strong> (name, business email,
+                        phone, system role, optional qualification/license numbers) — for
+                        authorization and maintaining an accountable Audit Trail (ISO 55000 & NIS2
+                        compliance).
+                      </li>
+                      <li>
+                        <strong>QR/NFC reporter data</strong> (fault description, photos, optional
+                        contact phone, and technical device session ID for anti-spam protection).
+                      </li>
+                      <li>
+                        <strong>Client & resident data</strong> (service address, contact person,
+                        phone, digital sign-off signature on device screen) — protected by strict
+                        B2C GDPR role isolation (visible only to assigned technicians).
+                      </li>
+                    </ul>
+                    <p className="text-[11px] sm:text-xs text-slate-600">
+                      Legal basis: Art. 6(1)(b), (c), and (f) GDPR (performance of contract/duties,
+                      compliance with statutory obligations, and legitimate interest in safeguarding
+                      assets, continuity of operations, and warranty claims).
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                    <h3 className="font-extrabold text-emerald-950 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-map-pin text-emerald-600 text-base"></i>
+                      <span>
+                        3. Point-in-Time GPS Verification (No Continuous Background Tracking)
+                      </span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5 text-emerald-950">
+                      <li>
+                        In Field Service and Facility Management modules, the app may capture GPS
+                        coordinates <strong>strictly at a single point in time</strong> — when a
+                        technician explicitly clicks status buttons (e.g., “Start Travel”, “Start
+                        Work on Site”, “Capture GPS” / “Confirm Completion”).
+                      </li>
+                      <li>
+                        VexoNT™ <strong>DOES NOT continuously track employee routes in the background</strong>{' '}
+                        or outside active task execution. Point-in-time GPS check-ins and task
+                        stopwatches are used solely to confirm on-site presence, verify inspection
+                        integrity, and settle working hours.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200">
+                    <h3 className="font-extrabold text-amber-950 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-sparkle text-amber-600 text-base"></i>
+                      <span>4. Artificial Intelligence Transparency (EU AI Act — Art. 50)</span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5 text-amber-950">
+                      <li>
+                        Voice dictation (AI speech-to-text / Smart AI) and the DTR Documentation
+                        Assistant use Google Cloud Vertex AI and Speech-to-Text models processed in
+                        certified European Economic Area data centers (EU: Warsaw / Frankfurt /
+                        Netherlands).
+                      </li>
+                      <li>
+                        Voice recordings are processed exclusively for speech-to-text conversion and
+                        are never used to train public AI models.
+                      </li>
+                      <li>
+                        <strong>Human-in-the-loop oversight:</strong> AI features act strictly as
+                        assistive tools (low-risk category). Every AI-generated note or response
+                        requires review and manual confirmation by an authorized user. VexoNT™{' '}
+                        <strong>
+                          does not use AI for automated profiling or evaluating employee performance
+                        </strong>
+                        .
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2 mb-2">
+                      <i className="ph-fill ph-lock-key text-slate-700 text-base"></i>
+                      <span>5. Security, Technical Storage (Offline PWA) & Data Subject Rights</span>
+                    </h3>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        All traffic is encrypted via TLS/HTTPS and data is stored on Google Cloud
+                        servers in the European Union (GDPR, ISO/IEC 27001, and SOC 2 compliant).
+                      </li>
+                      <li>
+                        The application <strong>DOES NOT use third-party advertising or tracking cookies</strong>.
+                        Only strictly necessary browser storage (LocalStorage and IndexedDB) is used
+                        for login sessions, language/layout preferences, and Offline PWA queuing.
+                      </li>
+                      <li>
+                        Every data subject has the right to access, rectify, or restrict the
+                        processing of their data, and to lodge a complaint with the Data Protection
+                        Authority (UODO). Operational data requests should be directed to the
+                        respective Data Controller (plant owner, property manager, or service
+                        company).
+                      </li>
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-[11px] font-semibold text-slate-500">
+                © 2026 VexoNT • RODO / GDPR • EU AI Act (Art. 50) • ISO 55000
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl transition-colors cursor-pointer"
+              >
+                {currentLang === 'pl' ? 'Rozumiem i zamknij' : 'Understood & Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

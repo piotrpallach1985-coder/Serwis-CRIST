@@ -33,13 +33,26 @@ import TicketMainColumnStepper from '../../components/manager/tickets/TicketMain
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
 import TechnicianPerformancePanel from '../../components/manager/reports/TechnicianPerformancePanel';
 import MachineCard from '../../components/manager/MachineCard';
+import Login from '../../components/Login';
+import { MemoryRouter } from 'react-router-dom';
 import { useManagerStore } from '../../store/managerStore';
 import { formatDetails } from '../../services/audit.service';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key, fallback) => (typeof fallback === 'string' ? fallback : key),
+    i18n: {
+      language: 'pl',
+      changeLanguage: vi.fn(),
+    },
   }),
+}));
+
+vi.mock('../../services/auth.service', () => ({
+  loginWithEmail: vi.fn(),
+  loginAnon: vi.fn(),
+  subscribeToGeneralSettings: vi.fn(() => () => {}),
+  subscribeToBranding: vi.fn(() => () => {}),
 }));
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -1331,6 +1344,34 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('tech-performance-summary-table').textContent).toContain(
         'Marek Konserwator'
       );
+
+      unmount();
+    });
+
+    it('otwiera i zamyka modal Polityki Prywatności, RODO i EU AI Act na ekranie startowym (Login.jsx)', () => {
+      const { unmount } = render(
+        <MemoryRouter>
+          <Login onLogin={vi.fn()} currentUser={null} />
+        </MemoryRouter>
+      );
+
+      const openBtn = screen.getByTestId('privacy-policy-open-btn');
+      expect(openBtn.textContent).toContain('Polityka Prywatności, RODO i AI');
+      expect(screen.queryByTestId('privacy-policy-modal')).toBeNull();
+
+      // Otwarcie modala
+      fireEvent.click(openBtn);
+      const modal = screen.getByTestId('privacy-policy-modal');
+      expect(modal).toBeTruthy();
+      expect(modal.textContent).toContain(
+        'Polityka Prywatności, Ochrona Danych (RODO) i Informacja o AI'
+      );
+      expect(modal.textContent).toContain('Punktowa weryfikacja lokalizacji GPS');
+      expect(modal.textContent).toContain('EU AI Act — Art. 50');
+
+      // Zamknięcie modala przyciskiem X
+      fireEvent.click(screen.getByTestId('privacy-policy-close-btn'));
+      expect(screen.queryByTestId('privacy-policy-modal')).toBeNull();
 
       unmount();
     });
