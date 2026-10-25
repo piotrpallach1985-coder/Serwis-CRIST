@@ -162,7 +162,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
       setStep('form');
     } else {
-      setSelectedMachine({ id: 'manual', name: 'Nieznana Maszyna', manualInput: mId });
+      setSelectedMachine({ id: 'manual', name: 'Nieznane Urządzenie', manualInput: mId });
       setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
       setStep('form');
     }
@@ -338,7 +338,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                 <p className="text-xs text-amber-800 mt-0.5">
                   {t(
                     'machines.toasts.scannedPartSubtext',
-                    'Zeskanowany kod QR należy do części magazynowej, a nie do maszyny.'
+                    'Zeskanowany kod QR należy do części magazynowej, a nie do urządzenia.'
                   )}
                 </p>
               </div>
@@ -371,10 +371,17 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
 
         {step === 'scan' && needsQr && (
           <div className="mb-4 bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 rounded shadow-sm">
-            <p className="font-bold text-sm">Zeskanuj kod QR dowolnej maszyny w zakładzie</p>
+            <p className="font-bold text-sm">
+              {t(
+                'operator.scanAnyQrTitle',
+                'Zeskanuj dowolny kod QR urządzenia w Twoim rejonie lub obiekcie'
+              )}
+            </p>
             <p className="text-xs mt-1">
-              To jednorazowo połączy telefon z systemem Twojej firmy. Potem możesz zgłaszać
-              awarie dowolnych maszyn.
+              {t(
+                'operator.scanAnyQrDesc',
+                'Awaria zostanie zgłoszona bezpośrednio do odpowiedniego działu lub serwisu. Jednorazowe zeskanowanie połączy telefon z systemem obsługującym zgłoszenia.'
+              )}
             </p>
           </div>
         )}
@@ -384,9 +391,14 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
         {step === 'form' && !selectedMachine && needsQr && (
           <div className="bg-white p-8 rounded-lg shadow-sm border border-amber-200 text-center flex flex-col items-center justify-center">
             <i className="ph ph-qr-code text-5xl text-amber-500 mb-4"></i>
-            <h2 className="text-lg font-semibold text-gray-800">Zeskanuj kod QR maszyny</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              {t('operator.scanDeviceQrHeading', 'Zeskanuj kod QR urządzenia')}
+            </h2>
             <p className="text-gray-500 text-sm mt-2 mb-6">
-              Telefon nie jest jeszcze połączony z systemem tej firmy.
+              {t(
+                'operator.deviceNotConnectedDesc',
+                'Zeskanuj dowolny kod QR w Twoim rejonie, aby zgłosić awarię do odpowiedniego działu lub serwisu.'
+              )}
             </p>
             <button
               onClick={() => handleStepChange('scan')}
@@ -400,9 +412,9 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
         {step === 'form' && !selectedMachine && !needsQr && (
           <div className="bg-white p-12 rounded-lg shadow-sm border border-gray-200 text-center flex flex-col items-center justify-center">
             <i className="ph ph-spinner-gap animate-spin text-4xl text-blue-600 mb-4"></i>
-            <h2 className="text-xl font-semibold text-gray-800">Wczytywanie maszyny...</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Wczytywanie urządzenia...</h2>
             <p className="text-gray-500 text-sm mt-2">
-              Pobieranie danych z systemu bazy maszyn.
+              Pobieranie danych z bazy urządzeń.
             </p>
           </div>
         )}
@@ -431,9 +443,9 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
               Gotowe!
             </h2>
             <p className="text-gray-600 mb-8 max-w-sm text-lg leading-relaxed">
-              Zgłoszenie awarii maszyny{' '}
+              Zgłoszenie awarii urządzenia{' '}
               <span className="font-bold text-gray-800">{selectedMachine?.name}</span> zostało
-              pomyślnie wysłane.
+              pomyślnie przekazane do odpowiedniego działu / serwisu.
             </p>
 
             <button

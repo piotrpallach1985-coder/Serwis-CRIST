@@ -275,22 +275,23 @@ export default function MachineForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto animate-fade-in flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10">
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden animate-fade-in flex flex-col">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-white shrink-0 z-20">
           <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-1.5">
             {editingMachine
               ? t('machines.form.editMachine', 'Edytuj dane urządzenia')
               : t('machines.form.addMachine', 'Dodaj nowe urządzenie i wygeneruj kod QR')}
           </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-200"
+            className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-100 cursor-pointer"
           >
             <i className="ph ph-x text-2xl"></i>
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -352,7 +353,7 @@ export default function MachineForm({
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
-                {t('machines.form.parentMachine', 'Urządzenia nadrzędna (Opcjonalnie)')}
+                {t('machines.form.parentMachine', 'Urządzenie nadrzędne (Opcjonalnie)')}
               </label>
               <select
                 value={parentId}

@@ -61,7 +61,7 @@ export default function OperatorForm({
                   {/* Lewa strona: Nazwa / Input */}
                   <div className="flex-1 w-full flex flex-col items-start gap-1">
                     <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded inline-block mb-1">
-                        Zgłoszenie dla maszyny
+                        Zgłoszenie dla urządzenia
                       </span>
                       {!user && <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded inline-block mb-1 ml-2">Firma: {companyName}</span>}
                     {selectedMachine.id === 'manual' ? (
@@ -71,7 +71,7 @@ export default function OperatorForm({
       value={selectedMachine.name || ''} 
       onChange={(e) => setSelectedMachine({...selectedMachine, name: e.target.value})} 
       className="w-full p-2 border border-blue-300 rounded font-bold text-lg focus:outline-none focus:border-blue-900 bg-white" 
-      placeholder="Wpisz lub wybierz maszynę..." 
+      placeholder="Wpisz lub wybierz urządzenie..." 
       autoFocus
       list="manual-machine-list"
     />
@@ -111,7 +111,7 @@ export default function OperatorForm({
                         className="flex items-center justify-center gap-2 text-sm text-yellow-900 bg-yellow-400 hover:bg-yellow-300 border-2 border-yellow-500 font-bold px-6 py-2.5 rounded-xl transition-colors shadow-sm w-full sm:w-auto whitespace-nowrap"
                       >
                         <i className="ph ph-pencil-simple text-xl"></i>
-                        <span>Inna Maszyna</span>
+                        <span>Inne Urządzenie</span>
                       </button>
                     )}
                     
@@ -133,13 +133,13 @@ export default function OperatorForm({
               {selectedMachine.id !== 'manual' && (
                 <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-blue-200/60 text-xs">
                   <div>
-                    <span className="text-slate-500 font-medium">Rejon / Numer Hali:</span>
+                    <span className="text-slate-500 font-medium">Miejsce montażu / Rejon:</span>
                     <div className="font-bold text-slate-800">
                       {regions.find(r => r.id === selectedMachine.regionId)?.name || 'Nieokreślono'}
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-medium">Przelot / Dodatkowe:</span>
+                    <span className="text-slate-500 font-medium">Informacja dodatkowa:</span>
                     <div className="font-bold text-slate-800">
                       {selectedMachine.bay || 'Brak'}
                     </div>

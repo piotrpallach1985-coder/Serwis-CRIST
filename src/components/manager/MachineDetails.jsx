@@ -127,7 +127,7 @@ export default function MachineDetails({
     () => [
       {
         id: 'machine_info',
-        title: t('machines.details.infoTileTitle', 'Dane maszyny, podzespoły i części (BOM)'),
+        title: t('machines.details.infoTileTitle', 'Dane urządzenia, podzespoły i części (BOM)'),
         icon: 'ph-engine',
         defaultColSpan: 8,
         render: () => (
@@ -147,7 +147,7 @@ export default function MachineDetails({
       },
       {
         id: 'machine_qr',
-        title: t('machines.details.qrTileTitle', 'Kod QR maszyny'),
+        title: t('machines.details.qrTileTitle', 'Kod QR urządzenia'),
         icon: 'ph-qr-code',
         defaultColSpan: 4,
         render: () => (

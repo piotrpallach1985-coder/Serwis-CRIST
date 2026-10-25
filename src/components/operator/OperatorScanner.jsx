@@ -226,12 +226,12 @@ export default function OperatorScanner({ onScanSuccess }) {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
-                    {t('operator.otherMachineCardTitle', 'Zgłoś inną maszynę:')}
+                    {t('operator.otherMachineCardTitle', 'Zgłoś inne urządzenie:')}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
                     {t(
                       'operator.otherMachineCardDesc',
-                      'Użyj dowolnego QR lub NFC i zgłoś awarię dowolnej maszyny.'
+                      'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, a awaria zostanie zgłoszona do odpowiedniego działu lub serwisu.'
                     )}
                   </p>
                 </div>

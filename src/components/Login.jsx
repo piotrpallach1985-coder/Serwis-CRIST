@@ -490,10 +490,10 @@ export default function Login({ onLogin, currentUser }) {
         isOpen={isScanning}
         onClose={() => setIsScanning(false)}
         onScanSuccess={handleScanSuccess}
-        title={t('login.scan_qr_title', 'Skanuj kod QR maszyny')}
+        title={t('login.scan_qr_title', 'Skanuj kod QR urządzenia')}
         subtitle={t(
           'login.scan_qr_subtitle',
-          'Skieruj aparat na kod QR, aby odczytać dokumenty DTR.'
+          'Skieruj aparat na kod QR urządzenia, aby odczytać dokumenty DTR lub zgłosić awarię.'
         )}
       />
 
