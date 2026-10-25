@@ -222,14 +222,27 @@ export default function MachineInfoCard({
               data-testid="machine-fleet-card"
               className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3 text-xs space-y-2.5"
             >
-              <div className="font-extrabold text-emerald-950 uppercase tracking-wider text-[11px] flex items-center justify-between gap-2 border-b border-emerald-200/70 pb-1.5">
+              <div className="font-extrabold text-emerald-950 uppercase tracking-wider text-[11px] flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/70 pb-1.5">
                 <div className="flex items-center gap-1.5">
                   <i className="ph ph-truck text-emerald-700 text-base"></i>
-                  <span>Metryczka Pojazdu / Floty (Przebieg, SKP, Polisa OC/AC, Kierowca)</span>
+                  <span>Metryczka Pojazdu / Floty (Przebieg, SKP, Polisa OC/AC, Opony, Assistance)</span>
                 </div>
-                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
-                  Licznik: {counterUnit}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {machine?.assistancePhone && (
+                    <a
+                      href={`tel:${String(machine.assistancePhone).replace(/\s+/g, '')}`}
+                      data-testid="machine-fleet-assistance-call-btn"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold shadow-xs transition-colors"
+                      title="Zadzwoń pod numer Assistance 24h"
+                    >
+                      <i className="ph ph-phone-call"></i>
+                      Assistance: {machine.assistancePhone}
+                    </a>
+                  )}
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                    Licznik: {counterUnit}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800">
@@ -274,7 +287,56 @@ export default function MachineInfoCard({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {(machine?.productionYear ||
+                machine?.engineSpec ||
+                machine?.tireSeason ||
+                machine?.tireSize ||
+                machine?.policyNumber ||
+                machine?.hasTowbar ||
+                machine?.ownershipType) && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-200/50 text-slate-800">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                      Rok prod. / Silnik
+                    </span>
+                    <span data-testid="machine-fleet-engine" className="font-bold text-slate-800">
+                      {[machine?.productionYear, machine?.engineSpec].filter(Boolean).join(' • ') ||
+                        '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                      Opony (Sezon / Rozmiar)
+                    </span>
+                    <span data-testid="machine-fleet-tires" className="font-bold text-slate-800">
+                      {[machine?.tireSeason, machine?.tireSize].filter(Boolean).join(' • ') || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                      Ubezpieczyciel / Nr polisy
+                    </span>
+                    <span data-testid="machine-fleet-policy" className="font-mono font-bold text-slate-800">
+                      {machine?.policyNumber || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                      Hak / DMC • Własność / Karta
+                    </span>
+                    <span data-testid="machine-fleet-ownership" className="font-semibold text-slate-800">
+                      {[machine?.hasTowbar, machine?.ownershipType].filter(Boolean).join(' • ') ||
+                        '-'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className={`grid grid-cols-1 ${
+                  machine?.udtOrExtinguisherDate ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+                } gap-2 pt-1`}
+              >
                 <div
                   data-testid="machine-fleet-skp-status"
                   className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
@@ -346,6 +408,41 @@ export default function MachineInfoCard({
                     </span>
                   )}
                 </div>
+
+                {machine?.udtOrExtinguisherDate && (
+                  <div
+                    data-testid="machine-fleet-udt-status"
+                    className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                      vehicleDates?.udtExtinguisherStatus === 'overdue'
+                        ? 'bg-red-50 border-red-300 text-red-900'
+                        : vehicleDates?.udtExtinguisherStatus === 'upcoming'
+                        ? 'bg-amber-50 border-amber-300 text-amber-900'
+                        : 'bg-white border-emerald-200 text-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[10px] font-bold uppercase opacity-75 block">
+                        UDT (winda/HDS) / Tachograf / Gaśnica
+                      </span>
+                      <span className="font-bold">{machine.udtOrExtinguisherDate}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        vehicleDates?.udtExtinguisherStatus === 'overdue'
+                          ? 'bg-red-600 text-white'
+                          : vehicleDates?.udtExtinguisherStatus === 'upcoming'
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {vehicleDates?.udtExtinguisherStatus === 'overdue'
+                        ? `PO TERMINIE (${Math.abs(vehicleDates.udtExtinguisherDaysLeft)} dni)!`
+                        : vehicleDates?.udtExtinguisherStatus === 'upcoming'
+                        ? `Za ${vehicleDates.udtExtinguisherDaysLeft} dni`
+                        : 'Aktualne'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

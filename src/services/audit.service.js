@@ -93,7 +93,16 @@ const FIELD_TRANSLATION_MAP = {
   fuelType: 'Rodzaj paliwa / napędu',
   techInspectionDate: 'Ważność badania SKP',
   insuranceExpiryDate: 'Ważność polisy OC/AC',
-  assignedDriver: 'Przypisany kierowca'
+  assignedDriver: 'Przypisany kierowca',
+  productionYear: 'Rok produkcji',
+  engineSpec: 'Silnik (pojemność / moc)',
+  tireSeason: 'Aktualne opony',
+  tireSize: 'Rozmiar opon',
+  policyNumber: 'Nr polisy OC/AC',
+  assistancePhone: 'Telefon Assistance 24h',
+  hasTowbar: 'Hak holowniczy i DMC',
+  ownershipType: 'Własność / Leasing / Karta paliwowa',
+  udtOrExtinguisherDate: 'Ważność UDT / Tachograf / Gaśnica'
 };
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?$/;

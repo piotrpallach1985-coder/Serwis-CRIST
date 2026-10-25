@@ -172,14 +172,36 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
           } | Paliwo: ${machine.fuelType || '-'}`
         ),
       ]);
+      if (machine.productionYear || machine.engineSpec || machine.tireSeason || machine.tireSize) {
+        baseInfoRows.push([
+          n('Rok prod. / Silnik / Opony:'),
+          n(
+            `Rok: ${machine.productionYear || '-'} | Silnik: ${
+              machine.engineSpec || '-'
+            } | Opony: ${[machine.tireSeason, machine.tireSize].filter(Boolean).join(' ') || '-'}`
+          ),
+        ]);
+      }
       baseInfoRows.push([
-        n('Terminy Pojazdu (SKP / Polisa OC/AC / Kierowca):'),
+        n('Terminy Pojazdu (SKP / OC/AC / UDT / Kierowca):'),
         n(
           `SKP: ${machine.techInspectionDate || '-'} | OC/AC: ${
             machine.insuranceExpiryDate || '-'
+          }${machine.policyNumber ? ' (' + machine.policyNumber + ')' : ''}${
+            machine.udtOrExtinguisherDate ? ' | UDT/BHP: ' + machine.udtOrExtinguisherDate : ''
           } | Kierowca: ${machine.assignedDriver || '-'}`
         ),
       ]);
+      if (machine.assistancePhone || machine.hasTowbar || machine.ownershipType) {
+        baseInfoRows.push([
+          n('Assistance / Hak DMC / Wlasnosc i Karta:'),
+          n(
+            `Assistance: ${machine.assistancePhone || '-'} | ${machine.hasTowbar || '-'} | ${
+              machine.ownershipType || '-'
+            }`
+          ),
+        ]);
+      }
     }
     if (machine.address || machine.mapAddress || (machine.gpsLat && machine.gpsLng)) {
       const gpsSuffix =

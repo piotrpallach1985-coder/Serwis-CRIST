@@ -361,6 +361,39 @@ export default function NotificationCenter({
             isDynamic: true,
           });
         }
+
+        if (
+          vStatus.udtExtinguisherStatus === 'overdue' ||
+          vStatus.udtExtinguisherStatus === 'upcoming'
+        ) {
+          const isOver = vStatus.udtExtinguisherStatus === 'overdue';
+          list.push({
+            id: 'dyn_fleet_udt_' + m.id,
+            title: isOver
+              ? 'PRZETERMINOWANY DOZÓR UDT / TACHOGRAF / GAŚNICA!'
+              : 'ZBLIŻA SIĘ TERMIN UDT / TACHOGRAFU / GAŚNICY POJAZDU',
+            message: `Pojazd: ${m.name}${plateInfo} — ${
+              isOver
+                ? `termin UDT / tachografu / gaśnicy minął ${Math.abs(
+                    vStatus.udtExtinguisherDaysLeft
+                  )} dni temu (${m.udtOrExtinguisherDate})`
+                : `ważność UDT / tachografu / gaśnicy kończy się za ${vStatus.udtExtinguisherDaysLeft} dni (${m.udtOrExtinguisherDate})`
+            }`,
+            isCritical: isOver,
+            priorityRank: isOver ? 2 : 4,
+            icon: 'ph-fire-extinguisher',
+            colorClass: isOver ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700',
+            badge: isOver ? 'UDT/BHP PILNE' : 'UDT/BHP ZBLIŻA SIĘ',
+            badgeClass: isOver
+              ? 'bg-red-600 text-white font-bold animate-pulse'
+              : 'bg-amber-100 text-amber-800 font-bold border border-amber-200',
+            read: false,
+            linkTo: 'machines',
+            machineId: m.id,
+            createdAt: { toDate: () => safeParseDate(m.udtOrExtinguisherDate) || new Date() },
+            isDynamic: true,
+          });
+        }
       });
 
       visibleMachines.filter(m => m.name && m.name.includes('(DO WERYFIKACJI)')).forEach(m => {

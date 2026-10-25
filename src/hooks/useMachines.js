@@ -127,6 +127,11 @@ export function useMachines(machines = [], regions = []) {
       'Nr Rejestracyjny': m.licensePlate || '-',
       'Numer VIN': m.vinNumber || '-',
       'Data 1. Rejestracji': m.firstRegistrationDate || '-',
+      'Rok prod. / Silnik': [m.productionYear, m.engineSpec].filter(Boolean).join(' • ') || '-',
+      Opony: [m.tireSeason, m.tireSize].filter(Boolean).join(' • ') || '-',
+      'Polisa / Assistance': [m.policyNumber, m.assistancePhone].filter(Boolean).join(' • ') || '-',
+      'Hak / DMC': m.hasTowbar || '-',
+      'Własność / Karta paliwowa': m.ownershipType || '-',
       Rejon:
         m.regionId === 'main_map'
           ? isVehicleAsset(m)
@@ -137,6 +142,7 @@ export function useMachines(machines = [], regions = []) {
       'Stan Licznika': `${m.currentWorkHours || 0} ${m.counterUnit === 'km' ? 'km' : 'RBG'}`,
       'Badanie SKP': m.techInspectionDate || '-',
       'Polisa OC/AC': m.insuranceExpiryDate || '-',
+      'UDT / Tachograf / Gaśnica': m.udtOrExtinguisherDate || '-',
       'Kierowca / Opiekun': m.assignedDriver || '-',
       'Dodatkowy Opis': m.additionalDescription || '-',
     }));

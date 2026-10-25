@@ -1461,9 +1461,18 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('fleet-counter-unit-select').value).toBe('km');
       expect(screen.getByTestId('fleet-tech-inspection-input')).toBeTruthy();
       expect(screen.getByTestId('fleet-insurance-expiry-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-production-year-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-engine-spec-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-tire-season-select')).toBeTruthy();
+      expect(screen.getByTestId('fleet-tire-size-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-policy-number-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-assistance-phone-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-towbar-dmc-select')).toBeTruthy();
+      expect(screen.getByTestId('fleet-udt-extinguisher-date-input')).toBeTruthy();
+      expect(screen.getByTestId('fleet-ownership-fuelcard-input')).toBeTruthy();
       unmountForm();
 
-      // 3) Karta pojazdu w MachineInfoCard, PlannedMaintenanceInfo i TicketMainColumnHeader + alerty SKP / OC + próg 1000 km
+      // 3) Karta pojazdu w MachineInfoCard, PlannedMaintenanceInfo i TicketMainColumnHeader + alerty SKP / OC / UDT + próg 1000 km
       const serviceVan = {
         id: 'van-1',
         name: 'Renault Master Bus Serwisowy #1',
@@ -1473,6 +1482,15 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         licensePlate: 'GD 12345',
         vinNumber: 'VF1MA000087654321',
         firstRegistrationDate: '2022-05-18',
+        productionYear: '2022',
+        engineSpec: '2.3 dCi 150 KM (Euro 6)',
+        tireSeason: 'Zimowe',
+        tireSize: '225/65 R16C',
+        policyNumber: 'PZU / 10293847',
+        assistancePhone: '+48 22 566 55 44',
+        hasTowbar: 'Hak holowniczy (DMC do 3.5t - kat. B)',
+        ownershipType: 'Leasing PKO (limit 30 tys. km/rok) • Orlen #4412',
+        udtOrExtinguisherDate: '2026-11-15', // za 21 dni względem 2026-10-25
         fuelType: 'Diesel (ON)',
         assignedDriver: 'Jan Serwisant',
         techInspectionDate: '2026-11-05', // za 11 dni względem 2026-10-25
@@ -1488,6 +1506,8 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(datesCheck.techInspectionDaysLeft).toBe(11);
       expect(datesCheck.insuranceStatus).toBe('overdue');
       expect(datesCheck.insuranceDaysLeft).toBe(-15);
+      expect(datesCheck.udtExtinguisherStatus).toBe('upcoming');
+      expect(datesCheck.udtExtinguisherDaysLeft).toBe(21);
 
       // Sprawdzenie progu 1000 km w checkServiceUrgency (zostało 800 km do 150 000 km -> isUpcoming = true!)
       const oilServicePlan = {
@@ -1545,6 +1565,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('machine-counter-value').textContent).toContain('149200 km');
       expect(screen.getByTestId('machine-fleet-card').textContent).toContain('VF1MA000087654321');
       expect(screen.getByTestId('machine-fleet-first-reg').textContent).toBe('2022-05-18');
+      expect(screen.getByTestId('machine-fleet-engine').textContent).toContain('2.3 dCi 150 KM');
+      expect(screen.getByTestId('machine-fleet-tires').textContent).toContain('Zimowe • 225/65 R16C');
+      expect(screen.getByTestId('machine-fleet-policy').textContent).toContain('PZU / 10293847');
+      expect(screen.getByTestId('machine-fleet-assistance-call-btn').textContent).toContain(
+        '+48 22 566 55 44'
+      );
+      expect(screen.getByTestId('machine-fleet-udt-status').textContent).toContain('2026-11-15');
       expect(screen.getByTestId('service-domain-fleet').textContent).toContain('GD 12345');
       expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('GD 12345');
 

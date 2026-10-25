@@ -383,27 +383,39 @@ export default function TicketMainColumnHeader({
             data-testid="ticket-domain-fleet"
             className="mt-4 pt-4 border-t border-emerald-200 bg-emerald-50/50 rounded-xl p-4 border"
           >
-            <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-3">
-              <i className="ph ph-truck text-emerald-700 text-base"></i>
-              <span>Karta Pojazdu / Floty Samochodowej (VexoNT Fleet)</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-3">
+              <div className="flex items-center gap-2">
+                <i className="ph ph-truck text-emerald-700 text-base"></i>
+                <span>Karta Pojazdu / Floty Samochodowej (VexoNT Fleet)</span>
+              </div>
+              {machineObj?.assistancePhone && (
+                <a
+                  href={`tel:${String(machineObj.assistancePhone).replace(/\s+/g, '')}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold shadow-xs transition-colors"
+                >
+                  <i className="ph ph-phone-call"></i> Assistance: {machineObj.assistancePhone}
+                </a>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
                 <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
-                  Nr rejestracyjny / VIN
+                  Nr rejestracyjny / VIN / Silnik
                 </span>
                 <span className="font-extrabold text-slate-800 mt-0.5 block font-mono">
                   {machineObj?.licensePlate || 'Brak nr rej.'}
                   {machineObj?.vinNumber ? ` · ${machineObj.vinNumber}` : ''}
+                  {machineObj?.engineSpec ? ` · ${machineObj.engineSpec}` : ''}
                 </span>
               </div>
               <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
                 <span className="text-emerald-800/70 font-bold uppercase block text-[10px]">
-                  Przebieg / Kierowca
+                  Przebieg / Kierowca / Opony
                 </span>
                 <span className="font-extrabold text-slate-800 mt-0.5 block">
                   {machineObj?.currentWorkHours ?? machineObj?.operatingHours ?? 0} {counterUnit}
                   {machineObj?.assignedDriver ? ` · ${machineObj.assignedDriver}` : ''}
+                  {machineObj?.tireSeason ? ` · ${machineObj.tireSeason}` : ''}
                 </span>
               </div>
               <div className="bg-white p-2.5 rounded-lg border border-emerald-200/80">
@@ -413,6 +425,7 @@ export default function TicketMainColumnHeader({
                 <span className="font-bold text-slate-800 mt-0.5 block">
                   SKP: {machineObj?.techInspectionDate || '-'} · OC:{' '}
                   {machineObj?.insuranceExpiryDate || '-'}
+                  {machineObj?.policyNumber ? ` (${machineObj.policyNumber})` : ''}
                 </span>
               </div>
             </div>

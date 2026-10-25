@@ -8,6 +8,8 @@ import {
   REFRIGERANT_TYPES,
   CKOB_CATEGORIES,
   FUEL_TYPES,
+  TIRE_SEASON_OPTIONS,
+  TOWBAR_DMC_OPTIONS,
   calculateCo2Equivalent,
 } from '../../utils/fieldServiceHelpers';
 
@@ -65,6 +67,15 @@ export default function MachineForm({
   const [techInspectionDate, setTechInspectionDate] = useState('');
   const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
   const [assignedDriver, setAssignedDriver] = useState('');
+  const [productionYear, setProductionYear] = useState('');
+  const [engineSpec, setEngineSpec] = useState('');
+  const [tireSeason, setTireSeason] = useState('');
+  const [tireSize, setTireSize] = useState('');
+  const [policyNumber, setPolicyNumber] = useState('');
+  const [assistancePhone, setAssistancePhone] = useState('');
+  const [hasTowbar, setHasTowbar] = useState('');
+  const [ownershipType, setOwnershipType] = useState('');
+  const [udtOrExtinguisherDate, setUdtOrExtinguisherDate] = useState('');
 
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
@@ -144,6 +155,19 @@ export default function MachineForm({
       setTechInspectionDate(editingMachine.techInspectionDate || '');
       setInsuranceExpiryDate(editingMachine.insuranceExpiryDate || '');
       setAssignedDriver(editingMachine.assignedDriver || '');
+      setProductionYear(
+        editingMachine.productionYear !== undefined && editingMachine.productionYear !== null
+          ? String(editingMachine.productionYear)
+          : ''
+      );
+      setEngineSpec(editingMachine.engineSpec || '');
+      setTireSeason(editingMachine.tireSeason || '');
+      setTireSize(editingMachine.tireSize || '');
+      setPolicyNumber(editingMachine.policyNumber || '');
+      setAssistancePhone(editingMachine.assistancePhone || '');
+      setHasTowbar(editingMachine.hasTowbar || '');
+      setOwnershipType(editingMachine.ownershipType || '');
+      setUdtOrExtinguisherDate(editingMachine.udtOrExtinguisherDate || '');
 
       setShowExtendedFields(
         industryProfile === 'hvac' ||
@@ -188,6 +212,15 @@ export default function MachineForm({
       setTechInspectionDate('');
       setInsuranceExpiryDate('');
       setAssignedDriver('');
+      setProductionYear('');
+      setEngineSpec('');
+      setTireSeason('');
+      setTireSize('');
+      setPolicyNumber('');
+      setAssistancePhone('');
+      setHasTowbar('');
+      setOwnershipType('');
+      setUdtOrExtinguisherDate('');
 
       if (initialParentId) {
         setParentId(initialParentId);
@@ -266,6 +299,15 @@ export default function MachineForm({
             techInspectionDate: techInspectionDate || '',
             insuranceExpiryDate: insuranceExpiryDate || '',
             assignedDriver: assignedDriver.trim(),
+            productionYear: productionYear.trim(),
+            engineSpec: engineSpec.trim(),
+            tireSeason: tireSeason || '',
+            tireSize: tireSize.trim(),
+            policyNumber: policyNumber.trim(),
+            assistancePhone: assistancePhone.trim(),
+            hasTowbar: hasTowbar || '',
+            ownershipType: ownershipType.trim(),
+            udtOrExtinguisherDate: udtOrExtinguisherDate || '',
             ...(initialCounterValue !== ''
               ? {
                   currentWorkHours: parsedCounter,
@@ -284,6 +326,15 @@ export default function MachineForm({
             techInspectionDate: '',
             insuranceExpiryDate: '',
             assignedDriver: '',
+            productionYear: '',
+            engineSpec: '',
+            tireSeason: '',
+            tireSize: '',
+            policyNumber: '',
+            assistancePhone: '',
+            hasTowbar: '',
+            ownershipType: '',
+            udtOrExtinguisherDate: '',
           }
         : {}),
       ...(allowContact
@@ -671,7 +722,7 @@ export default function MachineForm({
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-4">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Przypisany kierowca / Opiekun pojazdu
                     </label>
@@ -681,6 +732,135 @@ export default function MachineForm({
                       value={assignedDriver}
                       onChange={e => setAssignedDriver(e.target.value)}
                       placeholder="np. Jan Nowak (serwisant mobilny / kierowca)"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Rok produkcji
+                    </label>
+                    <input
+                      type="number"
+                      min="1980"
+                      max="2100"
+                      data-testid="fleet-production-year-input"
+                      value={productionYear}
+                      onChange={e => setProductionYear(e.target.value)}
+                      placeholder="np. 2022"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Silnik (pojemność / moc KM / Euro)
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-engine-spec-input"
+                      value={engineSpec}
+                      onChange={e => setEngineSpec(e.target.value)}
+                      placeholder="np. 2.3 dCi 150 KM (110 kW, Euro 6)"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Wiersz 3: Opony, Polisa + Assistance, DMC/Hak, Leasing/Karta paliwowa, UDT/Gaśnica */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Aktualnie założone opony
+                    </label>
+                    <select
+                      data-testid="fleet-tire-season-select"
+                      value={tireSeason}
+                      onChange={e => setTireSeason(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {TIRE_SEASON_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Rozmiar opon / przechowywanie
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-tire-size-input"
+                      value={tireSize}
+                      onChange={e => setTireSize(e.target.value)}
+                      placeholder="np. 225/65 R16C (2. kpl w magazynie)"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Ubezpieczyciel i nr polisy OC/AC
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-policy-number-input"
+                      value={policyNumber}
+                      onChange={e => setPolicyNumber(e.target.value)}
+                      placeholder="np. PZU / 1029384756"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Telefon Assistance 24h (w trasie)
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-assistance-phone-input"
+                      value={assistancePhone}
+                      onChange={e => setAssistancePhone(e.target.value)}
+                      placeholder="np. +48 22 566 55 44"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Hak holowniczy i DMC (Kategoria)
+                    </label>
+                    <select
+                      data-testid="fleet-towbar-dmc-select"
+                      value={hasTowbar}
+                      onChange={e => setHasTowbar(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {TOWBAR_DMC_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Dozór UDT (winda/HDS) / Tachograf / Gaśnica
+                    </label>
+                    <input
+                      type="date"
+                      data-testid="fleet-udt-extinguisher-date-input"
+                      value={udtOrExtinguisherDate}
+                      onChange={e => setUdtOrExtinguisherDate(e.target.value)}
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Własność / Leasing (limit km) / Nr karty paliwowej
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="fleet-ownership-fuelcard-input"
+                      value={ownershipType}
+                      onChange={e => setOwnershipType(e.target.value)}
+                      placeholder="np. Leasing PKO (limit 30 tys. km/rok) • Karta Orlen #4412"
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>

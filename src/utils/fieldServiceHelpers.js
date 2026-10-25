@@ -284,17 +284,47 @@ export function checkVehicleDatesStatus(machine, warningDays = 30, nowDate = new
 
   const skp = evaluateDate(machine?.techInspectionDate, 'Badanie SKP');
   const oc = evaluateDate(machine?.insuranceExpiryDate, 'Polisa OC/AC');
+  const udt = evaluateDate(machine?.udtOrExtinguisherDate, 'UDT / Tachograf / Gaśnica');
 
   return {
     skp,
     oc,
+    udt,
     techInspectionStatus: skp.status,
     techInspectionDaysLeft: skp.daysLeft,
     insuranceStatus: oc.status,
     insuranceDaysLeft: oc.daysLeft,
-    hasAnyAlert: Boolean(skp.isOverdue || skp.isUpcoming || oc.isOverdue || oc.isUpcoming),
+    udtExtinguisherStatus: udt.status,
+    udtExtinguisherDaysLeft: udt.daysLeft,
+    hasAnyAlert: Boolean(
+      skp.isOverdue ||
+        skp.isUpcoming ||
+        oc.isOverdue ||
+        oc.isUpcoming ||
+        udt.isOverdue ||
+        udt.isUpcoming
+    ),
   };
 }
+
+export const TIRE_SEASON_OPTIONS = [
+  { id: '', label: '-- Nie określono --' },
+  { id: 'Letnie', label: '☀️ Opony Letnie' },
+  { id: 'Zimowe', label: '❄️ Opony Zimowe' },
+  { id: 'Całoroczne', label: '🌦️ Opony Całoroczne ( Wielosezonowe )' },
+  { id: 'Przemysłowe / Robocze', label: '🚜 Przemysłowe / Pełne / Robocze' },
+];
+
+export const TOWBAR_DMC_OPTIONS = [
+  { id: '', label: '-- Nie określono --' },
+  { id: 'Brak haka (DMC do 3.5t - kat. B)', label: 'Brak haka (DMC ≤ 3.5t — kat. B)' },
+  { id: 'Hak holowniczy (DMC do 3.5t - kat. B)', label: 'Hak holowniczy (DMC ≤ 3.5t — kat. B)' },
+  {
+    id: 'Hak holowniczy (Zestaw > 3.5t - kat. B+E / C)',
+    label: 'Hak holowniczy (Zestaw > 3.5t — kat. B+E / C)',
+  },
+  { id: 'Powyżej 3.5t (Ciężarowy / Specjalny - kat. C)', label: 'Powyżej 3.5t (Ciężarowy / Specjalny — kat. C)' },
+];
 
 /**
  * Sprawdza, czy dla danego profilu firmy wymagany jest numer uprawnień kontrolującego / inspektora.
