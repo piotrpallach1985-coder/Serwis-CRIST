@@ -819,7 +819,7 @@ function isValidNumericCoord(val) {
 }
 
 function parseTaskTimestampMs(raw) {
-  if (!raw) return null;
+  if (!raw || typeof raw === 'boolean') return null;
   if (raw instanceof Date) {
     const ms = raw.getTime();
     return Number.isNaN(ms) ? null : ms;
@@ -831,6 +831,9 @@ function parseTaskTimestampMs(raw) {
   }
   if (typeof raw?.seconds === 'number') {
     return raw.seconds * 1000;
+  }
+  if (typeof raw?._seconds === 'number') {
+    return raw._seconds * 1000;
   }
   const d = new Date(raw);
   const ms = d.getTime();
@@ -882,39 +885,89 @@ export function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * Pomocniczy fallback wyciągający współrzędne GPS docelowego obiektu z maszyny lub hierarchii rejonów
- * (np. gdy urządzenie ma pinezkę na rzucie JPG kondygnacji wewnątrz budynku, który posiada współrzędne GPS na mapie nadrzędnej).
+ * Pomocniczy fallback wyciągający współrzędne GPS docelowego obiektu z maszyny, hierarchii maszyn (`parentId`)
+ * lub hierarchii rejonów (`region.parentId` oraz `submaps` Google).
  */
-function resolveTargetGpsCoordinates(machine, regions = []) {
-  const geo = resolveMachineGeoLocation(machine, regions);
-  if (geo.hasCoordinates && isValidNumericCoord(geo.lat) && isValidNumericCoord(geo.lng)) {
-    return { lat: Number(geo.lat), lng: Number(geo.lng) };
-  }
-
+function resolveTargetGpsCoordinates(machine, regions = [], machines = []) {
   if (!machine) return null;
 
-  const mLat = machine.gpsLat ?? (machine.pinnedOnMapType !== 'image' ? machine.lat ?? machine.mapLat : null);
-  const mLng = machine.gpsLng ?? (machine.pinnedOnMapType !== 'image' ? machine.lng ?? machine.mapLng : null);
-  if (isValidNumericCoord(mLat) && isValidNumericCoord(mLng)) {
-    return { lat: Number(mLat), lng: Number(mLng) };
+  const visitedMachines = new Set();
+  let currentMachine = machine;
+  let inheritedRegionId = machine.regionId || null;
+  let inheritedRegionName = machine.regionName || null;
+
+  while (currentMachine) {
+    if (currentMachine.id) visitedMachines.add(currentMachine.id);
+
+    const geo = resolveMachineGeoLocation(currentMachine, regions);
+    if (geo.hasCoordinates && isValidNumericCoord(geo.lat) && isValidNumericCoord(geo.lng)) {
+      return { lat: Number(geo.lat), lng: Number(geo.lng) };
+    }
+
+    const mLat =
+      currentMachine.gpsLat ??
+      (currentMachine.pinnedOnMapType !== 'image'
+        ? currentMachine.lat ?? currentMachine.mapLat
+        : null);
+    const mLng =
+      currentMachine.gpsLng ??
+      (currentMachine.pinnedOnMapType !== 'image'
+        ? currentMachine.lng ?? currentMachine.mapLng
+        : null);
+    if (isValidNumericCoord(mLat) && isValidNumericCoord(mLng)) {
+      return { lat: Number(mLat), lng: Number(mLng) };
+    }
+
+    if (!inheritedRegionId && currentMachine.regionId) {
+      inheritedRegionId = currentMachine.regionId;
+    }
+    if (!inheritedRegionName && currentMachine.regionName) {
+      inheritedRegionName = currentMachine.regionName;
+    }
+
+    if (currentMachine.parentMachine && typeof currentMachine.parentMachine === 'object') {
+      currentMachine = currentMachine.parentMachine;
+    } else if (
+      currentMachine.parentId &&
+      !visitedMachines.has(currentMachine.parentId) &&
+      Array.isArray(machines) &&
+      machines.length > 0
+    ) {
+      currentMachine = machines.find(m => m.id === currentMachine.parentId) || null;
+    } else {
+      currentMachine = null;
+    }
   }
 
-  const visited = new Set();
+  const visitedRegions = new Set();
   let currentRegion = (regions || []).find(
-    r => r.id === machine.regionId || (machine.regionName && r.name === machine.regionName)
+    r =>
+      (inheritedRegionId && r.id === inheritedRegionId) ||
+      (inheritedRegionName && r.name === inheritedRegionName)
   );
 
-  while (currentRegion && !visited.has(currentRegion.id)) {
-    visited.add(currentRegion.id);
+  while (currentRegion && !visitedRegions.has(currentRegion.id)) {
+    visitedRegions.add(currentRegion.id);
+    const googleSubmap = Array.isArray(currentRegion.submaps)
+      ? currentRegion.submaps.find(
+          sm =>
+            sm?.mapType === 'google' &&
+            isValidNumericCoord(sm?.googleLat) &&
+            isValidNumericCoord(sm?.googleLng)
+        )
+      : null;
+
     const rLat =
       currentRegion.gpsLat ??
       (currentRegion.pinnedOnMapType !== 'image' ? currentRegion.lat ?? currentRegion.mapLat : null) ??
       currentRegion.googleLat ??
+      googleSubmap?.googleLat ??
       null;
     const rLng =
       currentRegion.gpsLng ??
       (currentRegion.pinnedOnMapType !== 'image' ? currentRegion.lng ?? currentRegion.mapLng : null) ??
       currentRegion.googleLng ??
+      googleSubmap?.googleLng ??
       null;
     if (isValidNumericCoord(rLat) && isValidNumericCoord(rLng)) {
       return { lat: Number(rLat), lng: Number(rLng) };
@@ -930,8 +983,14 @@ function resolveTargetGpsCoordinates(machine, regions = []) {
 /**
  * Weryfikuje obecność serwisanta na obiekcie (Geofencing GPS) względem współrzędnych maszyny/rejonu.
  */
-export function verifyOnSiteGps(workerGps, machine, regions = [], thresholdMeters = 300) {
-  const targetCoords = resolveTargetGpsCoordinates(machine, regions);
+export function verifyOnSiteGps(
+  workerGps,
+  machine,
+  regions = [],
+  thresholdMeters = 300,
+  machines = []
+) {
+  const targetCoords = resolveTargetGpsCoordinates(machine, regions, machines);
   if (!targetCoords) {
     return {
       status: 'no_target_coords',
@@ -992,18 +1051,27 @@ export function verifyOnSiteGps(workerGps, machine, regions = [], thresholdMeter
  * oraz weryfikację geofencingu GPS dla zgłoszenia awarii (`ticket`) lub serwisu planowanego (`planned_service`).
  * Wyliczenia oparte wyłącznie na czystej matematyce (znaczniki czasu + wzór Haversine).
  */
-export function calculateWorkAndTravelMetrics(task, machine = null, regions = []) {
+export function calculateWorkAndTravelMetrics(task, machine = null, regions = [], machines = []) {
   const safeTask = task || {};
 
   const travelStartedAt = safeTask.travelStartedAt || null;
-  const workStartedAt = safeTask.workStartedAt || safeTask.inProgressAt || null;
+  const travelStartMs = parseTaskTimestampMs(travelStartedAt);
+
+  // Jeśli istnieje jawny workStartedAt, używamy go; w przeciwnym razie inProgressAt tylko gdy nie jest wcześniejszy niż start dojazdu
+  let workStartedAt = safeTask.workStartedAt || null;
+  if (!workStartedAt && safeTask.inProgressAt) {
+    const inProgMs = parseTaskTimestampMs(safeTask.inProgressAt);
+    if (inProgMs !== null && (travelStartMs === null || inProgMs >= travelStartMs)) {
+      workStartedAt = safeTask.inProgressAt;
+    }
+  }
+
   const completedAt =
     safeTask.closedAt ||
     safeTask.completedAt ||
     safeTask.completionDetails?.completedAt ||
     null;
 
-  const travelStartMs = parseTaskTimestampMs(travelStartedAt);
   const workStartMs = parseTaskTimestampMs(workStartedAt);
   const completedMs = parseTaskTimestampMs(completedAt);
 
@@ -1013,7 +1081,7 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
       : null;
 
   const stopwatchWorkMinutes =
-    workStartMs !== null && completedMs !== null && completedMs > workStartMs
+    workStartMs !== null && completedMs !== null && completedMs >= workStartMs
       ? Math.round((completedMs - workStartMs) / 60000)
       : null;
 
@@ -1040,18 +1108,22 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
     }
   }
 
+  const normalizedDeclaredStr =
+    rawDeclared !== null && rawDeclared !== undefined && typeof rawDeclared !== 'boolean'
+      ? String(rawDeclared).replace(',', '.').trim()
+      : '';
+  const parsedDeclaredNum =
+    normalizedDeclaredStr !== '' ? Number(normalizedDeclaredStr) : NaN;
+
   const declaredManHours =
-    rawDeclared !== null &&
-    rawDeclared !== undefined &&
-    rawDeclared !== '' &&
-    typeof rawDeclared !== 'boolean' &&
-    Number.isFinite(Number(rawDeclared)) &&
-    Number(rawDeclared) >= 0
-      ? Number(Number(rawDeclared).toFixed(2))
+    Number.isFinite(parsedDeclaredNum) && parsedDeclaredNum >= 0
+      ? Number(parsedDeclaredNum.toFixed(2))
       : null;
 
+  const isMultiDayOrPaused = Boolean(stopwatchWorkHours !== null && stopwatchWorkHours > 12);
+
   const discrepancyHours =
-    declaredManHours !== null && stopwatchWorkHours !== null
+    declaredManHours !== null && stopwatchWorkHours !== null && !isMultiDayOrPaused
       ? Number((declaredManHours - stopwatchWorkHours).toFixed(2))
       : null;
 
@@ -1061,7 +1133,6 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
       stopwatchWorkMinutes < 5 &&
       Boolean(safeTask.triggerType || safeTask.checklist)
   );
-  const isMultiDayOrPaused = Boolean(stopwatchWorkHours !== null && stopwatchWorkHours > 12);
 
   const effectiveMachine =
     machine ||
@@ -1076,12 +1147,16 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
   const startGpsVerification = verifyOnSiteGps(
     safeTask.workStartGps,
     effectiveMachine,
-    regions
+    regions,
+    300,
+    machines
   );
   const endGpsVerification = verifyOnSiteGps(
     safeTask.completedGps || safeTask.completionDetails?.completedGps,
     effectiveMachine,
-    regions
+    regions,
+    300,
+    machines
   );
 
   return {

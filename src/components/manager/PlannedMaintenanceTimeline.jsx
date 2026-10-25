@@ -248,7 +248,7 @@ export default function PlannedMaintenanceTimeline({
       await updatePlannedService(srv.id, {
         assignedService: selectedService,
         status: 'in_progress',
-        inProgressAt: srv.inProgressAt || nowIso,
+        assignedAt: srv.assignedAt || nowIso,
         currentStep: 3,
         history: newHistory,
       });
@@ -329,7 +329,11 @@ export default function PlannedMaintenanceTimeline({
   // 3. Krok 3 -> Krok 4: Przejście do podsumowania
   const handleGoToSummary = async () => {
     try {
-      await updatePlannedService(srv.id, { currentStep: 4 });
+      const payload = { currentStep: 4 };
+      if (!srv.workStartedAt && !localWorkStartedAt && !srv.inProgressAt) {
+        payload.inProgressAt = new Date().toISOString();
+      }
+      await updatePlannedService(srv.id, payload);
       setSelectedStepOverride(4);
     } catch {
       setSelectedStepOverride(4);
@@ -434,8 +438,17 @@ export default function PlannedMaintenanceTimeline({
           })
         : null;
 
+      const parsedSummaryManHours =
+        summaryManHours !== '' && summaryManHours !== null && summaryManHours !== undefined
+          ? Number(String(summaryManHours).replace(',', '.'))
+          : null;
+      const safeManHours =
+        parsedSummaryManHours !== null && Number.isFinite(parsedSummaryManHours) && parsedSummaryManHours >= 0
+          ? parsedSummaryManHours
+          : null;
+
       const historyEntry = {
-        manHours: summaryManHours ? Number(summaryManHours) : null,
+        manHours: safeManHours,
         date: new Date().toISOString(),
         user: user?.name || 'System',
         action: 'Zakończono serwis',
@@ -452,13 +465,14 @@ export default function PlannedMaintenanceTimeline({
 
       const completionData = {
         completedBy: user?.name || 'System',
+        completedAt: historyEntry.date,
         notes: summaryNotes,
-        manHours: summaryManHours ? Number(summaryManHours) : null,
+        manHours: safeManHours,
         checklistResponses,
         historyEntry,
         partsUsed: summaryPartsUsed,
         currentStep: 5,
-        completedGps: completedGps || null,
+        completedGps: completedGps || srv.completedGps || null,
         fGasProtocol: fGasProtocol || null,
         clientSignature: clientSignature || null,
         clientSignerName: clientSignerName ? clientSignerName.trim() : null,
@@ -511,6 +525,11 @@ export default function PlannedMaintenanceTimeline({
         onComplete({
           ...srv,
           ...completionData,
+          completedAt: historyEntry.date,
+          travelStartedAt: srv.travelStartedAt || localTravelStartedAt || null,
+          workStartedAt: srv.workStartedAt || localWorkStartedAt || null,
+          completionDetails: completionData,
+          history: [...(srv.history || []), historyEntry],
           status: 'completed',
           currentStep: 5,
         });

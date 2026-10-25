@@ -1246,5 +1246,93 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       unmount();
     });
+
+    it('obsługuje przypadki brzegowe z audytu: dziedziczenie GPS po drzewie maszyn (parentId), brak fałszywego zawyżenia RBG bez stopera oraz filtrowanie podrejonów budynku', () => {
+      const parentBuildingMachine = {
+        id: 'm-parent-building',
+        name: 'Budynek Główny A',
+        gpsLat: 54.5189,
+        gpsLng: 18.5305,
+        regionId: 'reg-building-a',
+      };
+      const childApartmentDevice = {
+        id: 'm-child-flat-12',
+        name: 'Kocioł dwufunkcyjny - Lokal 12',
+        parentId: 'm-parent-building',
+      };
+      const allMachines = [parentBuildingMachine, childApartmentDevice];
+      const allRegions = [
+        { id: 'reg-building-a', name: 'Budynek A (ul. Morska)' },
+        { id: 'reg-staircase-a1', name: 'Klatka A1', parentId: 'reg-building-a' },
+      ];
+
+      // 1) Dziedziczenie GPS po drzewie maszyn (machine.parentId)
+      const gpsInheritedFromParentMachine = verifyOnSiteGps(
+        { lat: 54.519, lng: 18.5306 },
+        childApartmentDevice,
+        allRegions,
+        300,
+        allMachines
+      );
+      expect(gpsInheritedFromParentMachine.status).toBe('on_site');
+      expect(gpsInheritedFromParentMachine.isOnSite).toBe(true);
+
+      // 2) Zamknięcie przeglądu w 0 sekund (completedAt === workStartedAt) + przecinek w RBG ("1,5") + wcześniejsze inProgressAt z Kroku 2
+      const instantService = {
+        id: 'srv-instant',
+        triggerType: 'calendar',
+        inProgressAt: '2026-10-25T07:00:00.000Z', // przydzielenie w biurze
+        travelStartedAt: '2026-10-25T09:00:00.000Z', // wyjazd o 09:00
+        workStartedAt: '2026-10-25T09:20:00.000Z', // przyjazd o 09:20 (20 min dojazdu)
+        completedAt: '2026-10-25T09:20:00.000Z', // 0 minut pracy!
+        manHours: '1,5',
+      };
+      const instantMetrics = calculateWorkAndTravelMetrics(
+        instantService,
+        childApartmentDevice,
+        allRegions,
+        allMachines
+      );
+      expect(instantMetrics.travelDurationMinutes).toBe(20);
+      expect(instantMetrics.stopwatchWorkMinutes).toBe(0);
+      expect(instantMetrics.declaredManHours).toBe(1.5);
+      expect(instantMetrics.isSuspiciouslyShort).toBe(true);
+
+      // 3) Zlecenie bez uruchomionego stopera (workStartedAt: null, manHours: 4.0) NIE generuje fałszywego alarmu +4.0 h nadwyżki w tabeli
+      const taskWithoutStopwatch = {
+        id: 't-no-stopwatch',
+        topic: 'Wymiana zaworu w Klatce A1',
+        machineId: 'm-child-flat-12',
+        regionId: 'reg-staircase-a1',
+        assignedTo: 'Marek Konserwator',
+        status: 5,
+        closedAt: '2026-10-25T14:00:00.000Z',
+        manHours: 4.0,
+      };
+
+      const { unmount } = render(
+        <TechnicianPerformancePanel
+          tickets={[taskWithoutStopwatch]}
+          plannedServices={[]}
+          machines={allMachines}
+          regions={allRegions}
+          services={[{ id: 's-marek', name: 'Marek Konserwator' }]}
+        />
+      );
+
+      const summaryTable = screen.getByTestId('tech-performance-summary-table');
+      expect(summaryTable.textContent).toContain('Marek Konserwator');
+      expect(summaryTable.textContent).toContain('4 h');
+      expect(summaryTable.textContent).not.toContain('+4 h');
+
+      // Filtr budynku nadrzędnego ('reg-building-a') uwzględnia zlecenia z podrejonu ('reg-staircase-a1')
+      const regionSelect = screen.getByTestId('tech-perf-region-select');
+      fireEvent.change(regionSelect, { target: { value: 'reg-building-a' } });
+      expect(screen.getByTestId('tech-performance-summary-table').textContent).toContain(
+        'Marek Konserwator'
+      );
+
+      unmount();
+    });
   });
 });

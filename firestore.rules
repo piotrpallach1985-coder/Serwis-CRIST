@@ -236,6 +236,7 @@ service cloud.firestore {
           && request.resource.data.key is string
           && request.resource.data.key.size() >= 20;
         allow update: if isTenantUser(tenantId) && isAdmin()
+          && request.resource.data.keys().hasOnly(['key', 'createdAt'])
           && request.resource.data.key is string
           && request.resource.data.key.size() >= 20;
       }

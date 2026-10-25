@@ -63,8 +63,13 @@ export const generateAuditorReport = async (
       user,
       onlyAssignedTasks
     );
+    const hasDedicatedScope = Boolean(
+      onlyAssignedTasks ||
+        user?.assignedService ||
+        (Array.isArray(user?.dedicatedServices) && user.dedicatedServices.length > 0)
+    );
     const allowedMachineIds = new Set(machines.map(m => m.id));
-    const actions = onlyAssignedTasks
+    const actions = hasDedicatedScope
       ? rawActions.filter(
           a => allowedMachineIds.has(a.machineId) || isTaskAssignedToUser(a, user)
         )

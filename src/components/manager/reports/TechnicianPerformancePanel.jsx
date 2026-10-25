@@ -3,8 +3,13 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { useManagerStore } from '../../../store/managerStore';
+import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { safeParseDate } from '../../../utils/dateHelpers';
-import { calculateWorkAndTravelMetrics } from '../../../utils/fieldServiceHelpers';
+import {
+  calculateWorkAndTravelMetrics,
+  filterTasksForFieldTechnician,
+} from '../../../utils/fieldServiceHelpers';
 
 export default function TechnicianPerformancePanel({
   tickets: propTickets = null,
@@ -13,6 +18,9 @@ export default function TechnicianPerformancePanel({
   regions: propRegions = null,
   services: propServices = null,
 }) {
+  const { user } = useAuth();
+  const { onlyAssignedTasks } = usePermissions();
+
   const storeTickets = useManagerStore(state => state.tickets || []);
   const storePlannedServices = useManagerStore(state => state.plannedServices || []);
   const storeMachines = useManagerStore(state => state.machines || []);
@@ -29,8 +37,17 @@ export default function TechnicianPerformancePanel({
   const [onlyAnomalies, setOnlyAnomalies] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
-  const effectiveTickets = fetchedArchiveTickets || propTickets || storeTickets;
-  const effectivePlanned = fetchedArchivePlanned || propPlannedServices || storePlannedServices;
+  const rawTickets = fetchedArchiveTickets || propTickets || storeTickets;
+  const rawPlanned = fetchedArchivePlanned || propPlannedServices || storePlannedServices;
+
+  const effectiveTickets = useMemo(
+    () => filterTasksForFieldTechnician(rawTickets, user, onlyAssignedTasks),
+    [rawTickets, user, onlyAssignedTasks]
+  );
+  const effectivePlanned = useMemo(
+    () => filterTasksForFieldTechnician(rawPlanned, user, onlyAssignedTasks),
+    [rawPlanned, user, onlyAssignedTasks]
+  );
   const effectiveMachines = propMachines || storeMachines;
   const effectiveRegions = propRegions || storeRegions;
   const effectiveServices = propServices || storeServices;
@@ -73,7 +90,27 @@ export default function TechnicianPerformancePanel({
   }, [effectiveRegions]);
 
   const resolveRegionInfo = (task, machineObj) => {
-    const rawRegionId = task?.regionId || machineObj?.regionId || '';
+    let rawRegionId = task?.regionId || machineObj?.regionId || '';
+    let rawRegionName = task?.regionName || machineObj?.regionName || '';
+
+    // Dziedziczenie rejonu (budynku) z maszyny nadrzędnej (parentId), jeśli urządzenie podrzędne nie ma własnego regionId
+    if (!rawRegionId && machineObj?.parentId) {
+      const visited = new Set([machineObj.id]);
+      let parentM = machineMap.get(machineObj.parentId);
+      while (parentM && !visited.has(parentM.id)) {
+        visited.add(parentM.id);
+        if (parentM.regionId) {
+          rawRegionId = parentM.regionId;
+          if (!rawRegionName && parentM.regionName) rawRegionName = parentM.regionName;
+          break;
+        }
+        if (!rawRegionName && parentM.regionName) {
+          rawRegionName = parentM.regionName;
+        }
+        parentM = parentM.parentId ? machineMap.get(parentM.parentId) : null;
+      }
+    }
+
     const regObj = rawRegionId ? regionMap.get(rawRegionId) : null;
     if (regObj) {
       return { regionId: regObj.id, regionName: regObj.name };
@@ -81,7 +118,7 @@ export default function TechnicianPerformancePanel({
     if (rawRegionId === 'main_map') {
       return { regionId: 'main_map', regionName: 'Mapa Główna' };
     }
-    const fallbackName = (task?.regionName || machineObj?.regionName || '').trim();
+    const fallbackName = rawRegionName.trim();
     if (fallbackName) {
       const byName = (effectiveRegions || []).find(r => r.name === fallbackName);
       return {
@@ -101,7 +138,12 @@ export default function TechnicianPerformancePanel({
     (effectiveTickets || []).forEach(ticket => {
       if (!ticket || ticket.isDeleted) return;
       const machineObj = machineMap.get(ticket.machineId) || null;
-      const metrics = calculateWorkAndTravelMetrics(ticket, machineObj, effectiveRegions);
+      const metrics = calculateWorkAndTravelMetrics(
+        ticket,
+        machineObj,
+        effectiveRegions,
+        effectiveMachines
+      );
       const technician =
         (
           ticket.assignedTo ||
@@ -174,7 +216,12 @@ export default function TechnicianPerformancePanel({
       if (!isExecutedOrStarted) return;
 
       const machineObj = machineMap.get(srv.machineId) || null;
-      const metrics = calculateWorkAndTravelMetrics(srv, machineObj, effectiveRegions);
+      const metrics = calculateWorkAndTravelMetrics(
+        srv,
+        machineObj,
+        effectiveRegions,
+        effectiveMachines
+      );
       const technician =
         (
           srv.assignedService ||
@@ -229,7 +276,7 @@ export default function TechnicianPerformancePanel({
     });
 
     return items.sort((a, b) => (b.refDate?.getTime() || 0) - (a.refDate?.getTime() || 0));
-  }, [effectiveTickets, effectivePlanned, machineMap, regionMap, effectiveRegions]);
+  }, [effectiveTickets, effectivePlanned, machineMap, regionMap, effectiveRegions, effectiveMachines]);
 
   const availableMonths = useMemo(() => {
     const set = new Set();
@@ -265,15 +312,32 @@ export default function TechnicianPerformancePanel({
       .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   }, [effectiveRegions, allNormalizedTasks]);
 
+  // Zbiór ID wybranego budynku/rejonu wraz ze wszystkimi jego podrejonami (klatki, kondygnacje, kotłownie)
+  const selectedRegionIdsSet = useMemo(() => {
+    if (selectedRegionId === 'all') return null;
+    const allowed = new Set([selectedRegionId]);
+    let added = true;
+    while (added) {
+      added = false;
+      (effectiveRegions || []).forEach(r => {
+        if (r?.id && r?.parentId && allowed.has(r.parentId) && !allowed.has(r.id)) {
+          allowed.add(r.id);
+          added = true;
+        }
+      });
+    }
+    return allowed;
+  }, [selectedRegionId, effectiveRegions]);
+
   const filteredTasks = useMemo(() => {
     return allNormalizedTasks.filter(item => {
       if (selectedPeriod !== 'all' && item.monthKey !== selectedPeriod) return false;
       if (selectedTechnician !== 'all' && item.technician !== selectedTechnician) return false;
-      if (selectedRegionId !== 'all' && item.regionId !== selectedRegionId) return false;
+      if (selectedRegionIdsSet && !selectedRegionIdsSet.has(item.regionId)) return false;
       if (onlyAnomalies && !item.hasAlert) return false;
       return true;
     });
-  }, [allNormalizedTasks, selectedPeriod, selectedTechnician, selectedRegionId, onlyAnomalies]);
+  }, [allNormalizedTasks, selectedPeriod, selectedTechnician, selectedRegionIdsSet, onlyAnomalies]);
 
   // TABELA 1: Ranking i weryfikacja serwisantów / konserwatorów
   const technicianRanking = useMemo(() => {
@@ -365,7 +429,7 @@ export default function TechnicianPerformancePanel({
             ? Number(
                 (r.totalComparedDeclaredHours - r.totalComparedStopwatchHours).toFixed(2)
               )
-            : Number((r.totalDeclaredHours - r.totalStopwatchHours).toFixed(2));
+            : null;
         const totalGpsChecked = r.onSiteCount + r.offSiteCount;
         const gpsCompliancePercent =
           totalGpsChecked > 0 ? Math.round((r.onSiteCount / totalGpsChecked) * 100) : null;
@@ -446,7 +510,7 @@ export default function TechnicianPerformancePanel({
         const discrepancyHours =
           r.comparedCount > 0
             ? Number((r.comparedDeclaredHours - r.comparedStopwatchHours).toFixed(2))
-            : Number((r.totalDeclaredHours - r.totalStopwatchHours).toFixed(2));
+            : null;
         const totalGpsChecked = r.onSiteCount + r.offSiteCount;
         const gpsCompliancePercent =
           totalGpsChecked > 0 ? Math.round((r.onSiteCount / totalGpsChecked) * 100) : null;
@@ -475,7 +539,8 @@ export default function TechnicianPerformancePanel({
         'Łączny czas dojazdu (h)': r.totalTravelHours,
         'Czas na obiekcie wg Stopera (h)': r.totalStopwatchHours,
         'Zadeklarowane RBG (h)': r.totalDeclaredHours,
-        'Bilans / Zawyżenie RBG (h)': r.discrepancyBalanceHours,
+        'Bilans / Zawyżenie RBG (h)':
+          r.discrepancyBalanceHours !== null ? r.discrepancyBalanceHours : '-',
         '% Zgodności GPS na obiekcie':
           r.gpsCompliancePercent !== null ? `${r.gpsCompliancePercent}%` : '-',
         'GPS Na miejscu': r.onSiteCount,
@@ -492,7 +557,7 @@ export default function TechnicianPerformancePanel({
         'Łączny czas dojazdów (h)': r.totalTravelHours,
         'Rzeczywisty czas pracy na budynku (Stoper h)': r.totalStopwatchHours,
         'Zadeklarowane RBG do rozliczenia (h)': r.totalDeclaredHours,
-        'Różnica / Nadwyżka RBG (h)': r.discrepancyHours,
+        'Różnica / Nadwyżka RBG (h)': r.discrepancyHours !== null ? r.discrepancyHours : '-',
         '% Weryfikacji GPS na budynku':
           r.gpsCompliancePercent !== null ? `${r.gpsCompliancePercent}%` : '-',
       }));
@@ -737,7 +802,8 @@ export default function TechnicianPerformancePanel({
                 </tr>
               ) : (
                 technicianRanking.map(row => {
-                  const hasPositiveDiscrepancy = row.discrepancyBalanceHours > 0.25;
+                  const hasPositiveDiscrepancy =
+                    row.discrepancyBalanceHours !== null && row.discrepancyBalanceHours > 0.25;
                   return (
                     <tr
                       key={row.technician}
@@ -778,16 +844,20 @@ export default function TechnicianPerformancePanel({
                         {row.totalDeclaredHours} h
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`inline-block font-extrabold px-2 py-0.5 rounded border text-[11px] ${
-                            hasPositiveDiscrepancy
-                              ? 'bg-red-50 text-red-700 border-red-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}
-                        >
-                          {row.discrepancyBalanceHours > 0 ? '+' : ''}
-                          {row.discrepancyBalanceHours} h
-                        </span>
+                        {row.discrepancyBalanceHours !== null ? (
+                          <span
+                            className={`inline-block font-extrabold px-2 py-0.5 rounded border text-[11px] ${
+                              hasPositiveDiscrepancy
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}
+                          >
+                            {row.discrepancyBalanceHours > 0 ? '+' : ''}
+                            {row.discrepancyBalanceHours} h
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                         {row.inflatedTasksCount > 0 && (
                           <span className="text-[10px] font-bold text-amber-700 block mt-0.5">
                             ⚠️ {row.inflatedTasksCount} zlec. z nadwyżką
@@ -895,16 +965,20 @@ export default function TechnicianPerformancePanel({
                       {reg.totalDeclaredHours} h
                     </td>
                     <td className="py-2.5 px-3 text-center">
-                      <span
-                        className={`inline-block font-bold px-2 py-0.5 rounded border text-[11px] ${
-                          reg.discrepancyHours > 0.25
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}
-                      >
-                        {reg.discrepancyHours > 0 ? '+' : ''}
-                        {reg.discrepancyHours} h
-                      </span>
+                      {reg.discrepancyHours !== null ? (
+                        <span
+                          className={`inline-block font-bold px-2 py-0.5 rounded border text-[11px] ${
+                            reg.discrepancyHours > 0.25
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}
+                        >
+                          {reg.discrepancyHours > 0 ? '+' : ''}
+                          {reg.discrepancyHours} h
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-center font-bold text-slate-700">
                       {reg.gpsCompliancePercent !== null ? (

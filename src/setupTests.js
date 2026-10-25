@@ -16,3 +16,25 @@ vi.mock('react-i18next', () => ({
     },
   }),
 }));
+
+if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+  window.alert = vi.fn();
+}
+
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    fillRect: vi.fn(),
+    drawImage: vi.fn(),
+    scale: vi.fn(),
+    lineWidth: 2,
+    lineCap: 'round',
+    lineJoin: 'round',
+    strokeStyle: '#0f172a',
+  }));
+  HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,mock');
+}

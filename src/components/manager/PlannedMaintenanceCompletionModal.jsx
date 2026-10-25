@@ -88,6 +88,14 @@ export default function PlannedMaintenanceCompletionModal({
     if (defaultLic) {
       setInspectorLicense(defaultLic);
     }
+    const existingGps =
+      serviceToComplete?.completedGps ||
+      serviceToComplete?.completionDetails?.completedGps ||
+      null;
+    setCompletedGps(existingGps);
+    if (existingGps) {
+      setShowGpsOption(true);
+    }
   }, [
     currentMachine?.id,
     currentMachine?.refrigerantType,
@@ -345,10 +353,11 @@ export default function PlannedMaintenanceCompletionModal({
           currentStep: 5,
           completedAt: historyEntry.date,
           completedBy: completionData.completedBy,
+          manHours: completionData.manHours,
           completionNotes,
           checklistResponses,
           fGasProtocol,
-          completedGps,
+          completedGps: completionData.completedGps,
           clientSignature: clientSignature || null,
           clientSignerName: clientSignerName || null,
           inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,

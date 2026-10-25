@@ -224,8 +224,27 @@ export default function Tickets({ isArchive, initialTicketId, onClearTicketId, i
       if (Number(newStatus) === TICKET_STATUS.CLOSED) {
         updateData.closedAt = new Date().toISOString();
         updateData.completedBy = user.name;
+      } else if (
+        newStatus !== undefined &&
+        newStatus !== null &&
+        Number(newStatus) < TICKET_STATUS.CLOSED &&
+        currentData.closedAt
+      ) {
+        updateData.closedAt = null;
       }
-      if (newStatus === 4 && (!currentData.inProgressAt || currentData.status < 4)) {
+      if (newStatus !== undefined && newStatus !== null && Number(newStatus) <= 2 && Number(currentData.status) > 2) {
+        updateData.travelStartedAt = null;
+        updateData.travelStartGps = null;
+        updateData.workStartedAt = null;
+        updateData.workStartGps = null;
+        updateData.inProgressAt = null;
+      }
+      if (
+        Number(newStatus) === 4 &&
+        (!currentData.inProgressAt ||
+          Number(currentData.status) < 4 ||
+          Number(currentData.status) === TICKET_STATUS.CLOSED)
+      ) {
         const nowIso = extraData?.workStartedAt || new Date().toISOString();
         updateData.inProgressAt = extraData?.inProgressAt || nowIso;
         if (!updateData.workStartedAt) {

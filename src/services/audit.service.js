@@ -145,6 +145,12 @@ export const formatDetails = (details, action, entityType, customState = null) =
       if (Array.isArray(value)) valStr = `${value.length} poz.`;
       else if (value && typeof value.toDate === 'function') {
         valStr = formatIsoString(value.toDate().toISOString());
+      } else if (
+        value &&
+        typeof value.lat === 'number' &&
+        typeof value.lng === 'number'
+      ) {
+        valStr = `${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}`;
       } else {
         continue;
       }
