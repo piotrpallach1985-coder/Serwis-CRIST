@@ -15,6 +15,7 @@ import {
   saveCustomRefrigerant,
   deleteCustomRefrigerant,
   isHvacAsset,
+  generateRandomReportPin,
 } from '../../utils/fieldServiceHelpers';
 
 export function formatPhoneXxx(raw) {
@@ -87,6 +88,7 @@ export default function MachineForm({
   const [hasTowbar, setHasTowbar] = useState('');
   const [ownershipType, setOwnershipType] = useState('');
   const [udtOrExtinguisherDate, setUdtOrExtinguisherDate] = useState('');
+  const [reportPin, setReportPin] = useState('');
 
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
@@ -187,6 +189,7 @@ export default function MachineForm({
       setHasTowbar(editingMachine.hasTowbar || '');
       setOwnershipType(editingMachine.ownershipType || '');
       setUdtOrExtinguisherDate(editingMachine.udtOrExtinguisherDate || '');
+      setReportPin(editingMachine.reportPin || '');
 
       setShowExtendedFields(
         isExistingHvac ||
@@ -247,6 +250,7 @@ export default function MachineForm({
       setHasTowbar('');
       setOwnershipType('');
       setUdtOrExtinguisherDate('');
+      setReportPin('');
 
       if (initialParentId) {
         setParentId(initialParentId);
@@ -351,6 +355,7 @@ export default function MachineForm({
     const extraPayload = {
       assetCategory: isVehicleSelected ? 'vehicle' : isHvacSelected ? 'hvac' : 'device',
       counterUnit: isVehicleSelected ? counterUnit || 'km' : 'RBG',
+      reportPin: reportPin.trim(),
       ...(isVehicleSelected
         ? {
             licensePlate: licensePlate.trim().toUpperCase(),
@@ -941,6 +946,55 @@ export default function MachineForm({
                       placeholder="np. Leasing PKO (limit 30 tys. km/rok) • Karta Orlen #4412"
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4 bg-amber-50/80 border border-amber-200 rounded-lg p-3 space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+                        <i className="ph-fill ph-key text-amber-600 text-sm"></i>
+                        <span>Indywidualny PIN zgłoszeń anonimowych dla tego pojazdu (opcjonalnie)</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        {branding?.globalFleetPin && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-200">
+                            Globalny PIN Floty: {branding.globalFleetPin}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          data-testid="fleet-generate-pin-btn"
+                          onClick={() => setReportPin(generateRandomReportPin(4))}
+                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <i className="ph ph-shuffle"></i> Losuj PIN
+                        </button>
+                        {reportPin && (
+                          <button
+                            type="button"
+                            onClick={() => setReportPin('')}
+                            className="px-2 py-0.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded transition-colors cursor-pointer"
+                          >
+                            Użyj globalnego
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <input
+                        type="text"
+                        data-testid="fleet-report-pin-input"
+                        value={reportPin}
+                        onChange={e => setReportPin(e.target.value)}
+                        placeholder={
+                          branding?.globalFleetPin
+                            ? `Domyślnie: Globalny PIN Floty (${branding.globalFleetPin})`
+                            : 'Wpisz indywidualny PIN pojazdu (np. 7410)'
+                        }
+                        className="w-full sm:max-w-xs p-2 border border-amber-300 rounded-lg text-xs font-mono font-black tracking-widest bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <span className="text-[11px] text-amber-800 leading-snug">
+                        Chroni przed fałszywymi zgłoszeniami awarii po numerze tablicy lub QR (dotyczy tylko zgłoszeń anonimowych). Jeśli puste, dla pojazdu obowiązuje Globalny PIN Floty.
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

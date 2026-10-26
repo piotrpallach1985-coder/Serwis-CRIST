@@ -5,7 +5,11 @@ import { compressImage } from '../utils/imageCompressor';
 import {
   checkQrSubmissionCooldown,
   recordQrSubmissionTimestamp,
+  resolveAnonymousReportPin,
+  verifyAnonymousReportPin,
+  findMachineByIdentifierOrPlate,
 } from '../utils/fieldServiceHelpers';
+import { useManagerStore } from '../store/managerStore';
 
 // Spójne z limitem w firestore.rules (anonimowe zgłoszenia)
 export const MAX_TICKET_PHOTOS = 10;
@@ -23,11 +27,14 @@ import { useAuth } from './useAuth';
 
 export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline , isInternal}) => {
   const { user } = useAuth();
+  const branding = useManagerStore(state => state.branding);
+  const mapSettings = useManagerStore(state => state.mapSettings);
   const [topicMode, setTopicMode] = useState('select'); // 'select' lub 'manual'
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
+  const [reportPin, setReportPin] = useState('');
   const [reporterDeviceId] = useState(() => {
     let id = localStorage.getItem('device_id_token');
     if (!id) {
@@ -58,10 +65,33 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     showToast
   });
 
+  const effectiveMachineForPin =
+    selectedMachine?.id === 'manual' && selectedMachine?.name
+      ? findMachineByIdentifierOrPlate(machines || [], selectedMachine.name) || selectedMachine
+      : selectedMachine;
+
+  const pinRequirement = !isInternal
+    ? resolveAnonymousReportPin(
+        effectiveMachineForPin,
+        regions || [],
+        branding || {},
+        mapSettings || {}
+      )
+    : { required: false, pin: '', source: 'none', sourceLabel: '' };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg(null);
 
     if (!isInternal) {
+      if (pinRequirement.required && !verifyAnonymousReportPin(reportPin, pinRequirement.pin)) {
+        const msg =
+          'Nieprawidłowy kod PIN autoryzacji zgłoszenia! Podaj poprawny kod PIN przypisany do tej lokalizacji lub pojazdu.';
+        setErrorMsg(msg);
+        showToast(msg, 'error');
+        return;
+      }
+
       const cooldown = checkQrSubmissionCooldown();
       if (!cooldown.allowed) {
         const msg = `Ochrona antyspamowa: odczekaj ${cooldown.remainingSeconds} s przed wysłaniem kolejnego zgłoszenia.`;
@@ -134,6 +164,8 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     description, setDescription,
     reporterName, setReporterName,
     reporterPhone, setReporterPhone,
+    reportPin, setReportPin,
+    pinRequirement,
     isCritical, setIsCritical,
     loading, setLoading,
     errorMsg, setErrorMsg,

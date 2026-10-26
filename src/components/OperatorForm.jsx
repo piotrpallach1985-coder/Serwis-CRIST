@@ -34,6 +34,8 @@ export default function OperatorForm({
     description, setDescription,
     reporterName, setReporterName,
     reporterPhone, setReporterPhone,
+    reportPin, setReportPin,
+    pinRequirement,
     isCritical, setIsCritical,
     loading,
     errorMsg,
@@ -199,6 +201,42 @@ export default function OperatorForm({
             )}
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {!isInternal && pinRequirement?.required && (
+                <div
+                  data-testid="operator-report-pin-section"
+                  className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-4 space-y-2 shadow-2xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label
+                      htmlFor="operator-report-pin-input"
+                      className="text-sm font-extrabold text-amber-950 flex items-center gap-1.5"
+                    >
+                      <i className="ph-fill ph-key text-amber-600 text-lg"></i>
+                      <span>Kod PIN autoryzacji zgłoszenia *</span>
+                    </label>
+                    {pinRequirement.sourceLabel && (
+                      <span className="text-[11px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                        {pinRequirement.sourceLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-800 leading-snug">
+                    Dla tej lokalizacji lub pojazdu wymagane jest podanie kodu PIN chroniącego przed nieautoryzowanymi zgłoszeniami.
+                  </p>
+                  <input
+                    id="operator-report-pin-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    data-testid="operator-report-pin-input"
+                    value={reportPin}
+                    onChange={e => setReportPin(e.target.value)}
+                    placeholder="Wpisz kod PIN (np. 1234)"
+                    required
+                    className="w-full sm:max-w-xs p-3 border-2 border-amber-400 rounded-lg font-mono font-black text-lg tracking-widest text-amber-950 bg-white focus:ring-2 focus:ring-amber-600 outline-none"
+                  />
+                </div>
+              )}
               {!isInternal && (
               <div className="mb-6">
                 <label className="block text-sm font-bold text-gray-700 mb-1">

@@ -184,6 +184,8 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     let unsubscribeMachines = () => {};
     let unsubscribeTopics = () => {};
     let unsubscribeRegions = () => {};
+    let unsubscribeBranding = () => {};
+    let unsubscribeMapSettings = () => {};
     let authUnsub = () => {};
     let cancelled = false;
 
@@ -202,6 +204,29 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           unsubscribeMachines();
           unsubscribeTopics();
           unsubscribeRegions();
+          unsubscribeBranding();
+          unsubscribeMapSettings();
+
+          unsubscribeBranding = onSnapshot(
+            doc(db, 'tenants', tenantId, 'settings', 'branding'),
+            snap => {
+              if (snap.exists()) {
+                const current = useManagerStore.getState().branding || {};
+                useManagerStore.getState().setBranding({ ...current, ...snap.data() });
+              }
+            },
+            () => {}
+          );
+
+          unsubscribeMapSettings = onSnapshot(
+            doc(db, 'tenants', tenantId, 'settings', 'map'),
+            snap => {
+              if (snap.exists()) {
+                useManagerStore.getState().setMapSettings(snap.data());
+              }
+            },
+            () => {}
+          );
 
           unsubscribeMachines = onSnapshot(
             query(
@@ -267,6 +292,8 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       unsubscribeMachines();
       unsubscribeTopics();
       unsubscribeRegions();
+      unsubscribeBranding();
+      unsubscribeMapSettings();
       if (authUnsub) authUnsub();
     };
   }, [urlMachineId, bindNonce]);

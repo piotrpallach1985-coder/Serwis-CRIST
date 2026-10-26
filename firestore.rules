@@ -242,7 +242,7 @@ service cloud.firestore {
       }
 
       match /settings/map {
-        allow read: if isTenantUser(tenantId);
+        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
         allow write: if isTenantUser(tenantId) && isStaff();
       }
 

@@ -1620,3 +1620,189 @@ export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = []
     };
   }
 }
+
+/**
+ * Generuje losowy 4-cyfrowy kod PIN do autoryzacji zgłoszeń anonimowych (od 1000 do 9999).
+ */
+export function generateRandomReportPin(length = 4) {
+  const safeLen = Math.max(4, Math.min(8, Number(length) || 4));
+  let result = '';
+  for (let i = 0; i < safeLen; i++) {
+    const min = i === 0 ? 1 : 0;
+    const digit = Math.floor(Math.random() * (10 - min)) + min;
+    result += String(digit);
+  }
+  return result;
+}
+
+/**
+ * Wyznacza aktywny PIN zgłoszeń anonimowych dla danego rejonu (uwzględnia dziedziczenie z rejonu nadrzędnego oraz Mapy Głównej).
+ */
+export function resolveRegionReportPin(
+  regionId,
+  regions = [],
+  mainMapSettings = {},
+  branding = {}
+) {
+  const mainPin = String(
+    mainMapSettings?.reportPin || branding?.mainMapReportPin || ''
+  ).trim();
+
+  if (!regionId || regionId === 'main_map') {
+    if (mainPin) {
+      return {
+        pin: mainPin,
+        source: 'main_map',
+        sourceName: 'Mapa Główna',
+        isInherited: false,
+      };
+    }
+    return { pin: '', source: 'none', sourceName: '', isInherited: false };
+  }
+
+  const safeRegions = Array.isArray(regions) ? regions : [];
+  const currentRegion = safeRegions.find(r => r && r.id === regionId);
+  if (currentRegion) {
+    const directPin = String(currentRegion.reportPin || '').trim();
+    if (directPin) {
+      return {
+        pin: directPin,
+        source: 'region',
+        sourceName: currentRegion.name || 'Rejon',
+        isInherited: false,
+      };
+    }
+
+    // Sprawdź rejony nadrzędne (parentId) z ochroną przed cyklami
+    const visited = new Set([currentRegion.id]);
+    let parentId = currentRegion.parentId;
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      const parentReg = safeRegions.find(r => r && r.id === parentId);
+      if (!parentReg) break;
+      const parentPin = String(parentReg.reportPin || '').trim();
+      if (parentPin) {
+        return {
+          pin: parentPin,
+          source: 'parent_region',
+          sourceName: parentReg.name || 'Rejon nadrzędny',
+          isInherited: true,
+        };
+      }
+      parentId = parentReg.parentId;
+    }
+  }
+
+  if (mainPin) {
+    return {
+      pin: mainPin,
+      source: 'main_map',
+      sourceName: 'Mapa Główna',
+      isInherited: true,
+    };
+  }
+
+  return { pin: '', source: 'none', sourceName: '', isInherited: false };
+}
+
+/**
+ * Wyznacza wymagany PIN dla zgłoszenia anonimowego (dla nieruchomości / rejonu lub dla pojazdu / floty).
+ * Zasady:
+ * - Dla pojazdów (Flota):
+ *   1. Indywidualny PIN przypisany do pojazdu (`machine.reportPin`) ma najwyższy priorytet.
+ *   2. Jeśli pojazd nie ma indywidualnego PIN-u, obowiązuje Globalny PIN Floty (`branding.globalFleetPin` lub `mainMapSettings.globalFleetPin`).
+ *   3. W dalszej kolejności sprawdzany jest PIN bazy/oddziału pojazdu (`regionId`).
+ * - Dla nieruchomości / urządzeń stacjonarnych:
+ *   1. Indywidualny PIN urządzenia (`machine.reportPin`), jeśli ustawiono.
+ *   2. PIN lokalizacji / rejonu (`regionId`) lub Mapy Głównej.
+ */
+export function resolveAnonymousReportPin(
+  machine,
+  regions = [],
+  branding = {},
+  mainMapSettings = {}
+) {
+  if (!machine) {
+    return { required: false, pin: '', source: 'none', sourceLabel: '' };
+  }
+
+  const isVehicle = isVehicleAsset(machine, branding?.industryProfile);
+  const directMachinePin = String(machine.reportPin || '').trim();
+  const globalFleetPin = String(
+    branding?.globalFleetPin || mainMapSettings?.globalFleetPin || ''
+  ).trim();
+
+  if (isVehicle) {
+    if (directMachinePin) {
+      return {
+        required: true,
+        pin: directMachinePin,
+        source: 'vehicle',
+        sourceLabel: `Indywidualny PIN pojazdu (${
+          machine.licensePlate || machine.name || 'Pojazd'
+        })`,
+      };
+    }
+    if (globalFleetPin) {
+      return {
+        required: true,
+        pin: globalFleetPin,
+        source: 'fleet_global',
+        sourceLabel: 'Globalny PIN Floty',
+      };
+    }
+    const regResolved = resolveRegionReportPin(
+      machine.regionId,
+      regions,
+      mainMapSettings,
+      branding
+    );
+    if (regResolved.pin) {
+      return {
+        required: true,
+        pin: regResolved.pin,
+        source: regResolved.source,
+        sourceLabel: `PIN bazy / lokalizacji (${regResolved.sourceName})`,
+      };
+    }
+    return { required: false, pin: '', source: 'none', sourceLabel: '' };
+  }
+
+  // Nieruchomości / Urządzenia / HVAC
+  if (directMachinePin) {
+    return {
+      required: true,
+      pin: directMachinePin,
+      source: 'machine',
+      sourceLabel: `PIN urządzenia (${machine.name || 'Urządzenie'})`,
+    };
+  }
+
+  const regResolved = resolveRegionReportPin(
+    machine.regionId,
+    regions,
+    mainMapSettings,
+    branding
+  );
+  if (regResolved.pin) {
+    return {
+      required: true,
+      pin: regResolved.pin,
+      source: regResolved.source,
+      sourceLabel: `PIN lokalizacji (${regResolved.sourceName || 'Rejon'})`,
+    };
+  }
+
+  return { required: false, pin: '', source: 'none', sourceLabel: '' };
+}
+
+/**
+ * Weryfikuje podany przez zgłaszającego anonimowego kod PIN względem wymaganego PIN-u.
+ */
+export function verifyAnonymousReportPin(enteredPin, expectedPin) {
+  const cleanExpected = String(expectedPin || '').trim();
+  if (!cleanExpected) return true;
+  const cleanEntered = String(enteredPin || '').trim();
+  if (!cleanEntered) return false;
+  return cleanEntered.toUpperCase() === cleanExpected.toUpperCase();
+}

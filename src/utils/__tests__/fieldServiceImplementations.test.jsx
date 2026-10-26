@@ -30,6 +30,10 @@ import {
   saveCustomRefrigerant,
   deleteCustomRefrigerant,
   isHvacAsset,
+  generateRandomReportPin,
+  resolveRegionReportPin,
+  resolveAnonymousReportPin,
+  verifyAnonymousReportPin,
 } from '../fieldServiceHelpers';
 import { checkServiceUrgency } from '../logicHelpers';
 import fs from 'fs';
@@ -37,6 +41,8 @@ import path from 'path';
 import SignaturePad from '../../components/shared/SignaturePad';
 import QRScannerModal from '../../components/shared/QRScannerModal';
 import OperatorScanner from '../../components/operator/OperatorScanner';
+import OperatorForm from '../../components/OperatorForm';
+import Regions from '../../components/manager/Regions';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
 import MachineForm from '../../components/manager/MachineForm';
 import MachineDTR from '../../components/manager/MachineDTR';
@@ -1814,6 +1820,143 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       deleteCustomRefrigerant('R452B');
       deleteCustomRefrigerant('R513A');
       unmount();
+    });
+
+    it('obsługuje PIN autoryzacji dla zgłoszeń anonimowych (lokalizacja/rejon, indywidualny PIN pojazdu, globalny PIN floty) oraz widoczność w zestawieniu rejonów', () => {
+      const randPin = generateRandomReportPin(4);
+      expect(randPin).toMatch(/^[1-9]\d{3}$/);
+
+      const testRegions = [
+        { id: 'reg-building-a', name: 'Budynek A (Wspólnota)', reportPin: '4821' },
+        { id: 'reg-floor-2', name: 'Piętro 2', parentId: 'reg-building-a', reportPin: '' },
+        { id: 'reg-open', name: 'Teren Zewnętrzny', reportPin: '' },
+      ];
+
+      // 1) Dziedziczenie PIN-u dla lokalizacji (bezpośredni, z rejonu nadrzędnego, z Mapy Głównej)
+      const directRegPin = resolveRegionReportPin('reg-building-a', testRegions, {}, {});
+      expect(directRegPin.pin).toBe('4821');
+      expect(directRegPin.isInherited).toBe(false);
+
+      const inheritedRegPin = resolveRegionReportPin('reg-floor-2', testRegions, {}, {});
+      expect(inheritedRegPin.pin).toBe('4821');
+      expect(inheritedRegPin.isInherited).toBe(true);
+      expect(inheritedRegPin.sourceName).toBe('Budynek A (Wspólnota)');
+
+      const openRegPin = resolveRegionReportPin('reg-open', testRegions, {}, {});
+      expect(openRegPin.pin).toBe('');
+
+      const mainFallbackPin = resolveRegionReportPin(
+        'reg-open',
+        testRegions,
+        { reportPin: '9000' },
+        {}
+      );
+      expect(mainFallbackPin.pin).toBe('9000');
+      expect(mainFallbackPin.isInherited).toBe(true);
+
+      // 2) Rozwiązywanie PIN-u dla nieruchomości vs floty pojazdów
+      const elevatorInBuildingA = {
+        id: 'm-elev-1',
+        name: 'Winda Osobowa Klatka B',
+        regionId: 'reg-floor-2',
+        assetCategory: 'device',
+      };
+      const elevPinReq = resolveAnonymousReportPin(elevatorInBuildingA, testRegions, {}, {});
+      expect(elevPinReq.required).toBe(true);
+      expect(elevPinReq.pin).toBe('4821');
+
+      const carWithGlobalPin = {
+        id: 'veh-1',
+        name: 'Toyota Proace',
+        licensePlate: 'GD 11111',
+        assetCategory: 'vehicle',
+        regionId: 'reg-open',
+      };
+      const fleetGlobalReq = resolveAnonymousReportPin(
+        carWithGlobalPin,
+        testRegions,
+        { globalFleetPin: '5520' },
+        {}
+      );
+      expect(fleetGlobalReq.required).toBe(true);
+      expect(fleetGlobalReq.pin).toBe('5520');
+      expect(fleetGlobalReq.source).toBe('fleet_global');
+
+      const carWithIndividualPin = {
+        ...carWithGlobalPin,
+        id: 'veh-2',
+        reportPin: '7788',
+      };
+      const fleetIndivReq = resolveAnonymousReportPin(
+        carWithIndividualPin,
+        testRegions,
+        { globalFleetPin: '5520' },
+        {}
+      );
+      expect(fleetIndivReq.required).toBe(true);
+      expect(fleetIndivReq.pin).toBe('7788');
+      expect(fleetIndivReq.source).toBe('vehicle');
+
+      expect(verifyAnonymousReportPin('7788', '7788')).toBe(true);
+      expect(verifyAnonymousReportPin('5520', '7788')).toBe(false);
+
+      // 3) OperatorForm: wymaga PIN-u TYLKO dla zgłoszeń anonimowych (isInternal=false), a NIE dla zalogowanych (isInternal=true)
+      useManagerStore.getState().setBranding({
+        companyName: 'Flota & Nieruchomości',
+        globalFleetPin: '5520',
+      });
+
+      const { unmount: unmountAnonForm } = render(
+        <OperatorForm
+          machines={[carWithIndividualPin, elevatorInBuildingA]}
+          selectedMachine={carWithIndividualPin}
+          setSelectedMachine={vi.fn()}
+          regions={testRegions}
+          handleStepChange={vi.fn()}
+          isOnline={true}
+          topicsList={['Awaria hamulców']}
+          reportersList={[]}
+          isInternal={false}
+        />
+      );
+      expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
+      expect(screen.getByTestId('operator-report-pin-input')).toBeTruthy();
+      unmountAnonForm();
+
+      const { unmount: unmountInternalForm } = render(
+        <OperatorForm
+          machines={[carWithIndividualPin, elevatorInBuildingA]}
+          selectedMachine={carWithIndividualPin}
+          setSelectedMachine={vi.fn()}
+          regions={testRegions}
+          handleStepChange={vi.fn()}
+          isOnline={true}
+          topicsList={['Awaria hamulców']}
+          reportersList={[]}
+          isInternal={true}
+        />
+      );
+      expect(screen.queryByTestId('operator-report-pin-section')).toBeNull();
+      unmountInternalForm();
+
+      // 4) Zestawienie rejonów (Regions.jsx): wyświetla kolumnę PIN-u dla rejonów oraz pasek Globalnego PIN-u Floty
+      useManagerStore.setState({
+        regions: testRegions,
+        machines: [elevatorInBuildingA, carWithIndividualPin],
+        branding: {
+          companyName: 'Flota & Nieruchomości',
+          globalFleetPin: '5520',
+          mainMapReportPin: '1010',
+        },
+      });
+
+      const { unmount: unmountRegions } = render(<Regions />);
+      expect(screen.getByTestId('regions-global-fleet-pin-bar')).toBeTruthy();
+      expect(screen.getByTestId('regions-active-fleet-pin-badge').textContent).toContain('5520');
+      expect(screen.getByTestId('region-pin-badge-main_map').textContent).toContain('1010');
+      expect(screen.getByTestId('region-pin-badge-reg-building-a').textContent).toContain('4821');
+      expect(screen.getByTestId('region-pin-badge-reg-floor-2').textContent).toContain('4821');
+      unmountRegions();
     });
   });
 });
