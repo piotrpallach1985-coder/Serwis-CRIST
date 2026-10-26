@@ -17,11 +17,9 @@ import {
   REFRIGERANT_TYPES,
   LEAK_TEST_RESULTS,
   buildFGasServiceEntry,
-  captureCurrentGpsPosition,
   getIndustryProfileConfig,
   isInspectorLicenseRequired,
 } from '../../utils/fieldServiceHelpers';
-import { safeParseDate } from '../../utils/dateHelpers';
 
 export default function PlannedMaintenanceTimeline({
   srv,
@@ -94,18 +92,6 @@ export default function PlannedMaintenanceTimeline({
   const canShowFGasSection =
     industryProfile !== 'industrial' &&
     (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType));
-  const [completedGps, setCompletedGps] = useState(
-    srv.completedGps || srv.completionDetails?.completedGps || null
-  );
-  const [showGpsOption, setShowGpsOption] = useState(
-    Boolean(srv.completedGps || srv.completionDetails?.completedGps)
-  );
-  const [gpsLoading, setGpsLoading] = useState(false);
-  const [gpsError, setGpsError] = useState('');
-  const [travelStarting, setTravelStarting] = useState(false);
-  const [workStarting, setWorkStarting] = useState(false);
-  const [localTravelStartedAt, setLocalTravelStartedAt] = useState(srv.travelStartedAt || null);
-  const [localWorkStartedAt, setLocalWorkStartedAt] = useState(srv.workStartedAt || null);
   const [licenseError, setLicenseError] = useState('');
   const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
   const [leakTestResult, setLeakTestResult] = useState('not_applicable');
@@ -168,20 +154,6 @@ export default function PlannedMaintenanceTimeline({
     }
   }, [srv.machineId, currentMachine, industryProfile]);
 
-  const handleCaptureGps = async () => {
-    setShowGpsOption(true);
-    setGpsLoading(true);
-    setGpsError('');
-    try {
-      const coords = await captureCurrentGpsPosition();
-      setCompletedGps(coords);
-    } catch (err) {
-      setGpsError(err.message || 'Błąd pobierania lokalizacji GPS.');
-    } finally {
-      setGpsLoading(false);
-    }
-  };
-
   const setQuickActionItemDueDate = days => {
     const d = new Date();
     d.setDate(d.getDate() + days);
@@ -195,9 +167,7 @@ export default function PlannedMaintenanceTimeline({
     if (srv.assignedService || srv.assignedTo) {
       setSelectedService(srv.assignedService || srv.assignedTo);
     }
-    setLocalTravelStartedAt(srv.travelStartedAt || null);
-    setLocalWorkStartedAt(srv.workStartedAt || null);
-  }, [srv.id, srv.assignedService, srv.assignedTo, srv.travelStartedAt, srv.workStartedAt]);
+  }, [srv.id, srv.assignedService, srv.assignedTo]);
 
   // Określenie naturalnego kroku (1 do 5)
   let naturalStepNum = 1;
@@ -259,81 +229,10 @@ export default function PlannedMaintenanceTimeline({
     }
   };
 
-  // Start dojazdu do obiektu (Field Service)
-  const handleStartTravel = async () => {
-    setTravelStarting(true);
-    try {
-      let coords = null;
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        coords = await captureCurrentGpsPosition({
-          enableHighAccuracy: true,
-          timeout: 4000,
-        }).catch(() => null);
-      }
-      const nowIso = new Date().toISOString();
-      setLocalTravelStartedAt(nowIso);
-      const historyEntry = {
-        date: nowIso,
-        user: user?.name || 'System',
-        action: 'Rozpoczęto dojazd do obiektu',
-        note: '',
-        ...(coords ? { travelStartGps: coords } : {}),
-      };
-      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
-      await updatePlannedService(srv.id, {
-        travelStartedAt: nowIso,
-        travelStartGps: coords || null,
-        history: newHistory,
-      });
-    } catch (err) {
-      console.error('Błąd startu dojazdu:', err);
-    } finally {
-      setTravelStarting(false);
-    }
-  };
-
-  // Start pracy na miejscu (Stoper i GPS)
-  const handleStartWorkOnSite = async () => {
-    setWorkStarting(true);
-    try {
-      let coords = null;
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        coords = await captureCurrentGpsPosition({
-          enableHighAccuracy: true,
-          timeout: 4000,
-        }).catch(() => null);
-      }
-      const nowIso = new Date().toISOString();
-      setLocalWorkStartedAt(nowIso);
-      const historyEntry = {
-        date: nowIso,
-        user: user?.name || 'System',
-        action: 'Rozpoczęto pracę na miejscu (Start stopera)',
-        note: '',
-        ...(coords ? { workStartGps: coords } : {}),
-      };
-      const newHistory = srv.history ? [...srv.history, historyEntry] : [historyEntry];
-      await updatePlannedService(srv.id, {
-        workStartedAt: nowIso,
-        inProgressAt: srv.inProgressAt || nowIso,
-        workStartGps: coords || null,
-        history: newHistory,
-      });
-    } catch (err) {
-      console.error('Błąd startu pracy na miejscu:', err);
-    } finally {
-      setWorkStarting(false);
-    }
-  };
-
   // 3. Krok 3 -> Krok 4: Przejście do podsumowania
   const handleGoToSummary = async () => {
     try {
-      const payload = { currentStep: 4 };
-      if (!srv.workStartedAt && !localWorkStartedAt && !srv.inProgressAt) {
-        payload.inProgressAt = new Date().toISOString();
-      }
-      await updatePlannedService(srv.id, payload);
+      await updatePlannedService(srv.id, { currentStep: 4 });
       setSelectedStepOverride(4);
     } catch {
       setSelectedStepOverride(4);
@@ -456,7 +355,6 @@ export default function PlannedMaintenanceTimeline({
         checklistSummary,
         partsUsed: summaryPartsUsed,
         ...(fGasProtocol ? { fGasProtocol } : {}),
-        ...(completedGps ? { completedGps } : {}),
         ...(clientSignerName ? { clientSignerName: clientSignerName.trim() } : {}),
         ...(inspectorLicense && inspectorLicense.trim()
           ? { inspectorLicense: inspectorLicense.trim() }
@@ -472,7 +370,7 @@ export default function PlannedMaintenanceTimeline({
         historyEntry,
         partsUsed: summaryPartsUsed,
         currentStep: 5,
-        completedGps: completedGps || srv.completedGps || null,
+        completedGps: srv.completedGps || null,
         fGasProtocol: fGasProtocol || null,
         clientSignature: clientSignature || null,
         clientSignerName: clientSignerName ? clientSignerName.trim() : null,
@@ -526,8 +424,6 @@ export default function PlannedMaintenanceTimeline({
           ...srv,
           ...completionData,
           completedAt: historyEntry.date,
-          travelStartedAt: srv.travelStartedAt || localTravelStartedAt || null,
-          workStartedAt: srv.workStartedAt || localWorkStartedAt || null,
           completionDetails: completionData,
           history: [...(srv.history || []), historyEntry],
           status: 'completed',
@@ -734,12 +630,13 @@ export default function PlannedMaintenanceTimeline({
                           {!isCompleted && srv.status !== 'completed' && (
                             <button
                               type="button"
+                              data-testid="planned-accept-btn"
                               disabled={!isActualStatus}
                               onClick={handleStartService}
                               className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
                             >
-                              <i className="ph ph-play-circle text-xl"></i>{' '}
-                              {t('planned.timeline.startServiceBtn', 'Rozpocznij serwis')}
+                              <i className="ph ph-check-circle text-xl"></i>{' '}
+                              {t('planned.timeline.acceptServiceBtn', 'Przyjęcie do realizacji')}
                             </button>
                           )}
                         </div>
@@ -818,77 +715,6 @@ export default function PlannedMaintenanceTimeline({
                                 {t('tickets.details.assignedContractor', 'Wyznaczony wykonawca')}:{' '}
                                 <strong className="font-bold">{srv.assignedService}</strong>
                               </span>
-                            </div>
-                          )}
-
-                          {/* Przyciski Dojazdu i Startu Pracy na miejscu (Stoper + GPS) */}
-                          {!isCompleted && srv.status !== 'completed' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {srv.travelStartedAt || localTravelStartedAt ? (
-                                <div
-                                  data-testid="planned-travel-started-badge"
-                                  className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl font-bold flex items-center gap-2"
-                                >
-                                  <i className="ph ph-car-profile text-base text-emerald-600"></i>
-                                  <span>
-                                    Dojazd rozpoczęty o godz.{' '}
-                                    {safeParseDate(
-                                      srv.travelStartedAt || localTravelStartedAt
-                                    )?.toLocaleTimeString('pl-PL', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    }) || '-'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  data-testid="planned-start-travel-btn"
-                                  disabled={!isActualStatus || travelStarting}
-                                  onClick={handleStartTravel}
-                                  className="bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-800 border border-indigo-200 px-3 py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                                >
-                                  <i className="ph ph-car-profile text-base text-indigo-600"></i>
-                                  <span>
-                                    {travelStarting
-                                      ? 'Rejestrowanie...'
-                                      : '🚗 Rozpocznij dojazd do obiektu (Start GPS)'}
-                                  </span>
-                                </button>
-                              )}
-
-                              {srv.workStartedAt || localWorkStartedAt ? (
-                                <div
-                                  data-testid="planned-work-started-badge"
-                                  className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl font-bold flex items-center gap-2"
-                                >
-                                  <i className="ph ph-timer text-base text-emerald-600"></i>
-                                  <span>
-                                    Praca na miejscu od godz.{' '}
-                                    {safeParseDate(
-                                      srv.workStartedAt || localWorkStartedAt
-                                    )?.toLocaleTimeString('pl-PL', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    }) || '-'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  data-testid="planned-start-work-btn"
-                                  disabled={!isActualStatus || workStarting}
-                                  onClick={handleStartWorkOnSite}
-                                  className="bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-800 border border-emerald-200 px-3 py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                                >
-                                  <i className="ph ph-wrench text-base text-emerald-600"></i>
-                                  <span>
-                                    {workStarting
-                                      ? 'Uruchamianie stopera...'
-                                      : '🔧 Rozpocznij pracę na miejscu (Start stopera i GPS)'}
-                                  </span>
-                                </button>
-                              )}
                             </div>
                           )}
 
@@ -1401,66 +1227,6 @@ export default function PlannedMaintenanceTimeline({
                                 </div>
                               )}
                             </div>
-                          </div>
-
-                          {/* Check-in GPS na miejscu wykonania (Opcjonalnie) */}
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  disabled={!isActualStatus}
-                                  checked={showGpsOption}
-                                  data-testid="timeline-gps-optional-toggle"
-                                  onChange={e => {
-                                    const next = e.target.checked;
-                                    setShowGpsOption(next);
-                                    if (!next) {
-                                      setCompletedGps(null);
-                                      setGpsError('');
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer"
-                                />
-                                <i className="ph ph-gps-fix text-blue-600 text-base"></i>
-                                <span>Potwierdzenie obecności GPS</span>
-                                <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
-                                  Opcja
-                                </span>
-                              </label>
-                              <button
-                                type="button"
-                                disabled={!isActualStatus || gpsLoading}
-                                onClick={handleCaptureGps}
-                                className="bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
-                              >
-                                <i
-                                  className={`ph ${
-                                    gpsLoading ? 'ph-spinner animate-spin' : 'ph-crosshair'
-                                  }`}
-                                ></i>
-                                {completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
-                              </button>
-                            </div>
-                            {showGpsOption && (
-                              <div className="text-xs text-slate-700 pl-6">
-                                {completedGps ? (
-                                  <span className="text-emerald-700 font-semibold block">
-                                    Zapisano współrzędne: {completedGps.lat.toFixed(5)},{' '}
-                                    {completedGps.lng.toFixed(5)} (±{completedGps.accuracy} m)
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500 block">
-                                    Opcjonalne potwierdzenie obecności serwisanta na obiekcie
-                                  </span>
-                                )}
-                                {gpsError && (
-                                  <span className="text-amber-700 font-medium block mt-0.5">
-                                    {gpsError}
-                                  </span>
-                                )}
-                              </div>
-                            )}
                           </div>
 
                           {/* Sekcja F-Gazy (HVAC / Pompy ciepła / Klimatyzacja) — widoczna dla profilu HVAC lub maszyn z czynnikiem, aktywna WYŁĄCZNIE gdy Krok 4 jest aktywnym etapem */}

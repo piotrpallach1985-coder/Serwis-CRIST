@@ -529,18 +529,11 @@ export default function TicketMainColumnStepper({
                                 type="button"
                                 disabled={!isActualStatus || loading}
                                 onClick={() => {
-                                  const nowIso = new Date().toISOString();
                                   handleUpdate(
                                     currentTicket.id,
                                     4,
                                     t('tickets.details.started_repair_action'),
-                                    etr,
-                                    [],
-                                    '',
-                                    {
-                                      workStartedAt: nowIso,
-                                      inProgressAt: nowIso,
-                                    }
+                                    etr
                                   );
                                   setSelectedStepOverride(4);
                                 }}

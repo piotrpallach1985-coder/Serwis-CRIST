@@ -8,8 +8,6 @@ import { useManagerStore } from '../../store/managerStore';
 import { normalizeSmartSummary, daysFromNowISODate } from '../../utils/smartSummaryParser';
 import {
   formatFGasSummary,
-  formatGpsCheckIn,
-  formatGeolocationError,
   getIndustryProfileConfig,
   isInspectorLicenseRequired,
 } from '../../utils/fieldServiceHelpers';
@@ -38,11 +36,7 @@ export default function PlannedMaintenanceCompletionModal({
   const [extraParts, setExtraParts] = useState([]);
   const [alreadyUsedParts, setAlreadyUsedParts] = useState([]);
 
-  // Field Service / HVAC F-Gaz / GPS Check-in / Podpis cyfrowy
-  const [completedGps, setCompletedGps] = useState(null);
-  const [showGpsOption, setShowGpsOption] = useState(false);
-  const [gpsLoading, setGpsLoading] = useState(false);
-  const [gpsError, setGpsError] = useState('');
+  // Field Service / HVAC F-Gaz / Podpis cyfrowy
   const [showFGasSection, setShowFGasSection] = useState(false);
   const [leakTestResult, setLeakTestResult] = useState('');
   const [refrigerantAddedKg, setRefrigerantAddedKg] = useState('');
@@ -88,14 +82,6 @@ export default function PlannedMaintenanceCompletionModal({
     if (defaultLic) {
       setInspectorLicense(defaultLic);
     }
-    const existingGps =
-      serviceToComplete?.completedGps ||
-      serviceToComplete?.completionDetails?.completedGps ||
-      null;
-    setCompletedGps(existingGps);
-    if (existingGps) {
-      setShowGpsOption(true);
-    }
   }, [
     currentMachine?.id,
     currentMachine?.refrigerantType,
@@ -126,32 +112,6 @@ export default function PlannedMaintenanceCompletionModal({
   if (!isOpen || !serviceToComplete) return null;
 
   const getMachine = id => machines.find(m => m.id === id);
-
-  const handleCaptureGps = () => {
-    setShowGpsOption(true);
-    if (!navigator.geolocation) {
-      setGpsError('Geolokalizacja GPS nie jest wspierana przez tę przeglądarkę.');
-      return;
-    }
-    setGpsLoading(true);
-    setGpsError('');
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setCompletedGps({
-          lat: Number(pos.coords.latitude.toFixed(6)),
-          lng: Number(pos.coords.longitude.toFixed(6)),
-          accuracy: Math.round(pos.coords.accuracy || 0),
-          timestamp: new Date().toISOString(),
-        });
-        setGpsLoading(false);
-      },
-      err => {
-        setGpsError(formatGeolocationError(err));
-        setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
 
   const handleSmartAiResult = result => {
     const r = normalizeSmartSummary(result);
@@ -267,7 +227,6 @@ export default function PlannedMaintenanceCompletionModal({
           : null;
 
       const fGasNoteStr = fGasProtocol ? formatFGasSummary(fGasProtocol) : '';
-      const gpsNoteStr = completedGps ? `Check-in GPS: ${formatGpsCheckIn(completedGps)}` : '';
       const sigNoteStr =
         clientSignature && clientSignerName
           ? `Odebrał i podpisał: ${clientSignerName}`
@@ -275,7 +234,7 @@ export default function PlannedMaintenanceCompletionModal({
           ? 'Dołączono podpis cyfrowy odbioru'
           : '';
 
-      const combinedNoteParts = [completionNotes, fGasNoteStr, gpsNoteStr, sigNoteStr].filter(
+      const combinedNoteParts = [completionNotes, fGasNoteStr, sigNoteStr].filter(
         Boolean
       );
 
@@ -288,7 +247,6 @@ export default function PlannedMaintenanceCompletionModal({
         checklistSummary,
         partsUsed,
         fGasProtocol,
-        completedGps,
         clientSignerName: clientSignerName || null,
         inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
       };
@@ -301,7 +259,7 @@ export default function PlannedMaintenanceCompletionModal({
         historyEntry,
         partsUsed,
         fGasProtocol,
-        completedGps,
+        completedGps: serviceToComplete?.completedGps || null,
         clientSignature: clientSignature || null,
         clientSignerName: clientSignerName || null,
         inspectorLicense: inspectorLicense && inspectorLicense.trim() ? inspectorLicense.trim() : null,
@@ -613,58 +571,8 @@ export default function PlannedMaintenanceCompletionModal({
           </div>
         </div>
 
-        {/* Sekcja: Check-in GPS (Opcjonalnie) oraz Protokół F-Gaz (HVAC) */}
+        {/* Sekcja: Protokół F-Gaz (HVAC) */}
         <div className="mb-4 space-y-3">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showGpsOption}
-                  data-testid="modal-gps-optional-toggle"
-                  onChange={e => {
-                    const next = e.target.checked;
-                    setShowGpsOption(next);
-                    if (!next) {
-                      setCompletedGps(null);
-                      setGpsError('');
-                    }
-                  }}
-                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 cursor-pointer"
-                />
-                <i className="ph ph-map-pin-line text-emerald-600 text-base"></i>
-                <span>Potwierdzenie obecności GPS</span>
-                <span className="text-[10px] font-semibold bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded">
-                  Opcja
-                </span>
-              </label>
-              <button
-                type="button"
-                onClick={handleCaptureGps}
-                disabled={gpsLoading}
-                data-testid="capture-gps-btn"
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
-              >
-                <i className="ph ph-crosshair"></i>
-                {gpsLoading ? 'Pobieranie...' : completedGps ? 'Odśwież GPS' : 'Pobierz GPS'}
-              </button>
-            </div>
-            {showGpsOption && (
-              <div className="text-xs pl-6">
-                {completedGps ? (
-                  <span className="text-emerald-700 font-semibold block">
-                    Zapisano GPS: {formatGpsCheckIn(completedGps)}
-                  </span>
-                ) : (
-                  <span className="text-slate-400 text-[11px] block">
-                    Opcjonalny znacznik lokalizacji do protokołu PDF
-                  </span>
-                )}
-                {gpsError && <span className="text-amber-700 text-[11px] block">{gpsError}</span>}
-              </div>
-            )}
-          </div>
-
           {/* Protokół F-Gaz / Próba szczelności (widoczny dla branży HVAC lub urządzeń z czynnikiem) */}
           {canShowFGasSection && (
             <div className="border border-cyan-200 rounded-xl bg-cyan-50/40 overflow-hidden">

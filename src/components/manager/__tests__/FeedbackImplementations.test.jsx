@@ -247,8 +247,68 @@ describe('Weryfikacja 12 punktów wdrożeniowych', () => {
     ).toBeInTheDocument();
   });
 
-  it('Pkt 6: Karta serwisu (PlannedMaintenanceTimeline) wyświetla w Kroku 5 zaktualizowany napis o przeniesieniu do historii', () => {
-    render(
+  it('Pkt 6: Karta serwisu (PlannedMaintenanceTimeline) wyświetla Przyjęcie do realizacji w Kroku 1, brak startu dojazdu/stopera w Kroku 3, brak GPS w Kroku 4 oraz napis o przeniesieniu do historii w Kroku 5', () => {
+    const { rerender } = render(
+      <PlannedMaintenanceTimeline
+        srv={{
+          id: 'srv_1',
+          name: 'Przegląd roczny suwnicy',
+          status: 'planned',
+          currentStep: 1,
+        }}
+        isCompleted={false}
+        user={{ uid: 'u1', role: 'admin' }}
+        canEditPlanned={true}
+        canDeletePlanned={false}
+        isArchive={false}
+        actualPartsUsed={[]}
+      />
+    );
+
+    expect(screen.getByTestId('planned-accept-btn')).toHaveTextContent('Przyjęcie do realizacji');
+
+    rerender(
+      <PlannedMaintenanceTimeline
+        srv={{
+          id: 'srv_1',
+          name: 'Przegląd roczny suwnicy',
+          status: 'in_progress',
+          currentStep: 3,
+          assignedService: 'Serwis Zewnętrzny',
+        }}
+        isCompleted={false}
+        user={{ uid: 'u1', role: 'admin' }}
+        canEditPlanned={true}
+        canDeletePlanned={false}
+        isArchive={false}
+        actualPartsUsed={[]}
+      />
+    );
+
+    expect(screen.queryByTestId('planned-start-travel-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('planned-start-work-btn')).not.toBeInTheDocument();
+
+    rerender(
+      <PlannedMaintenanceTimeline
+        srv={{
+          id: 'srv_1',
+          name: 'Przegląd roczny suwnicy',
+          status: 'in_progress',
+          currentStep: 4,
+          assignedService: 'Serwis Zewnętrzny',
+        }}
+        isCompleted={false}
+        user={{ uid: 'u1', role: 'admin' }}
+        canEditPlanned={true}
+        canDeletePlanned={false}
+        isArchive={false}
+        actualPartsUsed={[]}
+      />
+    );
+
+    expect(screen.queryByTestId('timeline-gps-optional-toggle')).not.toBeInTheDocument();
+
+    rerender(
       <PlannedMaintenanceTimeline
         srv={{
           id: 'srv_1',
