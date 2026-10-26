@@ -58,12 +58,8 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     urlMachineResolvedRef.current = false;
   }, [urlMachineId]);
 
-  const [step, setStep] = useState(
-    searchParams.get('step') || (urlMachineId === 'manual' ? 'form' : 'scan')
-  );
-  const [selectedMachine, setSelectedMachine] = useState(
-    urlMachineId === 'manual' ? { id: 'manual', name: '', regionId: '' } : null
-  );
+  const [step, setStep] = useState(searchParams.get('step') || 'scan');
+  const [selectedMachine, setSelectedMachine] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -72,12 +68,6 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
 
   const handleScanSuccess = async decodedText => {
     setPartQrNotice(null);
-    if (decodedText === 'manual') {
-      setSelectedMachine({ id: 'manual', name: '', regionId: '' });
-      setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
-      setStep('form');
-      return;
-    }
     const parsed = parseQrPayload(decodedText);
 
     // 1. Sprawdź czy kod QR zawiera jawny parametr części (part=...)

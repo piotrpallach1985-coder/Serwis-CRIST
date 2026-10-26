@@ -1664,10 +1664,18 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
       unmountQrModal();
 
-      // 6) Interakcja w OperatorScanner (rozwijana sekcja ręczna + zgłaszanie bez QR/NFC)
+      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC i brak ręcznego wpisywania (bo QR/NFC wskazują tenanta)
       const onOperatorScan = vi.fn();
+      const { unmount: unmountUnloggedScanner } = render(
+        <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={false} />
+      );
+      expect(screen.queryByTestId('operator-report-without-qr-btn')).toBeNull();
+      expect(screen.queryByTestId('operator-license-plate-section')).toBeNull();
+      unmountUnloggedScanner();
+
+      // 6b) Interakcja w OperatorScanner PO zalogowaniu (isInternal=true) -> dostępne zgłaszanie bez QR/NFC oraz rozwijana sekcja ręczna
       const { unmount: unmountOpScanner } = render(
-        <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} />
+        <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={true} />
       );
 
       expect(screen.getByTestId('operator-report-without-qr-btn')).toBeTruthy();

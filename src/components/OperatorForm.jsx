@@ -66,7 +66,7 @@ export default function OperatorForm({
                       {!user && <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded inline-block mb-1 ml-2">Firma: {companyName}</span>}
                     {selectedMachine.id === 'manual' ? (
                         <div className="mt-1 flex flex-col gap-2 w-full">
-                          {machines && machines.length > 0 && (
+                          {isInternal && machines && machines.length > 0 && (
                             <select
                               data-testid="operator-form-machine-select"
                               value=""
@@ -108,7 +108,7 @@ export default function OperatorForm({
       list="manual-machine-list"
     />
     <datalist id="manual-machine-list">
-        {machines?.map(m => (
+        {isInternal && machines?.map(m => (
           <option key={m.id} value={m.name} />
         ))}
       </datalist>

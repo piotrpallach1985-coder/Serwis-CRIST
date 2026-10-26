@@ -10,6 +10,7 @@ import {
   parseQrPayload,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../../services/qrAccess.service';
+import { findMachineByIdentifierOrPlate } from '../../utils/fieldServiceHelpers';
 
 export default function HomeDashboard({ onLogout }) {
   const { t, i18n } = useTranslation();
@@ -54,14 +55,10 @@ export default function HomeDashboard({ onLogout }) {
     }
 
     const resolvedMachineId = parsed.machineId || String(machineId || '').trim();
-    const targetMachine = machines.find(
-      m =>
-        m.id === resolvedMachineId ||
-        m.id === machineId ||
-        (m.qrCode && (m.qrCode === resolvedMachineId || m.qrCode === machineId || m.qrCode === rawQr)) ||
-        (m.internalId &&
-          (m.internalId.toLowerCase() === resolvedMachineId.toLowerCase() ||
-            m.internalId.toLowerCase() === String(machineId || '').toLowerCase()))
+    const targetMachine = findMachineByIdentifierOrPlate(
+      machines,
+      resolvedMachineId,
+      rawQr || machineId
     );
 
     if (!targetMachine) {

@@ -487,7 +487,7 @@ export default function Login({ onLogin, currentUser }) {
                 data-testid="logged-in-report-without-qr-tile"
                 onClick={() => {
                   onLogin(currentUser);
-                  navigate('/operator?step=form&machine=manual');
+                  navigate('/manager/ur/new_ticket_scanner');
                 }}
                 className="cursor-pointer bg-white aspect-square md:aspect-auto md:h-48 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1 hover:shadow-md px-3 text-center"
               >

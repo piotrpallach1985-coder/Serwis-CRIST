@@ -138,7 +138,7 @@ export default function InAppTicketScanner() {
       </div>
       {step === 'scan' && (
         <div className="w-full flex-1 flex flex-col">
-          <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} />
+          <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} isInternal={true} />
         </div>
       )}
 
