@@ -317,19 +317,12 @@ export default function ShipyardMap({
     return { unpinnedRegions: uRegions, unpinnedMachines: uMachines };
   }, [regions, machines, currentSubmapId, activeSubmapObj, currentSubmapTabId]);
 
-  // Oblicz widok domyślny (zapisany kadr domyślny lub dopasowany do pinezek)
+  // Oblicz widok domyślny (automatycznie dopasowany do wszystkich pinezek na mapie Google lub zapisany kadr domyślny)
   const computeCurrentLevelFitView = useCallback(() => {
-    if (hasSavedGoogleFrame) {
-      return {
-        lat: activeGoogleLat,
-        lng: activeGoogleLng,
-        zoom: activeGoogleZoom,
-      };
-    }
-
     const geoPoints = displayPins
-      .filter(p => p.lat != null && p.lng != null)
-      .map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
+      .filter(p => p.lat != null && p.lng != null && (Number(p.lat) !== 0 || Number(p.lng) !== 0))
+      .map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
 
     if (geoPoints.length >= 2) {
       return computeGoogleFitView(
@@ -353,14 +346,21 @@ export default function ShipyardMap({
       lng: activeGoogleLng,
       zoom: activeGoogleZoom,
     };
-  }, [hasSavedGoogleFrame, displayPins, activeGoogleLat, activeGoogleLng, activeGoogleZoom, imgBounds.width, imgBounds.height, currentSubmapId]);
+  }, [displayPins, activeGoogleLat, activeGoogleLng, activeGoogleZoom, imgBounds.width, imgBounds.height, currentSubmapId]);
 
-  // Przy zmianie poziomu podmapy lub załadowaniu mapy ustaw widok 100% (zapisany kadr domyślny)
+  // Przy zmianie poziomu podmapy, załadowaniu mapy lub dociągnięciu pinezek ustaw widok automatycznie dopasowany do wszystkich pinezek
   const lastFittedLevelRef = useRef(undefined);
   useEffect(() => {
     if (!mapLoaded) return;
     const activeTabKey = activeSubmapObj?.id || currentSubmapTabId || 'default';
-    const levelKey = `${currentSubmapId || 'main'}-${activeTabKey}-${activeMapType}`;
+    const geoPointsCount = displayPins.filter(
+      p => p.lat != null && p.lng != null && (Number(p.lat) !== 0 || Number(p.lng) !== 0)
+    ).length;
+    const baseLevelPrefix = `${currentSubmapId || 'main'}-${activeTabKey}-${activeMapType}-`;
+    const levelKey = `${baseLevelPrefix}pins:${geoPointsCount}`;
+    if (mode !== 'view' && lastFittedLevelRef.current && String(lastFittedLevelRef.current).startsWith(baseLevelPrefix)) {
+      return;
+    }
     if (lastFittedLevelRef.current !== levelKey) {
       lastFittedLevelRef.current = levelKey;
       if (activeMapType === 'google') {
@@ -386,7 +386,7 @@ export default function ShipyardMap({
         setZoomPan(mapConfig.defaultPan || { x: 0, y: 0 });
       }
     }
-  }, [mapLoaded, currentSubmapId, currentSubmapTabId, activeSubmapObj, activeMapType, activeGoogleStyle, computeCurrentLevelFitView, regions, mapConfig]);
+  }, [mapLoaded, currentSubmapId, currentSubmapTabId, activeSubmapObj, activeMapType, activeGoogleStyle, computeCurrentLevelFitView, regions, mapConfig, displayPins]);
 
   // Jeśli rejon ma zapisany tekstowy googleQuery, ale nie miał jeszcze współrzędnych googleLat/googleLng, dogeokoduj je
   useEffect(() => {

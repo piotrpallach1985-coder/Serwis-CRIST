@@ -22,6 +22,8 @@ export default function OperatorScanner({ onScanSuccess, machines: propMachines 
   const [plateQuery, setPlateQuery] = useState('');
   const [isRecognizingPlate, setIsRecognizingPlate] = useState(false);
   const [ocrNotice, setOcrNotice] = useState(null);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const autoAnprBusyRef = useRef(false);
 
   const fleetSuggestions = useMemo(() => {
     const vehicles = activeMachines.filter(
@@ -167,6 +169,44 @@ export default function OperatorScanner({ onScanSuccess, machines: propMachines 
     }
   }, [isLiveScanning]);
 
+  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery
+  useEffect(() => {
+    if (!isLiveScanning) return undefined;
+    let active = true;
+    const intervalId = setInterval(async () => {
+      if (!active || autoAnprBusyRef.current) return;
+      const container = document.getElementById('qr-reader');
+      const videoEl = container ? container.querySelector('video') : null;
+      if (!videoEl || (videoEl.readyState !== undefined && videoEl.readyState < 2)) return;
+
+      autoAnprBusyRef.current = true;
+      try {
+        const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines);
+        if (!active) return;
+        if (result.matchedMachine) {
+          stopLiveScanner();
+          onScanSuccess(
+            result.matchedMachine.id,
+            result.matchedMachine.licensePlate || result.plate
+          );
+        } else if (result.plate) {
+          setPlateQuery(result.plate);
+          stopLiveScanner();
+          onScanSuccess(result.plate, result.plate);
+        }
+      } catch {
+        // ignore background frame OCR errors
+      } finally {
+        autoAnprBusyRef.current = false;
+      }
+    }, 900);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [isLiveScanning, activeMachines, onScanSuccess]);
+
   const startLiveScanner = () => {
     setIsLiveScanning(true);
     setErrorMsg(null);
@@ -266,6 +306,13 @@ export default function OperatorScanner({ onScanSuccess, machines: propMachines 
             </div>
             <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[280px]"></div>
             <div className="mt-3 flex flex-col items-center gap-2">
+              <div
+                data-testid="operator-auto-anpr-badge"
+                className="w-full py-1.5 px-3 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (ANPR)</span>
+              </div>
               <button
                 type="button"
                 data-testid="operator-capture-plate-btn"
@@ -280,30 +327,45 @@ export default function OperatorScanner({ onScanSuccess, machines: propMachines 
                 ></i>
                 {isRecognizingPlate
                   ? 'Odczytywanie tablicy rejestracyjnej...'
-                  : '📷 Skieruj na tablicę rejestracyjną i odczytaj pojazd (ANPR)'}
+                  : '📷 Wymuś odczyt tablicy rejestracyjnej z kadru (ANPR)'}
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-6 w-full">
-            <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 w-full">
               <button
                 onClick={startLiveScanner}
-                className="py-8 sm:py-10 px-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-4 group cursor-pointer"
+                className="py-7 sm:py-9 px-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
               >
                 <i className="ph ph-qr-code text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
-                <span className="text-lg sm:text-xl tracking-wide">
-                  {t('operator.scanQrBtn', 'Skanuj QR')}
+                <span className="text-base sm:text-lg tracking-wide">
+                  {t('operator.scanQrBtn', 'Skanuj QR / Tablicę')}
                 </span>
               </button>
 
               <button
                 onClick={startNfcLive}
-                className="py-8 sm:py-10 px-4 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-4 group cursor-pointer"
+                className="py-7 sm:py-9 px-4 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
               >
                 <i className="ph ph-waves text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
-                <span className="text-lg sm:text-xl tracking-wide">
+                <span className="text-base sm:text-lg tracking-wide">
                   {t('operator.scanNfcBtn', 'Odczyt NFC')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="operator-report-without-qr-btn"
+                onClick={() => {
+                  stopLiveScanner();
+                  onScanSuccess('manual', 'manual');
+                }}
+                className="py-7 sm:py-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
+              >
+                <i className="ph ph-note-pencil text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
+                <span className="text-base sm:text-lg tracking-wide">
+                  {t('operator.reportWithoutQrBtn', 'Zgłoś bez QR / NFC')}
                 </span>
               </button>
             </div>
@@ -373,74 +435,90 @@ export default function OperatorScanner({ onScanSuccess, machines: propMachines 
           </div>
         )}
 
-        {/* WYSZUKIWANIE PO TABLICY REJESTRACYJNEJ / VIN */}
+        {/* ROZWIJANE WYSZUKIWANIE RĘCZNE PO TABLICY REJESTRACYJNEJ / VIN / NAZWIE */}
         <div
           data-testid="operator-license-plate-section"
-          className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 text-left"
+          className="mt-6 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden text-left"
         >
-          <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <i className="ph ph-identification-card text-blue-600 text-sm"></i>
-            {t(
-              'scanner.licensePlateLookupLabel',
-              'Znajdź pojazd po tablicy rejestracyjnej / VIN / kodzie'
-            )}
-          </label>
-          <form onSubmit={handlePlateSubmit} className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1 flex items-center">
-              <span className="inline-flex items-center justify-center px-2.5 py-2 bg-blue-700 text-white text-[10px] font-black rounded-l-lg border border-blue-700 select-none">
-                PL
-              </span>
-              <input
-                type="text"
-                data-testid="operator-plate-input"
-                value={plateQuery}
-                onChange={e => setPlateQuery(e.target.value.toUpperCase())}
-                placeholder={t(
-                  'scanner.licensePlatePlaceholder',
-                  'np. GD 12345, WE 9876A lub VIN...'
-                )}
-                className="w-full px-3 py-2 bg-white border border-l-0 border-slate-300 rounded-r-lg text-sm font-mono font-black uppercase tracking-wider text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <button
-              type="submit"
-              data-testid="operator-plate-submit-btn"
-              disabled={!plateQuery.trim()}
-              className="px-5 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white font-bold text-xs rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <i className="ph ph-magnifying-glass-bold"></i>
-              {t('scanner.openByPlateBtn', 'Wybierz pojazd')}
-            </button>
-          </form>
+          <button
+            type="button"
+            data-testid="operator-manual-toggle-btn"
+            onClick={() => setShowManualInput(prev => !prev)}
+            className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <i className="ph ph-keyboard text-blue-600 text-base"></i>
+              {t(
+                'scanner.licensePlateLookupLabel',
+                'Wpisz ręcznie (Tablica rejestracyjna / VIN / Kod urządzenia)'
+              )}
+            </span>
+            <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+              {showManualInput ? 'Zwiń' : 'Rozwiń'}
+              <i className={`ph ${showManualInput ? 'ph-caret-up' : 'ph-caret-down'}`}></i>
+            </span>
+          </button>
 
-          {fleetSuggestions.length > 0 && (
-            <div className="mt-2.5">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                {plateQuery.trim()
-                  ? 'Pasujące pojazdy w bazie:'
-                  : 'Szybki wybór pojazdu z floty:'}
-              </div>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                {fleetSuggestions.map(v => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    data-testid={`operator-plate-suggestion-${v.id}`}
-                    onClick={() => {
-                      stopLiveScanner();
-                      onScanSuccess(v.id, v.licensePlate || v.id);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-blue-50 border border-slate-300 hover:border-blue-400 rounded-lg text-xs font-bold text-slate-800 shadow-2xs transition-all cursor-pointer"
-                  >
-                    <span className="px-1.5 py-0.5 bg-blue-700 text-white font-mono font-black text-[10px] rounded tracking-wider">
-                      {v.licensePlate || 'FLOTA'}
-                    </span>
-                    <span className="truncate max-w-[160px] text-slate-700 font-semibold">
-                      {v.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
+          {showManualInput && (
+            <div className="p-4 pt-3 border-t border-slate-200/80">
+              <form onSubmit={handlePlateSubmit} className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1 flex items-center">
+                  <span className="inline-flex items-center justify-center px-2.5 py-2 bg-blue-700 text-white text-[10px] font-black rounded-l-lg border border-blue-700 select-none">
+                    PL
+                  </span>
+                  <input
+                    type="text"
+                    data-testid="operator-plate-input"
+                    value={plateQuery}
+                    onChange={e => setPlateQuery(e.target.value.toUpperCase())}
+                    placeholder={t(
+                      'scanner.licensePlatePlaceholder',
+                      'np. GD 12345, WE 9876A, VIN lub nazwa urządzenia...'
+                    )}
+                    className="w-full px-3 py-2 bg-white border border-l-0 border-slate-300 rounded-r-lg text-sm font-mono font-black uppercase tracking-wider text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  data-testid="operator-plate-submit-btn"
+                  disabled={!plateQuery.trim()}
+                  className="px-5 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white font-bold text-xs rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <i className="ph ph-magnifying-glass-bold"></i>
+                  {t('scanner.openByPlateBtn', 'Wybierz')}
+                </button>
+              </form>
+
+              {fleetSuggestions.length > 0 && (
+                <div className="mt-2.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    {plateQuery.trim()
+                      ? 'Pasujące pojazdy w bazie:'
+                      : 'Szybki wybór pojazdu z floty:'}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                    {fleetSuggestions.map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        data-testid={`operator-plate-suggestion-${v.id}`}
+                        onClick={() => {
+                          stopLiveScanner();
+                          onScanSuccess(v.id, v.licensePlate || v.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-blue-50 border border-slate-300 hover:border-blue-400 rounded-lg text-xs font-bold text-slate-800 shadow-2xs transition-all cursor-pointer"
+                      >
+                        <span className="px-1.5 py-0.5 bg-blue-700 text-white font-mono font-black text-[10px] rounded tracking-wider">
+                          {v.licensePlate || 'FLOTA'}
+                        </span>
+                        <span className="truncate max-w-[160px] text-slate-700 font-semibold">
+                          {v.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

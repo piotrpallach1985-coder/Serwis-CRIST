@@ -46,7 +46,12 @@ export default function PartsQRCodes() {
       }
 
       return true;
-    });
+    }).slice().sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), 'pl', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
   }, [parts, search, dateFrom, dateTo]);
 
   const toggleSelect = (id) => {

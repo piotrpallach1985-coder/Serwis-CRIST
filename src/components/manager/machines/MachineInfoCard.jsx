@@ -9,6 +9,7 @@ import {
   getCkobCategoryLabel,
   getIndustryProfileConfig,
   isVehicleAsset,
+  isHvacAsset,
   getMachineCounterUnit,
   checkVehicleDatesStatus,
 } from '../../../utils/fieldServiceHelpers';
@@ -34,16 +35,19 @@ export default function MachineInfoCard({
   const geo = resolveMachineGeoLocation(machine, regions, mapSettings);
   const navUrl = buildGoogleMapsNavigationUrl(geo);
 
+  const isVehicle = isVehicleAsset(machine, industryProfile);
+  const isExplicitHvac = machine?.assetCategory === 'hvac';
   const showCkob = industryProfile === 'facility';
   const showFGas =
+    isExplicitHvac ||
     industryProfile === 'hvac' ||
     (industryProfile === 'facility' && machine?.inspectionCategory === 'hvac_kotlownia');
   const showContact =
+    isExplicitHvac ||
     industryProfile === 'facility' ||
     industryProfile === 'hvac' ||
     industryProfile === 'fleet';
 
-  const isVehicle = isVehicleAsset(machine, industryProfile);
   const counterUnit = getMachineCounterUnit(machine, industryProfile);
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machine) : null;
 

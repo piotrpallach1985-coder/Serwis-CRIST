@@ -26,10 +26,19 @@ describe('qrAccess.service', () => {
     vi.clearAllMocks();
   });
 
-  it('buduje i parsuje treść QR z kluczem', () => {
+  it('buduje i parsuje treść QR z kluczem (bez pełnego linku URL, nawet przy przekazaniu obiektu urządzenia i metadanych)', () => {
     const v = buildMachineQrValue('firma-demo', 'm123', 'abc_DEF-123');
     expect(v).toBe('tenant=firma-demo&machine=m123&k=abc_DEF-123');
     expect(parseQrPayload(v)).toEqual({ tenantId: 'firma-demo', machineId: 'm123', key: 'abc_DEF-123' });
+
+    const vObj = buildMachineQrValue(
+      { id: 'm-compact-1', name: 'Klimatyzator Daikin' },
+      'firma-demo',
+      'key99',
+      { tenantName: 'Firma Demo', date: '26.10.2026' }
+    );
+    expect(vObj).toBe('tenant=firma-demo&machine=m-compact-1&k=key99');
+    expect(vObj).not.toContain('http');
   });
 
   it('parsuje pełny URL oraz URL z hashem', () => {

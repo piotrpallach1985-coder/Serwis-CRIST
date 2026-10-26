@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { exportToExcel } from '../utils/reports/excelExport';
-import { normalizeLicensePlate, isVehicleAsset } from '../utils/fieldServiceHelpers';
+import { normalizeLicensePlate, isVehicleAsset, isHvacAsset } from '../utils/fieldServiceHelpers';
 
 /**
- * useMachines — hook do zarządzania rejestrem maszyn/pojazdów, filtrowaniem po nazwie, nr rej., VIN, kierowcy i rejonie oraz eksportem.
+ * useMachines — hook do zarządzania rejestrem maszyn/pojazdów, filtrowaniem po nazwie, nr rej., VIN, kierowcy, kategorii i rejonie oraz eksportem.
  *
  * @param {Array<Object>} [machines=[]] Lista maszyn z bazy danych
  * @param {Array<Object>} [regions=[]] Lista rejonów / miejsc montażu
@@ -12,6 +12,7 @@ import { normalizeLicensePlate, isVehicleAsset } from '../utils/fieldServiceHelp
 export function useMachines(machines = [], regions = []) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
+  const [filterAssetCategory, setFilterAssetCategory] = useState('');
   const [expandedNodes, setExpandedNodes] = useState(new Set());
 
   const toggleNode = id => {
@@ -65,7 +66,8 @@ export function useMachines(machines = [], regions = []) {
       let flat = [];
       nodes.forEach(n => {
         const hasChildren = n.children && n.children.length > 0;
-        const isSearching = searchQuery.trim() !== '' || filterRegion !== '';
+        const isSearching =
+          searchQuery.trim() !== '' || filterRegion !== '' || filterAssetCategory !== '';
         const isExpanded = isSearching || expandedNodes.has(n.id);
 
         flat.push({ ...n, hasChildren, isCollapsed: !isExpanded });
@@ -116,9 +118,18 @@ export function useMachines(machines = [], regions = []) {
         matchRegion = m.regionId === filterRegion;
       }
 
-      return matchName && matchRegion;
+      let matchCategory = true;
+      if (filterAssetCategory === 'vehicle') {
+        matchCategory = isVehicleAsset(m, 'industrial');
+      } else if (filterAssetCategory === 'hvac') {
+        matchCategory = !isVehicleAsset(m, 'industrial') && isHvacAsset(m, 'industrial');
+      } else if (filterAssetCategory === 'device') {
+        matchCategory = !isVehicleAsset(m, 'industrial') && !isHvacAsset(m, 'industrial');
+      }
+
+      return matchName && matchRegion && matchCategory;
     });
-  }, [machines, searchQuery, filterRegion, expandedNodes]);
+  }, [machines, searchQuery, filterRegion, filterAssetCategory, expandedNodes]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredMachines.map(m => ({
@@ -154,6 +165,8 @@ export function useMachines(machines = [], regions = []) {
     setSearchQuery,
     filterRegion,
     setFilterRegion,
+    filterAssetCategory,
+    setFilterAssetCategory,
     filteredMachines,
     handleExportExcel,
     toggleNode,

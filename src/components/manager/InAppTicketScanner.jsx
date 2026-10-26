@@ -46,6 +46,11 @@ export default function InAppTicketScanner() {
   const [selectedMachine, setSelectedMachine] = useState(null);
 
   const handleScanSuccess = async (decodedText, rawQr) => {
+    if (decodedText === 'manual') {
+      setSelectedMachine({ id: 'manual', name: '', regionId: '' });
+      setStep('form');
+      return;
+    }
     const rawStr = rawQr || decodedText || '';
     const parsed = parseQrPayload(rawStr);
     const candidateId = parsed.partId || parsed.machineId || String(decodedText || '').trim();

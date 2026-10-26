@@ -78,7 +78,12 @@ export default function MachinesQRCodes({ onBack }) {
       }
 
       return true;
-    });
+    }).slice().sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), 'pl', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
   }, [activeMachines, filterRegion, searchQuery, dateFrom, dateTo, machines]);
 
   const toggleSelect = id => {

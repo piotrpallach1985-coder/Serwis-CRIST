@@ -90,6 +90,8 @@ export default function Machines({
     setSearchQuery,
     filterRegion,
     setFilterRegion,
+    filterAssetCategory,
+    setFilterAssetCategory,
     filteredMachines,
     handleExportExcel,
     toggleNode,
@@ -115,7 +117,7 @@ export default function Machines({
     currentItems,
     hasMore: hasMoreLocalItems,
     loadMore,
-  } = usePagination(filteredMachines, 50, [searchQuery, filterRegion]);
+  } = usePagination(filteredMachines, 50, [searchQuery, filterRegion, filterAssetCategory]);
 
   useEffect(() => {
     if (initialMachineId && visibleMachines.length > 0) {
@@ -517,6 +519,8 @@ export default function Machines({
             setSearchQuery={setSearchQuery}
             filterRegion={filterRegion}
             setFilterRegion={setFilterRegion}
+            filterAssetCategory={filterAssetCategory}
+            setFilterAssetCategory={setFilterAssetCategory}
             regions={regions}
             onAddMachine={() => {
               setEditingId(null);

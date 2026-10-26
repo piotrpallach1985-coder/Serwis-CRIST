@@ -26,6 +26,10 @@ import {
   findMachineByIdentifierOrPlate,
   extractLicensePlateFromOcrText,
   recognizeLicensePlateFromVideoFrame,
+  getAllRefrigerantTypes,
+  saveCustomRefrigerant,
+  deleteCustomRefrigerant,
+  isHvacAsset,
 } from '../fieldServiceHelpers';
 import { checkServiceUrgency } from '../logicHelpers';
 import fs from 'fs';
@@ -1635,7 +1639,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(frameResult.matchedMachine?.id).toBe('veh-transit');
       expect(frameResult.plate).toBe('WE 9876A');
 
-      // 5) Interakcja w QRScannerModal (wyszukanie po tablicy + kliknięcie sugestii)
+      // 5) Interakcja w QRScannerModal (rozwijana sekcja ręczna + wyszukanie po tablicy)
       useManagerStore.getState().setMachines(fleetMachines);
       const onModalScan = vi.fn();
       const onModalClose = vi.fn();
@@ -1649,7 +1653,10 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
 
+      expect(screen.getByTestId('scanner-auto-anpr-badge')).toBeTruthy();
       expect(screen.getByTestId('scanner-license-plate-section')).toBeTruthy();
+      expect(screen.queryByTestId('scanner-plate-input')).toBeNull(); // Domyślnie zwinięte!
+      fireEvent.click(screen.getByTestId('scanner-manual-toggle-btn')); // Rozwinięcie opcji wpisz ręcznie
       const plateInput = screen.getByTestId('scanner-plate-input');
       fireEvent.change(plateInput, { target: { value: 'gd12345' } });
       fireEvent.click(screen.getByTestId('scanner-plate-submit-btn'));
@@ -1657,17 +1664,84 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
       unmountQrModal();
 
-      // 6) Interakcja w OperatorScanner (zgłaszanie usterki po tablicy rejestracyjnej)
+      // 6) Interakcja w OperatorScanner (rozwijana sekcja ręczna + zgłaszanie bez QR/NFC)
       const onOperatorScan = vi.fn();
       const { unmount: unmountOpScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} />
       );
 
+      expect(screen.getByTestId('operator-report-without-qr-btn')).toBeTruthy();
       expect(screen.getByTestId('operator-license-plate-section')).toBeTruthy();
+      expect(screen.queryByTestId('operator-plate-input')).toBeNull(); // Domyślnie zwinięte!
+      fireEvent.click(screen.getByTestId('operator-manual-toggle-btn'));
       fireEvent.click(screen.getByTestId('operator-plate-suggestion-veh-transit'));
       expect(onOperatorScan).toHaveBeenCalledWith('veh-transit', 'WE 9876A');
 
+      fireEvent.click(screen.getByTestId('operator-report-without-qr-btn'));
+      expect(onOperatorScan).toHaveBeenCalledWith('manual', 'manual');
+
       unmountOpScanner();
+    });
+
+    it('obsługuje edytowalną listę czynników chłodniczych (dodawanie nowych, edycja GWP, usuwanie) oraz niezależną zakładkę Klimatyzacja / HVAC w MachineForm', () => {
+      // 1) Dodanie nowego czynnika R452B (GWP 698) i przeliczenie CO2e
+      const updatedTypes = saveCustomRefrigerant({
+        code: 'R452B',
+        name: 'R452B (Opteon XL55)',
+        gwp: 698,
+        isFluorinated: true,
+      });
+      expect(updatedTypes.R452B).toBeTruthy();
+      expect(updatedTypes.R452B.gwp).toBe(698);
+
+      const calc = calculateCo2Equivalent('R452B', 10);
+      expect(calc.co2EquivalentTons).toBe(6.98);
+      expect(calc.requiresCroCard).toBe(true);
+
+      // 2) Niezależna zakładka HVAC w MachineForm nawet w profilu 'industrial'
+      useManagerStore.getState().setBranding({
+        companyName: 'Zakład Przemysłowy',
+        industryProfile: 'industrial',
+      });
+
+      const { unmount } = render(
+        <MachineForm
+          isOpen={true}
+          onClose={vi.fn()}
+          editingMachine={null}
+          initialParentId=""
+          regions={[{ id: 'r1', name: 'Hala A' }]}
+          onSaved={vi.fn()}
+          onError={vi.fn()}
+        />
+      );
+
+      // Kliknięcie zakładki "Klimatyzacja / HVAC (F-Gazy / CRO)"
+      fireEvent.click(screen.getByTestId('asset-category-hvac-btn'));
+      expect(screen.getByTestId('machine-form-fgas-section')).toBeTruthy();
+
+      // Otwarcie edytora czynników chłodniczych w formularzu
+      fireEvent.click(screen.getByTestId('toggle-refrigerant-manager-btn'));
+      expect(screen.getByTestId('refrigerant-manager-panel')).toBeTruthy();
+
+      fireEvent.change(screen.getByTestId('custom-refrigerant-code-input'), {
+        target: { value: 'R513A' },
+      });
+      fireEvent.change(screen.getByTestId('custom-refrigerant-name-input'), {
+        target: { value: 'R513A (Opteon XP10)' },
+      });
+      fireEvent.change(screen.getByTestId('custom-refrigerant-gwp-input'), {
+        target: { value: '631' },
+      });
+      fireEvent.click(screen.getByTestId('save-custom-refrigerant-btn'));
+
+      expect(getAllRefrigerantTypes().R513A?.gwp).toBe(631);
+      expect(screen.getByTestId('machine-form-refrigerant-select').value).toBe('R513A');
+
+      // Usunięcie dodanego czynnika
+      deleteCustomRefrigerant('R452B');
+      deleteCustomRefrigerant('R513A');
+      unmount();
     });
   });
 });

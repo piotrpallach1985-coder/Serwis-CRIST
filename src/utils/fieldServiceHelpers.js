@@ -22,6 +22,89 @@ export const REFRIGERANT_TYPES = {
   R744: { code: 'R744', name: 'R744 (CO2 - naturalny)', gwp: 1, isFluorinated: false },
 };
 
+export const CUSTOM_REFRIGERANTS_STORAGE_KEY = 'vexont_custom_refrigerants';
+let memoryCustomRefrigerants = {};
+
+export function getCustomRefrigerants() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(CUSTOM_REFRIGERANTS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          memoryCustomRefrigerants = parsed;
+          return parsed;
+        }
+      }
+    }
+  } catch {
+    // fallback to memory
+  }
+  return { ...memoryCustomRefrigerants };
+}
+
+export function getAllRefrigerantTypes(customOverrides = null) {
+  const stored = getCustomRefrigerants();
+  const merged = {
+    ...REFRIGERANT_TYPES,
+    ...stored,
+    ...(customOverrides && typeof customOverrides === 'object' ? customOverrides : {}),
+  };
+  const result = {};
+  Object.entries(merged).forEach(([key, val]) => {
+    if (val && !val.isDeleted) {
+      result[key] = val;
+    }
+  });
+  return result;
+}
+
+export function saveCustomRefrigerant({ code, name, gwp, isFluorinated = true }) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return getAllRefrigerantTypes();
+  const numericGwp = Number(gwp);
+  const safeGwp = Number.isFinite(numericGwp) && numericGwp >= 0 ? numericGwp : 0;
+  const cleanName = String(name || '').trim() || cleanCode;
+
+  const current = getCustomRefrigerants();
+  current[cleanCode] = {
+    code: cleanCode,
+    name: cleanName,
+    gwp: safeGwp,
+    isFluorinated: Boolean(isFluorinated),
+    isCustom: !REFRIGERANT_TYPES[cleanCode],
+  };
+  memoryCustomRefrigerants = { ...current };
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(CUSTOM_REFRIGERANTS_STORAGE_KEY, JSON.stringify(current));
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return getAllRefrigerantTypes();
+}
+
+export function deleteCustomRefrigerant(code) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return getAllRefrigerantTypes();
+  const current = getCustomRefrigerants();
+  if (REFRIGERANT_TYPES[cleanCode]) {
+    current[cleanCode] = { code: cleanCode, isDeleted: true };
+  } else {
+    delete current[cleanCode];
+  }
+  memoryCustomRefrigerants = { ...current };
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(CUSTOM_REFRIGERANTS_STORAGE_KEY, JSON.stringify(current));
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return getAllRefrigerantTypes();
+}
+
 export const CKOB_CATEGORIES = [
   { id: '', label: 'Brak (Standardowe urządzenie / maszyna)' },
   { id: 'elektryczna_1r', label: 'Instalacja elektryczna i odgromowa (c-KOB art. 62)' },
@@ -207,7 +290,7 @@ export const INDUSTRY_PROFILES = {
 export function isVehicleAsset(machine, industryProfile = 'industrial') {
   if (!machine) return industryProfile === 'fleet';
   if (machine.assetCategory === 'vehicle') return true;
-  if (machine.assetCategory === 'device') return false;
+  if (machine.assetCategory === 'device' || machine.assetCategory === 'hvac') return false;
   if (
     machine.licensePlate ||
     machine.vinNumber ||
@@ -218,6 +301,25 @@ export function isVehicleAsset(machine, industryProfile = 'industrial') {
     return true;
   }
   return industryProfile === 'fleet';
+}
+
+/**
+ * Sprawdza, czy dany zasób jest urządzeniem chłodniczym / klimatyzacją / pompą ciepła (HVAC / F-Gaz).
+ * Działa zarówno dla profilu 'hvac', jak i dla urządzeń HVAC dodanych w zakładce HVAC w innych profilach.
+ */
+export function isHvacAsset(machine, industryProfile = 'industrial') {
+  if (!machine) return industryProfile === 'hvac';
+  if (machine.assetCategory === 'hvac') return true;
+  if (machine.assetCategory === 'vehicle' || machine.assetCategory === 'device') return false;
+  if (
+    machine.refrigerantType ||
+    Number(machine.refrigerantChargeKg) > 0 ||
+    Number(machine.coolingCapacityKw) > 0 ||
+    machine.ckobCategory === 'hvac_kotlownia'
+  ) {
+    return true;
+  }
+  return industryProfile === 'hvac';
 }
 
 /**
@@ -350,9 +452,10 @@ export function getIndustryProfileConfig(profileId) {
  * @param {string} refrigerantType Kod czynnika (np. 'R32', 'R410A')
  * @param {number|string} chargeKg Ilość czynnika w kg
  */
-export function calculateCo2Equivalent(refrigerantType, chargeKg) {
+export function calculateCo2Equivalent(refrigerantType, chargeKg, customRefrigerants = null) {
   const cleanType = (refrigerantType || '').trim();
-  const refInfo = REFRIGERANT_TYPES[cleanType] || null;
+  const allTypes = getAllRefrigerantTypes(customRefrigerants);
+  const refInfo = allTypes[cleanType] || REFRIGERANT_TYPES[cleanType] || null;
   const numericCharge = Number(chargeKg);
 
   if (!refInfo || !Number.isFinite(numericCharge) || numericCharge <= 0) {

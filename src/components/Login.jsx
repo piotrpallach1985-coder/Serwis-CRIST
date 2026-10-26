@@ -465,11 +465,11 @@ export default function Login({ onLogin, currentUser }) {
               </div>
             </div>
 
-            <div className="flex justify-center">
+            <div className="grid grid-cols-2 gap-4 md:gap-6">
               {/* Administrator */}
               <div
                 onClick={() => handleTileClick('master_data')}
-                className="w-1/2 min-w-[150px] cursor-pointer bg-white aspect-square md:aspect-auto md:h-48 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1 hover:shadow-md"
+                className="cursor-pointer bg-white aspect-square md:aspect-auto md:h-48 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1 hover:shadow-md"
               >
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.25rem] bg-[#eef2f6] text-[#0948b3] flex items-center justify-center mb-3 md:mb-5">
                   <div className="relative flex items-center justify-center">
@@ -479,6 +479,23 @@ export default function Login({ onLogin, currentUser }) {
                 </div>
                 <h3 className="font-bold text-gray-900 text-sm md:text-lg">
                   {t('login.admin_panel', 'Administrator')}
+                </h3>
+              </div>
+
+              {/* Zgłoś awarię bez QR / NFC */}
+              <div
+                data-testid="logged-in-report-without-qr-tile"
+                onClick={() => {
+                  onLogin(currentUser);
+                  navigate('/operator?step=form&machine=manual');
+                }}
+                className="cursor-pointer bg-white aspect-square md:aspect-auto md:h-48 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:-translate-y-1 hover:shadow-md px-3 text-center"
+              >
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.25rem] bg-emerald-50 text-emerald-600 border-2 border-emerald-200 flex items-center justify-center mb-3 md:mb-5 shadow-xs">
+                  <i className="ph ph-note-pencil text-3xl md:text-4xl"></i>
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm md:text-lg">
+                  {t('login.report_without_qr', 'Zgłoś awarię (Bez QR/NFC)')}
                 </h3>
               </div>
             </div>

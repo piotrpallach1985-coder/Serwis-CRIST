@@ -149,11 +149,10 @@ export const rotateQrKey = async (tenantId) => {
   return key;
 };
 
-export const buildMachineQrValue = (arg1, arg2, qrKey, meta) => {
+export const buildMachineQrValue = (arg1, arg2, qrKey, _meta) => {
   const isFirstArgMachineObj = arg1 && typeof arg1 === 'object';
   const tenantId = isFirstArgMachineObj ? arg2 : arg1;
   const machineId = isFirstArgMachineObj ? arg1.id : arg2;
-  const machineObj = isFirstArgMachineObj ? arg1 : null;
 
   const params = [
     `tenant=${encodeURIComponent(tenantId || '')}`,
@@ -163,59 +162,20 @@ export const buildMachineQrValue = (arg1, arg2, qrKey, meta) => {
     params.push(`k=${encodeURIComponent(qrKey)}`);
   }
 
-  if (meta && typeof meta === 'object') {
-    const tenantName = meta.tenantName || resolveTenantDisplayName(tenantId, meta.branding);
-    const machineName = meta.machineName || meta.name || machineObj?.name || '';
-    const dateStr =
-      typeof (meta.qrDate || meta.date) === 'string'
-        ? (meta.qrDate || meta.date)
-        : formatQrDate(
-            meta.qrDate || meta.date || machineObj || meta.qrCreatedAt || meta.updatedAt || meta.createdAt,
-            meta.allMachines || []
-          );
-    if (tenantName) params.push(`tn=${encodeURIComponent(tenantName)}`);
-    if (machineName) params.push(`mn=${encodeURIComponent(machineName)}`);
-    if (dateStr && dateStr !== '-') params.push(`dt=${encodeURIComponent(dateStr)}`);
-    return `${getQrBaseUrl()}/?${params.join('&')}`;
-  }
-
-  if (isFirstArgMachineObj) {
-    const tenantName = resolveTenantDisplayName(tenantId, null);
-    const machineName = machineObj?.name || '';
-    const dateStr = formatQrDate(machineObj, []);
-    if (tenantName) params.push(`tn=${encodeURIComponent(tenantName)}`);
-    if (machineName) params.push(`mn=${encodeURIComponent(machineName)}`);
-    if (dateStr) params.push(`dt=${encodeURIComponent(dateStr)}`);
-    return `${getQrBaseUrl()}/?${params.join('&')}`;
-  }
-
   return params.join('&');
 };
 
-export const buildPartQrValue = (partOrTenantId, arg2, meta = {}) => {
+export const buildPartQrValue = (partOrTenantId, arg2, _meta = {}) => {
   const isFirstArgPartObj = partOrTenantId && typeof partOrTenantId === 'object';
   const tenantId = isFirstArgPartObj ? arg2 : partOrTenantId;
   const partId = isFirstArgPartObj ? (partOrTenantId.id || partOrTenantId.code) : arg2;
-  const partObj = isFirstArgPartObj ? partOrTenantId : null;
-
-  const tenantName = meta.tenantName || resolveTenantDisplayName(tenantId, meta.branding);
-  const partName = meta.partName || meta.name || partObj?.name || '';
-  const partCode = meta.partCode || meta.code || partObj?.code || '';
-  const dateStr =
-    typeof (meta.qrDate || meta.date) === 'string'
-      ? (meta.qrDate || meta.date)
-      : formatQrDate(meta.qrDate || meta.date || partObj?.qrCreatedAt || partObj?.createdAt || partObj?.updatedAt || meta.qrCreatedAt || meta.createdAt || meta.updatedAt);
 
   const params = [
     `tenant=${encodeURIComponent(tenantId || '')}`,
     `part=${encodeURIComponent(partId || '')}`,
   ];
-  if (partCode) params.push(`code=${encodeURIComponent(partCode)}`);
-  if (tenantName) params.push(`tn=${encodeURIComponent(tenantName)}`);
-  if (partName) params.push(`pn=${encodeURIComponent(partName)}`);
-  if (dateStr && dateStr !== '-') params.push(`dt=${encodeURIComponent(dateStr)}`);
 
-  return `${getQrBaseUrl()}/?${params.join('&')}`;
+  return params.join('&');
 };
 
 export const parseQrPayload = (rawText) => {

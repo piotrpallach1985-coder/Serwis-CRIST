@@ -8,10 +8,10 @@ export default function MachineFilters({
   setSearchQuery,
   filterRegion,
   setFilterRegion,
+  filterAssetCategory = '',
+  setFilterAssetCategory,
   regions,
-  showDeleted,
-  setShowDeleted,
-  onAddMachine
+  onAddMachine,
 }) {
   const { t } = useTranslation();
   const branding = useManagerStore(state => state.branding);
@@ -23,44 +23,87 @@ export default function MachineFilters({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6 mb-4">
       {/* GŁÓWKA LISTY (Tytuł i główna akcja) */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div className="hidden md:block">
           <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <i className="ph ph-engine text-blue-600"></i> {t('machines.filters.title')}
           </h2>
           <p className="text-sm text-slate-500 mt-1">{t('machines.filters.subtitle')}</p>
         </div>
-        <button 
-          onClick={onAddMachine} 
-          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center justify-center gap-2"
+        <button
+          onClick={onAddMachine}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <i className="ph ph-plus text-lg"></i> {t('machines.buttons.addMachine')}
         </button>
       </div>
 
+      {/* NIEZALEŻNE ZAKŁADKI KATEGORII ZASOBÓW (Wszystkie / Urządzenia / HVAC / Pojazdy) */}
+      {typeof setFilterAssetCategory === 'function' && (
+        <div
+          data-testid="machines-category-tabs"
+          className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-slate-100"
+        >
+          {[
+            { id: '', label: 'Wszystkie zasoby', icon: 'ph-squares-four', activeClass: 'bg-slate-800 text-white' },
+            { id: 'device', label: 'Urządzenia / Maszyny', icon: 'ph-gear-six', activeClass: 'bg-blue-600 text-white' },
+            { id: 'hvac', label: 'Klimatyzacja / HVAC', icon: 'ph-snowflake', activeClass: 'bg-cyan-600 text-white' },
+            { id: 'vehicle', label: 'Pojazdy / Flota', icon: 'ph-truck', activeClass: 'bg-emerald-600 text-white' },
+          ].map(tab => {
+            const isActive = filterAssetCategory === tab.id;
+            return (
+              <button
+                key={tab.id || 'all'}
+                type="button"
+                data-testid={`machines-tab-${tab.id || 'all'}`}
+                onClick={() => setFilterAssetCategory(tab.id)}
+                className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isActive
+                    ? `${tab.activeClass} shadow-xs`
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <i className={`ph ${tab.icon} text-sm`}></i>
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* FILTRY */}
       <div className="flex flex-col sm:flex-row gap-4 w-full">
         <div className="relative w-full sm:w-72">
           <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-          <DebouncedInput 
-            type="text" 
-            placeholder={t('machines.filters.searchPlaceholder')} 
-            value={searchQuery} 
-            onChange={setSearchQuery} 
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all" 
+          <DebouncedInput
+            type="text"
+            placeholder={t('machines.filters.searchPlaceholder')}
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
           />
         </div>
         <div className="relative w-full sm:w-48">
           <i className="ph ph-funnel absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-          <select 
-            value={filterRegion} 
-            onChange={(e) => setFilterRegion(e.target.value)} 
+          <select
+            value={filterRegion}
+            onChange={e => setFilterRegion(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 appearance-none cursor-pointer transition-all"
           >
             <option value="">{t('machines.filters.allRegions')}</option>
-            <option value="main_map">{branding?.industryProfile === 'fleet' ? t('machines.form.wholeCompanyRegion', 'Cała Firma') : hasVehiclesOrFleet ? `${t('machines.form.mainMapRegion', 'Mapa Główna')} / Cała Firma` : t('machines.form.mainMapRegion', 'Mapa Główna')}</option>
+            <option value="main_map">
+              {branding?.industryProfile === 'fleet'
+                ? t('machines.form.wholeCompanyRegion', 'Cała Firma')
+                : hasVehiclesOrFleet
+                ? `${t('machines.form.mainMapRegion', 'Mapa Główna')} / Cała Firma`
+                : t('machines.form.mainMapRegion', 'Mapa Główna')}
+            </option>
             <option value="bez_rejonu">{t('machines.filters.noRegion')}</option>
-            {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            {regions.map(r => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>

@@ -6,6 +6,8 @@ import SignaturePad from '../../shared/SignaturePad';
 import { useManagerStore } from '../../../store/managerStore';
 import {
   REFRIGERANT_TYPES,
+  getAllRefrigerantTypes,
+  isHvacAsset,
   formatFGasSummary,
   formatGpsCheckIn,
   formatGeolocationError,
@@ -102,16 +104,17 @@ export default function TicketMainColumnStepper({
     : null;
 
   const canShowFGasSection =
-    industryProfile !== 'industrial' &&
-    (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType));
+    currentMachine?.assetCategory === 'hvac' ||
+    (industryProfile !== 'industrial' &&
+      (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType)));
 
   useEffect(() => {
-    if (industryProfile === 'industrial') {
+    if (industryProfile === 'industrial' && currentMachine?.assetCategory !== 'hvac') {
       setShowFGasSection(false);
       return;
     }
-    if (currentMachine?.refrigerantType) {
-      setRefrigerantType(currentMachine.refrigerantType);
+    if (currentMachine?.refrigerantType || currentMachine?.assetCategory === 'hvac') {
+      if (currentMachine?.refrigerantType) setRefrigerantType(currentMachine.refrigerantType);
       setShowFGasSection(true);
     } else if (industryProfile === 'hvac') {
       setShowFGasSection(true);
@@ -121,7 +124,7 @@ export default function TicketMainColumnStepper({
     if (currentMachine?.contactPerson && !clientSignerName) {
       setClientSignerName(currentMachine.contactPerson);
     }
-  }, [currentMachine?.id, currentMachine?.refrigerantType, industryProfile]);
+  }, [currentMachine?.id, currentMachine?.refrigerantType, currentMachine?.assetCategory, industryProfile]);
 
   let naturalStepNum = parseInt(currentTicket.status, 10);
   if (isNaN(naturalStepNum) || naturalStepNum < 1 || naturalStepNum > 5) {
@@ -896,7 +899,7 @@ export default function TicketMainColumnStepper({
                                             className="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-slate-100 disabled:opacity-60"
                                           >
                                             <option value="">-- Brak (Nie dotyczy) --</option>
-                                            {Object.values(REFRIGERANT_TYPES).map(ref => (
+                                            {Object.values(getAllRefrigerantTypes()).map(ref => (
                                               <option key={ref.code} value={ref.code}>
                                                 {ref.name} (GWP: {ref.gwp})
                                               </option>

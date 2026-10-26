@@ -11,6 +11,10 @@ import {
   TIRE_SEASON_OPTIONS,
   TOWBAR_DMC_OPTIONS,
   calculateCo2Equivalent,
+  getAllRefrigerantTypes,
+  saveCustomRefrigerant,
+  deleteCustomRefrigerant,
+  isHvacAsset,
 } from '../../utils/fieldServiceHelpers';
 
 export function formatPhoneXxx(raw) {
@@ -45,6 +49,12 @@ export default function MachineForm({
   const [inspectionCategory, setInspectionCategory] = useState('');
   const [refrigerantType, setRefrigerantType] = useState('');
   const [refrigerantChargeKg, setRefrigerantChargeKg] = useState('');
+  const [refrigerantTypesMap, setRefrigerantTypesMap] = useState(() => getAllRefrigerantTypes());
+  const [showRefrigerantManager, setShowRefrigerantManager] = useState(false);
+  const [customRefCode, setCustomRefCode] = useState('');
+  const [customRefName, setCustomRefName] = useState('');
+  const [customRefGwp, setCustomRefGwp] = useState('');
+  const [customRefFluorinated, setCustomRefFluorinated] = useState(true);
   // Metryczka obiektu budowlanego wg art. 60j ust. 3 Prawa budowlanego (c-KOB)
   const [buildingType, setBuildingType] = useState('');
   const [constructionYear, setConstructionYear] = useState('');
@@ -139,9 +149,17 @@ export default function MachineForm({
             editingMachine.techInspectionDate ||
             editingMachine.insuranceExpiryDate
         ) ||
-        (industryProfile === 'fleet' && editingMachine.assetCategory !== 'device');
+        (industryProfile === 'fleet' &&
+          editingMachine.assetCategory !== 'device' &&
+          editingMachine.assetCategory !== 'hvac');
+      const isExistingHvac =
+        !isExistingVehicle &&
+        (editingMachine.assetCategory === 'hvac' ||
+          Boolean(editingMachine.refrigerantType) ||
+          (industryProfile === 'hvac' && editingMachine.assetCategory !== 'device'));
 
-      setAssetCategory(isExistingVehicle ? 'vehicle' : 'device');
+      setAssetCategory(isExistingVehicle ? 'vehicle' : isExistingHvac ? 'hvac' : 'device');
+      setRefrigerantTypesMap(getAllRefrigerantTypes());
       setLicensePlate(editingMachine.licensePlate || '');
       setVinNumber(editingMachine.vinNumber || '');
       setFirstRegistrationDate(editingMachine.firstRegistrationDate || '');
@@ -184,6 +202,7 @@ export default function MachineForm({
       );
     } else {
       const defaultIsVehicle = industryProfile === 'fleet';
+      const defaultIsHvac = industryProfile === 'hvac';
       setName('');
       setInternalId('');
       setAdditionalDescription('');
@@ -193,6 +212,8 @@ export default function MachineForm({
       setInspectionCategory('');
       setRefrigerantType('');
       setRefrigerantChargeKg('');
+      setRefrigerantTypesMap(getAllRefrigerantTypes());
+      setShowRefrigerantManager(false);
       setBuildingType('');
       setConstructionYear('');
       setUsableAreaM2('');
@@ -202,7 +223,7 @@ export default function MachineForm({
       setPinbAuthority('');
       setLegalTitleDoc('');
 
-      setAssetCategory(defaultIsVehicle ? 'vehicle' : 'device');
+      setAssetCategory(defaultIsVehicle ? 'vehicle' : defaultIsHvac ? 'hvac' : 'device');
       setLicensePlate('');
       setVinNumber('');
       setFirstRegistrationDate('');
@@ -242,9 +263,41 @@ export default function MachineForm({
   }, [editingMachine, isOpen, initialParentId, machines, industryProfile]);
 
   const fGasCalc = useMemo(
-    () => calculateCo2Equivalent(refrigerantType, refrigerantChargeKg),
-    [refrigerantType, refrigerantChargeKg]
+    () => calculateCo2Equivalent(refrigerantType, refrigerantChargeKg, refrigerantTypesMap),
+    [refrigerantType, refrigerantChargeKg, refrigerantTypesMap]
   );
+
+  const handleSaveCustomRefrigerant = () => {
+    const code = customRefCode.trim();
+    if (!code) return;
+    const updatedMap = saveCustomRefrigerant({
+      code,
+      name: customRefName.trim() || code,
+      gwp: customRefGwp !== '' ? Number(customRefGwp) : 0,
+      isFluorinated: customRefFluorinated,
+    });
+    setRefrigerantTypesMap({ ...updatedMap });
+    setRefrigerantType(code);
+    setCustomRefCode('');
+    setCustomRefName('');
+    setCustomRefGwp('');
+    setCustomRefFluorinated(true);
+  };
+
+  const handleEditRefrigerantPill = rt => {
+    setCustomRefCode(rt.code);
+    setCustomRefName(rt.name || rt.code);
+    setCustomRefGwp(String(rt.gwp ?? 0));
+    setCustomRefFluorinated(Boolean(rt.isFluorinated));
+  };
+
+  const handleDeleteRefrigerantPill = code => {
+    const updatedMap = deleteCustomRefrigerant(code);
+    setRefrigerantTypesMap({ ...updatedMap });
+    if (refrigerantType === code) {
+      setRefrigerantType('');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -271,10 +324,13 @@ export default function MachineForm({
     setLoading(true);
 
     const allowCkob = industryProfile === 'facility';
+    const isHvacSelected = assetCategory === 'hvac';
     const allowFGas =
+      isHvacSelected ||
       industryProfile === 'hvac' ||
       (industryProfile === 'facility' && inspectionCategory === 'hvac_kotlownia');
     const allowContact =
+      isHvacSelected ||
       industryProfile === 'facility' ||
       industryProfile === 'hvac' ||
       industryProfile === 'fleet';
@@ -288,7 +344,7 @@ export default function MachineForm({
 
     const effectiveRefType = allowFGas ? refrigerantType || '' : '';
     const extraPayload = {
-      assetCategory: isVehicleSelected ? 'vehicle' : 'device',
+      assetCategory: isVehicleSelected ? 'vehicle' : isHvacSelected ? 'hvac' : 'device',
       counterUnit: isVehicleSelected ? counterUnit || 'km' : 'RBG',
       ...(isVehicleSelected
         ? {
@@ -436,10 +492,10 @@ export default function MachineForm({
         </div>
         <div className="p-6 overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Przełącznik Typu Zasobu (Urządzenie / Instalacja vs Pojazd / Flota) */}
+            {/* Przełącznik Typu Zasobu (Urządzenie / HVAC / Pojazd — niezależne zakładki) */}
             <div
               data-testid="machine-asset-category-switcher"
-              className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col sm:flex-row gap-2"
+              className="bg-slate-50 border border-slate-200 rounded-xl p-2 grid grid-cols-1 sm:grid-cols-3 gap-2"
             >
               <button
                 type="button"
@@ -448,14 +504,31 @@ export default function MachineForm({
                   setAssetCategory('device');
                   setCounterUnit('RBG');
                 }}
-                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   assetCategory === 'device'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
                 <i className="ph ph-gear-six text-base"></i>
-                Urządzenie / Instalacja / Sprzęt (RBG)
+                Urządzenie / Instalacja (RBG)
+              </button>
+              <button
+                type="button"
+                data-testid="asset-category-hvac-btn"
+                onClick={() => {
+                  setAssetCategory('hvac');
+                  setCounterUnit('RBG');
+                  setShowExtendedFields(true);
+                }}
+                className={`py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  assetCategory === 'hvac'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <i className="ph ph-snowflake text-base"></i>
+                Klimatyzacja / HVAC (F-Gazy / CRO)
               </button>
               <button
                 type="button"
@@ -464,14 +537,14 @@ export default function MachineForm({
                   setAssetCategory('vehicle');
                   if (!counterUnit || counterUnit === 'RBG') setCounterUnit('km');
                 }}
-                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   assetCategory === 'vehicle'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
                 <i className="ph ph-truck text-base"></i>
-                Pojazd / Środek transportu — Flota (km / RBG)
+                Pojazd / Flota (km / RBG)
               </button>
             </div>
 
@@ -868,12 +941,14 @@ export default function MachineForm({
               </div>
             )}
 
-            {/* Sekcja branżowa (wyłącznie dla profili Facility / c-KOB oraz HVAC / F-Gazy — zablokowana dla Przemysłu / Produkcji) */}
-            {(industryProfile === 'facility' || industryProfile === 'hvac') && (
+            {/* Sekcja branżowa (widoczna dla zakładki HVAC lub profili Facility / c-KOB oraz HVAC / F-Gazy) */}
+            {(assetCategory === 'hvac' ||
+              industryProfile === 'facility' ||
+              industryProfile === 'hvac') && (
               <div
                 data-testid="machine-form-domain-section"
                 className={`border rounded-xl overflow-hidden ${
-                  industryProfile === 'hvac'
+                  assetCategory === 'hvac' || industryProfile === 'hvac'
                     ? 'border-cyan-200 bg-cyan-50/40'
                     : 'border-amber-200 bg-amber-50/40'
                 }`}
@@ -886,13 +961,13 @@ export default function MachineForm({
                   <div className="flex items-center gap-2">
                     <i
                       className={`ph ${
-                        industryProfile === 'hvac'
+                        assetCategory === 'hvac' || industryProfile === 'hvac'
                           ? 'ph-snowflake text-cyan-600'
                           : 'ph-buildings text-amber-700'
                       } text-lg`}
                     ></i>
                     <span className="text-sm font-bold text-slate-800">
-                      {industryProfile === 'hvac'
+                      {assetCategory === 'hvac' || industryProfile === 'hvac'
                         ? t(
                             'machines.form.hvacSectionTitle',
                             'Parametry Chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO) oraz Dane Klienta'
@@ -1107,30 +1182,150 @@ export default function MachineForm({
                       </div>
                     </div>
 
-                    {/* HVAC / F-Gazy (Rozporządzenie UE 2024/573 & CRO) — widoczne dla HVAC lub węzłów cieplnych w Facility */}
-                    {(industryProfile === 'hvac' ||
+                    {/* HVAC / F-Gazy (Rozporządzenie UE 2024/573 & CRO) — widoczne dla zakładki HVAC, profilu HVAC lub węzłów cieplnych w Facility */}
+                    {(assetCategory === 'hvac' ||
+                      industryProfile === 'hvac' ||
                       (industryProfile === 'facility' &&
                         inspectionCategory === 'hvac_kotlownia')) && (
                       <div
                         data-testid="machine-form-fgas-section"
-                        className="pt-2 border-t border-slate-100"
+                        className="pt-2 border-t border-slate-100 space-y-3"
                       >
-                        <div className="text-xs font-extrabold text-cyan-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <i className="ph ph-snowflake text-base text-cyan-600"></i>
-                          Parametry chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO)
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs font-extrabold text-cyan-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <i className="ph ph-snowflake text-base text-cyan-600"></i>
+                            Parametry chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO)
+                          </div>
+                          <button
+                            type="button"
+                            data-testid="toggle-refrigerant-manager-btn"
+                            onClick={() => setShowRefrigerantManager(prev => !prev)}
+                            className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 transition-colors cursor-pointer"
+                          >
+                            <i className="ph ph-sliders-horizontal"></i>
+                            {showRefrigerantManager
+                              ? 'Zamknij edycję czynników'
+                              : '+ Edytuj / Dodaj czynnik chłodniczy'}
+                          </button>
                         </div>
+
+                        {showRefrigerantManager && (
+                          <div
+                            data-testid="refrigerant-manager-panel"
+                            className="bg-cyan-50/70 border border-cyan-200 rounded-xl p-3 space-y-3"
+                          >
+                            <div className="text-xs font-bold text-cyan-950 flex items-center justify-between">
+                              <span>Dodaj nowy czynnik chłodniczy lub edytuj współczynnik GWP:</span>
+                              <span className="text-[11px] font-normal text-cyan-800">
+                                Kliknij istniejący czynnik poniżej, aby go edytować
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Kod czynnika *
+                                </label>
+                                <input
+                                  type="text"
+                                  data-testid="custom-refrigerant-code-input"
+                                  value={customRefCode}
+                                  onChange={e => setCustomRefCode(e.target.value)}
+                                  placeholder="np. R452B / R513A"
+                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Nazwa / Opis
+                                </label>
+                                <input
+                                  type="text"
+                                  data-testid="custom-refrigerant-name-input"
+                                  value={customRefName}
+                                  onChange={e => setCustomRefName(e.target.value)}
+                                  placeholder="np. R452B (Opteon XL55)"
+                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Współczynnik GWP *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  data-testid="custom-refrigerant-gwp-input"
+                                  value={customRefGwp}
+                                  onChange={e => setCustomRefGwp(e.target.value)}
+                                  placeholder="np. 698"
+                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    data-testid="custom-refrigerant-fluorinated-checkbox"
+                                    checked={customRefFluorinated}
+                                    onChange={e => setCustomRefFluorinated(e.target.checked)}
+                                    className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                                  />
+                                  F-Gaz (CRO)
+                                </label>
+                                <button
+                                  type="button"
+                                  data-testid="save-custom-refrigerant-btn"
+                                  onClick={handleSaveCustomRefrigerant}
+                                  className="ml-auto px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                >
+                                  Zapisz czynnik
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-cyan-200/60">
+                              {Object.values(refrigerantTypesMap).map(rt => (
+                                <div
+                                  key={rt.code}
+                                  className="inline-flex items-center gap-1 bg-white border border-cyan-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 shadow-2xs"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditRefrigerantPill(rt)}
+                                    className="font-bold text-cyan-900 hover:underline cursor-pointer"
+                                    title="Kliknij, aby edytować czynnik"
+                                  >
+                                    {rt.code} (GWP: {rt.gwp})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    data-testid={`delete-refrigerant-${rt.code}`}
+                                    onClick={() => handleDeleteRefrigerantPill(rt.code)}
+                                    className="text-slate-400 hover:text-red-600 font-bold ml-1 cursor-pointer"
+                                    title="Usuń czynnik z listy"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                           <div>
                             <label className="block text-xs font-bold text-slate-700 mb-1">
                               Rodzaj czynnika chłodniczego
                             </label>
                             <select
+                              data-testid="machine-form-refrigerant-select"
                               value={refrigerantType}
                               onChange={e => setRefrigerantType(e.target.value)}
                               className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-cyan-500"
                             >
                               <option value="">-- Brak (Nie dotyczy) --</option>
-                              {Object.values(REFRIGERANT_TYPES).map(rt => (
+                              {Object.values(refrigerantTypesMap).map(rt => (
                                 <option key={rt.code} value={rt.code}>
                                   {rt.name} (GWP: {rt.gwp})
                                 </option>
