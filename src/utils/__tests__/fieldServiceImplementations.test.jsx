@@ -1506,14 +1506,18 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
 
-      // Domyślnie w profilu HVAC wybrany jest zasób typu 'device'
+      // Domyślnie w profilu HVAC wybrany jest zasób typu 'device' — bez dolnej sekcji HVAC i bez sekcji Floty
       expect(screen.queryByTestId('machine-form-fleet-section')).toBeNull();
+      expect(screen.queryByTestId('machine-form-fgas-section')).toBeNull();
+      expect(screen.queryByTestId('machine-form-domain-section')).toBeNull();
       expect(screen.getByTestId('machine-form-parent-field')).toBeTruthy();
       expect(screen.getByTestId('machine-form-region-select').textContent).toContain('Mapa Główna');
 
-      // Kliknięcie przełącznika "Pojazd / Środek transportu — Flota (km / RBG)"
+      // Kliknięcie przełącznika "Pojazd / Flota (km / RBG)" — brak dolnej sekcji HVAC
       fireEvent.click(screen.getByTestId('asset-category-vehicle-btn'));
       expect(screen.getByTestId('machine-form-fleet-section')).toBeTruthy();
+      expect(screen.queryByTestId('machine-form-fgas-section')).toBeNull();
+      expect(screen.queryByTestId('machine-form-domain-section')).toBeNull();
       // Przy dodawaniu samochodu "Urządzenie nadrzędne (Opcjonalnie)" nie jest wymagane i jest ukryte
       expect(screen.queryByTestId('machine-form-parent-field')).toBeNull();
       // W bazie zamiast "Mapa Główna" widnieje "Cała Firma"

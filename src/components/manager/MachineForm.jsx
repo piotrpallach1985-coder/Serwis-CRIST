@@ -29,6 +29,7 @@ export default function MachineForm({
   onClose,
   editingMachine,
   initialParentId,
+  initialAssetCategory,
   regions,
   onSaved,
   onError,
@@ -188,7 +189,7 @@ export default function MachineForm({
       setUdtOrExtinguisherDate(editingMachine.udtOrExtinguisherDate || '');
 
       setShowExtendedFields(
-        industryProfile === 'hvac' ||
+        isExistingHvac ||
           industryProfile === 'facility' ||
           Boolean(
             editingMachine.contactPerson ||
@@ -201,8 +202,12 @@ export default function MachineForm({
           )
       );
     } else {
-      const defaultIsVehicle = industryProfile === 'fleet';
-      const defaultIsHvac = industryProfile === 'hvac';
+      const resolvedCategory =
+        initialAssetCategory && ['device', 'hvac', 'vehicle'].includes(initialAssetCategory)
+          ? initialAssetCategory
+          : industryProfile === 'fleet'
+          ? 'vehicle'
+          : 'device';
       setName('');
       setInternalId('');
       setAdditionalDescription('');
@@ -213,7 +218,7 @@ export default function MachineForm({
       setRefrigerantType('');
       setRefrigerantChargeKg('');
       setRefrigerantTypesMap(getAllRefrigerantTypes());
-      setShowRefrigerantManager(false);
+      setShowRefrigerantManager(true);
       setBuildingType('');
       setConstructionYear('');
       setUsableAreaM2('');
@@ -223,12 +228,12 @@ export default function MachineForm({
       setPinbAuthority('');
       setLegalTitleDoc('');
 
-      setAssetCategory(defaultIsVehicle ? 'vehicle' : defaultIsHvac ? 'hvac' : 'device');
+      setAssetCategory(resolvedCategory);
       setLicensePlate('');
       setVinNumber('');
       setFirstRegistrationDate('');
       setInitialCounterValue('');
-      setCounterUnit(defaultIsVehicle ? 'km' : 'RBG');
+      setCounterUnit(resolvedCategory === 'vehicle' ? 'km' : 'RBG');
       setFuelType('');
       setTechInspectionDate('');
       setInsuranceExpiryDate('');
@@ -258,9 +263,9 @@ export default function MachineForm({
         setRegionId('');
         setBay('');
       }
-      setShowExtendedFields(industryProfile === 'hvac' || industryProfile === 'facility');
+      setShowExtendedFields(resolvedCategory === 'hvac' || industryProfile === 'facility');
     }
-  }, [editingMachine, isOpen, initialParentId, machines, industryProfile]);
+  }, [editingMachine, isOpen, initialParentId, initialAssetCategory, machines, industryProfile]);
 
   const fGasCalc = useMemo(
     () => calculateCo2Equivalent(refrigerantType, refrigerantChargeKg, refrigerantTypesMap),
@@ -323,17 +328,17 @@ export default function MachineForm({
     if (!name.trim() || !regionId) return;
     setLoading(true);
 
-    const allowCkob = industryProfile === 'facility';
+    const allowCkob = assetCategory === 'device' && industryProfile === 'facility';
     const isHvacSelected = assetCategory === 'hvac';
     const allowFGas =
       isHvacSelected ||
-      industryProfile === 'hvac' ||
-      (industryProfile === 'facility' && inspectionCategory === 'hvac_kotlownia');
+      (assetCategory === 'device' &&
+        industryProfile === 'facility' &&
+        inspectionCategory === 'hvac_kotlownia');
     const allowContact =
       isHvacSelected ||
-      industryProfile === 'facility' ||
-      industryProfile === 'hvac' ||
-      industryProfile === 'fleet';
+      (assetCategory === 'device' && industryProfile === 'facility') ||
+      (assetCategory === 'vehicle' && industryProfile === 'fleet');
     const isVehicleSelected = assetCategory === 'vehicle';
     const parsedCounter =
       initialCounterValue !== '' &&
@@ -941,17 +946,264 @@ export default function MachineForm({
               </div>
             )}
 
-            {/* Sekcja branżowa (widoczna dla zakładki HVAC lub profili Facility / c-KOB oraz HVAC / F-Gazy) */}
-            {(assetCategory === 'hvac' ||
-              industryProfile === 'facility' ||
-              industryProfile === 'hvac') && (
+            {/* Sekcja Klimatyzacji / HVAC (widoczna WYŁĄCZNIE w zakładce Klimatyzacja / HVAC — niezależna od Urządzeń i Pojazdów) */}
+            {assetCategory === 'hvac' && (
               <div
                 data-testid="machine-form-domain-section"
-                className={`border rounded-xl overflow-hidden ${
-                  assetCategory === 'hvac' || industryProfile === 'hvac'
-                    ? 'border-cyan-200 bg-cyan-50/40'
-                    : 'border-amber-200 bg-amber-50/40'
-                }`}
+                className="border border-cyan-200 bg-cyan-50/40 rounded-xl overflow-hidden"
+              >
+                <div className="w-full px-4 py-3 flex items-center justify-between border-b border-cyan-200/70 bg-cyan-50/80">
+                  <div className="flex items-center gap-2">
+                    <i className="ph ph-snowflake text-cyan-600 text-lg"></i>
+                    <span className="text-sm font-extrabold text-cyan-950">
+                      {t(
+                        'machines.form.hvacSectionTitle',
+                        'Parametry Chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO) oraz Dane Klienta'
+                      )}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full border border-cyan-200">
+                    F-Gazy / CRO
+                  </span>
+                </div>
+
+                <div className="p-4 space-y-4 bg-white">
+                  <div data-testid="machine-form-fgas-section" className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Rodzaj czynnika chłodniczego
+                        </label>
+                        <select
+                          data-testid="machine-form-refrigerant-select"
+                          value={refrigerantType}
+                          onChange={e => setRefrigerantType(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="">-- Brak (Nie dotyczy) --</option>
+                          {Object.values(refrigerantTypesMap).map(rt => (
+                            <option key={rt.code} value={rt.code}>
+                              {rt.name} (GWP: {rt.gwp})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Masa fabryczna czynnika (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          disabled={!refrigerantType}
+                          value={refrigerantChargeKg}
+                          onChange={e => setRefrigerantChargeKg(e.target.value)}
+                          placeholder="np. 2.5"
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-slate-100"
+                        />
+                      </div>
+                      <div>
+                        {refrigerantType && fGasCalc.chargeKg > 0 ? (
+                          <div
+                            className={`p-2 rounded-lg border text-xs font-bold ${
+                              fGasCalc.requiresCroCard
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                            }`}
+                          >
+                            <div>Ekwiwalent: {fGasCalc.co2EquivalentTons} t CO2e</div>
+                            <div className="text-[11px] font-medium">
+                              {fGasCalc.requiresCroCard
+                                ? `Wymagana karta CRO! (Próby co ${fGasCalc.recommendedLeakCheckMonths} mies.)`
+                                : 'Poniżej progu 5 t CO2e (brak wymogu CRO)'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-500">
+                            Wybierz czynnik i wagę, aby obliczyć ekwiwalent CO2e.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Edytowalna lista czynników chłodniczych (zawsze widoczna w zakładce HVAC) */}
+                    <div
+                      data-testid="refrigerant-manager-panel"
+                      className="bg-cyan-50/70 border border-cyan-200 rounded-xl p-3 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-extrabold text-cyan-950 flex items-center gap-1.5">
+                          <i className="ph ph-list-bullets text-base text-cyan-700"></i>
+                          <span>
+                            Edytowalna lista czynników chłodniczych (kliknij czynnik, aby edytować lub dodaj nowy):
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="toggle-refrigerant-manager-btn"
+                          onClick={() => {
+                            setShowRefrigerantManager(true);
+                            setCustomRefCode('');
+                            setCustomRefName('');
+                            setCustomRefGwp('');
+                            setCustomRefFluorinated(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-300 bg-white hover:bg-cyan-100 text-cyan-900 transition-colors cursor-pointer"
+                        >
+                          <i className="ph ph-plus-circle"></i>
+                          + Edytuj / Dodaj czynnik chłodniczy
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {Object.values(refrigerantTypesMap).map(rt => (
+                          <div
+                            key={rt.code}
+                            className={`inline-flex items-center gap-1.5 bg-white border rounded-lg px-2.5 py-1 text-xs shadow-2xs transition-colors ${
+                              customRefCode === rt.code
+                                ? 'border-cyan-600 ring-2 ring-cyan-300 bg-cyan-50'
+                                : 'border-cyan-200 text-slate-700'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleEditRefrigerantPill(rt)}
+                              className="font-bold text-cyan-900 hover:underline cursor-pointer flex items-center gap-1"
+                              title="Kliknij, aby edytować czynnik"
+                            >
+                              <i className="ph ph-pencil-simple text-cyan-600"></i>
+                              <span>
+                                {rt.code} (GWP: {rt.gwp})
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`delete-refrigerant-${rt.code}`}
+                              onClick={() => handleDeleteRefrigerantPill(rt.code)}
+                              className="text-slate-400 hover:text-red-600 font-bold ml-1 cursor-pointer"
+                              title="Usuń czynnik z listy"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end pt-2 border-t border-cyan-200/60">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Kod czynnika *
+                          </label>
+                          <input
+                            type="text"
+                            data-testid="custom-refrigerant-code-input"
+                            value={customRefCode}
+                            onChange={e => setCustomRefCode(e.target.value)}
+                            placeholder="np. R452B / R513A"
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Nazwa / Opis
+                          </label>
+                          <input
+                            type="text"
+                            data-testid="custom-refrigerant-name-input"
+                            value={customRefName}
+                            onChange={e => setCustomRefName(e.target.value)}
+                            placeholder="np. R452B (Opteon XL55)"
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Współczynnik GWP *
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            data-testid="custom-refrigerant-gwp-input"
+                            value={customRefGwp}
+                            onChange={e => setCustomRefGwp(e.target.value)}
+                            placeholder="np. 698"
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              data-testid="custom-refrigerant-fluorinated-checkbox"
+                              checked={customRefFluorinated}
+                              onChange={e => setCustomRefFluorinated(e.target.checked)}
+                              className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                            />
+                            F-Gaz (CRO)
+                          </label>
+                          <button
+                            type="button"
+                            data-testid="save-custom-refrigerant-btn"
+                            onClick={handleSaveCustomRefrigerant}
+                            className="ml-auto px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                          >
+                            Zapisz czynnik
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Klient / Właściciel / Osoba kontaktowa
+                      </label>
+                      <input
+                        type="text"
+                        value={contactPerson}
+                        onChange={e => setContactPerson(e.target.value)}
+                        placeholder="np. Jan Kowalski"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Telefon kontaktowy (xxx xxx xxx)
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactPhone}
+                        maxLength={11}
+                        onChange={e => setContactPhone(formatPhoneXxx(e.target.value))}
+                        placeholder="xxx xxx xxx (np. 500 600 700)"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Dostęp / Wskazówki dla serwisanta
+                      </label>
+                      <input
+                        type="text"
+                        value={accessNotes}
+                        onChange={e => setAccessNotes(e.target.value)}
+                        placeholder="np. Brama wjazdowa od ul. Leśnej"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sekcja Facility / c-KOB (widoczna WYŁĄCZNIE dla zakładki Urządzenie w profilu Facility Management) */}
+            {assetCategory === 'device' && industryProfile === 'facility' && (
+              <div
+                data-testid="machine-form-domain-section"
+                className="border border-amber-200 bg-amber-50/40 rounded-xl overflow-hidden"
               >
                 <button
                   type="button"
@@ -959,23 +1211,12 @@ export default function MachineForm({
                   className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/60 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
-                    <i
-                      className={`ph ${
-                        assetCategory === 'hvac' || industryProfile === 'hvac'
-                          ? 'ph-snowflake text-cyan-600'
-                          : 'ph-buildings text-amber-700'
-                      } text-lg`}
-                    ></i>
+                    <i className="ph ph-buildings text-amber-700 text-lg"></i>
                     <span className="text-sm font-bold text-slate-800">
-                      {assetCategory === 'hvac' || industryProfile === 'hvac'
-                        ? t(
-                            'machines.form.hvacSectionTitle',
-                            'Parametry Chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO) oraz Dane Klienta'
-                          )
-                        : t(
-                            'machines.form.facilitySectionTitle',
-                            'Dane Obiektu / Lokalu oraz Kategoria Przeglądu c-KOB (art. 62 Prawa budowlanego)'
-                          )}
+                      {t(
+                        'machines.form.facilitySectionTitle',
+                        'Dane Obiektu / Lokalu oraz Kategoria Przeglądu c-KOB (art. 62 Prawa budowlanego)'
+                      )}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
@@ -986,166 +1227,158 @@ export default function MachineForm({
 
                 {showExtendedFields && (
                   <div className="p-4 pt-3 border-t border-slate-200/70 space-y-4 bg-white">
-                    {industryProfile === 'facility' && (
-                      <div data-testid="machine-form-ckob-section" className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
-                          </label>
-                          <select
-                            value={inspectionCategory}
-                            onChange={e => setInspectionCategory(e.target.value)}
-                            className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                          >
-                            {CKOB_CATEGORIES.map(cat => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Metryczka obiektu budowlanego (c-KOB art. 60j ust. 3 PB) */}
-                        <div
-                          data-testid="machine-form-ckob-metric-section"
-                          className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 space-y-3"
+                    <div data-testid="machine-form-ckob-section" className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Kategoria obiektu / przeglądu (c-KOB / Prawo budowlane)
+                        </label>
+                        <select
+                          value={inspectionCategory}
+                          onChange={e => setInspectionCategory(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-amber-500"
                         >
-                          <div className="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                            <i className="ph ph-identification-card text-base text-amber-700"></i>
-                            Metryczka obiektu budowlanego (c-KOB art. 60j)
+                          {CKOB_CATEGORIES.map(cat => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Metryczka obiektu budowlanego (c-KOB art. 60j ust. 3 PB) */}
+                      <div
+                        data-testid="machine-form-ckob-metric-section"
+                        className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 space-y-3"
+                      >
+                        <div className="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <i className="ph ph-identification-card text-base text-amber-700"></i>
+                          Metryczka obiektu budowlanego (c-KOB art. 60j)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Rodzaj i funkcja obiektu
+                            </label>
+                            <input
+                              type="text"
+                              data-testid="ckob-building-type-input"
+                              value={buildingType}
+                              onChange={e => setBuildingType(e.target.value)}
+                              placeholder="np. Budynek mieszkalny wielorodzinny / Hala / Biurowiec"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className="sm:col-span-2">
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Rodzaj i funkcja obiektu
-                              </label>
-                              <input
-                                type="text"
-                                data-testid="ckob-building-type-input"
-                                value={buildingType}
-                                onChange={e => setBuildingType(e.target.value)}
-                                placeholder="np. Budynek mieszkalny wielorodzinny / Hala / Biurowiec"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Rok oddania do użytkowania
-                              </label>
-                              <input
-                                type="text"
-                                data-testid="ckob-construction-year-input"
-                                value={constructionYear}
-                                onChange={e => setConstructionYear(e.target.value)}
-                                placeholder="np. 2012"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Liczba kondygnacji
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                data-testid="ckob-floors-count-input"
-                                value={floorsCount}
-                                onChange={e => setFloorsCount(e.target.value)}
-                                placeholder="np. 5"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Powierzchnia użytkowa (m²)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                data-testid="ckob-usable-area-input"
-                                value={usableAreaM2}
-                                onChange={e => setUsableAreaM2(e.target.value)}
-                                placeholder="np. 2450"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Kubatura (m³)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                data-testid="ckob-cubature-input"
-                                value={cubatureM3}
-                                onChange={e => setCubatureM3(e.target.value)}
-                                placeholder="np. 8200"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Wyroby zawierające azbest
-                              </label>
-                              <select
-                                data-testid="ckob-asbestos-select"
-                                value={hasAsbestos}
-                                onChange={e => setHasAsbestos(e.target.value)}
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              >
-                                <option value="Brak">Brak</option>
-                                <option value="Występuje">Występuje</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Właściwy organ nadzoru (PINB)
-                              </label>
-                              <input
-                                type="text"
-                                data-testid="ckob-pinb-input"
-                                value={pinbAuthority}
-                                onChange={e => setPinbAuthority(e.target.value)}
-                                placeholder="np. PINB w Gdyni"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
-                            <div className="sm:col-span-2 lg:col-span-4">
-                              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                Dokument tytułu prawnego / Księga Wieczysta
-                              </label>
-                              <input
-                                type="text"
-                                data-testid="ckob-legal-title-input"
-                                value={legalTitleDoc}
-                                onChange={e => setLegalTitleDoc(e.target.value)}
-                                placeholder="np. KW GD1Y/00012345/6 - własność / zarząd powierzony art. 18 UWL"
-                                className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Rok oddania do użytkowania
+                            </label>
+                            <input
+                              type="text"
+                              data-testid="ckob-construction-year-input"
+                              value={constructionYear}
+                              onChange={e => setConstructionYear(e.target.value)}
+                              placeholder="np. 2012"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Liczba kondygnacji
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              data-testid="ckob-floors-count-input"
+                              value={floorsCount}
+                              onChange={e => setFloorsCount(e.target.value)}
+                              placeholder="np. 5"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Powierzchnia użytkowa (m²)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              data-testid="ckob-usable-area-input"
+                              value={usableAreaM2}
+                              onChange={e => setUsableAreaM2(e.target.value)}
+                              placeholder="np. 2450"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Kubatura (m³)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              data-testid="ckob-cubature-input"
+                              value={cubatureM3}
+                              onChange={e => setCubatureM3(e.target.value)}
+                              placeholder="np. 8200"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Wyroby zawierające azbest
+                            </label>
+                            <select
+                              data-testid="ckob-asbestos-select"
+                              value={hasAsbestos}
+                              onChange={e => setHasAsbestos(e.target.value)}
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                              <option value="Brak">Brak</option>
+                              <option value="Występuje">Występuje</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Właściwy organ nadzoru (PINB)
+                            </label>
+                            <input
+                              type="text"
+                              data-testid="ckob-pinb-input"
+                              value={pinbAuthority}
+                              onChange={e => setPinbAuthority(e.target.value)}
+                              placeholder="np. PINB w Gdyni"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 lg:col-span-4">
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Dokument tytułu prawnego / Księga Wieczysta
+                            </label>
+                            <input
+                              type="text"
+                              data-testid="ckob-legal-title-input"
+                              value={legalTitleDoc}
+                              onChange={e => setLegalTitleDoc(e.target.value)}
+                              placeholder="np. KW GD1Y/00012345/6 - własność / zarząd powierzony art. 18 UWL"
+                              className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                            />
                           </div>
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          {industryProfile === 'facility'
-                            ? 'Lokator / Zarządca / Osoba kontaktowa'
-                            : 'Klient / Właściciel / Osoba kontaktowa'}
+                          Lokator / Zarządca / Osoba kontaktowa
                         </label>
                         <input
                           type="text"
                           value={contactPerson}
                           onChange={e => setContactPerson(e.target.value)}
-                          placeholder={
-                            industryProfile === 'facility'
-                              ? 'np. Wspólnota Mieszkaniowa / Administracja'
-                              : 'np. Jan Kowalski'
-                          }
+                          placeholder="np. Wspólnota Mieszkaniowa / Administracja"
                           className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -1164,214 +1397,17 @@ export default function MachineForm({
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
-                          {industryProfile === 'facility'
-                            ? 'Dostęp / Kod domofonu / Klatka'
-                            : 'Dostęp / Wskazówki dla serwisanta'}
+                          Dostęp / Kod domofonu / Klatka
                         </label>
                         <input
                           type="text"
                           value={accessNotes}
                           onChange={e => setAccessNotes(e.target.value)}
-                          placeholder={
-                            industryProfile === 'facility'
-                              ? 'np. Kod: 12#3456, klucz w administracji'
-                              : 'np. Brama wjazdowa od ul. Leśnej'
-                          }
+                          placeholder="np. Kod: 12#3456, klucz w administracji"
                           className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     </div>
-
-                    {/* HVAC / F-Gazy (Rozporządzenie UE 2024/573 & CRO) — widoczne dla zakładki HVAC, profilu HVAC lub węzłów cieplnych w Facility */}
-                    {(assetCategory === 'hvac' ||
-                      industryProfile === 'hvac' ||
-                      (industryProfile === 'facility' &&
-                        inspectionCategory === 'hvac_kotlownia')) && (
-                      <div
-                        data-testid="machine-form-fgas-section"
-                        className="pt-2 border-t border-slate-100 space-y-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-xs font-extrabold text-cyan-800 uppercase tracking-wider flex items-center gap-1.5">
-                            <i className="ph ph-snowflake text-base text-cyan-600"></i>
-                            Parametry chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO)
-                          </div>
-                          <button
-                            type="button"
-                            data-testid="toggle-refrigerant-manager-btn"
-                            onClick={() => setShowRefrigerantManager(prev => !prev)}
-                            className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 transition-colors cursor-pointer"
-                          >
-                            <i className="ph ph-sliders-horizontal"></i>
-                            {showRefrigerantManager
-                              ? 'Zamknij edycję czynników'
-                              : '+ Edytuj / Dodaj czynnik chłodniczy'}
-                          </button>
-                        </div>
-
-                        {showRefrigerantManager && (
-                          <div
-                            data-testid="refrigerant-manager-panel"
-                            className="bg-cyan-50/70 border border-cyan-200 rounded-xl p-3 space-y-3"
-                          >
-                            <div className="text-xs font-bold text-cyan-950 flex items-center justify-between">
-                              <span>Dodaj nowy czynnik chłodniczy lub edytuj współczynnik GWP:</span>
-                              <span className="text-[11px] font-normal text-cyan-800">
-                                Kliknij istniejący czynnik poniżej, aby go edytować
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  Kod czynnika *
-                                </label>
-                                <input
-                                  type="text"
-                                  data-testid="custom-refrigerant-code-input"
-                                  value={customRefCode}
-                                  onChange={e => setCustomRefCode(e.target.value)}
-                                  placeholder="np. R452B / R513A"
-                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  Nazwa / Opis
-                                </label>
-                                <input
-                                  type="text"
-                                  data-testid="custom-refrigerant-name-input"
-                                  value={customRefName}
-                                  onChange={e => setCustomRefName(e.target.value)}
-                                  placeholder="np. R452B (Opteon XL55)"
-                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  Współczynnik GWP *
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  data-testid="custom-refrigerant-gwp-input"
-                                  value={customRefGwp}
-                                  onChange={e => setCustomRefGwp(e.target.value)}
-                                  placeholder="np. 698"
-                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    data-testid="custom-refrigerant-fluorinated-checkbox"
-                                    checked={customRefFluorinated}
-                                    onChange={e => setCustomRefFluorinated(e.target.checked)}
-                                    className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-                                  />
-                                  F-Gaz (CRO)
-                                </label>
-                                <button
-                                  type="button"
-                                  data-testid="save-custom-refrigerant-btn"
-                                  onClick={handleSaveCustomRefrigerant}
-                                  className="ml-auto px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-                                >
-                                  Zapisz czynnik
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-cyan-200/60">
-                              {Object.values(refrigerantTypesMap).map(rt => (
-                                <div
-                                  key={rt.code}
-                                  className="inline-flex items-center gap-1 bg-white border border-cyan-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 shadow-2xs"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditRefrigerantPill(rt)}
-                                    className="font-bold text-cyan-900 hover:underline cursor-pointer"
-                                    title="Kliknij, aby edytować czynnik"
-                                  >
-                                    {rt.code} (GWP: {rt.gwp})
-                                  </button>
-                                  <button
-                                    type="button"
-                                    data-testid={`delete-refrigerant-${rt.code}`}
-                                    onClick={() => handleDeleteRefrigerantPill(rt.code)}
-                                    className="text-slate-400 hover:text-red-600 font-bold ml-1 cursor-pointer"
-                                    title="Usuń czynnik z listy"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Rodzaj czynnika chłodniczego
-                            </label>
-                            <select
-                              data-testid="machine-form-refrigerant-select"
-                              value={refrigerantType}
-                              onChange={e => setRefrigerantType(e.target.value)}
-                              className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                            >
-                              <option value="">-- Brak (Nie dotyczy) --</option>
-                              {Object.values(refrigerantTypesMap).map(rt => (
-                                <option key={rt.code} value={rt.code}>
-                                  {rt.name} (GWP: {rt.gwp})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Masa fabryczna czynnika (kg)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              disabled={!refrigerantType}
-                              value={refrigerantChargeKg}
-                              onChange={e => setRefrigerantChargeKg(e.target.value)}
-                              placeholder="np. 2.5"
-                              className="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-slate-100"
-                            />
-                          </div>
-                          <div>
-                            {refrigerantType && fGasCalc.chargeKg > 0 ? (
-                              <div
-                                className={`p-2 rounded-lg border text-xs font-bold ${
-                                  fGasCalc.requiresCroCard
-                                    ? 'bg-amber-50 border-amber-300 text-amber-900'
-                                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                }`}
-                              >
-                                <div>Ekwiwalent: {fGasCalc.co2EquivalentTons} t CO2e</div>
-                                <div className="text-[11px] font-medium">
-                                  {fGasCalc.requiresCroCard
-                                    ? `Wymagana karta CRO! (Próby co ${fGasCalc.recommendedLeakCheckMonths} mies.)`
-                                    : 'Poniżej progu 5 t CO2e (brak wymogu CRO)'}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="p-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-500">
-                                Wybierz czynnik i wagę, aby obliczyć ekwiwalent CO2e.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

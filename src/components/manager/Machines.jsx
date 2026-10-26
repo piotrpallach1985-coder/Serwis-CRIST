@@ -10,6 +10,9 @@ import {
   filterTasksForFieldTechnician,
   findMachineByIdentifierOrPlate,
   isVehicleAsset,
+  getAllRefrigerantTypes,
+  saveCustomRefrigerant,
+  deleteCustomRefrigerant,
 } from '../../utils/fieldServiceHelpers';
 import { generateMachineHistoryPDF } from '../../utils/reports/pdfMachineCard';
 import {
@@ -105,6 +108,12 @@ export default function Machines({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isNfcScanning, setIsNfcScanning] = useState(false);
+  const [isRefrigerantsModalOpen, setIsRefrigerantsModalOpen] = useState(false);
+  const [refrigerantTypesMap, setRefrigerantTypesMap] = useState(() => getAllRefrigerantTypes());
+  const [customRefCode, setCustomRefCode] = useState('');
+  const [customRefName, setCustomRefName] = useState('');
+  const [customRefGwp, setCustomRefGwp] = useState('');
+  const [customRefFluorinated, setCustomRefFluorinated] = useState(true);
 
   const { toastConfig, showToast, hideToast } = useToast();
   const {
@@ -560,6 +569,18 @@ export default function Machines({
                     {t('machines.buttons.qrList', 'Baza QR Urządzeń')}
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  data-testid="open-refrigerants-modal-btn"
+                  onClick={() => {
+                    setRefrigerantTypesMap(getAllRefrigerantTypes());
+                    setIsRefrigerantsModalOpen(true);
+                  }}
+                  className="flex-1 md:flex-none bg-cyan-50 text-cyan-800 border border-cyan-200 hover:bg-cyan-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                >
+                  <i className="ph ph-snowflake text-lg"></i> Czynniki chłodnicze (Lista / Dodaj)
+                </button>
               </div>
             </div>
             <MachineTable
@@ -587,11 +608,171 @@ export default function Machines({
       {toastConfig.show && (
         <Toast message={toastConfig.message} type={toastConfig.type} onClose={hideToast} />
       )}
+      {isRefrigerantsModalOpen && (
+        <div
+          data-testid="refrigerants-list-modal"
+          className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-3 sm:p-4"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-cyan-200 bg-cyan-50/70">
+              <h3 className="text-lg font-extrabold text-cyan-950 flex items-center gap-2">
+                <i className="ph ph-snowflake text-cyan-600 text-xl"></i>
+                Edytowalna lista czynników chłodniczych (F-Gazy / GWP)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsRefrigerantsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white cursor-pointer"
+              >
+                <i className="ph ph-x text-xl"></i>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="bg-cyan-50/60 border border-cyan-200 rounded-xl p-3.5 space-y-3">
+                <div className="text-xs font-bold text-cyan-950">
+                  Dodaj nowy czynnik chłodniczy lub edytuj wybrany z listy poniżej:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Kod czynnika *
+                    </label>
+                    <input
+                      type="text"
+                      value={customRefCode}
+                      onChange={e => setCustomRefCode(e.target.value)}
+                      placeholder="np. R452B / R513A"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Nazwa / Opis
+                    </label>
+                    <input
+                      type="text"
+                      value={customRefName}
+                      onChange={e => setCustomRefName(e.target.value)}
+                      placeholder="np. R452B (Opteon XL55)"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Współczynnik GWP *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={customRefGwp}
+                      onChange={e => setCustomRefGwp(e.target.value)}
+                      placeholder="np. 698"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={customRefFluorinated}
+                        onChange={e => setCustomRefFluorinated(e.target.checked)}
+                        className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                      />
+                      F-Gaz (CRO)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = customRefCode.trim();
+                        if (!code) return;
+                        const updated = saveCustomRefrigerant({
+                          code,
+                          name: customRefName.trim() || code,
+                          gwp: customRefGwp !== '' ? Number(customRefGwp) : 0,
+                          isFluorinated: customRefFluorinated,
+                        });
+                        setRefrigerantTypesMap({ ...updated });
+                        setCustomRefCode('');
+                        setCustomRefName('');
+                        setCustomRefGwp('');
+                        setCustomRefFluorinated(true);
+                      }}
+                      className="ml-auto px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                    >
+                      Zapisz
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase">
+                    <tr>
+                      <th className="py-2.5 px-3">Kod</th>
+                      <th className="py-2.5 px-3">Nazwa czynnika</th>
+                      <th className="py-2.5 px-3">GWP</th>
+                      <th className="py-2.5 px-3">Typ</th>
+                      <th className="py-2.5 px-3 text-right">Akcje</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {Object.values(refrigerantTypesMap).map(rt => (
+                      <tr key={rt.code} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 font-mono font-bold text-cyan-900">{rt.code}</td>
+                        <td className="py-2 px-3 text-slate-700">{rt.name}</td>
+                        <td className="py-2 px-3 font-mono font-bold">{rt.gwp}</td>
+                        <td className="py-2 px-3">
+                          {rt.isFluorinated ? (
+                            <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200 font-semibold text-[11px]">
+                              F-Gaz (CRO)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[11px]">
+                              Naturalny
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomRefCode(rt.code);
+                              setCustomRefName(rt.name || rt.code);
+                              setCustomRefGwp(String(rt.gwp ?? 0));
+                              setCustomRefFluorinated(Boolean(rt.isFluorinated));
+                            }}
+                            className="text-cyan-700 hover:text-cyan-950 font-bold cursor-pointer"
+                          >
+                            Edytuj
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = deleteCustomRefrigerant(rt.code);
+                              setRefrigerantTypesMap({ ...updated });
+                            }}
+                            className="text-red-500 hover:text-red-700 font-bold cursor-pointer"
+                          >
+                            Usuń
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <MachineForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         editingMachine={editingId ? machines.find(m => m.id === editingId) : null}
         initialParentId={formInitialParentId}
+        initialAssetCategory={filterAssetCategory !== 'all' ? filterAssetCategory : undefined}
         regions={regions}
         onSaved={(msg, newMachineId) => {
           showToast(msg, 'success');
