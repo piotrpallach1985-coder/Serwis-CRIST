@@ -9,13 +9,9 @@ import {
   getAllRefrigerantTypes,
   isHvacAsset,
   formatFGasSummary,
-  formatGpsCheckIn,
-  formatGeolocationError,
-  captureCurrentGpsPosition,
   getIndustryProfileConfig,
   isInspectorLicenseRequired,
 } from '../../../utils/fieldServiceHelpers';
-import { safeParseDate } from '../../../utils/dateHelpers';
 
 export default function TicketMainColumnStepper({
   currentTicket,
@@ -46,20 +42,11 @@ export default function TicketMainColumnStepper({
   // Pozwala na swobodne przeglądanie kroków (aktywne są jednak wyłącznie przyciski z aktywnego etapu)
   const [selectedStepOverride, setSelectedStepOverride] = useState(null);
 
-  // Field Service / HVAC F-Gaz / GPS Check-in / Podpis cyfrowy klienta (Krok 4)
   const storeBranding = useManagerStore(state => state.branding || {});
   const effectiveBranding = branding || storeBranding;
   const industryProfile = effectiveBranding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
 
-  const [completedGps, setCompletedGps] = useState(currentTicket?.completedGps || null);
-  const [showGpsOption, setShowGpsOption] = useState(Boolean(currentTicket?.completedGps));
-  const [gpsLoading, setGpsLoading] = useState(false);
-  const [gpsError, setGpsError] = useState('');
-  const [travelStarting, setTravelStarting] = useState(false);
-  const [localTravelStartedAt, setLocalTravelStartedAt] = useState(
-    currentTicket?.travelStartedAt || null
-  );
   const [actualManHours, setActualManHours] = useState(
     currentTicket?.manHours ?? currentTicket?.actualManHours ?? ''
   );
@@ -137,41 +124,14 @@ export default function TicketMainColumnStepper({
 
   useEffect(() => {
     setSelectedStepOverride(null);
-    setLocalTravelStartedAt(currentTicket?.travelStartedAt || null);
     setActualManHours(currentTicket?.manHours ?? currentTicket?.actualManHours ?? '');
-  }, [currentTicket.id, currentTicket.status, currentTicket?.travelStartedAt, currentTicket?.manHours]);
+  }, [currentTicket.id, currentTicket.status, currentTicket?.manHours]);
 
   useEffect(() => {
     if (currentTicket.assignedTo) {
       setSelectedService(currentTicket.assignedTo);
     }
   }, [currentTicket.assignedTo, setSelectedService]);
-
-  const handleCaptureGps = () => {
-    setShowGpsOption(true);
-    if (!navigator.geolocation) {
-      setGpsError('Geolokalizacja GPS nie jest wspierana przez tę przeglądarkę.');
-      return;
-    }
-    setGpsLoading(true);
-    setGpsError('');
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setCompletedGps({
-          lat: Number(pos.coords.latitude.toFixed(6)),
-          lng: Number(pos.coords.longitude.toFixed(6)),
-          accuracy: Math.round(pos.coords.accuracy || 0),
-          timestamp: new Date().toISOString(),
-        });
-        setGpsLoading(false);
-      },
-      err => {
-        setGpsError(formatGeolocationError(err));
-        setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
 
   const stepsList = [
     { id: 1, label: t('tickets.details.step_1') },
@@ -454,6 +414,7 @@ export default function TicketMainColumnStepper({
                           {!isClosed && !isArchive && (
                             <button
                               type="button"
+                              data-testid="ticket-accept-btn"
                               disabled={!isActualStatus || loading}
                               onClick={() => {
                                 handleUpdate(
@@ -466,8 +427,8 @@ export default function TicketMainColumnStepper({
                               }}
                               className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
                             >
-                              <i className="ph ph-play-circle text-xl"></i>{' '}
-                              {t('tickets.details.startRepairBtn', 'Rozpocznij naprawę')}
+                              <i className="ph ph-check-circle text-xl"></i>{' '}
+                              {t('tickets.details.acceptTicketBtn', 'Przyjęcie zgłoszenia')}
                             </button>
                           )}
                         </div>
@@ -562,88 +523,13 @@ export default function TicketMainColumnStepper({
                             </div>
                           )}
 
-                          {/* Dojazd do klienta (Start GPS) */}
-                          {(currentTicket.travelStartedAt || localTravelStartedAt) ? (
-                            <div
-                              data-testid="ticket-travel-started-badge"
-                              className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-2 rounded-xl font-bold flex items-center gap-2"
-                            >
-                              <i className="ph ph-car-profile text-base text-emerald-600"></i>
-                              <span>
-                                Dojazd rozpoczęty o godz.{' '}
-                                {safeParseDate(
-                                  currentTicket.travelStartedAt || localTravelStartedAt
-                                )?.toLocaleTimeString('pl-PL', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }) || '-'}
-                              </span>
-                            </div>
-                          ) : (
-                            !isClosed &&
-                            !isArchive && (
-                              <button
-                                type="button"
-                                data-testid="ticket-start-travel-btn"
-                                disabled={!isActualStatus || loading || travelStarting}
-                                onClick={async () => {
-                                  setTravelStarting(true);
-                                  let coords = null;
-                                  if (typeof navigator !== 'undefined' && navigator.geolocation) {
-                                    coords = await captureCurrentGpsPosition({
-                                      enableHighAccuracy: true,
-                                      timeout: 4000,
-                                    }).catch(() => null);
-                                  }
-                                  const nowIso = new Date().toISOString();
-                                  setLocalTravelStartedAt(nowIso);
-                                  await handleUpdate(
-                                    currentTicket.id,
-                                    3,
-                                    'Rozpoczęto dojazd do klienta',
-                                    etr,
-                                    [],
-                                    '',
-                                    {
-                                      travelStartedAt: nowIso,
-                                      travelStartGps: coords || null,
-                                    }
-                                  );
-                                  setTravelStarting(false);
-                                }}
-                                className="w-full bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-800 border border-indigo-200 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                              >
-                                <i className="ph ph-car-profile text-lg text-indigo-600"></i>
-                                <span>
-                                  {travelStarting
-                                    ? 'Rejestrowanie startu dojazdu...'
-                                    : '🚗 Rozpocznij dojazd do klienta (Start GPS)'}
-                                </span>
-                              </button>
-                            )
-                          )}
-
                           {!isClosed && !isArchive && (
                             <div className="flex flex-col sm:flex-row gap-3">
                               <button
                                 type="button"
                                 disabled={!isActualStatus || loading}
-                                onClick={async () => {
+                                onClick={() => {
                                   const nowIso = new Date().toISOString();
-                                  let coords = null;
-                                  if (
-                                    typeof navigator !== 'undefined' &&
-                                    navigator.geolocation &&
-                                    (showGpsOption ||
-                                      currentTicket.travelStartedAt ||
-                                      localTravelStartedAt ||
-                                      industryProfile !== 'industrial')
-                                  ) {
-                                    coords = await captureCurrentGpsPosition({
-                                      enableHighAccuracy: true,
-                                      timeout: 3000,
-                                    }).catch(() => null);
-                                  }
                                   handleUpdate(
                                     currentTicket.id,
                                     4,
@@ -654,7 +540,6 @@ export default function TicketMainColumnStepper({
                                     {
                                       workStartedAt: nowIso,
                                       inProgressAt: nowIso,
-                                      workStartGps: coords || null,
                                     }
                                   );
                                   setSelectedStepOverride(4);
@@ -705,7 +590,7 @@ export default function TicketMainColumnStepper({
 
                           {!isClosed && !isArchive && renderNotesAndPartsSection(isActualStatus)}
 
-                          {/* Sekcja Field Service: Deklarowany czas pracy (RBG), Potwierdzenie GPS, F-Gazy (HVAC) i Podpis cyfrowy odbierającego */}
+                          {/* Sekcja Field Service: Deklarowany czas pracy (RBG), F-Gazy (HVAC) i Podpis cyfrowy odbierającego */}
                           {!isClosed && !isArchive && (
                             <div
                               className={`pt-3 border-t border-slate-200 space-y-3 ${
@@ -728,65 +613,6 @@ export default function TicketMainColumnStepper({
                                   placeholder="np. 2.5"
                                   className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
                                 />
-                              </div>
-
-                              <div className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer select-none">
-                                    <input
-                                      type="checkbox"
-                                      disabled={!isActualStatus}
-                                      checked={showGpsOption}
-                                      data-testid="ticket-gps-optional-toggle"
-                                      onChange={e => {
-                                        const next = e.target.checked;
-                                        setShowGpsOption(next);
-                                        if (!next) {
-                                          setCompletedGps(null);
-                                          setGpsError('');
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 cursor-pointer"
-                                    />
-                                    <i className="ph ph-map-pin-line text-emerald-600 text-base"></i>
-                                    <span>Potwierdzenie obecności GPS</span>
-                                    <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                                      Opcja
-                                    </span>
-                                  </label>
-                                  <button
-                                    type="button"
-                                    disabled={!isActualStatus || gpsLoading}
-                                    onClick={handleCaptureGps}
-                                    data-testid="ticket-capture-gps-btn"
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <i className="ph ph-crosshair"></i>
-                                    {gpsLoading
-                                      ? 'Pobieranie...'
-                                      : completedGps
-                                      ? 'Odśwież GPS'
-                                      : 'Pobierz GPS'}
-                                  </button>
-                                </div>
-                                {showGpsOption && (
-                                  <div className="text-xs pl-6">
-                                    {completedGps ? (
-                                      <span className="text-emerald-700 font-semibold block">
-                                        Zapisano GPS: {formatGpsCheckIn(completedGps)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 text-[11px] block">
-                                        Opcjonalny znacznik lokalizacji do protokołu PDF
-                                      </span>
-                                    )}
-                                    {gpsError && (
-                                      <span className="text-amber-700 text-[11px] block">
-                                        {gpsError}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
                               </div>
 
                               {/* Nr uprawnień kontrolującego / inspektora — wymagany przy HVAC i Facility (c-KOB) */}
@@ -1011,9 +837,6 @@ export default function TicketMainColumnStepper({
                                       ? `Deklarowany czas pracy: ${parsedManHours} h (RBG)`
                                       : '',
                                     fGasProtocol ? formatFGasSummary(fGasProtocol) : '',
-                                    completedGps
-                                      ? `Check-in GPS: ${formatGpsCheckIn(completedGps)}`
-                                      : '',
                                     clientSignature && clientSignerName
                                       ? `Odebrał i podpisał: ${clientSignerName}`
                                       : '',
@@ -1030,7 +853,6 @@ export default function TicketMainColumnStepper({
                                     extraNotes,
                                     {
                                       manHours: parsedManHours,
-                                      completedGps: completedGps || null,
                                       fGasProtocol,
                                       clientSignature: clientSignature || null,
                                       clientSignerName: clientSignerName || null,

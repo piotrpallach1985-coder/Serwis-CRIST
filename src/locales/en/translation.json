@@ -250,6 +250,8 @@
       "manager_panel": "MANAGER PANEL - COMMENTS",
       "tech_panel": "TECHNICAL DEPT - IMPLEMENTATION STEPS",
       "step_1": "Ticket acceptance",
+      "acceptTicketBtn": "Accept ticket",
+      "startRepairBtn": "Start repair",
       "step_2": "Contractor selection",
       "step_3": "Repair start",
       "step_4": "Repair in progress",

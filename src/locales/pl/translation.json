@@ -250,6 +250,8 @@
       "manager_panel": "PANEL KIEROWNIKA - KOMENTARZE",
       "tech_panel": "DZIAŁ TECHNICZNY - KROKI REALIZACJI",
       "step_1": "Przyjęcie zgłoszenia",
+      "acceptTicketBtn": "Przyjęcie zgłoszenia",
+      "startRepairBtn": "Rozpocznij naprawę",
       "step_2": "Wybór wykonawcy",
       "step_3": "Rozpoczęcie naprawy",
       "step_4": "Naprawa w trakcie",

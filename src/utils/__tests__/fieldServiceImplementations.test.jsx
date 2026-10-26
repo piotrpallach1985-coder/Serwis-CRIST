@@ -973,11 +973,70 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(source).toContain("doc(db, 'tenants', tenantId, 'settings', 'qr_access')");
     });
 
-    it('w Kroku 4: traktuje GPS i podpis mistrza jako opcję, ukrywa nr uprawnień w profilu industrial oraz wymaga numeru uprawnień w profilach HVAC i facility', () => {
+    it('w Kroku 1 wyświetla przycisk Przyjęcie zgłoszenia, w Kroku 3 nie wyświetla Start GPS, a w Kroku 4 nie wyświetla Potwierdzenia obecności GPS, zachowując podpis i nr uprawnień', () => {
+      const ticketInStep1 = { id: 't-step1', machineId: 'm1', status: 1 };
+      const { unmount: unmountStep1 } = render(
+        <TicketMainColumnStepper
+          currentTicket={ticketInStep1}
+          user={{ role: 'admin', name: 'Mistrz' }}
+          loading={false}
+          isArchive={false}
+          selectedService=""
+          setSelectedService={vi.fn()}
+          services={[]}
+          etr={null}
+          comment=""
+          setComment={vi.fn()}
+          handleUpdate={vi.fn()}
+          handleArchiveTicket={vi.fn()}
+          handleDeleteTicket={vi.fn()}
+          allowTicketDeletion={false}
+          uploadedPhotos={[]}
+          setUploadedPhotos={vi.fn()}
+          uploadError={null}
+          branding={{ industryProfile: 'industrial' }}
+          setIsPartModalOpen={vi.fn()}
+          isUploading={false}
+          uploadProgress=""
+        />
+      );
+      expect(screen.getByTestId('ticket-accept-btn').textContent).toContain('Przyjęcie zgłoszenia');
+      unmountStep1();
+
+      const ticketInStep3 = { id: 't-step3', machineId: 'm1', status: 3, assignedTo: 'Mechanicy' };
+      const { unmount: unmountStep3 } = render(
+        <TicketMainColumnStepper
+          currentTicket={ticketInStep3}
+          user={{ role: 'admin', name: 'Mistrz' }}
+          loading={false}
+          isArchive={false}
+          selectedService="Mechanicy"
+          setSelectedService={vi.fn()}
+          services={[]}
+          etr={null}
+          comment=""
+          setComment={vi.fn()}
+          handleUpdate={vi.fn()}
+          handleArchiveTicket={vi.fn()}
+          handleDeleteTicket={vi.fn()}
+          allowTicketDeletion={false}
+          uploadedPhotos={[]}
+          setUploadedPhotos={vi.fn()}
+          uploadError={null}
+          branding={{ industryProfile: 'hvac' }}
+          setIsPartModalOpen={vi.fn()}
+          isUploading={false}
+          uploadProgress=""
+        />
+      );
+      expect(screen.queryByTestId('ticket-start-travel-btn')).toBeNull();
+      expect(screen.queryByTestId('ticket-travel-started-badge')).toBeNull();
+      unmountStep3();
+
       const ticketInStep4 = { id: 't-step4', machineId: 'm1', status: 4 };
       const handleUpdate = vi.fn();
 
-      // 1) Profil INDUSTRIAL (Przemysł / Produkcja) -> brak pola nr uprawnień, GPS i podpis zwinięte jako opcja
+      // 1) Profil INDUSTRIAL (Przemysł / Produkcja) -> brak pola nr uprawnień, brak Potwierdzenia GPS, podpis zwinięty jako opcja
       const { unmount: unmountInd } = render(
         <TicketMainColumnStepper
           currentTicket={ticketInStep4}
@@ -1005,7 +1064,8 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       );
 
       expect(screen.queryByTestId('ticket-inspector-license-input')).toBeNull();
-      expect(screen.getByTestId('ticket-gps-optional-toggle')).toBeTruthy();
+      expect(screen.queryByTestId('ticket-gps-optional-toggle')).toBeNull();
+      expect(screen.queryByTestId('ticket-capture-gps-btn')).toBeNull();
       expect(screen.getByTestId('signature-optional-toggle')).toBeTruthy();
       expect(screen.queryByTestId('signature-canvas')).toBeNull();
 
