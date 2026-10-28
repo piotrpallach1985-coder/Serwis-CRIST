@@ -1322,16 +1322,16 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       expect(screen.getByTestId('ticket-work-gps-verification-box')).toBeTruthy();
       expect(screen.getByTestId('ticket-time-inflated-badge').textContent).toContain('+1.5 h');
-      expect(screen.getByTestId('ticket-gps-geofence-badge').textContent).toContain('POZA OBIEKTEM');
+      expect(screen.queryByTestId('ticket-gps-geofence-badge')).toBeNull();
 
       expect(screen.getByTestId('service-work-gps-verification-box')).toBeTruthy();
       expect(screen.getByTestId('service-suspiciously-short-badge').textContent).toContain(
         'Przegląd trwał poniżej 5 min (3 min)'
       );
+      expect(screen.queryByTestId('service-gps-geofence-badge')).toBeNull();
 
       const summaryTable = screen.getByTestId('tech-performance-summary-table');
       expect(summaryTable.textContent).toContain('Jan Serwisant');
-      expect(summaryTable.textContent).toContain('25 min');
       expect(summaryTable.textContent).toContain('3.5 h'); // 2.5h + 1.0h
 
       const regionsTable = screen.getByTestId('tech-performance-regions-table');

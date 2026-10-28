@@ -52,10 +52,8 @@ export default function TicketMainColumnHeader({
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machineObj) : null;
   const workMetrics = calculateWorkAndTravelMetrics(currentTicket, machineObj, regions);
   const showWorkVerificationBox =
-    workMetrics.travelDurationMinutes !== null ||
     workMetrics.stopwatchWorkMinutes !== null ||
-    workMetrics.declaredManHours !== null ||
-    Boolean(currentTicket.workStartGps || currentTicket.completedGps);
+    workMetrics.declaredManHours !== null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -218,11 +216,6 @@ export default function TicketMainColumnHeader({
               {safeParseDate(currentTicket.createdAt)?.toLocaleString('pl-PL') ||
                 t('tickets.history.no_date')}
             </div>
-            {gpsCheckInStr && (
-              <div className="mt-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
-                <i className="ph ph-map-pin-line"></i> Potwierdzenie GPS: {gpsCheckInStr}
-              </div>
-            )}
             {industryProfile !== 'industrial' && fGasSummaryStr && (
               <div className="mt-2 text-xs font-semibold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg">
                 <i className="ph ph-snowflake mr-1"></i> {fGasSummaryStr}
@@ -432,7 +425,7 @@ export default function TicketMainColumnHeader({
           </div>
         )}
 
-        {/* WERYFIKACJA CZASU PRACY I LOKALIZACJI GPS (FIELD SERVICE) */}
+        {/* WERYFIKACJA CZASU PRACY */}
         {showWorkVerificationBox && (
           <div
             data-testid="ticket-work-gps-verification-box"
@@ -441,14 +434,14 @@ export default function TicketMainColumnHeader({
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-950 uppercase tracking-wider">
                 <i className="ph ph-timer text-indigo-700 text-base"></i>
-                <span>Weryfikacja Czasu Pracy i Lokalizacji GPS (Field Service)</span>
+                <span>Weryfikacja Czasu Pracy</span>
               </div>
               {workMetrics.isTimeInflated && (
                 <span
                   data-testid="ticket-time-inflated-badge"
                   className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
                 >
-                  ⚠️ Odchyłka RBG vs Stoper: +{workMetrics.discrepancyHours} h (sprawdź liczbę osób lub czas na miejscu)
+                  ⚠️ Odchyłka RBG vs Czas realizacji: +{workMetrics.discrepancyHours} h (sprawdź liczbę osób lub czas na miejscu)
                 </span>
               )}
               {workMetrics.isSuspiciouslyShort && (
@@ -461,18 +454,7 @@ export default function TicketMainColumnHeader({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-              <div className="bg-white p-2.5 rounded-lg border border-indigo-100">
-                <span className="text-slate-400 font-bold uppercase block text-[10px]">
-                  Czas dojazdu
-                </span>
-                <span className="font-extrabold text-slate-800 mt-0.5 block">
-                  {workMetrics.travelDurationMinutes !== null
-                    ? `${workMetrics.travelDurationMinutes} min`
-                    : '-'}
-                </span>
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="bg-white p-2.5 rounded-lg border border-indigo-100">
                 <span className="text-slate-400 font-bold uppercase block text-[10px]">
                   Czas pracy na miejscu (Stoper)
@@ -516,32 +498,6 @@ export default function TicketMainColumnHeader({
                     {workMetrics.discrepancyHours} h
                   </span>
                 )}
-              </div>
-
-              <div className="bg-white p-2.5 rounded-lg border border-indigo-100">
-                <span className="text-slate-400 font-bold uppercase block text-[10px]">
-                  Geofencing GPS (Odległość od obiektu)
-                </span>
-                {(() => {
-                  const gpsVer =
-                    workMetrics.endGpsVerification.status !== 'no_worker_gps'
-                      ? workMetrics.endGpsVerification
-                      : workMetrics.startGpsVerification;
-                  const badgeColor =
-                    gpsVer.status === 'on_site'
-                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                      : gpsVer.status === 'off_site'
-                      ? 'text-red-700 bg-red-50 border-red-200'
-                      : 'text-slate-600 bg-slate-50 border-slate-200';
-                  return (
-                    <span
-                      data-testid="ticket-gps-geofence-badge"
-                      className={`inline-block font-bold mt-1 px-2 py-0.5 rounded border text-[11px] ${badgeColor}`}
-                    >
-                      {gpsVer.label}
-                    </span>
-                  );
-                })()}
               </div>
             </div>
           </div>
