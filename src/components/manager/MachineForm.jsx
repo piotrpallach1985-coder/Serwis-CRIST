@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
 import React, { useState, useEffect, useMemo } from 'react';
-import { serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useManagerStore } from '../../store/managerStore';
 import { addMachine, updateMachine } from '../../services/machines.service';
 import {
@@ -12,6 +14,8 @@ import {
   TOWBAR_DMC_OPTIONS,
   calculateCo2Equivalent,
   getAllRefrigerantTypes,
+  getCustomRefrigerants,
+  hydrateCustomRefrigerants,
   saveCustomRefrigerant,
   deleteCustomRefrigerant,
   isHvacAsset,
@@ -276,6 +280,29 @@ export default function MachineForm({
     [refrigerantType, refrigerantChargeKg, refrigerantTypesMap]
   );
 
+  useEffect(() => {
+    if (branding?.customRefrigerants && typeof branding.customRefrigerants === 'object') {
+      const synced = hydrateCustomRefrigerants(branding.customRefrigerants);
+      setRefrigerantTypesMap({ ...synced });
+    }
+  }, [branding?.customRefrigerants]);
+
+  const persistRefrigerantsToFirestore = customMap => {
+    try {
+      const tenantId = getCurrentTenant();
+      if (db && tenantId && typeof setDoc === 'function') {
+        const ref = doc(db, 'tenants', tenantId, 'settings', 'branding');
+        if (ref) {
+          Promise.resolve(
+            setDoc(ref, { customRefrigerants: customMap }, { merge: true })
+          ).catch(() => {});
+        }
+      }
+    } catch {
+      // fallback to localStorage when offline or in unit tests
+    }
+  };
+
   const handleSaveCustomRefrigerant = () => {
     const code = customRefCode.trim();
     if (!code) return;
@@ -286,6 +313,7 @@ export default function MachineForm({
       isFluorinated: customRefFluorinated,
     });
     setRefrigerantTypesMap({ ...updatedMap });
+    persistRefrigerantsToFirestore(getCustomRefrigerants());
     setRefrigerantType(code);
     setCustomRefCode('');
     setCustomRefName('');
@@ -303,6 +331,7 @@ export default function MachineForm({
   const handleDeleteRefrigerantPill = code => {
     const updatedMap = deleteCustomRefrigerant(code);
     setRefrigerantTypesMap({ ...updatedMap });
+    persistRefrigerantsToFirestore(getCustomRefrigerants());
     if (refrigerantType === code) {
       setRefrigerantType('');
     }

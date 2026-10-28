@@ -23,6 +23,15 @@ export default function MachinesQRCodes({ onBack }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [qrKey, setQrKey] = useState(null);
+  const [visibleLimit, setVisibleLimit] = useState(60);
+
+  const machineByIdMap = useMemo(() => {
+    const map = new Map();
+    (machines || []).forEach(m => {
+      if (m?.id) map.set(m.id, m);
+    });
+    return map;
+  }, [machines]);
 
   const tenantId = getCurrentTenant();
   const tenantName = resolveTenantDisplayName(tenantId, branding);
@@ -271,7 +280,7 @@ export default function MachinesQRCodes({ onBack }) {
             </h3>
           </div>
         ) : (
-          filteredMachines.map(machine => {
+          filteredMachines.slice(0, visibleLimit).map(machine => {
             const qrDateStr = formatQrDate(machine, machines, '-');
             const qrVal = buildMachineQrValue(machine, tenantId, qrKey, {
               branding,
@@ -282,7 +291,7 @@ export default function MachinesQRCodes({ onBack }) {
             const isSelected = selectedIds.includes(machine.id);
             const regionName = getRegionName(machine.regionId);
             const parentMachine = machine.parentId
-              ? machines.find(m => m.id === machine.parentId)
+              ? machineByIdMap.get(machine.parentId) || null
               : null;
 
             return (
@@ -349,6 +358,18 @@ export default function MachinesQRCodes({ onBack }) {
           })
         )}
       </div>
+
+      {filteredMachines.length > visibleLimit && (
+        <div className="no-print flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleLimit(prev => prev + 60)}
+            className="px-5 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+          >
+            Pokaż kolejne kody QR ({visibleLimit} z {filteredMachines.length})
+          </button>
+        </div>
+      )}
     </div>
   );
 }

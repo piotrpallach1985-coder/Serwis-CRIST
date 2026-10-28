@@ -173,9 +173,12 @@ export default function OperatorScanner({
     }
   }, [isLiveScanning]);
 
-  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery (wyłącznie po zalogowaniu, gdy znany jest tenant)
+  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery (wyłącznie po zalogowaniu, gdy znany jest tenant i przeglądarka wspiera TextDetector)
   useEffect(() => {
     if (!isLiveScanning || !isInternal) return undefined;
+    if (typeof window === 'undefined' || typeof window.TextDetector !== 'function') {
+      return undefined;
+    }
     let active = true;
     const intervalId = setInterval(async () => {
       if (!active || autoAnprBusyRef.current) return;

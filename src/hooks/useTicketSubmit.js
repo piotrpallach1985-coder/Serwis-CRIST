@@ -21,6 +21,7 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       description,
       reporterName,
       reporterPhone,
+      reportPin,
       isCritical,
       pendingPhotos,
       
@@ -162,6 +163,9 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         status: TICKET_STATUS.OPEN,
         createdAt: new Date().toISOString(),
         photos: uploadedUrls,
+        ...(reportPin && String(reportPin).trim()
+          ? { reportPin: String(reportPin).trim() }
+          : {}),
         updates: [{
           timestamp: new Date().toISOString(),
           status: TICKET_STATUS.OPEN,

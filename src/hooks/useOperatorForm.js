@@ -65,18 +65,38 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     showToast
   });
 
+  const initialMachineRef = useRef(selectedMachine);
+  useEffect(() => {
+    if (!initialMachineRef.current && selectedMachine) {
+      initialMachineRef.current = selectedMachine;
+    }
+  }, [selectedMachine]);
+
   const effectiveMachineForPin =
     selectedMachine?.id === 'manual' && selectedMachine?.name
       ? findMachineByIdentifierOrPlate(machines || [], selectedMachine.name) || selectedMachine
       : selectedMachine;
 
   const pinRequirement = !isInternal
-    ? resolveAnonymousReportPin(
-        effectiveMachineForPin,
-        regions || [],
-        branding || {},
-        mapSettings || {}
-      )
+    ? (() => {
+        const currentReq = resolveAnonymousReportPin(
+          effectiveMachineForPin,
+          regions || [],
+          branding || {},
+          mapSettings || {}
+        );
+        if (currentReq.required) return currentReq;
+        if (initialMachineRef.current) {
+          const initialReq = resolveAnonymousReportPin(
+            initialMachineRef.current,
+            regions || [],
+            branding || {},
+            mapSettings || {}
+          );
+          if (initialReq.required) return initialReq;
+        }
+        return currentReq;
+      })()
     : { required: false, pin: '', source: 'none', sourceLabel: '' };
 
   const handleSubmit = async (e) => {
@@ -118,6 +138,7 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       description,
       reporterName: isInternal ? (user?.name || 'Pracownik (Wewnętrzny)') : 'Szybkie Zgłoszenie',
       reporterPhone: isInternal ? (user?.phone || '') : reporterPhone,
+      reportPin: !isInternal && reportPin ? String(reportPin).trim() : '',
       isCritical,
       pendingPhotos,
       acceptedRodo,

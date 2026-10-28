@@ -43,6 +43,23 @@ export function getCustomRefrigerants() {
   return { ...memoryCustomRefrigerants };
 }
 
+export function hydrateCustomRefrigerants(remoteCustomMap) {
+  if (!remoteCustomMap || typeof remoteCustomMap !== 'object') {
+    return getAllRefrigerantTypes();
+  }
+  const current = getCustomRefrigerants();
+  const merged = { ...current, ...remoteCustomMap };
+  memoryCustomRefrigerants = { ...merged };
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(CUSTOM_REFRIGERANTS_STORAGE_KEY, JSON.stringify(merged));
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return getAllRefrigerantTypes();
+}
+
 export function getAllRefrigerantTypes(customOverrides = null) {
   const stored = getCustomRefrigerants();
   const merged = {
@@ -1342,12 +1359,13 @@ export function calculateWorkAndTravelMetrics(task, machine = null, regions = []
   const travelStartedAt = safeTask.travelStartedAt || null;
   const travelStartMs = parseTaskTimestampMs(travelStartedAt);
 
-  // Jeśli istnieje jawny workStartedAt, używamy go; w przeciwnym razie inProgressAt tylko gdy nie jest wcześniejszy niż start dojazdu
+  // Jeśli istnieje jawny workStartedAt, używamy go; w przeciwnym razie inProgressAt lub assignedAt gdy nie jest wcześniejszy niż start dojazdu
   let workStartedAt = safeTask.workStartedAt || null;
-  if (!workStartedAt && safeTask.inProgressAt) {
-    const inProgMs = parseTaskTimestampMs(safeTask.inProgressAt);
+  const fallbackStart = safeTask.inProgressAt || safeTask.assignedAt || null;
+  if (!workStartedAt && fallbackStart) {
+    const inProgMs = parseTaskTimestampMs(fallbackStart);
     if (inProgMs !== null && (travelStartMs === null || inProgMs >= travelStartMs)) {
-      workStartedAt = safeTask.inProgressAt;
+      workStartedAt = fallbackStart;
     }
   }
 

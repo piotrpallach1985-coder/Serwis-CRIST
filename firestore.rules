@@ -115,17 +115,47 @@ service cloud.firestore {
       return !(field in d) || d[field] == null || (d[field] is string && d[field].size() <= maxLen);
     }
 
+    function anonPinMatchesRegion(tenantId, d) {
+      let rDoc = get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId)).data;
+      return !('reportPin' in rDoc)
+        || !(rDoc.reportPin is string)
+        || rDoc.reportPin.size() == 0
+        || ('reportPin' in d && d.reportPin == rDoc.reportPin);
+    }
+
+    function anonTicketPinValid(tenantId, d) {
+      return d.machineId != 'manual'
+        ? (
+            ('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data
+             && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin is string
+             && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin.size() > 0)
+              ? ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin)
+              : (
+                  get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('assetCategory', 'device') == 'vehicle'
+                  || !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
+                  || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
+                  || anonPinMatchesRegion(tenantId, d)
+                )
+          )
+        : (
+            !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
+            || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
+            || anonPinMatchesRegion(tenantId, d)
+          );
+    }
+
     // Zgłoszenie anonima: tylko pola formularza, status "Nowe" (1), bez przypisań/zamknięć/kosztów
     function isValidAnonTicket(tenantId, ticketId) {
       let d = request.resource.data;
       return d.keys().hasOnly(['machineId', 'machineName', 'bay', 'regionId', 'regionName', 'topic', 'description',
                                'isCritical', 'reportedBy', 'reporterPhone', 'reporterDevice', 'reporterDeviceId',
-                               'reporterUid', 'status', 'createdAt', 'photos', 'updates'])
+                               'reporterUid', 'status', 'createdAt', 'photos', 'updates', 'reportPin'])
         && d.keys().hasAll(['machineId', 'topic', 'description', 'status', 'reporterUid'])
         && d.status == 1
         && d.reporterUid == request.auth.uid
         && d.machineId is string
         && (d.machineId == 'manual' || exists(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)))
+        && anonTicketPinValid(tenantId, d)
         && d.topic is string && d.topic.size() > 0 && d.topic.size() <= 300
         && d.description is string && d.description.size() > 0 && d.description.size() <= 5000
         && optString(d, 'machineName', 300)
@@ -137,6 +167,7 @@ service cloud.firestore {
         && optString(d, 'reporterDevice', 500)
         && optString(d, 'reporterDeviceId', 200)
         && optString(d, 'createdAt', 40)
+        && optString(d, 'reportPin', 30)
         && (!('isCritical' in d) || d.isCritical is bool)
         && (!('photos' in d) || (d.photos is list && photosValid(d.photos, tenantId, ticketId)))
         && (!('updates' in d) || (d.updates is list && d.updates.size() <= 1

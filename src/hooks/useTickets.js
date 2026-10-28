@@ -135,6 +135,22 @@ export function useTickets({
 
   const activeTicketsArray = isArchive ? scopedArchive : tickets;
 
+  const machineByIdMap = useMemo(() => {
+    const map = new Map();
+    (machines || []).forEach(m => {
+      if (m?.id) map.set(m.id, m);
+    });
+    return map;
+  }, [machines]);
+
+  const regionByIdMap = useMemo(() => {
+    const map = new Map();
+    (regions || []).forEach(r => {
+      if (r?.id) map.set(r.id, r);
+    });
+    return map;
+  }, [regions]);
+
   const filteredTickets = useMemo(() => {
     return activeTicketsArray
       .filter(t => !t.isDeleted)
@@ -143,11 +159,15 @@ export function useTickets({
         
         // Exact Region filter (from dropdown)
         if (filterRegion) {
-          const machObj = (machines || []).find(m => m.id === t.machineId || m.name === t.machineName);
+          const machObj =
+            machineByIdMap.get(t.machineId) ||
+            (machines || []).find(m => m.name === t.machineName);
           const regId = t.regionId || machObj?.regionId;
           const regName = t.regionName;
           
-          const filterRegObj = (regions || []).find(r => r.id === filterRegion || r.name === filterRegion);
+          const filterRegObj =
+            regionByIdMap.get(filterRegion) ||
+            (regions || []).find(r => r.name === filterRegion);
           const fRegId = filterRegObj ? filterRegObj.id : filterRegion;
           const fRegName = filterRegObj ? filterRegObj.name : filterRegion;
 
@@ -158,7 +178,9 @@ export function useTickets({
 
         // Exact Machine filter (from dropdown)
         if (filterMachineId) {
-          const machObjFilter = (machines || []).find(m => m.id === filterMachineId || m.name === filterMachineId);
+          const machObjFilter =
+            machineByIdMap.get(filterMachineId) ||
+            (machines || []).find(m => m.name === filterMachineId);
           const fMachId = machObjFilter ? machObjFilter.id : filterMachineId;
           const fMachName = machObjFilter ? machObjFilter.name : filterMachineId;
           

@@ -219,6 +219,7 @@ export default function PlannedMaintenanceTimeline({
         assignedService: selectedService,
         status: 'in_progress',
         assignedAt: srv.assignedAt || nowIso,
+        inProgressAt: srv.inProgressAt || nowIso,
         currentStep: 3,
         history: newHistory,
       });

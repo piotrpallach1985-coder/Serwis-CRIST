@@ -150,13 +150,30 @@ export default function PlannedMaintenance({
     [machines, tickets, rawServices, user, onlyAssignedTasks]
   );
 
-  // --- Helpery ---
-  const getMachine = id => machines.find(m => m.id === id);
+  // --- Helpery O(1) ---
+  const machineByIdMap = useMemo(() => {
+    const map = new Map();
+    (machines || []).forEach(m => {
+      if (m?.id) map.set(m.id, m);
+    });
+    return map;
+  }, [machines]);
+
+  const regionByIdMap = useMemo(() => {
+    const map = new Map();
+    (regions || []).forEach(r => {
+      if (r?.id) map.set(r.id, r);
+      if (r?.name) map.set(r.name, r);
+    });
+    return map;
+  }, [regions]);
+
+  const getMachine = id => machineByIdMap.get(id);
   const getMachineName = id => getMachine(id)?.name || 'Nieznana maszyna';
   const getMachineRegionName = regionId => {
     if (!regionId) return '-';
     if (regionId === 'main_map') return t('machines.form.mainMapRegion', 'Mapa Główna');
-    const found = regions.find(r => r.id === regionId || r.name === regionId);
+    const found = regionByIdMap.get(regionId);
     return found ? found.name : regionId;
   };
 

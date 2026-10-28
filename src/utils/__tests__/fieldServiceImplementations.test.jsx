@@ -27,6 +27,7 @@ import {
   extractLicensePlateFromOcrText,
   recognizeLicensePlateFromVideoFrame,
   getAllRefrigerantTypes,
+  hydrateCustomRefrigerants,
   saveCustomRefrigerant,
   deleteCustomRefrigerant,
   isHvacAsset,
@@ -1957,6 +1958,48 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('region-pin-badge-reg-building-a').textContent).toContain('4821');
       expect(screen.getByTestId('region-pin-badge-reg-floor-2').textContent).toContain('4821');
       unmountRegions();
+
+      // 5) Ochrona przed ominięciem PIN-u przy przełączeniu na "Inne Urządzenie" i zmianie rejonu na pusty
+      function WrapperAnonForm() {
+        const [mach, setMach] = React.useState(elevatorInBuildingA);
+        return (
+          <OperatorForm
+            machines={[elevatorInBuildingA]}
+            selectedMachine={mach}
+            setSelectedMachine={setMach}
+            regions={testRegions}
+            handleStepChange={vi.fn()}
+            isOnline={true}
+            topicsList={['Drzwi nie domykają się']}
+            reportersList={[]}
+            isInternal={false}
+          />
+        );
+      }
+      const { unmount: unmountBypass } = render(<WrapperAnonForm />);
+      expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
+      fireEvent.click(screen.getByText('Inne Urządzenie'));
+      // Nawet po przełączeniu na "Inne Urządzenie", sekcja PIN-u dla pierwotnego budynku A (4821) pozostaje wymagana
+      expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
+      unmountBypass();
+
+      // 6) Hydratacja czynników chłodniczych z Firestore (branding.customRefrigerants) oraz fallback assignedAt w metrykach
+      const hydrated = hydrateCustomRefrigerants({
+        R513A: { code: 'R513A', name: 'R513A (Opteon XP10)', gwp: 631, isFluorinated: true, isCustom: true },
+      });
+      expect(hydrated.R513A).toBeDefined();
+      expect(hydrated.R513A.gwp).toBe(631);
+
+      const srvWithoutManualStopwatch = {
+        id: 'srv-no-stopwatch',
+        status: 'completed',
+        assignedAt: '2026-10-28T08:00:00.000Z',
+        completedAt: '2026-10-28T09:30:00.000Z',
+        manHours: 1.5,
+      };
+      const fallbackMetrics = calculateWorkAndTravelMetrics(srvWithoutManualStopwatch, null, [], []);
+      expect(fallbackMetrics.stopwatchWorkMinutes).toBe(90);
+      expect(fallbackMetrics.stopwatchWorkHours).toBe(1.5);
     });
   });
 });

@@ -330,7 +330,6 @@ export default function PlannedMaintenanceCompletionModal({
       setActionItemProblem('');
       setActionItemDueDate('');
       setPartsUsed(false);
-      setCompletedGps(null);
       setLeakTestResult('');
       setRefrigerantAddedKg('');
       setRefrigerantRecoveredKg('');
