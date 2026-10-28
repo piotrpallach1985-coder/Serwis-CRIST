@@ -51,9 +51,7 @@ export default function TicketMainColumnHeader({
   const counterUnit = getMachineCounterUnit(machineObj, industryProfile);
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machineObj) : null;
   const workMetrics = calculateWorkAndTravelMetrics(currentTicket, machineObj, regions);
-  const showWorkVerificationBox =
-    workMetrics.stopwatchWorkMinutes !== null ||
-    workMetrics.declaredManHours !== null;
+  const showWorkVerificationBox = workMetrics.declaredManHours !== null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -436,68 +434,16 @@ export default function TicketMainColumnHeader({
                 <i className="ph ph-timer text-indigo-700 text-base"></i>
                 <span>Weryfikacja Czasu Pracy</span>
               </div>
-              {workMetrics.isTimeInflated && (
-                <span
-                  data-testid="ticket-time-inflated-badge"
-                  className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
-                >
-                  ⚠️ Odchyłka RBG vs Czas realizacji: +{workMetrics.discrepancyHours} h (sprawdź liczbę osób lub czas na miejscu)
-                </span>
-              )}
-              {workMetrics.isSuspiciouslyShort && (
-                <span
-                  data-testid="ticket-suspiciously-short-badge"
-                  className="bg-red-100 text-red-900 border border-red-300 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
-                >
-                  🚨 Czas pracy poniżej 5 min ({workMetrics.stopwatchWorkMinutes} min)
-                </span>
-              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="bg-white p-2.5 rounded-lg border border-indigo-100">
-                <span className="text-slate-400 font-bold uppercase block text-[10px]">
-                  Czas pracy na miejscu (Stoper)
-                </span>
-                <span className="font-extrabold text-slate-800 mt-0.5 block">
-                  {workMetrics.stopwatchWorkMinutes !== null
-                    ? `${workMetrics.stopwatchWorkMinutes} min (${workMetrics.stopwatchWorkHours} h)`
-                    : '-'}
-                </span>
-                {workMetrics.isMultiDayOrPaused && (
-                  <span className="text-[10px] font-semibold text-slate-500 block mt-0.5">
-                    Zlecenie wielodniowe / z przerwą (&gt;12h)
-                  </span>
-                )}
-              </div>
-
-              <div
-                className={`p-2.5 rounded-lg border ${
-                  workMetrics.isTimeInflated
-                    ? 'bg-red-50/70 border-red-200'
-                    : 'bg-white border-indigo-100'
-                }`}
-              >
+              <div className="p-2.5 rounded-lg border bg-white border-indigo-100">
                 <span className="text-slate-400 font-bold uppercase block text-[10px]">
                   Zadeklarowane RBG
                 </span>
-                <span
-                  className={`font-extrabold mt-0.5 block ${
-                    workMetrics.isTimeInflated ? 'text-red-700' : 'text-slate-800'
-                  }`}
-                >
+                <span className="font-extrabold mt-0.5 block text-slate-800">
                   {workMetrics.declaredManHours !== null ? `${workMetrics.declaredManHours} h` : '-'}
                 </span>
-                {workMetrics.discrepancyHours !== null && (
-                  <span
-                    className={`text-[10px] font-bold block mt-0.5 ${
-                      workMetrics.isTimeInflated ? 'text-red-600' : 'text-emerald-700'
-                    }`}
-                  >
-                    Bilans vs Stoper: {workMetrics.discrepancyHours > 0 ? '+' : ''}
-                    {workMetrics.discrepancyHours} h
-                  </span>
-                )}
               </div>
             </div>
           </div>

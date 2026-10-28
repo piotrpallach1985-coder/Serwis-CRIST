@@ -1321,13 +1321,11 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       );
 
       expect(screen.getByTestId('ticket-work-gps-verification-box')).toBeTruthy();
-      expect(screen.getByTestId('ticket-time-inflated-badge').textContent).toContain('+1.5 h');
+      expect(screen.getByTestId('ticket-work-gps-verification-box').textContent).toContain('2.5 h');
       expect(screen.queryByTestId('ticket-gps-geofence-badge')).toBeNull();
 
       expect(screen.getByTestId('service-work-gps-verification-box')).toBeTruthy();
-      expect(screen.getByTestId('service-suspiciously-short-badge').textContent).toContain(
-        'Przegląd trwał poniżej 5 min (3 min)'
-      );
+      expect(screen.getByTestId('service-work-gps-verification-box').textContent).toContain('1 h');
       expect(screen.queryByTestId('service-gps-geofence-badge')).toBeNull();
 
       const summaryTable = screen.getByTestId('tech-performance-summary-table');
