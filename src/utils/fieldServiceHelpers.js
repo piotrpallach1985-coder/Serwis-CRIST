@@ -1630,7 +1630,39 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
     }
   }
 
-  // 2b. Pojedynczy złączony token bez spacji: np. "GD12345", "PLGD12345", "WE9876A", "GDA45678"
+  // 2b. Trójki tokenów rozdzielone przez szeroki kerning na tablicy: np. ["GD", "12", "345"] lub ["G", "D", "12345"]
+  for (let i = 0; i < tokens.length - 2; i++) {
+    const t1 = tokens[i];
+    const t2 = tokens[i + 1];
+    const t3 = tokens[i + 2];
+    if (/^[A-Z]{1,3}$/.test(t1) && /^[A-Z0-9]{1,3}$/.test(t2) && /^[A-Z0-9]{2,4}$/.test(t3)) {
+      const combinedSuffix = `${t2}${t3}`;
+      if (
+        /^[A-Z0-9]{3,6}$/.test(combinedSuffix) &&
+        /\d/.test(combinedSuffix) &&
+        t1.length + combinedSuffix.length >= 4 &&
+        t1.length + combinedSuffix.length <= 9
+      ) {
+        const candidatePlate = `${t1} ${combinedSuffix}`;
+        const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+        return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
+      }
+    }
+    if (/^[A-Z]{1,2}$/.test(t1) && /^[A-Z]{1,2}$/.test(t2) && /^[A-Z0-9]{3,6}$/.test(t3) && /\d/.test(t3)) {
+      const combinedPrefix = `${t1}${t2}`;
+      if (
+        combinedPrefix.length <= 3 &&
+        combinedPrefix.length + t3.length >= 4 &&
+        combinedPrefix.length + t3.length <= 9
+      ) {
+        const candidatePlate = `${combinedPrefix} ${t3}`;
+        const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+        return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
+      }
+    }
+  }
+
+  // 2c. Pojedynczy złączony token bez spacji: np. "GD12345", "PLGD12345", "WE9876A", "GDA45678"
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i];
     if (tok.startsWith('PL') && tok.length >= 6 && /^PL[A-Z]{2,3}\d/.test(tok)) {
@@ -1652,6 +1684,13 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
 }
 
 let tesseractWorkerPromise = null;
+let ocrMutexPromise = Promise.resolve();
+
+function runWithOcrMutex(taskFn) {
+  const next = ocrMutexPromise.then(() => taskFn(), () => taskFn());
+  ocrMutexPromise = next.catch(() => {});
+  return next;
+}
 
 function loadTesseractScript() {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -1709,16 +1748,17 @@ async function getBrowserOcrWorker() {
   return tesseractWorkerPromise;
 }
 
-function buildPlateCanvasFromVideo(videoEl, thresholdMode = false) {
+function buildPlateCanvasFromVideo(videoEl, mode = 'crop_gray') {
   if (typeof document === 'undefined' || !videoEl) return null;
   const vw = Number(videoEl.videoWidth) || 0;
   const vh = Number(videoEl.videoHeight) || 0;
   if (vw <= 0 || vh <= 0) return null;
 
-  const sx = Math.floor(vw * 0.08);
-  const sy = Math.floor(vh * 0.25);
-  const sw = Math.max(1, Math.floor(vw * 0.84));
-  const sh = Math.max(1, Math.floor(vh * 0.5));
+  const isFull = mode === 'full_gray';
+  const sx = isFull ? 0 : Math.floor(vw * 0.06);
+  const sy = isFull ? Math.floor(vh * 0.12) : Math.floor(vh * 0.25);
+  const sw = isFull ? vw : Math.max(1, Math.floor(vw * 0.88));
+  const sh = isFull ? Math.max(1, Math.floor(vh * 0.76)) : Math.max(1, Math.floor(vh * 0.5));
 
   const targetWidth = Math.min(960, Math.max(480, sw));
   const scale = targetWidth / sw;
@@ -1743,6 +1783,7 @@ function buildPlateCanvasFromVideo(videoEl, thresholdMode = false) {
     }
     const range = Math.max(1, maxL - minL);
     const mid = (minL + maxL) / 2;
+    const thresholdMode = mode === 'crop_binary';
     for (let i = 0; i < data.length; i += 4) {
       const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
       let val = ((lum - minL) / range) * 255;
@@ -1788,7 +1829,7 @@ export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = []
       if (res.plate) return res;
     }
 
-    // Fallback uniwersalnego silnika OCR (Tesseract.js + Canvas) dla przeglądarek bez eksperymentalnego TextDetector (Chrome, Safari, Firefox, Edge)
+    // Fallback uniwersalnego silnika OCR (Tesseract.js + Canvas z mutexem zapobiegającym kolizjom zapytań)
     const isRealDomVideo =
       videoEl &&
       typeof videoEl.tagName === 'string' &&
@@ -1797,20 +1838,18 @@ export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = []
       Number(videoEl.videoHeight) > 0;
 
     if (isRealDomVideo) {
-      const canvasGray = buildPlateCanvasFromVideo(videoEl, false);
-      if (canvasGray) {
+      const wasmRes = await runWithOcrMutex(async () => {
         const worker = await getBrowserOcrWorker();
-        const { data } = await worker.recognize(canvasGray);
-        const res1 = extractLicensePlateFromOcrText(data?.text || '', machines);
-        if (res1.plate) return res1;
-
-        const canvasBin = buildPlateCanvasFromVideo(videoEl, true);
-        if (canvasBin) {
-          const { data: data2 } = await worker.recognize(canvasBin);
-          const res2 = extractLicensePlateFromOcrText(data2?.text || '', machines);
-          if (res2.plate) return res2;
+        for (const mode of ['crop_gray', 'crop_binary', 'full_gray']) {
+          const canvas = buildPlateCanvasFromVideo(videoEl, mode);
+          if (!canvas) continue;
+          const { data } = await worker.recognize(canvas);
+          const parsed = extractLicensePlateFromOcrText(data?.text || '', machines);
+          if (parsed.plate) return parsed;
         }
-      }
+        return null;
+      });
+      if (wasmRes && wasmRes.plate) return wasmRes;
     }
 
     return {
