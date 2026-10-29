@@ -410,7 +410,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           <OperatorScanner
             onScanSuccess={handleScanSuccess}
             machines={machines}
-            allowPlateScan={!needsQr && machines.length > 0}
+            isInternal={Boolean(auth.currentUser && !auth.currentUser.isAnonymous)}
           />
         )}
 
