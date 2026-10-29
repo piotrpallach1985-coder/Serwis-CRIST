@@ -1547,13 +1547,33 @@ export function findMachineByIdentifierOrPlate(machines = [], rawQuery = '', raw
 }
 
 /**
+ * Sprawdza czy w ciągu OCR występuje podciąg różniący się co najwyżej o 1 znak od wzorca tablicy (min. 6 znaków).
+ */
+function hasSingleCharOcrMatch(haystack = '', needle = '') {
+  if (!haystack || !needle || needle.length < 6 || haystack.length < needle.length) return false;
+  const len = needle.length;
+  for (let i = 0; i <= haystack.length - len; i++) {
+    let diffs = 0;
+    for (let j = 0; j < len; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        diffs++;
+        if (diffs > 1) break;
+      }
+    }
+    if (diffs <= 1) return true;
+  }
+  return false;
+}
+
+/**
  * Wyodrębnia numer tablicy rejestracyjnej z surowego tekstu OCR kamery i dopasowuje do bazy pojazdów.
  */
 export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
   if (!rawText) return { plate: '', matchedMachine: null };
-  const cleanedLines = String(rawText)
+  const cleanedTokens = String(rawText)
     .toUpperCase()
     .replace(/[^A-Z0-9\s-]/g, ' ')
+    .replace(/-/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
 
@@ -1576,24 +1596,168 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
         return { plate: m.licensePlate, matchedMachine: m };
       }
     }
+    for (const m of machines) {
+      if (!m || m.isDeleted || !m.licensePlate) continue;
+      const mFuzzy = normalizeOcrPlateFuzzy(m.licensePlate);
+      if (mFuzzy.length >= 6 && hasSingleCharOcrMatch(fullFuzzy, mFuzzy)) {
+        return { plate: m.licensePlate, matchedMachine: m };
+      }
+    }
   }
 
-  // 2. Wyodrębnienie wzorca tablicy rejestracyjnej PL / UE (np. GD 12345, WE 9876A, GDA 45678, KR 12345)
-  const joinedText = cleanedLines.join(' ');
-  const plateRegex = /\b([A-Z]{1,3})[\s-]?([A-Z0-9]{3,6})\b/g;
-  let match;
-  while ((match = plateRegex.exec(joinedText)) !== null) {
-    const prefix = match[1];
-    const suffix = match[2];
-    // Tablica musi zawierać przynajmniej jedną cyfrę w drugim członie (odrzuca zwykłe słowa)
-    if (/\d/.test(suffix) && (prefix.length + suffix.length) >= 4 && (prefix.length + suffix.length) <= 9) {
+  // 2. Wyodrębnienie wzorca tablicy rejestracyjnej PL / UE z tokenów (obsługuje również "PL GD 12345" oraz złączone "GD12345")
+  const tokens = cleanedTokens.filter((tok, idx) => {
+    if ((tok === 'PL' || tok === 'EU') && idx + 1 < cleanedTokens.length && /^[A-Z]{1,3}$/.test(cleanedTokens[idx + 1])) {
+      return false;
+    }
+    return true;
+  });
+
+  // 2a. Pary sąsiednich tokenów: np. ["GD", "12345"], ["WE", "9876A"], ["KR", "4567C"]
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const prefix = tokens[i];
+    const suffix = tokens[i + 1];
+    if (
+      /^[A-Z]{1,3}$/.test(prefix) &&
+      /^[A-Z0-9]{3,6}$/.test(suffix) &&
+      /\d/.test(suffix) &&
+      prefix.length + suffix.length >= 4 &&
+      prefix.length + suffix.length <= 9
+    ) {
       const candidatePlate = `${prefix} ${suffix}`;
       const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
       return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
     }
   }
 
+  // 2b. Pojedynczy złączony token bez spacji: np. "GD12345", "PLGD12345", "WE9876A", "GDA45678"
+  for (let i = 0; i < tokens.length; i++) {
+    let tok = tokens[i];
+    if (tok.startsWith('PL') && tok.length >= 6 && /^PL[A-Z]{2,3}\d/.test(tok)) {
+      tok = tok.slice(2);
+    }
+    const mergedMatch = tok.match(/^([A-Z]{1,3})(\d[A-Z0-9]{2,5})$/) || tok.match(/^([A-Z]{2,3})([A-Z0-9]{3,5})$/);
+    if (mergedMatch) {
+      const prefix = mergedMatch[1];
+      const suffix = mergedMatch[2];
+      if (/\d/.test(suffix) && prefix.length + suffix.length >= 4 && prefix.length + suffix.length <= 9) {
+        const candidatePlate = `${prefix} ${suffix}`;
+        const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+        return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
+      }
+    }
+  }
+
   return { plate: '', matchedMachine: null };
+}
+
+let tesseractWorkerPromise = null;
+
+function loadTesseractScript() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.reject(new Error('Brak środowiska przeglądarki'));
+  }
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-tesseract-ocr="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.Tesseract));
+      existing.addEventListener('error', () => reject(new Error('Błąd ładowania modułu OCR')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js';
+    script.async = true;
+    script.dataset.tesseractOcr = 'true';
+    script.onload = () => {
+      if (window.Tesseract) resolve(window.Tesseract);
+      else reject(new Error('Nie udało się zainicjować silnika OCR'));
+    };
+    script.onerror = () => {
+      script.remove();
+      const backup = document.createElement('script');
+      backup.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      backup.async = true;
+      backup.dataset.tesseractOcr = 'true';
+      backup.onload = () =>
+        window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Brak silnika OCR'));
+      backup.onerror = () => reject(new Error('Nie udało się pobrać silnika OCR'));
+      document.head.appendChild(backup);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function getBrowserOcrWorker() {
+  if (!tesseractWorkerPromise) {
+    tesseractWorkerPromise = (async () => {
+      const Tesseract = await loadTesseractScript();
+      const worker = await Tesseract.createWorker('eng');
+      if (worker && typeof worker.setParameters === 'function') {
+        await worker.setParameters({
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -',
+          tessedit_pageseg_mode: '6',
+        });
+      }
+      return worker;
+    })().catch(err => {
+      tesseractWorkerPromise = null;
+      throw err;
+    });
+  }
+  return tesseractWorkerPromise;
+}
+
+function buildPlateCanvasFromVideo(videoEl, thresholdMode = false) {
+  if (typeof document === 'undefined' || !videoEl) return null;
+  const vw = Number(videoEl.videoWidth) || 0;
+  const vh = Number(videoEl.videoHeight) || 0;
+  if (vw <= 0 || vh <= 0) return null;
+
+  const sx = Math.floor(vw * 0.08);
+  const sy = Math.floor(vh * 0.25);
+  const sw = Math.max(1, Math.floor(vw * 0.84));
+  const sh = Math.max(1, Math.floor(vh * 0.5));
+
+  const targetWidth = Math.min(960, Math.max(480, sw));
+  const scale = targetWidth / sw;
+  const targetHeight = Math.max(1, Math.round(sh * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+  try {
+    const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+    const data = imgData.data;
+    let minL = 255;
+    let maxL = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      if (lum < minL) minL = lum;
+      if (lum > maxL) maxL = lum;
+    }
+    const range = Math.max(1, maxL - minL);
+    const mid = (minL + maxL) / 2;
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      let val = ((lum - minL) / range) * 255;
+      if (thresholdMode) {
+        val = lum > mid ? 255 : 0;
+      }
+      data[i] = val;
+      data[i + 1] = val;
+      data[i + 2] = val;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {
+    // ignore cross-origin or canvas pixel read errors
+  }
+  return canvas;
 }
 
 /**
@@ -1624,11 +1788,36 @@ export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = []
       if (res.plate) return res;
     }
 
+    // Fallback uniwersalnego silnika OCR (Tesseract.js + Canvas) dla przeglądarek bez eksperymentalnego TextDetector (Chrome, Safari, Firefox, Edge)
+    const isRealDomVideo =
+      videoEl &&
+      typeof videoEl.tagName === 'string' &&
+      videoEl.tagName.toUpperCase() === 'VIDEO' &&
+      Number(videoEl.videoWidth) > 0 &&
+      Number(videoEl.videoHeight) > 0;
+
+    if (isRealDomVideo) {
+      const canvasGray = buildPlateCanvasFromVideo(videoEl, false);
+      if (canvasGray) {
+        const worker = await getBrowserOcrWorker();
+        const { data } = await worker.recognize(canvasGray);
+        const res1 = extractLicensePlateFromOcrText(data?.text || '', machines);
+        if (res1.plate) return res1;
+
+        const canvasBin = buildPlateCanvasFromVideo(videoEl, true);
+        if (canvasBin) {
+          const { data: data2 } = await worker.recognize(canvasBin);
+          const res2 = extractLicensePlateFromOcrText(data2?.text || '', machines);
+          if (res2.plate) return res2;
+        }
+      }
+    }
+
     return {
       plate: '',
       matchedMachine: null,
       error:
-        'Przeglądarka nie wykryła automatycznie napisu na tablicy — wpisz lub wybierz numer rejestracyjny poniżej.',
+        'Nie wykryto wyraźnego numeru tablicy w kadrze — wyśrodkuj tablicę rejestracyjną i spróbuj ponownie lub wpisz numer ręcznie poniżej.',
     };
   } catch (err) {
     return {

@@ -34,7 +34,8 @@ export default function PlannedMaintenanceInfo({
   const branding = useManagerStore(state => state.branding || {});
   const mapSettings = useManagerStore(state => state.mapSettings);
   const industryProfile = branding?.industryProfile || 'industrial';
-  const profileConfig = getIndustryProfileConfig(industryProfile);
+  const isVehicle = isVehicleAsset(machine, industryProfile);
+  const profileConfig = getIndustryProfileConfig(isVehicle ? 'fleet' : industryProfile);
 
   const [localCkobEntered, setLocalCkobEntered] = useState(Boolean(srv?.ckobEntered));
   const [localCkobEnteredAt, setLocalCkobEnteredAt] = useState(srv?.ckobEnteredAt || null);
@@ -118,7 +119,6 @@ export default function PlannedMaintenanceInfo({
   const clientSignerName =
     srv.clientSignerName || srv.completionDetails?.clientSignerName || '';
   const workMetrics = calculateWorkAndTravelMetrics(srv, machine, regions);
-  const isVehicle = isVehicleAsset(machine, industryProfile);
   const counterUnit = getMachineCounterUnit(machine, industryProfile);
   const counterUnitLower = counterUnit === 'km' ? 'km' : 'rbg';
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machine) : null;
@@ -422,7 +422,7 @@ export default function PlannedMaintenanceInfo({
             </div>
 
             {/* DEDYKOWANA SEKCJA BRANŻOWA NA KARCIE SERWISU (INDUSTRIAL / FACILITY / HVAC) */}
-            {industryProfile === 'industrial' && (
+            {industryProfile === 'industrial' && !isVehicle && (
               <div
                 data-testid="service-domain-industrial"
                 className="mt-4 bg-slate-50/90 border border-slate-200 rounded-xl p-3.5"
@@ -483,7 +483,7 @@ export default function PlannedMaintenanceInfo({
               </div>
             )}
 
-            {industryProfile === 'facility' && (
+            {industryProfile === 'facility' && !isVehicle && (
               <div
                 data-testid="service-domain-facility"
                 className="mt-4 bg-amber-50/50 border border-amber-200 rounded-xl p-3.5"
@@ -524,7 +524,7 @@ export default function PlannedMaintenanceInfo({
               </div>
             )}
 
-            {industryProfile === 'hvac' && (
+            {industryProfile === 'hvac' && !isVehicle && (
               <div
                 data-testid="service-domain-hvac"
                 className="mt-4 bg-cyan-50/50 border border-cyan-200 rounded-xl p-3.5"

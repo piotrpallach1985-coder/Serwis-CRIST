@@ -27,9 +27,10 @@ export default function TicketMainColumnHeader({
   const branding = useManagerStore(state => state.branding || {});
   const mapSettings = useManagerStore(state => state.mapSettings);
   const industryProfile = branding?.industryProfile || 'industrial';
-  const profileConfig = getIndustryProfileConfig(industryProfile);
 
   const machineObj = (machines || []).find(m => m.id === currentTicket.machineId) || null;
+  const isVehicle = isVehicleAsset(machineObj, industryProfile);
+  const profileConfig = getIndustryProfileConfig(isVehicle ? 'fleet' : industryProfile);
   const geo = resolveMachineGeoLocation(
     machineObj || {
       regionId: currentTicket.regionId,
@@ -47,7 +48,6 @@ export default function TicketMainColumnHeader({
     currentTicket.fGasProtocol?.refrigerantChargeKg || machineObj?.refrigerantChargeKg
   );
   const ckobLabel = getCkobCategoryLabel(machineObj?.inspectionCategory);
-  const isVehicle = isVehicleAsset(machineObj, industryProfile);
   const counterUnit = getMachineCounterUnit(machineObj, industryProfile);
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machineObj) : null;
   const workMetrics = calculateWorkAndTravelMetrics(currentTicket, machineObj, regions);
@@ -234,7 +234,7 @@ export default function TicketMainColumnHeader({
         </div>
 
         {/* DEDYKOWANA SEKCJA BRANŻOWA NA KARCIE AWARII (INDUSTRIAL / FACILITY / HVAC) */}
-        {industryProfile === 'industrial' && (
+        {industryProfile === 'industrial' && !isVehicle && (
           <div
             data-testid="ticket-domain-industrial"
             className="mt-4 pt-4 border-t border-slate-200 bg-slate-50/80 rounded-xl p-4 border"
@@ -278,7 +278,7 @@ export default function TicketMainColumnHeader({
           </div>
         )}
 
-        {industryProfile === 'facility' && (
+        {industryProfile === 'facility' && !isVehicle && (
           <div
             data-testid="ticket-domain-facility"
             className="mt-4 pt-4 border-t border-amber-200 bg-amber-50/50 rounded-xl p-4 border"
@@ -318,7 +318,7 @@ export default function TicketMainColumnHeader({
           </div>
         )}
 
-        {industryProfile === 'hvac' && (
+        {industryProfile === 'hvac' && !isVehicle && (
           <div
             data-testid="ticket-domain-hvac"
             className="mt-4 pt-4 border-t border-cyan-200 bg-cyan-50/50 rounded-xl p-4 border"

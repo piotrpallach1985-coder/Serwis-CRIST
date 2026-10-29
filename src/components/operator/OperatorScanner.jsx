@@ -12,8 +12,10 @@ export default function OperatorScanner({
   onScanSuccess,
   machines: propMachines,
   isInternal = false,
+  allowPlateScan = false,
 }) {
   const { t } = useTranslation();
+  const canScanPlates = Boolean(isInternal || allowPlateScan);
   const storeMachines = useManagerStore(state => state.machines || []);
   const activeMachines = useMemo(() => {
     const list = Array.isArray(propMachines) && propMachines.length > 0 ? propMachines : storeMachines;
@@ -70,6 +72,12 @@ export default function OperatorScanner({
   const handleCapturePlateFromCamera = async () => {
     setErrorMsg(null);
     setOcrNotice(null);
+    if (!canScanPlates && activeMachines.length === 0) {
+      setOcrNotice(
+        'Sama tablica rejestracyjna nie wskazuje firmy. Przy pierwszym zgłoszeniu anonimowym zeskanuj dowolny kod QR lub tag NFC firmy (w pojeździe lub w bazie), aby połączyć telefon z firmą — kolejne skanowania tablic będą automatycznie przypisywane do tej firmy.'
+      );
+      return;
+    }
     const container = document.getElementById('qr-reader');
     const videoEl = container?.querySelector('video');
     if (!videoEl) {
@@ -92,6 +100,7 @@ export default function OperatorScanner({
       }
       if (result.plate) {
         setPlateQuery(result.plate);
+        setShowManualInput(true);
         const fallbackMatch = findMachineByIdentifierOrPlate(
           activeMachines,
           result.plate,
@@ -103,15 +112,12 @@ export default function OperatorScanner({
           return;
         }
         setOcrNotice(
-          `Rozpoznano tablicę "${result.plate}", ale nie znaleziono takiego pojazdu w bazie. Sprawdź lub zatwierdź ręcznie poniżej.`
-        );
-      } else if (result.error === 'UNSUPPORTED_BROWSER_OCR') {
-        setOcrNotice(
-          'Twoja przeglądarka nie wspiera bezpośredniego OCR wideo. Wpisz lub wybierz numer rejestracyjny pojazdu poniżej.'
+          `Rozpoznano tablicę "${result.plate}", ale nie znaleziono takiego pojazdu w bazie wybranej firmy. Sprawdź lub zatwierdź ręcznie poniżej.`
         );
       } else {
         setOcrNotice(
-          'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy lub wpisz numer ręcznie.'
+          result.error ||
+            'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy lub wpisz numer ręcznie.'
         );
       }
     } finally {
@@ -173,12 +179,9 @@ export default function OperatorScanner({
     }
   }, [isLiveScanning]);
 
-  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery (wyłącznie po zalogowaniu, gdy znany jest tenant i przeglądarka wspiera TextDetector)
+  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery (gdy znany jest tenant)
   useEffect(() => {
-    if (!isLiveScanning || !isInternal) return undefined;
-    if (typeof window === 'undefined' || typeof window.TextDetector !== 'function') {
-      return undefined;
-    }
+    if (!isLiveScanning || (!canScanPlates && activeMachines.length === 0)) return undefined;
     let active = true;
     const intervalId = setInterval(async () => {
       if (!active || autoAnprBusyRef.current) return;
@@ -206,13 +209,13 @@ export default function OperatorScanner({
       } finally {
         autoAnprBusyRef.current = false;
       }
-    }, 900);
+    }, 1200);
 
     return () => {
       active = false;
       clearInterval(intervalId);
     };
-  }, [isLiveScanning, activeMachines, onScanSuccess]);
+  }, [isLiveScanning, canScanPlates, activeMachines, onScanSuccess]);
 
   const startLiveScanner = () => {
     setIsLiveScanning(true);
@@ -312,33 +315,31 @@ export default function OperatorScanner({
               </button>
             </div>
             <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[280px]"></div>
-            {isInternal && (
-              <div className="mt-3 flex flex-col items-center gap-2">
-                <div
-                  data-testid="operator-auto-anpr-badge"
-                  className="w-full py-1.5 px-3 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (ANPR)</span>
-                </div>
-                <button
-                  type="button"
-                  data-testid="operator-capture-plate-btn"
-                  onClick={handleCapturePlateFromCamera}
-                  disabled={isRecognizingPlate}
-                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <i
-                    className={`ph ${
-                      isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-car-profile'
-                    } text-lg`}
-                  ></i>
-                  {isRecognizingPlate
-                    ? 'Odczytywanie tablicy rejestracyjnej...'
-                    : '📷 Wymuś odczyt tablicy rejestracyjnej z kadru (ANPR)'}
-                </button>
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <div
+                data-testid="operator-auto-anpr-badge"
+                className="w-full py-1.5 px-3 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (ANPR)</span>
               </div>
-            )}
+              <button
+                type="button"
+                data-testid="operator-capture-plate-btn"
+                onClick={handleCapturePlateFromCamera}
+                disabled={isRecognizingPlate}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <i
+                  className={`ph ${
+                    isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-car-profile'
+                  } text-lg`}
+                ></i>
+                {isRecognizingPlate
+                  ? 'Odczytywanie tablicy rejestracyjnej...'
+                  : '📷 Wymuś odczyt tablicy rejestracyjnej z kadru (ANPR)'}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-6 w-full">
@@ -353,7 +354,7 @@ export default function OperatorScanner({
               >
                 <i className="ph ph-qr-code text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
                 <span className="text-base sm:text-lg tracking-wide">
-                  {isInternal
+                  {canScanPlates
                     ? t('operator.scanQrOrPlateBtn', 'Skanuj QR / Tablicę')
                     : t('operator.scanQrBtn', 'Skanuj QR')}
                 </span>
@@ -452,8 +453,8 @@ export default function OperatorScanner({
           </div>
         )}
 
-        {/* ROZWIJANE WYSZUKIWANIE RĘCZNE PO TABLICY REJESTRACYJNEJ / VIN / NAZWIE — WYŁĄCZNIE PO ZALOGOWANIU (gdy znany jest tenant) */}
-        {isInternal && (
+        {/* ROZWIJANE WYSZUKIWANIE RĘCZNE PO TABLICY REJESTRACYJNEJ / VIN / NAZWIE — GDY ZNANY JEST TENANT (ZALOGOWANY LUB POWIĄZANY TELEFON) */}
+        {canScanPlates && (
           <div
             data-testid="operator-license-plate-section"
             className="mt-6 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden text-left"

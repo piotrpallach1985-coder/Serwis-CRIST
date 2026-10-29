@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { logAudit } from '../../services/audit.service';
+import { isVehicleAsset } from '../../utils/fieldServiceHelpers';
 
 export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isKm = machine?.counterUnit === 'km';
+  const isKm = machine?.counterUnit === 'km' || isVehicleAsset(machine);
   const unitLabel = isKm ? 'km' : 'RBG';
 
   if (!isOpen) return null;

@@ -29,8 +29,17 @@ export const saveOperatorQrKey = (tenantId, key) => {
   if (!tenantId || !key) return;
   try {
     localStorage.setItem(`${STORAGE_PREFIX}${tenantId}`, key);
+    localStorage.setItem('vexont_last_anon_tenant', tenantId);
   } catch (e) {
     console.warn('Could not save operator QR key:', e);
+  }
+};
+
+export const getLastAnonTenant = () => {
+  try {
+    return localStorage.getItem('vexont_last_anon_tenant') || null;
+  } catch {
+    return null;
   }
 };
 

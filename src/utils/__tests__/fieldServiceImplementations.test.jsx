@@ -1646,7 +1646,12 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       );
       expect(screen.getByTestId('machine-fleet-udt-status').textContent).toContain('2026-11-15');
       expect(screen.getByTestId('service-domain-fleet').textContent).toContain('GD 12345');
+      expect(screen.getByTestId('service-domain-fleet').textContent).toContain('149200 km');
       expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('GD 12345');
+      expect(screen.getByTestId('ticket-domain-fleet').textContent).toContain('149200 km');
+      // Pojazd nie może dublować karty przemysłowej (RBG) ani pokazywać jednocześnie RBG i km
+      expect(screen.queryByTestId('ticket-domain-industrial')).toBeNull();
+      expect(screen.queryByTestId('service-domain-industrial')).toBeNull();
 
       unmountCards();
     });
@@ -1691,9 +1696,12 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(ocrKnown.matchedMachine?.id).toBe('veh-master');
       expect(ocrKnown.plate).toBe('GD 12345');
 
-      const ocrGeneric = extractLicensePlateFromOcrText('AUTO SERWIS KR 4567C', fleetMachines);
+      const ocrGeneric = extractLicensePlateFromOcrText('AUTO SERWIS PL KR 4567C', fleetMachines);
       expect(ocrGeneric.plate).toBe('KR 4567C');
       expect(ocrGeneric.matchedMachine).toBeNull();
+
+      const ocrMerged = extractLicensePlateFromOcrText('PLGDA54321', []);
+      expect(ocrMerged.plate).toBe('GDA 54321');
 
       // 4) Rozpoznanie z ramki wideo przy użyciu detektora ANPR
       const fakeVideoEl = { videoWidth: 1280, videoHeight: 720 };

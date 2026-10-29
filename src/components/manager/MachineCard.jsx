@@ -59,8 +59,8 @@ export default function MachineCard({ machine, regions, onClick, onPrintQR, onSh
           </div>
           <div className="flex items-center gap-1"><i className="ph ph-door-open"></i> {t('machines.card.bay')}{machine.bay || '-'}</div>
           <div className="flex items-center gap-1">
-            <i className={`ph ${machine.counterUnit === 'km' ? 'ph-gauge' : 'ph-hourglass'}`}></i>{' '}
-            {machine.counterUnit === 'km'
+            <i className={`ph ${machine.counterUnit === 'km' || isVehicle ? 'ph-gauge' : 'ph-hourglass'}`}></i>{' '}
+            {machine.counterUnit === 'km' || isVehicle
               ? `Przebieg: ${machine.currentWorkHours || 0} km`
               : `${t('machines.card.rbg')}${machine.currentWorkHours || 0}`}
           </div>

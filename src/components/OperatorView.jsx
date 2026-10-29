@@ -19,6 +19,7 @@ import { ensureAnonSessionForTenant } from '../services/auth.service';
 import {
   parseQrPayload,
   saveOperatorQrKey,
+  getLastAnonTenant,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../services/qrAccess.service';
 import { findMachineByIdentifierOrPlate } from '../utils/fieldServiceHelpers';
@@ -34,7 +35,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
 
   useEffect(() => {
     const realParams = new URLSearchParams(window.location.search);
-    const tParam = realParams.get('tenant');
+    const tParam = realParams.get('tenant') || getLastAnonTenant();
     if (tParam) {
       useManagerStore.getState().setTenantId(tParam);
     }
@@ -405,7 +406,13 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           </div>
         )}
 
-        {step === 'scan' && <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} />}
+        {step === 'scan' && (
+          <OperatorScanner
+            onScanSuccess={handleScanSuccess}
+            machines={machines}
+            allowPlateScan={!needsQr && machines.length > 0}
+          />
+        )}
 
         {step === 'form' && !selectedMachine && needsQr && (
           <div className="bg-white p-8 rounded-lg shadow-sm border border-amber-200 text-center flex flex-col items-center justify-center">
