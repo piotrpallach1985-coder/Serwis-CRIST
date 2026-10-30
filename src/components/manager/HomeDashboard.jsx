@@ -62,7 +62,9 @@ export default function HomeDashboard({ onLogout }) {
     );
 
     if (!targetMachine) {
-      alert('Nie znaleziono zeskanowanej maszyny w bazie tej firmy.');
+      alert(
+        `Nie znaleziono zeskanowanej maszyny / pojazdu (${resolvedMachineId}) w bazie tej firmy. Upewnij się, że pojazd ma przypisany ten numer rejestracyjny w zakładce Flota / Urządzenia.`
+      );
       return;
     }
 

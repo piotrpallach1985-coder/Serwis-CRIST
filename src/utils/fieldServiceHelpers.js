@@ -1493,15 +1493,71 @@ export function normalizeLicensePlate(raw) {
 }
 
 /**
- * Zamienia znaki często mylone przez OCR (O<->0, I<->1, S<->5, B<->8, Z<->2) do porównania rozmytego z bazą pojazdów.
+ * Zamienia znaki często mylone przez OCR (O<->0, I<->1, S<->5, B<->8, Z<->2, Y<->V) do porównania rozmytego z bazą pojazdów.
  */
 function normalizeOcrPlateFuzzy(raw) {
   return normalizeLicensePlate(raw)
     .replace(/O/g, '0')
     .replace(/I/g, '1')
+    .replace(/L/g, '1')
     .replace(/S/g, '5')
     .replace(/B/g, '8')
-    .replace(/Z/g, '2');
+    .replace(/Z/g, '2')
+    .replace(/Y/g, 'V');
+}
+
+function getMachinePlateStrings(m) {
+  if (!m || m.isDeleted) return [];
+  const list = [];
+  if (m.licensePlate && String(m.licensePlate).trim()) {
+    list.push(String(m.licensePlate).trim().toUpperCase());
+  }
+  if (m.internalId && String(m.internalId).trim()) {
+    list.push(String(m.internalId).trim().toUpperCase());
+  }
+  if (m.name && String(m.name).trim()) {
+    const nameUpper = String(m.name).trim().toUpperCase();
+    const matchInName = nameUpper.match(/\b([A-Z]{2,3})[\s-]?([0-9A-Z]{4,5})\b/);
+    if (matchInName && /\d/.test(matchInName[2])) {
+      list.push(`${matchInName[1]} ${matchInName[2]}`);
+    }
+  }
+  return list;
+}
+
+function levenshteinDistance(a = '', b = '') {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Sprawdza czy w ciągu OCR występuje podciąg o odległości edycyjnej Levenshteina <= maxDist (obsługuje też wtrącenie znaku z nalepki legalizacyjnej między wyróżnikiem a numerem, np. GD13V975 vs GD3V975).
+ */
+function hasApproximateOcrMatch(haystack = '', needle = '', maxDist = 1) {
+  if (!haystack || !needle || needle.length < 5) return false;
+  if (haystack.includes(needle)) return true;
+  const minW = Math.max(4, needle.length - maxDist);
+  const maxW = needle.length + maxDist;
+  for (let w = minW; w <= maxW; w++) {
+    if (haystack.length < w) continue;
+    for (let i = 0; i <= haystack.length - w; i++) {
+      const sub = haystack.slice(i, i + w);
+      if (levenshteinDistance(sub, needle) <= maxDist) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1522,8 +1578,9 @@ export function findMachineByIdentifierOrPlate(machines = [], rawQuery = '', raw
     if (m.id === queryStr) return true;
     if (m.qrCode && (m.qrCode === queryStr || m.qrCode === origStr)) return true;
     if (m.internalId && m.internalId.toLowerCase() === queryLower) return true;
-    if (m.licensePlate && normPlateQuery.length >= 3) {
-      if (normalizeLicensePlate(m.licensePlate) === normPlateQuery) return true;
+    if (normPlateQuery.length >= 3) {
+      const candidates = getMachinePlateStrings(m);
+      if (candidates.some(c => normalizeLicensePlate(c) === normPlateQuery)) return true;
     }
     if (m.vinNumber && normPlateQuery.length >= 6) {
       if (normalizeLicensePlate(m.vinNumber) === normPlateQuery) return true;
@@ -1533,12 +1590,21 @@ export function findMachineByIdentifierOrPlate(machines = [], rawQuery = '', raw
 
   if (exactMatch) return exactMatch;
 
-  // 2. Dopasowanie rozmyte OCR dla tablic rejestracyjnych (np. GD1234S -> GD 12345)
+  // 2. Dopasowanie rozmyte OCR dla tablic rejestracyjnych (np. GD1234S -> GD 12345 oraz z pominięciem nalepki legalizacyjnej np. GD13V975 -> GD 3V975)
   if (normPlateQuery.length >= 4) {
     const fuzzyQuery = normalizeOcrPlateFuzzy(normPlateQuery);
     const fuzzyMatch = machines.find(m => {
-      if (!m || m.isDeleted || !m.licensePlate) return false;
-      return normalizeOcrPlateFuzzy(m.licensePlate) === fuzzyQuery;
+      if (!m || m.isDeleted) return false;
+      const candidates = getMachinePlateStrings(m);
+      return candidates.some(c => {
+        const cFuzzy = normalizeOcrPlateFuzzy(c);
+        if (!cFuzzy) return false;
+        if (cFuzzy === fuzzyQuery) return true;
+        if (cFuzzy.length >= 6 && fuzzyQuery.length >= 6 && levenshteinDistance(cFuzzy, fuzzyQuery) <= 1) {
+          return true;
+        }
+        return false;
+      });
     });
     if (fuzzyMatch) return fuzzyMatch;
   }
@@ -1546,23 +1612,39 @@ export function findMachineByIdentifierOrPlate(machines = [], rawQuery = '', raw
   return null;
 }
 
+const IGNORED_VEHICLE_OCR_WORDS = new Set([
+  'PLICHTA',
+  'TIGUAN',
+  '4MOTION',
+  'MOTION',
+  'VOLKSWAGEN',
+  'PASSAT',
+  'CADDY',
+  'CRAFTER',
+  'TRANSPORTER',
+  'RENAULT',
+  'MASTER',
+  'TRAFIC',
+  'TRANSIT',
+  'SPRINTER',
+  'DUCATO',
+  'OCTAVIA',
+  'SUPERB',
+  'FABIA',
+  'TOYOTA',
+  'SERWIS',
+  'POLSKA',
+]);
+
 /**
- * Sprawdza czy w ciągu OCR występuje podciąg różniący się co najwyżej o 1 znak od wzorca tablicy (min. 6 znaków).
+ * Usuwa z odczytu OCR pojedynczy znak nalepki legalizacyjnej pomiędzy 2-literowym wyróżnikiem a 5-znakowym numerem (np. "GD13V975" -> "GD 3V975").
  */
-function hasSingleCharOcrMatch(haystack = '', needle = '') {
-  if (!haystack || !needle || needle.length < 6 || haystack.length < needle.length) return false;
-  const len = needle.length;
-  for (let i = 0; i <= haystack.length - len; i++) {
-    let diffs = 0;
-    for (let j = 0; j < len; j++) {
-      if (haystack[i + j] !== needle[j]) {
-        diffs++;
-        if (diffs > 1) break;
-      }
-    }
-    if (diffs <= 1) return true;
+function stripPolishStickerChar(prefix = '', suffix = '') {
+  if (/^[A-Z]{2}$/.test(prefix) && suffix.length === 6 && /^[01IO8BSZ][0-9A-Z]{5}$/.test(suffix)) {
+    const trimmedSuffix = suffix.slice(1);
+    if (/\d/.test(trimmedSuffix)) return `${prefix} ${trimmedSuffix}`;
   }
-  return false;
+  return `${prefix} ${suffix}`;
 }
 
 /**
@@ -1575,37 +1657,65 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
     .replace(/[^A-Z0-9\s-]/g, ' ')
     .replace(/-/g, ' ')
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(tok => Boolean(tok) && !IGNORED_VEHICLE_OCR_WORDS.has(tok));
 
-  const fullNormalized = normalizeLicensePlate(rawText);
-  const fullFuzzy = normalizeOcrPlateFuzzy(rawText);
+  const fullNormalized = normalizeLicensePlate(cleanedTokens.join(' '));
+  const fullFuzzy = normalizeOcrPlateFuzzy(cleanedTokens.join(' '));
 
   // 1. Sprawdź czy w tekście z kamery znajduje się tablica któregokolwiek pojazdu z bazy firmy
   if (Array.isArray(machines) && machines.length > 0 && fullNormalized.length >= 4) {
+    // 1a. Dokładny podciąg znormalizowany
     for (const m of machines) {
-      if (!m || m.isDeleted || !m.licensePlate) continue;
-      const mNorm = normalizeLicensePlate(m.licensePlate);
-      if (mNorm.length >= 4 && fullNormalized.includes(mNorm)) {
-        return { plate: m.licensePlate, matchedMachine: m };
+      const candidates = getMachinePlateStrings(m);
+      for (const c of candidates) {
+        const mNorm = normalizeLicensePlate(c);
+        if (mNorm.length >= 4 && fullNormalized.includes(mNorm)) {
+          return { plate: m.licensePlate || c, matchedMachine: m };
+        }
       }
     }
+    // 1b. Podciąg po korekcie typowych pomyłek OCR (O/0, I/1, S/5, B/8, Z/2, Y/V)
     for (const m of machines) {
-      if (!m || m.isDeleted || !m.licensePlate) continue;
-      const mFuzzy = normalizeOcrPlateFuzzy(m.licensePlate);
-      if (mFuzzy.length >= 4 && fullFuzzy.includes(mFuzzy)) {
-        return { plate: m.licensePlate, matchedMachine: m };
+      const candidates = getMachinePlateStrings(m);
+      for (const c of candidates) {
+        const mFuzzy = normalizeOcrPlateFuzzy(c);
+        if (mFuzzy.length >= 4 && fullFuzzy.includes(mFuzzy)) {
+          return { plate: m.licensePlate || c, matchedMachine: m };
+        }
       }
     }
+    // 1c. Odległość edycyjna Levenshteina <= 1 (uwzględnia m.in. odczytanie nalepki legalizacyjnej między GD a 3V975 jako dodatkowego znaku!)
     for (const m of machines) {
-      if (!m || m.isDeleted || !m.licensePlate) continue;
-      const mFuzzy = normalizeOcrPlateFuzzy(m.licensePlate);
-      if (mFuzzy.length >= 6 && hasSingleCharOcrMatch(fullFuzzy, mFuzzy)) {
-        return { plate: m.licensePlate, matchedMachine: m };
+      const candidates = getMachinePlateStrings(m);
+      for (const c of candidates) {
+        const mFuzzy = normalizeOcrPlateFuzzy(c);
+        if (mFuzzy.length >= 6 && hasApproximateOcrMatch(fullFuzzy, mFuzzy, 1)) {
+          return { plate: m.licensePlate || c, matchedMachine: m };
+        }
       }
+    }
+    // 1d. Dopasowanie po unikalnym 4-5 znakowym członie numeru rejestracyjnego (np. "3V975" z "GD 3V975"), gdy euroband/wyróżnik był zasłonięty lub przekłamany
+    const suffixMatches = [];
+    for (const m of machines) {
+      const candidates = getMachinePlateStrings(m);
+      for (const c of candidates) {
+        const mNorm = normalizeLicensePlate(c);
+        const suffixMatch = mNorm.match(/^[A-Z]{2,3}([A-Z0-9]{4,5})$/);
+        if (suffixMatch && /\d/.test(suffixMatch[1])) {
+          const sFuzzy = normalizeOcrPlateFuzzy(suffixMatch[1]);
+          if (sFuzzy.length >= 4 && fullFuzzy.includes(sFuzzy)) {
+            suffixMatches.push({ machine: m, plate: m.licensePlate || c });
+            break;
+          }
+        }
+      }
+    }
+    if (suffixMatches.length === 1) {
+      return { plate: suffixMatches[0].plate, matchedMachine: suffixMatches[0].machine };
     }
   }
 
-  // 2. Wyodrębnienie wzorca tablicy rejestracyjnej PL / UE z tokenów (obsługuje również "PL GD 12345" oraz złączone "GD12345")
+  // 2. Wyodrębnienie wzorca tablicy rejestracyjnej PL / UE z tokenów (obsługuje również "PL GD 3V975", nalepkę legalizacyjną oraz złączone "GD3V975")
   const tokens = cleanedTokens.filter((tok, idx) => {
     if ((tok === 'PL' || tok === 'EU') && idx + 1 < cleanedTokens.length && /^[A-Z]{1,3}$/.test(cleanedTokens[idx + 1])) {
       return false;
@@ -1613,7 +1723,19 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
     return true;
   });
 
-  // 2a. Pary sąsiednich tokenów: np. ["GD", "12345"], ["WE", "9876A"], ["KR", "4567C"]
+  // 2a. Trójki tokenów, gdzie środkowy 1-znakowy token to nalepka legalizacyjna (np. ["GD", "1", "3V975"])
+  for (let i = 0; i < tokens.length - 2; i++) {
+    const t1 = tokens[i];
+    const t2 = tokens[i + 1];
+    const t3 = tokens[i + 2];
+    if (/^[A-Z]{2,3}$/.test(t1) && /^[A-Z0-9]$/.test(t2) && /^[A-Z0-9]{4,5}$/.test(t3) && /\d/.test(t3)) {
+      const candidatePlate = `${t1} ${t3}`;
+      const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+      return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
+    }
+  }
+
+  // 2b. Pary sąsiednich tokenów: np. ["GD", "3V975"], ["GD", "13V975"], ["WE", "9876A"], ["KR", "4567C"]
   for (let i = 0; i < tokens.length - 1; i++) {
     const prefix = tokens[i];
     const suffix = tokens[i + 1];
@@ -1624,13 +1746,13 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
       prefix.length + suffix.length >= 4 &&
       prefix.length + suffix.length <= 9
     ) {
-      const candidatePlate = `${prefix} ${suffix}`;
+      const candidatePlate = stripPolishStickerChar(prefix, suffix);
       const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
       return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
     }
   }
 
-  // 2b. Trójki tokenów rozdzielone przez szeroki kerning na tablicy: np. ["GD", "12", "345"] lub ["G", "D", "12345"]
+  // 2c. Trójki tokenów rozdzielone przez szeroki kerning na tablicy: np. ["GD", "3V", "975"] lub ["G", "D", "3V975"]
   for (let i = 0; i < tokens.length - 2; i++) {
     const t1 = tokens[i];
     const t2 = tokens[i + 1];
@@ -1643,7 +1765,7 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
         t1.length + combinedSuffix.length >= 4 &&
         t1.length + combinedSuffix.length <= 9
       ) {
-        const candidatePlate = `${t1} ${combinedSuffix}`;
+        const candidatePlate = stripPolishStickerChar(t1, combinedSuffix);
         const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
         return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
       }
@@ -1655,25 +1777,32 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
         combinedPrefix.length + t3.length >= 4 &&
         combinedPrefix.length + t3.length <= 9
       ) {
-        const candidatePlate = `${combinedPrefix} ${t3}`;
+        const candidatePlate = stripPolishStickerChar(combinedPrefix, t3);
         const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
         return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
       }
     }
   }
 
-  // 2c. Pojedynczy złączony token bez spacji: np. "GD12345", "PLGD12345", "WE9876A", "GDA45678"
+  // 2d. Pojedynczy złączony token bez spacji: np. "GD3V975", "GD13V975", "PLGD3V975", "WE9876A"
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i];
-    if (tok.startsWith('PL') && tok.length >= 6 && /^PL[A-Z]{2,3}\d/.test(tok)) {
+    if (tok.startsWith('PL') && tok.length >= 6 && /^PL[A-Z]{2,3}[0-9A-Z]/.test(tok)) {
       tok = tok.slice(2);
+    }
+    // Obsługa 2-literowego wyróżnika + 1 znak nalepki + 5 znaków (np. GD13V975 -> GD 3V975)
+    const stickerMerged = tok.match(/^([A-Z]{2})[01IO8BSZ](\d[A-Z0-9]{4})$/);
+    if (stickerMerged) {
+      const candidatePlate = `${stickerMerged[1]} ${stickerMerged[2]}`;
+      const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
+      return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
     }
     const mergedMatch = tok.match(/^([A-Z]{1,3})(\d[A-Z0-9]{2,5})$/) || tok.match(/^([A-Z]{2,3})([A-Z0-9]{3,5})$/);
     if (mergedMatch) {
       const prefix = mergedMatch[1];
       const suffix = mergedMatch[2];
       if (/\d/.test(suffix) && prefix.length + suffix.length >= 4 && prefix.length + suffix.length <= 9) {
-        const candidatePlate = `${prefix} ${suffix}`;
+        const candidatePlate = stripPolishStickerChar(prefix, suffix);
         const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
         return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
       }

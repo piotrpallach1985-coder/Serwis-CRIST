@@ -193,9 +193,21 @@ export default function OperatorScanner({
             result.matchedMachine.licensePlate || result.plate
           );
         } else if (result.plate) {
-          setPlateQuery(result.plate);
-          stopLiveScanner();
-          onScanSuccess(result.plate, result.plate);
+          const fallbackMatch = findMachineByIdentifierOrPlate(
+            activeMachines,
+            result.plate,
+            result.plate
+          );
+          if (fallbackMatch) {
+            stopLiveScanner();
+            onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || result.plate);
+          } else {
+            setPlateQuery(result.plate);
+            setShowManualInput(true);
+            setOcrNotice(
+              `Wykryto tablicę "${result.plate}" — brak pojazdu o tym numerze w bazie firmy. Skieruj kamerę dokładniej na tablicę lub zatwierdź numer poniżej.`
+            );
+          }
         }
       } catch {
         // ignore background frame OCR errors

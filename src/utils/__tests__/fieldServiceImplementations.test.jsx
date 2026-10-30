@@ -1703,6 +1703,21 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const ocrMerged = extractLicensePlateFromOcrText('PLGDA54321', []);
       expect(ocrMerged.plate).toBe('GDA 54321');
 
+      // 3b) Obsługa polskiej nalepki legalizacyjnej pomiędzy wyróżnikiem a numerem (np. GD [nalepka] 3V975 + napisy z ramki PLICHTA TIGUAN)
+      const tiguanList = [
+        ...fleetMachines,
+        { id: 'veh-tiguan', name: 'VW Tiguan', assetCategory: 'vehicle', licensePlate: 'GD 3V975' },
+      ];
+      const ocrStickerMerged = extractLicensePlateFromOcrText(
+        'PL GD13V975 PLICHTA TIGUAN 4MOTION',
+        tiguanList
+      );
+      expect(ocrStickerMerged.matchedMachine?.id).toBe('veh-tiguan');
+      expect(ocrStickerMerged.plate).toBe('GD 3V975');
+
+      const ocrStickerSplit = extractLicensePlateFromOcrText('PL GD I 3V975 PLICHTA', []);
+      expect(ocrStickerSplit.plate).toBe('GD 3V975');
+
       // 4) Rozpoznanie z ramki wideo przy użyciu detektora ANPR
       const fakeVideoEl = { videoWidth: 1280, videoHeight: 720 };
       const fakeDetector = {

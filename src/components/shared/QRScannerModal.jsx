@@ -81,8 +81,16 @@ export default function QRScannerModal({
             res.matchedMachine.licensePlate || res.matchedMachine.id
           );
         } else if (res.plate) {
-          setPlateQuery(res.plate);
-          onScanSuccess(res.plate, res.plate);
+          const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
+          if (fallbackMatch) {
+            onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
+          } else {
+            setPlateQuery(res.plate);
+            setShowManualInput(true);
+            setOcrStatusMsg(
+              `Wykryto tablicę "${res.plate}", której nie ma jeszcze w bazie pojazdów tej firmy. Skieruj aparat dokładniej na tablicę lub wybierz pojazd poniżej.`
+            );
+          }
         }
       } catch {
         // ignore frame OCR errors in background loop
@@ -301,10 +309,19 @@ export default function QRScannerModal({
         return;
       }
       if (res.plate) {
+        const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
+        if (fallbackMatch) {
+          onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
+          return;
+        }
         setPlateQuery(res.plate);
-        onScanSuccess(res.plate, res.plate);
+        setShowManualInput(true);
+        setOcrStatusMsg(
+          `Rozpoznano tablicę "${res.plate}", ale nie znaleziono takiego pojazdu w bazie tej firmy. Sprawdź numer poniżej lub wybierz pojazd z listy.`
+        );
         return;
       }
+      setShowManualInput(true);
       setOcrStatusMsg(
         res.error ||
           'Nie wykryto tablicy w kadrze — przybliż aparat do tablicy rejestracyjnej lub wpisz numer poniżej.'
