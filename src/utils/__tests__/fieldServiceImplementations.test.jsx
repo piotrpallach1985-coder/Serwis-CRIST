@@ -1718,6 +1718,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const ocrStickerSplit = extractLicensePlateFromOcrText('PL GD I 3V975 PLICHTA', []);
       expect(ocrStickerSplit.plate).toBe('GD 3V975');
 
+      const ocrNoise = extractLicensePlateFromOcrText(
+        'EE\nJ - 7 4\n\n1 1 RL L\nJT 1\n\n4 1 3 IA SESE',
+        tiguanList
+      );
+      expect(ocrNoise.plate).toBe('');
+      expect(ocrNoise.matchedMachine).toBeNull();
+
       // 4) Rozpoznanie z ramki wideo przy użyciu detektora ANPR
       const fakeVideoEl = { videoWidth: 1280, videoHeight: 720 };
       const fakeDetector = {

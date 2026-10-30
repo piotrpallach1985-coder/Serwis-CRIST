@@ -50,6 +50,24 @@ export const initPWAInstallListener = () => {
       mq.addEventListener('change', notifyListeners);
     }
   }
+
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+      navigator.serviceWorker.getRegistrations?.().then(regs => {
+        regs?.forEach(reg => {
+          try {
+            reg.update();
+          } catch {}
+        });
+      });
+    } catch {}
+  }
 };
 
 // Auto-initialize on module load in browser environment

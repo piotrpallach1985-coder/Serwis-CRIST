@@ -184,7 +184,9 @@ export default function OperatorScanner({
 
       autoAnprBusyRef.current = true;
       try {
-        const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines);
+        const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines, null, {
+          isBackground: true,
+        });
         if (!active) return;
         if (result.matchedMachine) {
           stopLiveScanner();

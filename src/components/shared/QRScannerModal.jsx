@@ -73,7 +73,9 @@ export default function QRScannerModal({
 
       autoAnprBusyRef.current = true;
       try {
-        const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines);
+        const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines, null, {
+          isBackground: true,
+        });
         if (!active) return;
         if (res.matchedMachine) {
           onScanSuccess(

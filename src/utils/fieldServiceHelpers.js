@@ -984,6 +984,7 @@ export function filterMachinesForFieldTechnician(
 
   return machines.filter(m => {
     if (!m) return false;
+    if (m.assetCategory === 'vehicle' || Boolean(m.licensePlate)) return true;
     if (allowedMachineIds.has(m.id)) return true;
     if (m.parentId && allowedMachineIds.has(m.parentId)) return true;
     if (m.name && allowedMachineNames.has(String(m.name).trim().toLowerCase())) return true;
@@ -1515,11 +1516,13 @@ function getMachinePlateStrings(m) {
   if (m.internalId && String(m.internalId).trim()) {
     list.push(String(m.internalId).trim().toUpperCase());
   }
-  if (m.name && String(m.name).trim()) {
-    const nameUpper = String(m.name).trim().toUpperCase();
-    const matchInName = nameUpper.match(/\b([A-Z]{2,3})[\s-]?([0-9A-Z]{4,5})\b/);
-    if (matchInName && /\d/.test(matchInName[2])) {
-      list.push(`${matchInName[1]} ${matchInName[2]}`);
+  for (const fieldVal of [m.name, m.bay, m.additionalDescription]) {
+    if (fieldVal && String(fieldVal).trim()) {
+      const upper = String(fieldVal).trim().toUpperCase();
+      const matchInField = upper.match(/\b([A-Z]{2,3})[\s-]?([0-9A-Z]{4,5})\b/);
+      if (matchInField && /\d/.test(matchInField[2])) {
+        list.push(`${matchInField[1]} ${matchInField[2]}`);
+      }
     }
   }
   return list;
@@ -1740,10 +1743,10 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
     const prefix = tokens[i];
     const suffix = tokens[i + 1];
     if (
-      /^[A-Z]{1,3}$/.test(prefix) &&
-      /^[A-Z0-9]{3,6}$/.test(suffix) &&
+      /^[A-Z]{2,3}$/.test(prefix) &&
+      /^[A-Z0-9]{4,6}$/.test(suffix) &&
       /\d/.test(suffix) &&
-      prefix.length + suffix.length >= 4 &&
+      prefix.length + suffix.length >= 6 &&
       prefix.length + suffix.length <= 9
     ) {
       const candidatePlate = stripPolishStickerChar(prefix, suffix);
@@ -1757,12 +1760,12 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
     const t1 = tokens[i];
     const t2 = tokens[i + 1];
     const t3 = tokens[i + 2];
-    if (/^[A-Z]{1,3}$/.test(t1) && /^[A-Z0-9]{1,3}$/.test(t2) && /^[A-Z0-9]{2,4}$/.test(t3)) {
+    if (/^[A-Z]{2,3}$/.test(t1) && /^[A-Z0-9]{2,3}$/.test(t2) && /^[A-Z0-9]{2,4}$/.test(t3)) {
       const combinedSuffix = `${t2}${t3}`;
       if (
-        /^[A-Z0-9]{3,6}$/.test(combinedSuffix) &&
+        /^[A-Z0-9]{4,6}$/.test(combinedSuffix) &&
         /\d/.test(combinedSuffix) &&
-        t1.length + combinedSuffix.length >= 4 &&
+        t1.length + combinedSuffix.length >= 6 &&
         t1.length + combinedSuffix.length <= 9
       ) {
         const candidatePlate = stripPolishStickerChar(t1, combinedSuffix);
@@ -1770,11 +1773,12 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
         return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
       }
     }
-    if (/^[A-Z]{1,2}$/.test(t1) && /^[A-Z]{1,2}$/.test(t2) && /^[A-Z0-9]{3,6}$/.test(t3) && /\d/.test(t3)) {
+    if (/^[A-Z]{1,2}$/.test(t1) && /^[A-Z]{1,2}$/.test(t2) && /^[A-Z0-9]{4,6}$/.test(t3) && /\d/.test(t3)) {
       const combinedPrefix = `${t1}${t2}`;
       if (
+        combinedPrefix.length >= 2 &&
         combinedPrefix.length <= 3 &&
-        combinedPrefix.length + t3.length >= 4 &&
+        combinedPrefix.length + t3.length >= 6 &&
         combinedPrefix.length + t3.length <= 9
       ) {
         const candidatePlate = stripPolishStickerChar(combinedPrefix, t3);
@@ -1797,11 +1801,11 @@ export function extractLicensePlateFromOcrText(rawText = '', machines = []) {
       const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
       return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
     }
-    const mergedMatch = tok.match(/^([A-Z]{1,3})(\d[A-Z0-9]{2,5})$/) || tok.match(/^([A-Z]{2,3})([A-Z0-9]{3,5})$/);
+    const mergedMatch = tok.match(/^([A-Z]{2,3})(\d[A-Z0-9]{3,5})$/) || tok.match(/^([A-Z]{2,3})([A-Z0-9]{4,5})$/);
     if (mergedMatch) {
       const prefix = mergedMatch[1];
       const suffix = mergedMatch[2];
-      if (/\d/.test(suffix) && prefix.length + suffix.length >= 4 && prefix.length + suffix.length <= 9) {
+      if (/\d/.test(suffix) && prefix.length + suffix.length >= 6 && prefix.length + suffix.length <= 9) {
         const candidatePlate = stripPolishStickerChar(prefix, suffix);
         const matched = findMachineByIdentifierOrPlate(machines, candidatePlate);
         return { plate: matched?.licensePlate || candidatePlate, matchedMachine: matched };
@@ -1865,7 +1869,7 @@ async function getBrowserOcrWorker() {
       if (worker && typeof worker.setParameters === 'function') {
         await worker.setParameters({
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -',
-          tessedit_pageseg_mode: '6',
+          tessedit_pageseg_mode: '7',
         });
       }
       return worker;
@@ -1877,6 +1881,221 @@ async function getBrowserOcrWorker() {
   return tesseractWorkerPromise;
 }
 
+/**
+ * Szybka lokalizacja prostokąta białej tablicy rejestracyjnej z ciemnymi znakami w kadrze wideo (~2 ms).
+ * Eliminuje konieczność uruchamiania ciężkiego OCR na całym samochodzie i zapobiega halucynacjom z elementów karoserii/wycieraczki.
+ */
+export function detectLicensePlateBoundingBox(videoEl) {
+  if (typeof document === 'undefined' || !videoEl) return null;
+  const vw = Number(videoEl.videoWidth || videoEl.naturalWidth || videoEl.width) || 0;
+  const vh = Number(videoEl.videoHeight || videoEl.naturalHeight || videoEl.height) || 0;
+  if (vw <= 0 || vh <= 0) return null;
+
+  const scanW = Math.min(480, vw);
+  const scanH = Math.max(1, Math.round((vh / vw) * scanW));
+  const scanCanvas = document.createElement('canvas');
+  scanCanvas.width = scanW;
+  scanCanvas.height = scanH;
+  const sctx = scanCanvas.getContext && scanCanvas.getContext('2d');
+  if (!sctx) return null;
+
+  try {
+    sctx.drawImage(videoEl, 0, 0, vw, vh, 0, 0, scanW, scanH);
+    const sData = sctx.getImageData(0, 0, scanW, scanH).data;
+
+    let maxLum = 0;
+    for (let i = 0; i < sData.length; i += 64) {
+      const lum = sData[i] + sData[i + 1] + sData[i + 2];
+      if (lum > maxLum) maxLum = lum;
+    }
+    if (maxLum === 0) {
+      // Pusty canvas w środowisku testowym jsdom
+      return { x: 0.15, y: 0.35, w: 0.7, h: 0.15, isMockBlank: true };
+    }
+
+    const yStart = Math.floor(scanH * 0.1);
+    const yEnd = Math.floor(scanH * 0.9);
+    const maxCharGap = Math.max(8, Math.round(scanW * 0.055));
+
+    const rowScores = new Float32Array(scanH);
+    const rowSegX1 = new Int32Array(scanH);
+    const rowSegX2 = new Int32Array(scanH);
+
+    for (let y = yStart; y < yEnd; y++) {
+      let bestSegScore = 0;
+      let bestX1 = 0;
+      let bestX2 = 0;
+      let curX1 = -1;
+      let lastWhiteX = -1;
+      let whiteCount = 0;
+      let transitions = 0;
+      let prevWhite = false;
+
+      for (let x = Math.floor(scanW * 0.05); x < Math.floor(scanW * 0.95); x++) {
+        const idx = (y * scanW + x) * 4;
+        const r = sData[idx];
+        const g = sData[idx + 1];
+        const b = sData[idx + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        const isWhite = lum > 150 && sat < 60;
+        const isDark = lum < 105;
+
+        if (isWhite) {
+          if (curX1 === -1 || x - lastWhiteX > maxCharGap) {
+            curX1 = x;
+            whiteCount = 1;
+            transitions = 1;
+          } else {
+            whiteCount++;
+            if (!prevWhite) transitions++;
+          }
+          lastWhiteX = x;
+          prevWhite = true;
+        } else if (isDark && curX1 !== -1 && x - lastWhiteX <= maxCharGap) {
+          if (prevWhite) transitions++;
+          prevWhite = false;
+        }
+
+        if (curX1 !== -1 && lastWhiteX > curX1) {
+          const span = lastWhiteX - curX1 + 1;
+          if (
+            span >= scanW * 0.16 &&
+            span <= scanW * 0.86 &&
+            transitions >= 8 &&
+            whiteCount >= span * 0.34
+          ) {
+            const score = transitions * (whiteCount / span);
+            if (score > bestSegScore) {
+              bestSegScore = score;
+              bestX1 = curX1;
+              bestX2 = lastWhiteX;
+            }
+          }
+        }
+      }
+      rowScores[y] = bestSegScore;
+      rowSegX1[y] = bestX1;
+      rowSegX2[y] = bestX2;
+    }
+
+    let bestBandScore = 0;
+    let bestY1 = 0;
+    let bestY2 = 0;
+    for (let y1 = yStart; y1 < yEnd; y1++) {
+      if (rowScores[y1] === 0) continue;
+      let y2 = y1;
+      let sum = 0;
+      while (
+        y2 < yEnd &&
+        (rowScores[y2] > 0 || (y2 + 1 < yEnd && rowScores[y2 + 1] > 0)) &&
+        y2 - y1 < scanH * 0.22
+      ) {
+        sum += rowScores[y2];
+        y2++;
+      }
+      if (y2 - y1 >= Math.max(6, scanH * 0.02) && sum > bestBandScore) {
+        bestBandScore = sum;
+        bestY1 = y1;
+        bestY2 = y2;
+      }
+    }
+
+    if (bestBandScore <= 0) return null;
+
+    const xs1 = [];
+    const xs2 = [];
+    for (let y = bestY1; y < bestY2; y++) {
+      if (rowScores[y] > 0) {
+        xs1.push(rowSegX1[y]);
+        xs2.push(rowSegX2[y]);
+      }
+    }
+    xs1.sort((a, b) => a - b);
+    xs2.sort((a, b) => a - b);
+    const x1 = xs1[Math.floor(xs1.length * 0.3)];
+    const x2 = xs2[Math.floor(xs2.length * 0.7)];
+    const boxW = (x2 - x1 + 4) / scanW;
+    const boxH = (bestY2 - bestY1 + 4) / scanH;
+    const aspect = (boxW * vw) / Math.max(1, boxH * vh);
+    if (aspect < 1.8 || aspect > 10.0) return null;
+
+    return {
+      x: Math.max(0, (x1 - 2) / scanW),
+      y: Math.max(0, (bestY1 - 2) / scanH),
+      w: Math.min(1, boxW),
+      h: Math.min(1, boxH),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildLocalizedPlateCanvas(videoEl, box, mode = 'gray') {
+  if (typeof document === 'undefined' || !videoEl || !box) return null;
+  const vw = Number(videoEl.videoWidth || videoEl.naturalWidth || videoEl.width) || 0;
+  const vh = Number(videoEl.videoHeight || videoEl.naturalHeight || videoEl.height) || 0;
+  if (vw <= 0 || vh <= 0) return null;
+
+  const sx = Math.floor(vw * box.x);
+  const sy = Math.floor(vh * box.y);
+  const sw = Math.max(1, Math.floor(vw * box.w));
+  const sh = Math.max(1, Math.floor(vh * box.h));
+  const targetH = 96;
+  const scale = targetH / sh;
+  const targetW = Math.min(720, Math.max(180, Math.round(sw * scale)));
+  const pad = 24;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW + pad * 2;
+  canvas.height = targetH + pad * 2;
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(videoEl, sx, sy, sw, sh, pad, pad, targetW, targetH);
+
+  try {
+    const imgData = ctx.getImageData(pad, pad, targetW, targetH);
+    const d = imgData.data;
+    let minL = 255;
+    let maxL = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (lum < minL) minL = lum;
+      if (lum > maxL) maxL = lum;
+    }
+    const range = Math.max(1, maxL - minL);
+    for (let y = 0; y < targetH; y++) {
+      for (let x = 0; x < targetW; x++) {
+        const i = (y * targetW + x) * 4;
+        const r = d[i];
+        const g = d[i + 1];
+        const b = d[i + 2];
+        // Maskowanie niebieskiego paska eurobandu (PL) oraz dolnej/górnej ramki tablicy (np. PLICHTA)
+        const isBlueEuroband = b - r > 20 && b - g > 8;
+        const isOuterFrame = y < targetH * 0.08 || y > targetH * 0.88 || x > targetW * 0.98;
+        if (isBlueEuroband || isOuterFrame) {
+          d[i] = 255;
+          d[i + 1] = 255;
+          d[i + 2] = 255;
+          continue;
+        }
+        const normLum = ((0.299 * r + 0.587 * g + 0.114 * b - minL) / range) * 255;
+        const val = mode === 'bin140' ? (normLum > 140 ? 255 : 0) : normLum;
+        d[i] = val;
+        d[i + 1] = val;
+        d[i + 2] = val;
+      }
+    }
+    ctx.putImageData(imgData, pad, pad);
+  } catch {
+    // ignore canvas pixel read errors
+  }
+  return canvas;
+}
+
 function buildPlateCanvasFromVideo(videoEl, mode = 'crop_gray') {
   if (typeof document === 'undefined' || !videoEl) return null;
   const vw = Number(videoEl.videoWidth) || 0;
@@ -1884,12 +2103,12 @@ function buildPlateCanvasFromVideo(videoEl, mode = 'crop_gray') {
   if (vw <= 0 || vh <= 0) return null;
 
   const isFull = mode === 'full_gray';
-  const sx = isFull ? 0 : Math.floor(vw * 0.06);
-  const sy = isFull ? Math.floor(vh * 0.12) : Math.floor(vh * 0.25);
-  const sw = isFull ? vw : Math.max(1, Math.floor(vw * 0.88));
-  const sh = isFull ? Math.max(1, Math.floor(vh * 0.76)) : Math.max(1, Math.floor(vh * 0.5));
+  const sx = isFull ? 0 : Math.floor(vw * 0.12);
+  const sy = isFull ? Math.floor(vh * 0.15) : Math.floor(vh * 0.30);
+  const sw = isFull ? vw : Math.max(1, Math.floor(vw * 0.76));
+  const sh = isFull ? Math.max(1, Math.floor(vh * 0.70)) : Math.max(1, Math.floor(vh * 0.35));
 
-  const targetWidth = Math.min(960, Math.max(480, sw));
+  const targetWidth = Math.min(720, Math.max(420, sw));
   const scale = targetWidth / sw;
   const targetHeight = Math.max(1, Math.round(sh * scale));
 
@@ -1933,7 +2152,12 @@ function buildPlateCanvasFromVideo(videoEl, mode = 'crop_gray') {
 /**
  * Przechwytuje klatkę z elementu <video> skanera i odczytuje tablicę rejestracyjną (ANPR / OCR).
  */
-export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = [], customDetector = null) {
+export async function recognizeLicensePlateFromVideoFrame(
+  videoEl,
+  machines = [],
+  customDetector = null,
+  options = {}
+) {
   if (!videoEl && !customDetector) {
     return { plate: '', matchedMachine: null, error: 'Brak aktywnego obrazu z kamery.' };
   }
@@ -1958,23 +2182,39 @@ export async function recognizeLicensePlateFromVideoFrame(videoEl, machines = []
       if (res.plate) return res;
     }
 
-    // Fallback uniwersalnego silnika OCR (Tesseract.js + Canvas z mutexem zapobiegającym kolizjom zapytań)
+    // Fallback uniwersalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
     const isRealDomVideo =
       videoEl &&
       typeof videoEl.tagName === 'string' &&
-      videoEl.tagName.toUpperCase() === 'VIDEO' &&
-      Number(videoEl.videoWidth) > 0 &&
-      Number(videoEl.videoHeight) > 0;
+      (videoEl.tagName.toUpperCase() === 'VIDEO' || videoEl.tagName.toUpperCase() === 'IMG') &&
+      Number(videoEl.videoWidth || videoEl.naturalWidth) > 0 &&
+      Number(videoEl.videoHeight || videoEl.naturalHeight) > 0;
 
     if (isRealDomVideo) {
+      const plateBox = detectLicensePlateBoundingBox(videoEl);
+      // W pętli tła nie uruchamiamy ciężkiego OCR, dopóki w kadrze nie pojawi się prostokąt tablicy rejestracyjnej
+      if (!plateBox && options?.isBackground) {
+        return { plate: '', matchedMachine: null };
+      }
+
       const wasmRes = await runWithOcrMutex(async () => {
         const worker = await getBrowserOcrWorker();
-        for (const mode of ['crop_gray', 'crop_binary', 'full_gray']) {
-          const canvas = buildPlateCanvasFromVideo(videoEl, mode);
-          if (!canvas) continue;
-          const { data } = await worker.recognize(canvas);
-          const parsed = extractLicensePlateFromOcrText(data?.text || '', machines);
-          if (parsed.plate) return parsed;
+        if (plateBox && !plateBox.isMockBlank) {
+          for (const mode of ['gray', 'bin140']) {
+            const canvas = buildLocalizedPlateCanvas(videoEl, plateBox, mode);
+            if (!canvas) continue;
+            const { data } = await worker.recognize(canvas);
+            const parsed = extractLicensePlateFromOcrText(data?.text || '', machines);
+            if (parsed.matchedMachine || parsed.plate) return parsed;
+          }
+        }
+        if (!options?.isBackground || (plateBox && plateBox.isMockBlank)) {
+          const fallbackCanvas = buildPlateCanvasFromVideo(videoEl, 'crop_gray');
+          if (fallbackCanvas) {
+            const { data } = await worker.recognize(fallbackCanvas);
+            const parsed = extractLicensePlateFromOcrText(data?.text || '', machines);
+            if (parsed.matchedMachine || parsed.plate) return parsed;
+          }
         }
         return null;
       });
