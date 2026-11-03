@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import {
   calculateCo2Equivalent,
   formatFGasSummary,
@@ -48,6 +48,7 @@ import Regions from '../../components/manager/Regions';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
 import MachineQRCard from '../../components/manager/machines/MachineQRCard';
 import MachinesQRCodes from '../../components/manager/machines/MachinesQRCodes';
+import Machines from '../../components/manager/Machines';
 import MachineForm from '../../components/manager/MachineForm';
 import BulkImportModal from '../../components/manager/BulkImportModal';
 import PartForm from '../../components/manager/parts/PartForm';
@@ -2348,6 +2349,55 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const selectedParentBadge = screen.getByTestId(`selected-compat-parent-${chillerSub.id}`);
       expect(selectedParentBadge.textContent).toContain('Podlega pod: Wycinarka laserowa Nukon (UR-101)');
       unmountPartForm();
+
+      // 6) Opcjonalne drukowanie PIN-u na etykietach QR (domyślnie ukryte, widoczne po zaznaczeniu checkboxa)
+      useManagerStore.getState().setRegions([
+        { id: 'reg-ciecie', name: 'Hala Cięcia', reportPin: '4821' },
+        { id: 'reg-spaw', name: 'Hala Spawalni' },
+      ]);
+      const { unmount: unmountSinglePinQr } = render(<MachineQRCard machine={nukon} />);
+      expect(screen.queryByTestId('single-qr-pin-value')).toBeNull();
+      const singlePinCheckbox = screen.getByTestId('single-qr-show-pin-checkbox');
+      fireEvent.click(singlePinCheckbox);
+      expect(screen.getByTestId('single-qr-pin-value').textContent).toContain('4821');
+      unmountSinglePinQr();
+
+      const { unmount: unmountBulkPinQr } = render(<MachinesQRCodes onBack={vi.fn()} />);
+      expect(screen.queryByTestId(`qr-card-pin-${nukon.id}`)).toBeNull();
+      fireEvent.click(screen.getByTestId('qr-print-show-pin-checkbox'));
+      expect(screen.getByTestId(`qr-card-pin-${nukon.id}`).textContent).toContain('4821');
+      unmountBulkPinQr();
+
+      // 7) Szybki filtr "Do weryfikacji (1)" oraz masowe przypisanie rejonu i aktywacja kodów QR w Machines.jsx
+      const { unmount: unmountMachinesView } = render(
+        <MemoryRouter>
+          <Machines />
+        </MemoryRouter>
+      );
+      const unverifiedBar = screen.getByTestId('unverified-machines-bar');
+      expect(unverifiedBar.textContent).toContain('Do weryfikacji (1)');
+
+      // Kliknięcie szybkiego filtra zostawia na liście tylko maszynę do weryfikacji
+      fireEvent.click(screen.getByTestId('filter-unverified-machines-btn'));
+      expect(screen.getByText(/Wiertarka kolumnowa bez rejonu/)).toBeTruthy();
+      expect(screen.queryByText('Wycinarka laserowa Nukon')).toBeNull();
+
+      // Masowe przypisanie rejonu "Hala Spawalni" i aktywacja kodów QR
+      fireEvent.change(screen.getByTestId('bulk-verify-region-select'), {
+        target: { value: 'reg-spaw' },
+      });
+      fireEvent.click(screen.getByTestId('bulk-verify-assign-region-btn'));
+
+      await waitFor(() => {
+        const updatedWiertarka = useManagerStore
+          .getState()
+          .machines.find(m => m.internalId === 'UR-103');
+        expect(updatedWiertarka.regionId).toBe('reg-spaw');
+        expect(updatedWiertarka.needsVerification).toBe(false);
+        expect(updatedWiertarka.name).toBe('Wiertarka kolumnowa bez rejonu');
+        expect(updatedWiertarka.qrCreatedAt).toBeTruthy();
+      });
+      unmountMachinesView();
     });
   });
 });

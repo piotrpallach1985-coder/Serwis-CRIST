@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { exportToExcel } from '../utils/reports/excelExport';
 import { normalizeLicensePlate, isVehicleAsset, isHvacAsset } from '../utils/fieldServiceHelpers';
+import { isMachineIncompleteForQr } from '../utils/bulkImportHelper';
 
 /**
  * useMachines — hook do zarządzania rejestrem maszyn/pojazdów, filtrowaniem po nazwie, nr rej., VIN, kierowcy, kategorii i rejonie oraz eksportem.
@@ -13,7 +14,12 @@ export function useMachines(machines = [], regions = []) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [filterAssetCategory, setFilterAssetCategory] = useState('');
+  const [onlyUnverified, setOnlyUnverified] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+
+  const unverifiedMachines = useMemo(() => {
+    return (machines || []).filter(m => !m.isDeleted && isMachineIncompleteForQr(m));
+  }, [machines]);
 
   const toggleNode = id => {
     setExpandedNodes(prev => {
@@ -28,8 +34,8 @@ export function useMachines(machines = [], regions = []) {
     const activeMachines = machines.filter(m => !m.isDeleted);
 
     const sortFn = (a, b) => {
-      const aVerify = (a.name || '').includes('(DO WERYFIKACJI)');
-      const bVerify = (b.name || '').includes('(DO WERYFIKACJI)');
+      const aVerify = isMachineIncompleteForQr(a);
+      const bVerify = isMachineIncompleteForQr(b);
       if (aVerify && !bVerify) return -1;
       if (!aVerify && bVerify) return 1;
       return (a.name || '').localeCompare(b.name || '');
@@ -67,7 +73,10 @@ export function useMachines(machines = [], regions = []) {
       nodes.forEach(n => {
         const hasChildren = n.children && n.children.length > 0;
         const isSearching =
-          searchQuery.trim() !== '' || filterRegion !== '' || filterAssetCategory !== '';
+          searchQuery.trim() !== '' ||
+          filterRegion !== '' ||
+          filterAssetCategory !== '' ||
+          onlyUnverified;
         const isExpanded = isSearching || expandedNodes.has(n.id);
 
         flat.push({ ...n, hasChildren, isCollapsed: !isExpanded });
@@ -127,9 +136,14 @@ export function useMachines(machines = [], regions = []) {
         matchCategory = !isVehicleAsset(m, 'industrial') && !isHvacAsset(m, 'industrial');
       }
 
-      return matchName && matchRegion && matchCategory;
+      let matchUnverified = true;
+      if (onlyUnverified) {
+        matchUnverified = isMachineIncompleteForQr(m);
+      }
+
+      return matchName && matchRegion && matchCategory && matchUnverified;
     });
-  }, [machines, searchQuery, filterRegion, filterAssetCategory, expandedNodes]);
+  }, [machines, searchQuery, filterRegion, filterAssetCategory, onlyUnverified, expandedNodes]);
 
   const handleExportExcel = () => {
     const dataToExport = filteredMachines.map(m => ({
@@ -167,6 +181,9 @@ export function useMachines(machines = [], regions = []) {
     setFilterRegion,
     filterAssetCategory,
     setFilterAssetCategory,
+    onlyUnverified,
+    setOnlyUnverified,
+    unverifiedMachines,
     filteredMachines,
     handleExportExcel,
     toggleNode,

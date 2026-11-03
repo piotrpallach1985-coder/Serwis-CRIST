@@ -12,12 +12,14 @@ import {
   formatQrDate,
 } from '../../../services/qrAccess.service';
 import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
+import { resolveAnonymousReportPin } from '../../../utils/fieldServiceHelpers';
 
 export default function MachinesQRCodes({ onBack }) {
   const { t } = useTranslation();
   const machines = useManagerStore(state => state.machines || []);
   const regions = useManagerStore(state => state.regions || []);
   const branding = useManagerStore(state => state.branding);
+  const mapSettings = useManagerStore(state => state.mapSettings);
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +28,7 @@ export default function MachinesQRCodes({ onBack }) {
   const [dateTo, setDateTo] = useState('');
   const [qrKey, setQrKey] = useState(null);
   const [visibleLimit, setVisibleLimit] = useState(60);
+  const [showPinOnQr, setShowPinOnQr] = useState(false);
 
   const machineByIdMap = useMemo(() => {
     const map = new Map();
@@ -153,7 +156,18 @@ export default function MachinesQRCodes({ onBack }) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-950 text-xs font-bold rounded-xl cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                data-testid="qr-print-show-pin-checkbox"
+                checked={showPinOnQr}
+                onChange={e => setShowPinOnQr(e.target.checked)}
+                className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+              />
+              <i className="ph ph-key text-sm text-amber-600"></i>
+              <span>Drukuj PIN zgłoszeń na etykiecie QR (jeśli nadano)</span>
+            </label>
             <button
               type="button"
               onClick={selectAll}
@@ -281,14 +295,25 @@ export default function MachinesQRCodes({ onBack }) {
       {unverifiedMachinesCount > 0 && (
         <div
           data-testid="qr-unverified-machines-notice"
-          className="no-print bg-amber-50 border border-amber-300 text-amber-950 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2.5"
+          className="no-print bg-amber-50 border border-amber-300 text-amber-950 px-4 py-3 rounded-xl text-xs font-semibold flex flex-wrap items-center justify-between gap-2.5"
         >
-          <i className="ph-fill ph-warning-circle text-amber-600 text-lg shrink-0"></i>
-          <span>
-            Ukryto <strong>{unverifiedMachinesCount}</strong> urządzeń oznaczonych jako{' '}
-            <strong>(DO WERYFIKACJI)</strong> lub bez przypisanego rejonu. Kody QR zostaną dla nich
-            wygenerowane po uzupełnieniu rejonu i zatwierdzeniu w edycji urządzenia.
-          </span>
+          <div className="flex items-center gap-2.5">
+            <i className="ph-fill ph-warning-circle text-amber-600 text-lg shrink-0"></i>
+            <span>
+              Ukryto <strong>{unverifiedMachinesCount}</strong> urządzeń oznaczonych jako{' '}
+              <strong>(DO WERYFIKACJI)</strong> lub bez przypisanego rejonu. Kody QR zostaną dla nich
+              wygenerowane po uzupełnieniu rejonu i zatwierdzeniu w bazie urządzeń.
+            </span>
+          </div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+            >
+              Przejdź do weryfikacji urządzeń
+            </button>
+          )}
         </div>
       )}
 
@@ -318,6 +343,7 @@ export default function MachinesQRCodes({ onBack }) {
             const parentMachine = machine.parentId
               ? machineByIdMap.get(machine.parentId) || null
               : null;
+            const pinReq = resolveAnonymousReportPin(machine, regions, branding, mapSettings);
 
             return (
               <div
@@ -410,6 +436,19 @@ export default function MachinesQRCodes({ onBack }) {
                       {qrDateStr}
                     </div>
                   </div>
+                  {showPinOnQr && pinReq.required && pinReq.pin && (
+                    <div
+                      data-testid={`qr-card-pin-${machine.id}`}
+                      className="pt-1.5 mt-1 border-t border-dashed border-slate-300"
+                    >
+                      <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                        KOD PIN ZGŁOSZEŃ
+                      </div>
+                      <div className="text-xs font-extrabold font-mono text-slate-900 tracking-widest leading-snug">
+                        {pinReq.pin}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -12,14 +12,17 @@ import {
   formatQrDate,
 } from '../../../services/qrAccess.service';
 import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
+import { resolveAnonymousReportPin } from '../../../utils/fieldServiceHelpers';
 
 export default function MachineQRCard({ machine }) {
   const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const branding = useManagerStore(state => state.branding);
+  const mapSettings = useManagerStore(state => state.mapSettings);
   const machines = useManagerStore(state => state.machines || []);
   const regions = useManagerStore(state => state.regions || []);
   const [qrKey, setQrKey] = useState(null);
+  const [showPinOnQr, setShowPinOnQr] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,6 +41,7 @@ export default function MachineQRCard({ machine }) {
   const locationStr = resolveMachineQrLocation(machine, regions, '-');
   const internalIdStr = machine.internalId || machine.licensePlate || '-';
   const qrDateStr = formatQrDate(machine, machines, t('machines.print.noData', '-'));
+  const pinReq = resolveAnonymousReportPin(machine, regions, branding, mapSettings);
   const qrValue = buildMachineQrValue(machine, tenantId, qrKey, {
     branding,
     tenantName,
@@ -128,8 +132,36 @@ export default function MachineQRCard({ machine }) {
               {qrDateStr}
             </div>
           </div>
+          {showPinOnQr && pinReq.required && pinReq.pin && (
+            <div
+              data-testid="single-qr-pin-value"
+              className="pt-1.5 mt-1 border-t border-dashed border-slate-300"
+            >
+              <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                KOD PIN ZGŁOSZEŃ
+              </div>
+              <div className="text-xs font-extrabold font-mono text-slate-900 tracking-widest leading-snug">
+                {pinReq.pin}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {pinReq.required && pinReq.pin && (
+        <label className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-950 cursor-pointer transition-colors">
+          <input
+            type="checkbox"
+            id={`qr-show-pin-${machine.id}`}
+            data-testid="single-qr-show-pin-checkbox"
+            checked={showPinOnQr}
+            onChange={e => setShowPinOnQr(e.target.checked)}
+            className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+          />
+          <i className="ph ph-key text-amber-600"></i>
+          <span>Drukuj PIN na etykiecie ({pinReq.pin})</span>
+        </label>
+      )}
     </div>
   );
 }
