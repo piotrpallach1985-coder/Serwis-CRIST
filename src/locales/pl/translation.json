@@ -1318,11 +1318,13 @@
     "internalTitle": "Zgłoszenie awarii"
   },
   "operator": {
-    "scanQrBtn": "Skanuj QR/Tablicę",
+    "scanQrBtn": "Skanuj QR",
     "scanQrOrPlateBtn": "Skanuj QR/Tablicę",
     "scanNfcBtn": "Zbliżeniowe NFC",
-    "scanQrCardTitle": "Skanuj QR/Tablicę:",
-    "scanQrCardDesc": "Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.",
+    "scanQrCardTitle": "Skanuj QR:",
+    "scanQrCardDesc": "Zeskanuj kod QR urządzenia i zgłoś awarię.",
+    "scanQrPlateCardTitle": "Skanuj QR/Tablicę:",
+    "scanQrPlateCardDesc": "Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.",
     "scanNfcCardTitle": "Zbliżeniowe NFC:",
     "scanNfcCardDesc": "Odczytaj przy pomocy NFC i zgłoś awarię.",
     "otherMachineCardTitle": "Zgłoś inne urządzenie:",

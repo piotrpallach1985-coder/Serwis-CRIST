@@ -1787,12 +1787,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
       unmountQrModal();
 
-      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC i brak ręcznego wpisywania (bo QR/NFC wskazują tenanta)
+      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC i brak skanowania tablic (tylko Skanuj QR + Zbliżeniowe NFC)
       const onOperatorScan = vi.fn();
       const { unmount: unmountUnloggedScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={false} />
       );
-      expect(screen.getByText('Skanuj QR/Tablicę')).toBeTruthy();
+      expect(screen.getByText('Skanuj QR')).toBeTruthy();
+      expect(screen.queryByText('Skanuj QR/Tablicę')).toBeNull();
       expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
       expect(
         screen.getByText(
@@ -1803,7 +1804,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByTestId('operator-license-plate-section')).toBeNull();
       unmountUnloggedScanner();
 
-      // 6b) Interakcja w OperatorScanner PO zalogowaniu (isInternal=true) -> dostępne zgłaszanie bez QR/NFC oraz rozwijana sekcja ręczna
+      // 6b) Interakcja w OperatorScanner PO zalogowaniu (isInternal=true) -> dostępne Skanuj QR/Tablicę, zgłaszanie bez QR/NFC oraz rozwijana sekcja ręczna
       const { unmount: unmountOpScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={true} />
       );

@@ -365,7 +365,9 @@ export default function OperatorScanner({
               >
                 <i className="ph ph-qr-code text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
                 <span className="text-base sm:text-lg tracking-wide">
-                  {t('operator.scanQrOrPlateBtn', 'Skanuj QR/Tablicę')}
+                  {isInternal
+                    ? t('operator.scanQrOrPlateBtn', 'Skanuj QR/Tablicę')
+                    : t('operator.scanQrBtn', 'Skanuj QR')}
                 </span>
               </button>
 
@@ -405,13 +407,17 @@ export default function OperatorScanner({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
-                    {t('operator.scanQrCardTitle', 'Skanuj QR/Tablicę:')}
+                    {isInternal
+                      ? t('operator.scanQrPlateCardTitle', 'Skanuj QR/Tablicę:')
+                      : t('operator.scanQrCardTitle', 'Skanuj QR:')}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
-                    {t(
-                      'operator.scanQrCardDesc',
-                      'Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.'
-                    )}
+                    {isInternal
+                      ? t(
+                          'operator.scanQrPlateCardDesc',
+                          'Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.'
+                        )
+                      : t('operator.scanQrCardDesc', 'Zeskanuj kod QR urządzenia i zgłoś awarię.')}
                   </p>
                 </div>
               </div>
