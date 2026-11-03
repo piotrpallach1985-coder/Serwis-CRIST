@@ -6,6 +6,7 @@ import { useManagerStore } from '../../../store/managerStore';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { safeParseDate } from '../../../utils/dateHelpers';
+import { getMachineParentHierarchyInfo } from '../../../utils/bulkImportHelper';
 import {
   buildPartQrValue,
   resolveTenantDisplayName,
@@ -191,12 +192,21 @@ export default function PartDetails({ part, onBack, onEdit }) {
                 {part.compatibleMachines && part.compatibleMachines.length > 0 ? (
                   part.compatibleMachines.map(mid => {
                     const m = machines.find(mac => mac.id === mid);
+                    const hierarchy = m ? getMachineParentHierarchyInfo(m, machines) : null;
                     return (
                       <span
                         key={mid}
-                        className="bg-slate-50 border border-slate-100 px-3 py-1 rounded-lg text-xs font-bold text-slate-600"
+                        className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1 rounded-lg text-xs font-bold text-slate-600"
                       >
-                        {m ? m.name : t('parts.details.unknown_machine')}
+                        <span>
+                          {m ? m.name : t('parts.details.unknown_machine')}
+                          {m?.internalId ? ` (${m.internalId})` : ''}
+                        </span>
+                        {hierarchy?.isChild && hierarchy?.parentLabel && (
+                          <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-md">
+                            ↳ Podlega pod: {hierarchy.parentLabel}
+                          </span>
+                        )}
                       </span>
                     );
                   })

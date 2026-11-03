@@ -3,12 +3,13 @@ import { addPart, updatePart } from '../../../services/parts.service';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
 import { useManagerStore } from '../../../store/managerStore';
 import { useTranslation } from 'react-i18next';
+import { getMachineParentHierarchyInfo } from '../../../utils/bulkImportHelper';
 
 export default function PartForm({ part, onClose, user }) {
   const { t } = useTranslation();
   const isEditing = !!part;
   const machines = useManagerStore(state => state.machines || []);
-  
+
   const regions = useManagerStore(state => state.regions || []);
   const [building, setBuilding] = useState(part?.building || '');
   const [name, setName] = useState(part?.name || '');
@@ -22,13 +23,13 @@ export default function PartForm({ part, onClose, user }) {
   const [compatibleMachines, setCompatibleMachines] = useState(part?.compatibleMachines || []);
   const [machineSearch, setMachineSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  
+
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       const tenantId = getCurrentTenant();
       const numStock = Number(stock);
@@ -78,10 +79,14 @@ export default function PartForm({ part, onClose, user }) {
     }
   };
 
-  
+  const allMachineIds = new Set(machines.map(m => m.id));
   const buildTree = (allMachines, parentId = null, depth = 0) => {
     return allMachines
-      .filter(m => parentId ? m.parentId === parentId : (!m.parentId || m.parentId === ''))
+      .filter(m =>
+        parentId
+          ? m.parentId === parentId
+          : !m.parentId || m.parentId === '' || !allMachineIds.has(m.parentId)
+      )
       .map(m => {
         const children = buildTree(allMachines, m.id, depth + 1);
         return { ...m, depth, children };
@@ -102,15 +107,21 @@ export default function PartForm({ part, onClose, user }) {
   const machineTree = buildTree(machines);
   let flatMachines = flattenTree(machineTree);
 
-  // If there's a search, we just filter the flat list to keep it simple and searchable
+  // If there's a search, filter by machine name, internalId, or parent machine label
   if (machineSearch.trim()) {
     const q = machineSearch.toLowerCase().trim();
-    flatMachines = flatMachines.filter(m => m.name.toLowerCase().includes(q));
+    flatMachines = flatMachines.filter(m => {
+      const hierarchy = getMachineParentHierarchyInfo(m, machines);
+      return (
+        String(m.name || '').toLowerCase().includes(q) ||
+        String(m.internalId || '').toLowerCase().includes(q) ||
+        String(hierarchy.parentLabel || '').toLowerCase().includes(q)
+      );
+    });
   }
 
   // Filter out already selected machines from the dropdown view
   const dropdownMachines = flatMachines.filter(m => !compatibleMachines.includes(m.id));
-
 
   return (
       <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 overflow-y-auto">
@@ -138,7 +149,7 @@ export default function PartForm({ part, onClose, user }) {
               </div>
             </div>
 
-                          {isEditing && (
+              {isEditing && (
                 <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-xl border border-blue-100 flex items-center gap-2">
                   <i className="ph ph-info text-lg"></i>
                   {t('parts.form.info_fifo')}
@@ -208,10 +219,26 @@ export default function PartForm({ part, onClose, user }) {
                   {compatibleMachines.map(mid => {
                     const m = machines.find(mac => mac.id === mid);
                     if (!m) return null;
+                    const hierarchy = getMachineParentHierarchyInfo(m, machines);
                     return (
-                      <span key={mid} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs border border-blue-100">
-                        {m.name}
-                        <button type="button" onClick={() => toggleMachine(mid)} className="hover:text-blue-900 transition-colors">
+                      <span
+                        key={mid}
+                        data-testid={`selected-compat-machine-${mid}`}
+                        className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs border border-blue-100"
+                      >
+                        <span>
+                          {m.name}
+                          {m.internalId ? ` (${m.internalId})` : ''}
+                        </span>
+                        {hierarchy.isChild && hierarchy.parentLabel && (
+                          <span
+                            data-testid={`selected-compat-parent-${mid}`}
+                            className="text-[10px] font-extrabold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md border border-indigo-200"
+                          >
+                            ↳ Podlega pod: {hierarchy.parentLabel}
+                          </span>
+                        )}
+                        <button type="button" onClick={() => toggleMachine(mid)} className="hover:text-blue-900 transition-colors ml-0.5">
                           <i className="ph ph-x"></i>
                         </button>
                       </span>
@@ -223,6 +250,7 @@ export default function PartForm({ part, onClose, user }) {
                   <i className="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                   <input
                     type="text"
+                    data-testid="part-compat-machine-search"
                     placeholder={t('parts.form.search_machine')}
                     value={machineSearch}
                     onChange={(e) => setMachineSearch(e.target.value)}
@@ -230,26 +258,54 @@ export default function PartForm({ part, onClose, user }) {
                     className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
                   />
                   {showDropdown && (
-                      <div className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto pb-4">
+                      <div
+                        data-testid="part-compat-machine-dropdown"
+                        className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto pb-4"
+                      >
                         {dropdownMachines.length === 0 ? (
                           <div className="p-4 text-center text-gray-500 text-sm">{t('parts.list.no_results_title')}</div>
                         ) : (
-                          dropdownMachines.map(m => (
-                              <button
-                                key={m.id}
-                                type="button"
-                                onClick={() => toggleMachine(m.id)}
-                                className="w-full text-left hover:bg-blue-50 text-sm font-semibold text-gray-700 transition-colors border-b border-gray-50 last:border-0 flex items-center justify-between"
-                                style={{ padding: `0.75rem 1rem 0.75rem ${m.depth * 1.5 + 1}rem` }}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {m.depth > 0 && <i className="ph ph-arrow-elbow-down-right text-gray-400"></i>}
-                                  {!m.depth && <i className="ph ph-engine text-gray-400"></i>}
-                                  <span>{m.name}</span>
-                                </div>
-                                <i className="ph ph-plus text-blue-600 shrink-0"></i>
-                              </button>
-                            ))
+                          dropdownMachines.map(m => {
+                              const hierarchy = getMachineParentHierarchyInfo(m, machines);
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  data-testid={`part-compat-option-${m.id}`}
+                                  onClick={() => toggleMachine(m.id)}
+                                  className="w-full text-left hover:bg-blue-50 text-sm font-semibold text-gray-700 transition-colors border-b border-gray-50 last:border-0 flex items-center justify-between gap-2"
+                                  style={{ padding: `0.75rem 1rem 0.75rem ${m.depth * 1.5 + 1}rem` }}
+                                >
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      {hierarchy.isChild ? (
+                                        <i className="ph ph-arrow-elbow-down-right text-indigo-500 shrink-0"></i>
+                                      ) : (
+                                        <i className="ph ph-engine text-gray-400 shrink-0"></i>
+                                      )}
+                                      <span className="truncate">
+                                        {m.name}
+                                        {m.internalId ? (
+                                          <span className="text-xs font-mono text-gray-400 ml-1">
+                                            ({m.internalId})
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </div>
+                                    {hierarchy.isChild && hierarchy.parentLabel && (
+                                      <span
+                                        data-testid={`part-compat-parent-badge-${m.id}`}
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md shrink-0"
+                                      >
+                                        <i className="ph-bold ph-git-branch"></i>
+                                        Podlega pod: {hierarchy.parentLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <i className="ph ph-plus text-blue-600 shrink-0"></i>
+                                </button>
+                              );
+                            })
                         )}
                       </div>
                     )}

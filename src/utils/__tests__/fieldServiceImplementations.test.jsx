@@ -50,12 +50,15 @@ import MachineQRCard from '../../components/manager/machines/MachineQRCard';
 import MachinesQRCodes from '../../components/manager/machines/MachinesQRCodes';
 import MachineForm from '../../components/manager/MachineForm';
 import BulkImportModal from '../../components/manager/BulkImportModal';
+import PartForm from '../../components/manager/parts/PartForm';
 import MachineDTR from '../../components/manager/MachineDTR';
 import {
   isMachineIncompleteForQr,
   autoDetectColumnMapping,
   prepareMachinesImportPreview,
   preparePartsImportPreview,
+  getImportLegendRows,
+  getMachineParentHierarchyInfo,
 } from '../bulkImportHelper';
 import PlannedMaintenanceFormModal from '../../components/manager/PlannedMaintenanceFormModal';
 import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
@@ -2124,32 +2127,60 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         })
       ).toBe(true);
 
-      // 2) Przygotowanie podglądu importu maszyn (1 kompletna z istniejącym rejonem, 1 z nowym rejonem, 1 bez rejonu -> DO WERYFIKACJI bez QR)
+      // 2) Przygotowanie podglądu importu maszyn (1 kompletna z istniejącym rejonem, 1 podzespół podlegający pod UR-101 dziedziczący rejon z tego samego pliku, 1 z nowym rejonem, 1 bez rejonu -> DO WERYFIKACJI bez QR)
       const excelMachineRows = [
         {
           'Nazwa urządzenia *': 'Wycinarka laserowa Nukon',
           'Miejsce montażu (Rejon)': 'Hala Cięcia',
           'Numer wewnętrzny': 'UR-101',
+          'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
+          'Stan licznika': '1250',
+        },
+        {
+          'Nazwa urządzenia *': 'Agregat chłodzący Chiller Nukon',
+          'Miejsce montażu (Rejon)': '',
+          'Numer wewnętrzny': 'UR-101-CH',
+          'Urządzenie nadrzędne (Nazwa lub Nr wew.)': 'UR-101',
           'Stan licznika': '1250',
         },
         {
           'Nazwa urządzenia *': 'Prasa krawędziowa TrumaBend',
           'Miejsce montażu (Rejon)': 'Hala Nowa Spawalnia',
           'Numer wewnętrzny': 'UR-102',
+          'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
           'Stan licznika': '400',
         },
         {
           'Nazwa urządzenia *': 'Wiertarka kolumnowa bez rejonu',
           'Miejsce montażu (Rejon)': '',
           'Numer wewnętrzny': 'UR-103',
+          'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
           'Stan licznika': '0',
         },
       ];
+
+      // Sprawdzenie legendy wymagalności kolumn dla obu plików (Maszyny i Części)
+      const machinesLegend = getImportLegendRows('machines');
+      const partsLegend = getImportLegendRows('parts');
+      expect(
+        machinesLegend.find(r => r.Wymagalność === 'WYMAGANE BEZWARUNKOWO')?.Kolumna
+      ).toContain('Nazwa urządzenia');
+      expect(
+        machinesLegend.find(r => r.Wymagalność === 'WYMAGANE DO KODU QR')?.Kolumna
+      ).toContain('Miejsce montażu');
+      expect(
+        partsLegend.filter(r => r.Wymagalność === 'WYMAGANE BEZWARUNKOWO').map(r => r.Kolumna)
+      ).toEqual([
+        'Nazwa części *',
+        'Kod magazynowy / Indeks *',
+        'Stan początkowy (Fizyczny) *',
+      ]);
 
       const colMap = autoDetectColumnMapping(Object.keys(excelMachineRows[0]), 'machines');
       expect(colMap.name).toBe('Nazwa urządzenia *');
       expect(colMap.regionName).toBe('Miejsce montażu (Rejon)');
       expect(colMap.internalId).toBe('Numer wewnętrzny');
+      expect(colMap.parentMachine).toBe('Urządzenie nadrzędne (Nazwa lub Nr wew.)');
 
       const preview = prepareMachinesImportPreview(excelMachineRows, colMap, {
         existingMachines: [],
@@ -2158,17 +2189,34 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         industryProfile: 'industrial',
       });
 
-      expect(preview.summary.readyWithQrCount).toBe(2);
+      expect(preview.summary.readyWithQrCount).toBe(3);
+      expect(preview.summary.subassembliesCount).toBe(1);
       expect(preview.summary.incompleteWithoutQrCount).toBe(1);
       expect(preview.summary.newRegions).toEqual(['Hala Nowa Spawalnia']);
 
-      const incompleteRow = preview.rows[2];
+      // Podzespół (wiersz 2) dziedziczy rejon Hala Cięcia z maszyny nadrzędnej UR-101 i jest gotowy do QR
+      const subassemblyRow = preview.rows[1];
+      expect(subassemblyRow.qrReady).toBe(true);
+      expect(subassemblyRow.parentRowIndex).toBe(1);
+      expect(subassemblyRow.parentDisplay).toContain('Wycinarka laserowa Nukon');
+      expect(subassemblyRow.regionDisplay).toContain('Hala Cięcia');
+
+      const incompleteRow = preview.rows[3];
       expect(incompleteRow.status).toBe('incomplete');
       expect(incompleteRow.qrReady).toBe(false);
       expect(incompleteRow.name).toBe('Wiertarka kolumnowa bez rejonu (DO WERYFIKACJI)');
       expect(incompleteRow.payload.needsVerification).toBe(true);
 
-      // 3) Wykonanie importu w BulkImportModal i sprawdzenie, że maszyna bez rejonu ma qrCreatedAt=null i nie wyświetla kodu QR w MachineQRCard ani w MachinesQRCodes
+      // Sprawdzenie widoczności legendy w Kroku 1 kreatora
+      const { unmount: unmountStep1Modal } = render(
+        <BulkImportModal isOpen={true} onClose={vi.fn()} mode="machines" />
+      );
+      expect(screen.getByTestId('bulk-import-legend-section')).toBeTruthy();
+      expect(screen.getByTestId('legend-row-name').textContent).toContain('WYMAGANE BEZWARUNKOWO');
+      expect(screen.getByTestId('legend-row-parentMachine').textContent).toContain('OPCJONALNE');
+      unmountStep1Modal();
+
+      // 3) Wykonanie importu w BulkImportModal i sprawdzenie, że podzespół ma przypisane parentId do UR-101, a maszyna bez rejonu ma qrCreatedAt=null
       useManagerStore.setState({
         regions: [{ id: 'reg-ciecie', name: 'Hala Cięcia', isDeleted: false }],
         machines: [],
@@ -2186,7 +2234,8 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
 
-      expect(screen.getByTestId('summary-ready-qr').textContent).toContain('2');
+      expect(screen.getByTestId('summary-ready-qr').textContent).toContain('3');
+      expect(screen.getByTestId('summary-subassemblies').textContent).toContain('1');
       expect(screen.getByTestId('summary-incomplete-no-qr').textContent).toContain('1');
       expect(screen.getByTestId('incomplete-qr-warning-banner')).toBeTruthy();
 
@@ -2196,13 +2245,18 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       unmountImportModal();
 
       const importedMachines = useManagerStore.getState().machines;
-      expect(importedMachines.length).toBe(3);
+      expect(importedMachines.length).toBe(4);
 
       const nukon = importedMachines.find(m => m.internalId === 'UR-101');
+      const chillerSub = importedMachines.find(m => m.internalId === 'UR-101-CH');
       const wiertarkaUnverified = importedMachines.find(m => m.internalId === 'UR-103');
 
       expect(nukon.qrCreatedAt).toBeTruthy();
       expect(nukon.needsVerification).toBe(false);
+      // Podzespół ma ustawione parentId wskazujące bezpośrednio na ID zaimportowanego Nukona oraz odziedziczony regionId
+      expect(chillerSub.parentId).toBe(nukon.id);
+      expect(chillerSub.regionId).toBe('reg-ciecie');
+      expect(chillerSub.qrCreatedAt).toBeTruthy();
       expect(wiertarkaUnverified.qrCreatedAt).toBeNull();
       expect(wiertarkaUnverified.needsVerification).toBe(true);
       expect(wiertarkaUnverified.name).toContain('(DO WERYFIKACJI)');
@@ -2221,7 +2275,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(qrCardVerified.querySelector('svg[id^="qr-svg-"]')).toBeTruthy();
       unmountQrCard2();
 
-      // W Baza QR Urządzeń (MachinesQRCodes) widoczne są tylko 2 kompletne maszyny, a o 1 niezweryfikowanej informuje baner
+      // W Baza QR Urządzeń (MachinesQRCodes) widoczne są tylko 3 kompletne maszyny, a o 1 niezweryfikowanej informuje baner
       const { unmount: unmountQrList } = render(<MachinesQRCodes onBack={vi.fn()} />);
       expect(screen.getByTestId('qr-unverified-machines-notice').textContent).toContain('1');
       expect(screen.queryByText(/Wiertarka kolumnowa bez rejonu/)).toBeNull();
@@ -2250,6 +2304,26 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(partPreview.rows[0].batches.length).toBe(1);
       expect(partPreview.rows[0].batches[0].qty).toBe(8);
       expect(partPreview.rows[0].compatibleMachines).toEqual([nukon.id]);
+
+      // 5) W formularzu części (PartForm) przy wyborze kompatybilności podzespół ma wyraźne oznaczenie pod jakie urządzenie nadrzędne podlega
+      const hierarchyInfo = getMachineParentHierarchyInfo(chillerSub, importedMachines);
+      expect(hierarchyInfo.isChild).toBe(true);
+      expect(hierarchyInfo.parentLabel).toBe('Wycinarka laserowa Nukon (UR-101)');
+
+      const { unmount: unmountPartForm } = render(
+        <PartForm part={null} onClose={vi.fn()} user={{ uid: 'u1' }} />
+      );
+      const searchInput = screen.getByTestId('part-compat-machine-search');
+      fireEvent.focus(searchInput);
+
+      const parentBadgeInDropdown = screen.getByTestId(`part-compat-parent-badge-${chillerSub.id}`);
+      expect(parentBadgeInDropdown.textContent).toContain('Podlega pod: Wycinarka laserowa Nukon (UR-101)');
+
+      // Po kliknięciu podzespołu, wybrany tag również pokazuje informację o maszynie nadrzędnej
+      fireEvent.click(screen.getByTestId(`part-compat-option-${chillerSub.id}`));
+      const selectedParentBadge = screen.getByTestId(`selected-compat-parent-${chillerSub.id}`);
+      expect(selectedParentBadge.textContent).toContain('Podlega pod: Wycinarka laserowa Nukon (UR-101)');
+      unmountPartForm();
     });
   });
 });

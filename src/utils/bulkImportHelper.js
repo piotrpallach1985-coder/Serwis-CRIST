@@ -1,38 +1,220 @@
 /**
- * Helpery do masowego importu Urządzeń/Pojazdów oraz Części Magazynowych z plików Excel (.xlsx/.xls) i CSV.
+ * Helpery do masowego importu Urządzeń/Pojazdów (wraz z podzespołami parentId) oraz Części Magazynowych z plików Excel (.xlsx/.xls) i CSV.
  */
 
 export const MACHINE_IMPORT_FIELDS = [
-  { key: 'name', label: 'Nazwa urządzenia / pojazdu *', required: true },
-  { key: 'regionName', label: 'Miejsce montażu (Rejon) — wymagane do kodu QR', required: false },
-  { key: 'internalId', label: 'Numer wewnętrzny / inwentarzowy', required: false },
-  { key: 'bay', label: 'Informacja dodatkowa (Hala / Piętro / Stanowisko)', required: false },
-  { key: 'assetCategory', label: 'Kategoria zasobu (device / vehicle / hvac)', required: false },
-  { key: 'currentWorkHours', label: 'Stan licznika (RBG / km)', required: false },
-  { key: 'counterUnit', label: 'Jednostka licznika (RBG / km)', required: false },
-  { key: 'additionalDescription', label: 'Dodatkowy opis', required: false },
-  { key: 'licensePlate', label: 'Nr rejestracyjny (dla pojazdów)', required: false },
-  { key: 'vinNumber', label: 'Numer VIN (dla pojazdów)', required: false },
-  { key: 'productionYear', label: 'Rok produkcji', required: false },
-  { key: 'techInspectionDate', label: 'Data badania SKP / UDT (RRRR-MM-DD)', required: false },
-  { key: 'insuranceExpiryDate', label: 'Data końca polisy OC/AC (RRRR-MM-DD)', required: false },
-  { key: 'needsVerification', label: 'Status weryfikacji (np. DO WERYFIKACJI)', required: false },
+  {
+    key: 'name',
+    label: 'Nazwa urządzenia / pojazdu *',
+    required: true,
+    requirementLevel: 'unconditional',
+    requirementBadge: 'WYMAGANE BEZWARUNKOWO',
+    legendDesc:
+      'Pełna nazwa maszyny, podzespołu lub pojazdu. Wiersze bez nazwy zostaną pominięte.',
+  },
+  {
+    key: 'regionName',
+    label: 'Miejsce montażu (Rejon)',
+    required: false,
+    requirementLevel: 'for_qr',
+    requirementBadge: 'WYMAGANE DO KODU QR',
+    legendDesc:
+      'Nazwa rejonu/hali (np. Hala Cięcia, Mapa Główna). Jeśli brak rejonu (i brak urządzenia nadrzędnego z rejonem), urządzenie zostanie dodane jako (DO WERYFIKACJI) bez kodu QR.',
+  },
+  {
+    key: 'parentMachine',
+    label: 'Urządzenie nadrzędne (Nazwa lub Nr wew.) — dla podzespołów',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (PODZESPÓŁ)',
+    legendDesc:
+      'Wpisz dokładną nazwę lub numer wewnętrzny urządzenia głównego (z bazy lub z wyższego wiersza tego samego pliku Excel), jeśli dany wiersz jest podzespołem. Podzespół automatycznie odziedziczy rejon po urządzeniu głównym.',
+  },
+  {
+    key: 'internalId',
+    label: 'Numer wewnętrzny / inwentarzowy',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (ZALECANE)',
+    legendDesc:
+      'Unikalny kod UR / numer inwentarzowy (np. UR-101). Ułatwia wyszukiwanie duplikatów oraz przypisywanie podzespołów i części zamiennych.',
+  },
+  {
+    key: 'bay',
+    label: 'Informacja dodatkowa (Hala / Piętro / Stanowisko)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Szczegółowa lokalizacja wewnątrz rejonu (np. Nawa B, Piętro 2, Gniazdo 4).',
+  },
+  {
+    key: 'assetCategory',
+    label: 'Kategoria zasobu (device / vehicle / hvac)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc:
+      'Domyślnie: device (maszyna/urządzenie). Dla pojazdów wpisz: vehicle (lub pojazd/flota).',
+  },
+  {
+    key: 'currentWorkHours',
+    label: 'Stan licznika (RBG / km)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Początkowy stan licznika roboczogodzin (RBG) lub przebiegu (km). Domyślnie 0.',
+  },
+  {
+    key: 'counterUnit',
+    label: 'Jednostka licznika (RBG / km)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Jednostka licznika: RBG dla maszyn lub km dla pojazdów.',
+  },
+  {
+    key: 'additionalDescription',
+    label: 'Dodatkowy opis',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Dodatkowe informacje techniczne widoczne w karcie urządzenia.',
+  },
+  {
+    key: 'licensePlate',
+    label: 'Nr rejestracyjny (dla pojazdów)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (FLOTA)',
+    legendDesc: 'Numer tablicy rejestracyjnej pojazdu (np. GD 3V975).',
+  },
+  {
+    key: 'vinNumber',
+    label: 'Numer VIN (dla pojazdów)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (FLOTA)',
+    legendDesc: '17-znakowy numer nadwozia VIN.',
+  },
+  {
+    key: 'productionYear',
+    label: 'Rok produkcji',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Rok produkcji maszyny lub pojazdu (np. 2023).',
+  },
+  {
+    key: 'techInspectionDate',
+    label: 'Data badania SKP / UDT (RRRR-MM-DD)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Termin ważności przeglądu technicznego SKP lub badania UDT.',
+  },
+  {
+    key: 'insuranceExpiryDate',
+    label: 'Data końca polisy OC/AC (RRRR-MM-DD)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (FLOTA)',
+    legendDesc: 'Termin ważności ubezpieczenia pojazdu.',
+  },
+  {
+    key: 'needsVerification',
+    label: 'Status weryfikacji (np. TAK / DO WERYFIKACJI)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc:
+      'Wpisz TAK, jeśli mimo podanego rejonu urządzenie ma trafić do bazy jako (DO WERYFIKACJI) bez generowania kodu QR.',
+  },
 ];
 
 export const PART_IMPORT_FIELDS = [
-  { key: 'name', label: 'Nazwa części *', required: true },
-  { key: 'code', label: 'Kod magazynowy / Indeks *', required: true },
-  { key: 'stock', label: 'Stan początkowy (Fizyczny)', required: false },
-  { key: 'unit', label: 'Jednostka miary (szt. / kg / L / m / kpl.)', required: false },
-  { key: 'minStock', label: 'Stan minimalny', required: false },
-  { key: 'unitPrice', label: 'Cena jedn. netto (PLN)', required: false },
-  { key: 'building', label: 'Budynek magazynowy', required: false },
-  { key: 'location', label: 'Lokalizacja (Regał / Półka / Kuweta)', required: false },
-  { key: 'expirationDate', label: 'Data ważności (RRRR-MM-DD)', required: false },
+  {
+    key: 'name',
+    label: 'Nazwa części *',
+    required: true,
+    requirementLevel: 'unconditional',
+    requirementBadge: 'WYMAGANE BEZWARUNKOWO',
+    legendDesc: 'Pełna nazwa części zamiennej lub materiału eksploatacyjnego.',
+  },
+  {
+    key: 'code',
+    label: 'Kod magazynowy / Indeks *',
+    required: true,
+    requirementLevel: 'unconditional',
+    requirementBadge: 'WYMAGANE BEZWARUNKOWO',
+    legendDesc:
+      'Unikalny kod magazynowy / indeks ERP / SKU (np. LOZ-6205-2RS). Służy do identyfikacji części i kodów QR.',
+  },
+  {
+    key: 'stock',
+    label: 'Stan początkowy (Fizyczny) *',
+    required: true,
+    requirementLevel: 'unconditional',
+    requirementBadge: 'WYMAGANE BEZWARUNKOWO',
+    legendDesc:
+      'Ilość fizyczna na magazynie (wpisz 0, jeśli zakładasz tylko kartotekę części; dla wartości > 0 system automatycznie utworzy pierwszą partię FIFO).',
+  },
+  {
+    key: 'unit',
+    label: 'Jednostka miary (szt. / kg / L / m / kpl.)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Jednostka magazynowa: szt., kg, L, m, m2, opak., kpl. (domyślnie: szt.).',
+  },
+  {
+    key: 'minStock',
+    label: 'Stan minimalny (Alarmowy)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc:
+      'Próg poniżej którego część pojawi się na Liście Zakupowej jako Niski Stan (domyślnie: 0).',
+  },
+  {
+    key: 'unitPrice',
+    label: 'Cena jedn. netto (PLN)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Cena jednostkowa netto w PLN dla partii początkowej FIFO.',
+  },
+  {
+    key: 'building',
+    label: 'Budynek magazynowy',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Nazwa magazynu lub budynku (np. Magazyn Główny UR).',
+  },
+  {
+    key: 'location',
+    label: 'Lokalizacja (Regał / Półka / Kuweta)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Dokładne miejsce składowania na magazynie (np. Regał R-04 / Półka P-02).',
+  },
+  {
+    key: 'expirationDate',
+    label: 'Data ważności (RRRR-MM-DD)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE',
+    legendDesc: 'Opcjonalna data ważności partii początkowej w formacie RRRR-MM-DD.',
+  },
   {
     key: 'compatibleMachines',
     label: 'Kompatybilne urządzenia (nazwy lub nr wew. po przecinku)',
     required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (MOŻNA DODAĆ PÓŹNIEJ)',
+    legendDesc:
+      'Możesz podać nazwy lub numery wewnętrzne urządzeń/podzespołów po przecinku (np. UR-101, UR-102) ALBO zostawić puste i przypisać kompatybilne urządzenia później w edycji części.',
   },
 ];
 
@@ -66,6 +248,19 @@ const MACHINE_HEADER_ALIASES = {
     'region',
     'location',
     'rejon / miejsce montażu',
+  ],
+  parentMachine: [
+    'urządzenie nadrzędne',
+    'urzadzenie nadrzedne',
+    'urządzenie nadrzędne (nazwa lub nr wew.)',
+    'maszyna nadrzędna',
+    'maszyna główna',
+    'urządzenie główne',
+    'podlega pod',
+    'parent',
+    'parent machine',
+    'parent id',
+    'nadrzędne',
   ],
   internalId: [
     'numer wewnętrzny',
@@ -193,6 +388,7 @@ const PART_HEADER_ALIASES = {
     'stan początkowy',
     'stan poczatkowy',
     'stan początkowy *',
+    'stan początkowy (fizyczny) *',
     'stan fizyczny',
     'stan',
     'ilość',
@@ -204,6 +400,7 @@ const PART_HEADER_ALIASES = {
   unit: ['jednostka', 'jednostka miary', 'j.m.', 'jm', 'unit'],
   minStock: [
     'stan minimalny',
+    'stan minimalny (alarmowy)',
     'minimum',
     'min',
     'min.',
@@ -259,6 +456,60 @@ const normalizeHeader = str =>
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
+
+/**
+ * Zwraca informację o urządzeniu nadrzędnym (lub pełnej ścieżce nadrzędnej), pod które podlega dany podzespół.
+ * Używane m.in. na liście kompatybilności części zamiennych.
+ */
+export function getMachineParentHierarchyInfo(machine, allMachines = []) {
+  if (!machine || !machine.parentId) {
+    return {
+      isChild: false,
+      parentMachine: null,
+      parentName: '',
+      parentLabel: '',
+      fullHierarchyLabel: machine?.name || '',
+    };
+  }
+
+  const byId = new Map();
+  (allMachines || []).forEach(m => {
+    if (m?.id) byId.set(m.id, m);
+  });
+
+  const directParent = byId.get(machine.parentId) || null;
+  if (!directParent) {
+    return {
+      isChild: true,
+      parentMachine: null,
+      parentName: '',
+      parentLabel: '',
+      fullHierarchyLabel: machine.name || '',
+    };
+  }
+
+  const chain = [];
+  let cursor = directParent;
+  const visited = new Set([machine.id]);
+  while (cursor && !visited.has(cursor.id)) {
+    visited.add(cursor.id);
+    const labelWithCode = cursor.internalId
+      ? `${cursor.name} (${cursor.internalId})`
+      : cursor.name;
+    chain.unshift(labelWithCode);
+    cursor = cursor.parentId ? byId.get(cursor.parentId) : null;
+  }
+
+  const parentLabel = chain.join(' → ');
+  return {
+    isChild: true,
+    parentMachine: directParent,
+    parentName: directParent.name || '',
+    parentInternalId: directParent.internalId || '',
+    parentLabel,
+    fullHierarchyLabel: `${machine.name} (Podlega pod: ${parentLabel})`,
+  };
+}
 
 /**
  * Sprawdza, czy urządzenie jest niekompletne i NIE powinno mieć jeszcze aktywnego kodu QR do wydruku.
@@ -349,9 +600,9 @@ function parseNumericValue(val, fallback = 0) {
 }
 
 /**
- * Przygotowuje podgląd i walidację wierszy dla masowego importu Urządzeń / Pojazdów.
+ * Przygotowuje podgląd i walidację wierszy dla masowego importu Urządzeń / Pojazdów (wraz z podzespołami parentMachine).
  * Zasada QR:
- * - Jeśli wiersz ma nazwę i rejon (istniejący lub nowy do utworzenia) oraz nie jest oznaczony jako "do weryfikacji" ->
+ * - Jeśli wiersz ma nazwę i rejon (własny lub odziedziczony po urządzeniu nadrzędnym) oraz nie jest oznaczony jako "do weryfikacji" ->
  *   otrzymuje `qrReady: true` (kod QR zostanie wygenerowany od razu).
  * - Jeśli brakuje rejonu lub wiersz jest oznaczony jako "do weryfikacji" ->
  *   otrzymuje dopisek `(DO WERYFIKACJI)` w nazwie, `needsVerification: true`, `qrReady: false` (`qrCreatedAt: null`).
@@ -374,10 +625,39 @@ export function prepareMachinesImportPreview(
       regionsByName.set(String(r.name).trim().toLowerCase(), r);
     });
 
+  // Krok 1: Zbudowanie indeksu urządzeń z tego samego pliku (aby podzespół mógł wskazywać na maszynę główną z tego samego arkusza!)
+  const inFileByKey = new Map();
+  rawRows.forEach((rawRow, idx) => {
+    const getVal = fieldKey => {
+      const colName = columnMap[fieldKey];
+      if (!colName || rawRow[colName] === undefined || rawRow[colName] === null) return '';
+      return String(rawRow[colName]).trim();
+    };
+    const rName = getVal('name')
+      .replace(/\(DO WERYFIKACJI\)/gi, '')
+      .trim();
+    const rInternalId = getVal('internalId');
+    const rRegionName = getVal('regionName');
+    const rBay = getVal('bay');
+    if (!rName) return;
+    const entry = {
+      rowIndex: idx + 1,
+      name: rName,
+      internalId: rInternalId,
+      regionName: rRegionName,
+      bay: rBay,
+    };
+    inFileByKey.set(rName.toLowerCase(), entry);
+    if (rInternalId) {
+      inFileByKey.set(rInternalId.toLowerCase(), entry);
+    }
+  });
+
   const newRegionsSet = new Map(); // lowerName -> displayName
   const rows = [];
   let readyWithQrCount = 0;
   let incompleteWithoutQrCount = 0;
+  let subassembliesCount = 0;
   let updateCount = 0;
   let skipCount = 0;
 
@@ -400,9 +680,55 @@ export function prepareMachinesImportPreview(
       return;
     }
 
-    const rawRegionName = getVal('regionName');
+    const rawParentRef = getVal('parentMachine');
+    let resolvedParentId = null;
+    let resolvedParentRowIndex = null;
+    let resolvedParentDisplay = '';
+    let inheritedRegionId = '';
+    let inheritedRegionName = '';
+    let inheritedBay = '';
+
+    if (rawParentRef) {
+      const parentKey = rawParentRef
+        .replace(/\(DO WERYFIKACJI\)/gi, '')
+        .trim()
+        .toLowerCase();
+      // 1. Szukaj w istniejącej bazie urządzeń
+      const existingParent = activeMachines.find(m => {
+        const mName = String(m.name || '')
+          .replace(/\(DO WERYFIKACJI\)/gi, '')
+          .trim()
+          .toLowerCase();
+        const mInternal = String(m.internalId || '')
+          .trim()
+          .toLowerCase();
+        return mName === parentKey || (mInternal && mInternal === parentKey);
+      });
+
+      if (existingParent) {
+        resolvedParentId = existingParent.id;
+        resolvedParentDisplay = existingParent.internalId
+          ? `${existingParent.name} (${existingParent.internalId})`
+          : existingParent.name;
+        inheritedRegionId = existingParent.regionId || '';
+        inheritedBay = existingParent.bay || '';
+      } else if (inFileByKey.has(parentKey)) {
+        // 2. Szukaj wśród urządzeń importowanych w tym samym pliku Excel
+        const fileParent = inFileByKey.get(parentKey);
+        if (fileParent && fileParent.rowIndex !== idx + 1) {
+          resolvedParentRowIndex = fileParent.rowIndex;
+          resolvedParentDisplay = `${fileParent.name}${
+            fileParent.internalId ? ` (${fileParent.internalId})` : ''
+          } [wiersz #${fileParent.rowIndex}]`;
+          inheritedRegionName = fileParent.regionName || '';
+          inheritedBay = fileParent.bay || '';
+        }
+      }
+    }
+
+    const rawRegionName = getVal('regionName') || inheritedRegionName;
     const internalId = getVal('internalId');
-    const bay = getVal('bay');
+    const bay = getVal('bay') || inheritedBay;
     const licensePlate = getVal('licensePlate').toUpperCase();
     const vinNumber = getVal('vinNumber').toUpperCase();
     const assetCategory = normalizeAssetCategory(
@@ -424,7 +750,7 @@ export function prepareMachinesImportPreview(
     const insuranceExpiryDate = getVal('insuranceExpiryDate');
     const rawVerifyFlag = getVal('needsVerification').toLowerCase();
 
-    // Rozpoznanie rejonu
+    // Rozpoznanie rejonu (własnego lub odziedziczonego po urządzeniu nadrzędnym)
     let resolvedRegionId = '';
     let resolvedRegionLabel = '';
     let newRegionToCreate = '';
@@ -451,6 +777,14 @@ export function prepareMachinesImportPreview(
           newRegionsSet.set(lowerReg, rawRegionName);
         }
       }
+    } else if (inheritedRegionId) {
+      resolvedRegionId = inheritedRegionId;
+      const existingReg = (existingRegions || []).find(r => r.id === inheritedRegionId);
+      resolvedRegionLabel = existingReg
+        ? `${existingReg.name} (z urządzenia nadrzędnego)`
+        : inheritedRegionId === 'main_map'
+        ? 'Mapa Główna (z urządzenia nadrzędnego)'
+        : inheritedRegionId;
     }
 
     const markedUnverifiedInFile =
@@ -461,11 +795,19 @@ export function prepareMachinesImportPreview(
       rawVerifyFlag.includes('weryfikac');
 
     const hasRegion = Boolean(resolvedRegionId || newRegionToCreate);
-    const isIncomplete = !hasRegion || markedUnverifiedInFile;
+    // Jeśli podano parentMachine w arkuszu, ale nie udało się go znaleźć ani w bazie ani w pliku -> oznacz do weryfikacji
+    const unresolvedParentRef = Boolean(
+      rawParentRef && !resolvedParentId && !resolvedParentRowIndex
+    );
+    const isIncomplete = !hasRegion || markedUnverifiedInFile || unresolvedParentRef;
 
     let finalName = rawName.replace(/\(DO WERYFIKACJI\)/gi, '').trim();
     if (isIncomplete) {
       finalName = `${finalName} (DO WERYFIKACJI)`;
+    }
+
+    if (resolvedParentId || resolvedParentRowIndex) {
+      subassembliesCount += 1;
     }
 
     // Sprawdzenie duplikatów (po nr rejestracyjnym, nr wewnętrznym lub dokładnej nazwie)
@@ -492,7 +834,8 @@ export function prepareMachinesImportPreview(
 
     const payload = {
       name: finalName,
-      regionId: resolvedRegionId, // jeśli newRegionToCreate, zostanie podmienione po utworzeniu rejonu
+      regionId: resolvedRegionId,
+      parentId: assetCategory === 'vehicle' ? null : resolvedParentId || null,
       internalId,
       bay,
       assetCategory,
@@ -518,6 +861,8 @@ export function prepareMachinesImportPreview(
           qrReady: !isIncomplete,
           isIncomplete,
           newRegionToCreate,
+          parentRowIndex: resolvedParentRowIndex,
+          parentDisplay: resolvedParentDisplay,
           regionDisplay: resolvedRegionLabel || 'Brak rejonu (DO WERYFIKACJI)',
           reason: `Aktualizacja istniejącego urządzenia (${duplicateMachine.name})`,
           payload,
@@ -531,6 +876,8 @@ export function prepareMachinesImportPreview(
           existingId: duplicateMachine.id,
           qrReady: false,
           isIncomplete,
+          parentRowIndex: resolvedParentRowIndex,
+          parentDisplay: resolvedParentDisplay,
           regionDisplay: resolvedRegionLabel || '-',
           reason: `Duplikat w bazie (${duplicateMachine.name}) — pominięto`,
           payload,
@@ -548,8 +895,14 @@ export function prepareMachinesImportPreview(
         qrReady: false,
         isIncomplete: true,
         newRegionToCreate,
+        parentRowIndex: resolvedParentRowIndex,
+        parentDisplay:
+          resolvedParentDisplay ||
+          (unresolvedParentRef ? `Nie znaleziono nadrzędnego: "${rawParentRef}"` : ''),
         regionDisplay: resolvedRegionLabel || 'Brak rejonu',
-        reason: !hasRegion
+        reason: unresolvedParentRef
+          ? `Nie znaleziono urządzenia nadrzędnego "${rawParentRef}" — dodano jako (DO WERYFIKACJI)`
+          : !hasRegion
           ? 'Brak rejonu — zostanie dodane jako (DO WERYFIKACJI) bez kodu QR'
           : 'Oznaczone do weryfikacji — kod QR zostanie wygenerowany po weryfikacji',
         payload,
@@ -563,6 +916,8 @@ export function prepareMachinesImportPreview(
         qrReady: true,
         isIncomplete: false,
         newRegionToCreate,
+        parentRowIndex: resolvedParentRowIndex,
+        parentDisplay: resolvedParentDisplay,
         regionDisplay: resolvedRegionLabel,
         reason: 'Komplet danych — kod QR zostanie wygenerowany automatycznie',
         payload,
@@ -577,6 +932,7 @@ export function prepareMachinesImportPreview(
       totalRows: rawRows.length,
       readyWithQrCount,
       incompleteWithoutQrCount,
+      subassembliesCount,
       createTotalCount: readyWithQrCount + incompleteWithoutQrCount,
       updateCount,
       skipCount,
@@ -758,6 +1114,18 @@ export function preparePartsImportPreview(
 }
 
 /**
+ * Zwraca wiersze Legendy Kolumn (używane zarówno w drugim arkuszu pliku Excel "Legenda_Kolumn", jak i w UI kreatora).
+ */
+export function getImportLegendRows(mode = 'machines') {
+  const fields = mode === 'parts' ? PART_IMPORT_FIELDS : MACHINE_IMPORT_FIELDS;
+  return fields.map(f => ({
+    Kolumna: f.label,
+    Wymagalność: f.requirementBadge,
+    'Opis i zasady importu': f.legendDesc,
+  }));
+}
+
+/**
  * Generuje przykładowe wiersze szablonu Excel (.xlsx) do pobrania dla klienta.
  */
 export function getSampleTemplateRows(mode = 'machines', industryProfile = 'industrial') {
@@ -766,26 +1134,26 @@ export function getSampleTemplateRows(mode = 'machines', industryProfile = 'indu
       {
         'Nazwa części *': 'Łożysko kulkowe 6205-2RS SKF',
         'Kod magazynowy *': 'LOZ-6205-2RS',
-        'Stan początkowy': 12,
+        'Stan początkowy *': 12,
         'Jednostka miary': 'szt.',
         'Stan minimalny': 4,
         'Cena jedn. netto (PLN)': 28.5,
         'Budynek magazynowy': 'Magazyn Główny UR',
         'Lokalizacja (Regał/Półka)': 'R-04 / P-02',
         'Data ważności': '',
-        'Kompatybilne urządzenia': 'UR-001, UR-002',
+        'Kompatybilne urządzenia': 'UR-001, UR-001-CHILL',
       },
       {
-        'Nazwa części *': 'Olej hydrauliczny HVLP 46',
+        'Nazwa części *': 'Olej hydrauliczny HVLP 46 (Kompatybilne urządzenia można też przypisać później)',
         'Kod magazynowy *': 'OLEJ-HVLP-46',
-        'Stan początkowy': 60,
+        'Stan początkowy *': 60,
         'Jednostka miary': 'L',
         'Stan minimalny': 20,
         'Cena jedn. netto (PLN)': 14.2,
         'Budynek magazynowy': 'Magazyn Olejowy',
         'Lokalizacja (Regał/Półka)': 'Strefa B',
         'Data ważności': '2028-12-31',
-        'Kompatybilne urządzenia': 'UR-001',
+        'Kompatybilne urządzenia': '',
       },
     ];
   }
@@ -795,6 +1163,7 @@ export function getSampleTemplateRows(mode = 'machines', industryProfile = 'indu
       {
         'Nazwa urządzenia *': 'Volkswagen Crafter 2.0 TDI Brygadówka',
         'Miejsce montażu (Rejon)': 'Cała Firma',
+        'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
         'Numer wewnętrzny': 'FLOTA-01',
         'Informacja dodatkowa': 'Brygada Serwisowa Północ',
         'Kategoria zasobu': 'vehicle',
@@ -809,8 +1178,9 @@ export function getSampleTemplateRows(mode = 'machines', industryProfile = 'indu
         'Do weryfikacji': '',
       },
       {
-        'Nazwa urządzenia *': 'Ford Transit Custom (Nowy zakup — brak przypisanego oddziału)',
+        'Nazwa urządzenia *': 'Ford Transit Custom (Brak oddziału — trafi do weryfikacji bez QR)',
         'Miejsce montażu (Rejon)': '',
+        'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
         'Numer wewnętrzny': 'FLOTA-02',
         'Informacja dodatkowa': '',
         'Kategoria zasobu': 'vehicle',
@@ -831,28 +1201,31 @@ export function getSampleTemplateRows(mode = 'machines', industryProfile = 'indu
     {
       'Nazwa urządzenia *': 'Wycinarka laserowa Nukon Extreme 30250',
       'Miejsce montażu (Rejon)': 'Hala Cięcia',
+      'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
       'Numer wewnętrzny': 'UR-001',
       'Informacja dodatkowa': 'Nawa A / Stanowisko 1',
       'Kategoria zasobu': 'device',
       'Stan licznika': 4250,
       'Jednostka licznika': 'RBG',
-      'Dodatkowy opis': 'Źródło światłowodowe 12 kW',
+      'Dodatkowy opis': 'Główne urządzenie — otrzyma kod QR',
       'Do weryfikacji': '',
     },
     {
-      'Nazwa urządzenia *': 'Prasa krawędziowa TrumaBend V130',
-      'Miejsce montażu (Rejon)': 'Hala Gięcia',
-      'Numer wewnętrzny': 'UR-002',
-      'Informacja dodatkowa': 'Nawa B',
+      'Nazwa urządzenia *': 'Chiller chłodzący źrodło lasera (Podzespół)',
+      'Miejsce montażu (Rejon)': 'Hala Cięcia',
+      'Urządzenie nadrzędne (Nazwa lub Nr wew.)': 'UR-001',
+      'Numer wewnętrzny': 'UR-001-CHILL',
+      'Informacja dodatkowa': 'Nawa A / Przy laserze',
       'Kategoria zasobu': 'device',
-      'Stan licznika': 8120,
+      'Stan licznika': 4250,
       'Jednostka licznika': 'RBG',
-      'Dodatkowy opis': '',
+      'Dodatkowy opis': 'Podzespół podlegający pod urządzenie UR-001',
       'Do weryfikacji': '',
     },
     {
       'Nazwa urządzenia *': 'Suwnica pomostowa 16T (Brak rejonu - do uzupełnienia)',
       'Miejsce montażu (Rejon)': '',
+      'Urządzenie nadrzędne (Nazwa lub Nr wew.)': '',
       'Numer wewnętrzny': 'UR-003',
       'Informacja dodatkowa': '',
       'Kategoria zasobu': 'device',
