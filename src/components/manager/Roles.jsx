@@ -43,7 +43,7 @@ export default function Roles() {
         { id: 'parts_kpi', label: 'KPI Magazynu' },
         { id: 'parts_inventory', label: 'Baza Części' },
         { id: 'parts_transactions', label: 'Operacje Magazynowe' },
-        { id: 'parts_qr', label: 'Kody QR Części' },
+        { id: 'parts_qr', label: 'Baza QR Części' },
       ],
     },
     {

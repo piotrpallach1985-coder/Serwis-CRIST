@@ -601,17 +601,19 @@ export default function Machines({
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  data-testid="open-refrigerants-modal-btn"
-                  onClick={() => {
-                    setRefrigerantTypesMap(getAllRefrigerantTypes());
-                    setIsRefrigerantsModalOpen(true);
-                  }}
-                  className="flex-1 md:flex-none bg-cyan-50 text-cyan-800 border border-cyan-200 hover:bg-cyan-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
-                >
-                  <i className="ph ph-snowflake text-lg"></i> Czynniki chłodnicze (Lista / Dodaj)
-                </button>
+                {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                  <button
+                    type="button"
+                    data-testid="open-refrigerants-modal-btn"
+                    onClick={() => {
+                      setRefrigerantTypesMap(getAllRefrigerantTypes());
+                      setIsRefrigerantsModalOpen(true);
+                    }}
+                    className="flex-1 md:flex-none bg-cyan-50 text-cyan-800 border border-cyan-200 hover:bg-cyan-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                  >
+                    <i className="ph ph-snowflake text-lg"></i> Czynniki chłodnicze (Lista / Dodaj)
+                  </button>
+                )}
               </div>
             </div>
             <MachineTable

@@ -15,9 +15,10 @@ export default function MachineFilters({
 }) {
   const { t } = useTranslation();
   const branding = useManagerStore(state => state.branding);
+  const industryProfile = branding?.industryProfile || 'industrial';
   const machines = useManagerStore(state => state.machines || []);
   const hasVehiclesOrFleet =
-    branding?.industryProfile === 'fleet' ||
+    industryProfile === 'fleet' ||
     machines.some(m => !m.isDeleted && (m.assetCategory === 'vehicle' || m.licensePlate));
 
   return (
@@ -47,7 +48,9 @@ export default function MachineFilters({
           {[
             { id: '', label: 'Wszystkie zasoby', icon: 'ph-squares-four', activeClass: 'bg-slate-800 text-white' },
             { id: 'device', label: 'Urządzenia / Maszyny', icon: 'ph-gear-six', activeClass: 'bg-blue-600 text-white' },
-            { id: 'hvac', label: 'Klimatyzacja / HVAC', icon: 'ph-snowflake', activeClass: 'bg-cyan-600 text-white' },
+            ...(industryProfile !== 'industrial'
+              ? [{ id: 'hvac', label: 'Klimatyzacja / HVAC', icon: 'ph-snowflake', activeClass: 'bg-cyan-600 text-white' }]
+              : []),
             { id: 'vehicle', label: 'Pojazdy / Flota', icon: 'ph-truck', activeClass: 'bg-emerald-600 text-white' },
           ].map(tab => {
             const isActive = filterAssetCategory === tab.id;

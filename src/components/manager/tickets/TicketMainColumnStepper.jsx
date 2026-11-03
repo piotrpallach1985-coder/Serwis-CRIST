@@ -91,12 +91,13 @@ export default function TicketMainColumnStepper({
     : null;
 
   const canShowFGasSection =
-    currentMachine?.assetCategory === 'hvac' ||
-    (industryProfile !== 'industrial' &&
-      (industryProfile === 'hvac' || Boolean(currentMachine?.refrigerantType)));
+    industryProfile !== 'industrial' &&
+    (currentMachine?.assetCategory === 'hvac' ||
+      industryProfile === 'hvac' ||
+      Boolean(currentMachine?.refrigerantType));
 
   useEffect(() => {
-    if (industryProfile === 'industrial' && currentMachine?.assetCategory !== 'hvac') {
+    if (industryProfile === 'industrial') {
       setShowFGasSection(false);
       return;
     }

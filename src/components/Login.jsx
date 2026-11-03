@@ -734,10 +734,9 @@ export default function Login({ onLogin, currentUser }) {
                       </li>
                       <li>
                         Aplikacja VexoNT™ <strong>NIE śledzi trasy pracownika w sposób ciągły w tle</strong>{' '}
-                        ani poza czasem realizacji zlecenia. Punktowy odczyt GPS oraz stoper czasu
-                        trwania zlecenia służą wyłącznie do potwierdzenia obecności na obiekcie
-                        klienta, weryfikacji rzetelności przeglądów technicznych i rozliczenia czasu
-                        pracy.
+                        ani poza czasem realizacji zlecenia. Punktowy odczyt GPS służy wyłącznie do
+                        potwierdzenia obecności na obiekcie klienta i weryfikacji rzetelności
+                        przeglądów technicznych.
                       </li>
                     </ul>
                   </div>
@@ -876,9 +875,8 @@ export default function Login({ onLogin, currentUser }) {
                       </li>
                       <li>
                         VexoNT™ <strong>DOES NOT continuously track employee routes in the background</strong>{' '}
-                        or outside active task execution. Point-in-time GPS check-ins and task
-                        stopwatches are used solely to confirm on-site presence, verify inspection
-                        integrity, and settle working hours.
+                        or outside active task execution. Point-in-time GPS check-ins are used
+                        solely to confirm on-site presence and verify inspection integrity.
                       </li>
                     </ul>
                   </div>

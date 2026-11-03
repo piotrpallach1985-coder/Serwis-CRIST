@@ -160,6 +160,7 @@ export default function MachineForm({
           editingMachine.assetCategory !== 'device' &&
           editingMachine.assetCategory !== 'hvac');
       const isExistingHvac =
+        industryProfile !== 'industrial' &&
         !isExistingVehicle &&
         (editingMachine.assetCategory === 'hvac' ||
           Boolean(editingMachine.refrigerantType) ||
@@ -210,7 +211,9 @@ export default function MachineForm({
       );
     } else {
       const resolvedCategory =
-        initialAssetCategory && ['device', 'hvac', 'vehicle'].includes(initialAssetCategory)
+        initialAssetCategory &&
+        ['device', 'hvac', 'vehicle'].includes(initialAssetCategory) &&
+        !(industryProfile === 'industrial' && initialAssetCategory === 'hvac')
           ? initialAssetCategory
           : industryProfile === 'fleet'
           ? 'vehicle'
@@ -362,12 +365,13 @@ export default function MachineForm({
     setLoading(true);
 
     const allowCkob = assetCategory === 'device' && industryProfile === 'facility';
-    const isHvacSelected = assetCategory === 'hvac';
+    const isHvacSelected = industryProfile !== 'industrial' && assetCategory === 'hvac';
     const allowFGas =
-      isHvacSelected ||
-      (assetCategory === 'device' &&
-        industryProfile === 'facility' &&
-        inspectionCategory === 'hvac_kotlownia');
+      industryProfile !== 'industrial' &&
+      (isHvacSelected ||
+        (assetCategory === 'device' &&
+          industryProfile === 'facility' &&
+          inspectionCategory === 'hvac_kotlownia'));
     const allowContact =
       isHvacSelected ||
       (assetCategory === 'device' && industryProfile === 'facility') ||
@@ -534,7 +538,9 @@ export default function MachineForm({
             {/* Przełącznik Typu Zasobu (Urządzenie / HVAC / Pojazd — niezależne zakładki) */}
             <div
               data-testid="machine-asset-category-switcher"
-              className="bg-slate-50 border border-slate-200 rounded-xl p-2 grid grid-cols-1 sm:grid-cols-3 gap-2"
+              className={`bg-slate-50 border border-slate-200 rounded-xl p-2 grid grid-cols-1 ${
+                industryProfile === 'industrial' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
+              } gap-2`}
             >
               <button
                 type="button"
@@ -550,25 +556,27 @@ export default function MachineForm({
                 }`}
               >
                 <i className="ph ph-gear-six text-base"></i>
-                Urządzenie / Instalacja (RBG)
+                Urządzenie / Instalacja
               </button>
-              <button
-                type="button"
-                data-testid="asset-category-hvac-btn"
-                onClick={() => {
-                  setAssetCategory('hvac');
-                  setCounterUnit('RBG');
-                  setShowExtendedFields(true);
-                }}
-                className={`py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  assetCategory === 'hvac'
-                    ? 'bg-cyan-600 text-white shadow-sm'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                <i className="ph ph-snowflake text-base"></i>
-                Klimatyzacja / HVAC (F-Gazy / CRO)
-              </button>
+              {industryProfile !== 'industrial' && (
+                <button
+                  type="button"
+                  data-testid="asset-category-hvac-btn"
+                  onClick={() => {
+                    setAssetCategory('hvac');
+                    setCounterUnit('RBG');
+                    setShowExtendedFields(true);
+                  }}
+                  className={`py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    assetCategory === 'hvac'
+                      ? 'bg-cyan-600 text-white shadow-sm'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <i className="ph ph-snowflake text-base"></i>
+                  Klimatyzacja / HVAC (F-Gazy / CRO)
+                </button>
+              )}
               <button
                 type="button"
                 data-testid="asset-category-vehicle-btn"
@@ -583,7 +591,7 @@ export default function MachineForm({
                 }`}
               >
                 <i className="ph ph-truck text-base"></i>
-                Pojazd / Flota (km / RBG)
+                Pojazd / Flota
               </button>
             </div>
 
@@ -601,9 +609,11 @@ export default function MachineForm({
                 placeholder={
                   assetCategory === 'vehicle'
                     ? 'np. Renault Master Bus Serwisowy / Toyota Proace / Wózek widłowy Linde'
+                    : assetCategory === 'hvac' || industryProfile === 'hvac'
+                    ? 'np. Klimatyzator Split / Pompa ciepła / Centrala K-01'
                     : t(
                         'machines.form.machineNamePlaceholder',
-                        'np. Klimatyzator Split / Pompa ciepła / Centrala K-01'
+                        'np. Prasa hydrauliczna / Tokarka CNC / Suwnica'
                       )
                 }
                 required
@@ -1029,8 +1039,8 @@ export default function MachineForm({
               </div>
             )}
 
-            {/* Sekcja Klimatyzacji / HVAC (widoczna WYŁĄCZNIE w zakładce Klimatyzacja / HVAC — niezależna od Urządzeń i Pojazdów) */}
-            {assetCategory === 'hvac' && (
+            {/* Sekcja Klimatyzacji / HVAC (widoczna WYŁĄCZNIE w zakładce Klimatyzacja / HVAC poza profilem Przemysł) */}
+            {industryProfile !== 'industrial' && assetCategory === 'hvac' && (
               <div
                 data-testid="machine-form-domain-section"
                 className="border border-cyan-200 bg-cyan-50/40 rounded-xl overflow-hidden"

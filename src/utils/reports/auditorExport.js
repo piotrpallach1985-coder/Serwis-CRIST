@@ -107,12 +107,7 @@ export const generateAuditorReport = async (
         'Zgłaszający': t.reportedBy || '-',
         'Urządzenie zgłaszającego': t.reporterDevice || '-',
         'Zakończone przez': t.completedBy || t.assignedTo || '-',
-        'Czas dojazdu (min)': metrics.travelDurationMinutes !== null ? metrics.travelDurationMinutes : '-',
-        'Czas pracy Stoper (h)': metrics.stopwatchWorkHours !== null ? metrics.stopwatchWorkHours : '-',
         'Zadeklarowane RBG (h)': metrics.declaredManHours !== null ? metrics.declaredManHours : '-',
-        'Odchyłka RBG vs Stoper (h)': metrics.discrepancyHours !== null ? metrics.discrepancyHours : '-',
-        'Weryfikacja GPS': gpsVer.label,
-        'Odległość GPS (m)': gpsVer.distanceMeters !== null ? gpsVer.distanceMeters : '-',
         'Data Zgłoszenia': created ? created.toLocaleString('pl-PL') : '-',
         'Data Zamknięcia': closed ? closed.toLocaleString('pl-PL') : '-',
         'Usunięte (Ciche)': isDeleted,
@@ -153,12 +148,7 @@ export const generateAuditorReport = async (
         'Nazwa Serwisu': p.name || '-',
         'Typ wyzwalacza': p.triggerType || '-',
         'Wykonawca': p.completedBy || p.assignedService || '-',
-        'Czas dojazdu (min)': metrics.travelDurationMinutes !== null ? metrics.travelDurationMinutes : '-',
-        'Czas pracy Stoper (h)': metrics.stopwatchWorkHours !== null ? metrics.stopwatchWorkHours : '-',
         'Zadeklarowane RBG (h)': metrics.declaredManHours !== null ? metrics.declaredManHours : '-',
-        'Odchyłka RBG vs Stoper (h)': metrics.discrepancyHours !== null ? metrics.discrepancyHours : '-',
-        'Weryfikacja GPS': gpsVer.label,
-        'Odległość GPS (m)': gpsVer.distanceMeters !== null ? gpsVer.distanceMeters : '-',
         'Data Dodania': created ? created.toLocaleString('pl-PL') : '-',
         'Usunięte (Ciche)': isDeleted,
         'Kto usunął': p.deletedBy || '-',
@@ -250,12 +240,7 @@ export const generateAuditorReport = async (
             'Liczba zleceń (Łącznie)': 0,
             'Awarie': 0,
             'Serwisy planowane': 0,
-            'Łączny czas dojazdu (min)': 0,
-            'Czas pracy wg Stopera (h)': 0,
             'Zadeklarowane RBG (h)': 0,
-            'Zlecenia z nadwyżką RBG (>15m)': 0,
-            'GPS Na miejscu (<=300m)': 0,
-            'GPS POZA OBIEKTEM': 0,
           });
         }
         const entry = techStatsMap.get(techName);
@@ -264,28 +249,11 @@ export const generateAuditorReport = async (
         else entry['Serwisy planowane'] += 1;
 
         const m = calculateWorkAndTravelMetrics(task, machineObjMap[task.machineId] || null, rawRegions);
-        if (m.travelDurationMinutes !== null) {
-          entry['Łączny czas dojazdu (min)'] += m.travelDurationMinutes;
-        }
-        if (m.stopwatchWorkHours !== null && !m.isMultiDayOrPaused) {
-          entry['Czas pracy wg Stopera (h)'] = Number(
-            (entry['Czas pracy wg Stopera (h)'] + m.stopwatchWorkHours).toFixed(2)
-          );
-        }
         if (m.declaredManHours !== null) {
           entry['Zadeklarowane RBG (h)'] = Number(
             (entry['Zadeklarowane RBG (h)'] + m.declaredManHours).toFixed(2)
           );
         }
-        if (m.isTimeInflated) {
-          entry['Zlecenia z nadwyżką RBG (>15m)'] += 1;
-        }
-        const gpsVer =
-          m.endGpsVerification.status !== 'no_worker_gps'
-            ? m.endGpsVerification
-            : m.startGpsVerification;
-        if (gpsVer.status === 'on_site') entry['GPS Na miejscu (<=300m)'] += 1;
-        else if (gpsVer.status === 'off_site') entry['GPS POZA OBIEKTEM'] += 1;
       };
 
       tickets.forEach(t => accumulateTask(t, true));

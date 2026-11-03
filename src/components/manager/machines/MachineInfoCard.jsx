@@ -36,17 +36,19 @@ export default function MachineInfoCard({
   const navUrl = buildGoogleMapsNavigationUrl(geo);
 
   const isVehicle = isVehicleAsset(machine, industryProfile);
-  const isExplicitHvac = machine?.assetCategory === 'hvac';
+  const isExplicitHvac = industryProfile !== 'industrial' && machine?.assetCategory === 'hvac';
   const showCkob = industryProfile === 'facility';
   const showFGas =
-    isExplicitHvac ||
-    industryProfile === 'hvac' ||
-    (industryProfile === 'facility' && machine?.inspectionCategory === 'hvac_kotlownia');
+    industryProfile !== 'industrial' &&
+    (isExplicitHvac ||
+      industryProfile === 'hvac' ||
+      (industryProfile === 'facility' && machine?.inspectionCategory === 'hvac_kotlownia'));
   const showContact =
-    isExplicitHvac ||
-    industryProfile === 'facility' ||
-    industryProfile === 'hvac' ||
-    industryProfile === 'fleet';
+    industryProfile !== 'industrial' &&
+    (isExplicitHvac ||
+      industryProfile === 'facility' ||
+      industryProfile === 'hvac' ||
+      industryProfile === 'fleet');
 
   const counterUnit = getMachineCounterUnit(machine, industryProfile);
   const vehicleDates = isVehicle ? checkVehicleDatesStatus(machine) : null;

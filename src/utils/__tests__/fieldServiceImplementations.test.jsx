@@ -1805,10 +1805,34 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(calc.co2EquivalentTons).toBe(6.98);
       expect(calc.requiresCroCard).toBe(true);
 
-      // 2) Niezależna zakładka HVAC w MachineForm nawet w profilu 'industrial'
+      // 2) W profilu 'industrial' (Przemysł) zakres HVAC nie jest widoczny, a przyciski nie zawierają napisu RBG
       useManagerStore.getState().setBranding({
         companyName: 'Zakład Przemysłowy',
         industryProfile: 'industrial',
+      });
+
+      const { unmount: unmountInd } = render(
+        <MachineForm
+          isOpen={true}
+          onClose={vi.fn()}
+          editingMachine={null}
+          initialParentId=""
+          regions={[{ id: 'r1', name: 'Hala A' }]}
+          onSaved={vi.fn()}
+          onError={vi.fn()}
+        />
+      );
+      expect(screen.queryByTestId('asset-category-hvac-btn')).toBeNull();
+      expect(screen.getByTestId('asset-category-device-btn').textContent).toBe(
+        'Urządzenie / Instalacja'
+      );
+      expect(screen.getByTestId('asset-category-vehicle-btn').textContent).toBe('Pojazd / Flota');
+      unmountInd();
+
+      // 3) W profilu 'hvac' widoczna jest zakładka Klimatyzacja / HVAC oraz edytor czynników chłodniczych
+      useManagerStore.getState().setBranding({
+        companyName: 'Klima-Serwis',
+        industryProfile: 'hvac',
       });
 
       const { unmount } = render(
