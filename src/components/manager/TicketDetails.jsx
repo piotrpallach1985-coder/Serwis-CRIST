@@ -185,7 +185,7 @@ export default function TicketDetails({
     if (machine) {
       list.push({
         id: 'dtr',
-        title: t('tickets.details.tile_dtr', 'Dokumentacja DTR i notatki techniczne'),
+        title: t('tickets.details.tile_dtr', 'Dokumentacja i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (

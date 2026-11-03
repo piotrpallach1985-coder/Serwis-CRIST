@@ -174,9 +174,27 @@ export const DTR_DOC_CATEGORIES = [
   },
   {
     id: 'DOWOD_POLISA_FLOTA',
-    label: 'Dowód rejestracyjny / Polisa OC/AC / Karta pojazdu',
-    shortLabel: 'Dowód / OC/AC',
+    label: 'Dowód rejestracyjny / Karta pojazdu',
+    shortLabel: 'Dowód / Karta poj.',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+  {
+    id: 'POLISA_FLOTA',
+    label: 'Polisa ubezpieczeniowa (OC / AC / Assistance)',
+    shortLabel: 'Polisa OC/AC',
+    badgeClass: 'bg-teal-100 text-teal-800 border-teal-200',
+  },
+  {
+    id: 'BADANIE_SKP_UDT',
+    label: 'Badanie techniczne (SKP) / Dozór UDT / Legalizacja',
+    shortLabel: 'Badanie SKP/UDT',
+    badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+  },
+  {
+    id: 'INNE',
+    label: 'Inne / Pozostałe',
+    shortLabel: 'Inne / Pozostałe',
+    badgeClass: 'bg-gray-100 text-gray-800 border-gray-200',
   },
 ];
 
@@ -193,6 +211,28 @@ export const FUEL_TYPES = [
 export function getDtrDocCategoryInfo(docCategory) {
   const found = DTR_DOC_CATEGORIES.find(c => c.id === docCategory);
   return found || DTR_DOC_CATEGORIES[0];
+}
+
+export function getDtrDocCategoriesForMachine(machine, industryProfile = 'industrial') {
+  const isVehicle = isVehicleAsset(machine, industryProfile);
+  if (isVehicle) {
+    const vehicleIds = ['DOWOD_POLISA_FLOTA', 'POLISA_FLOTA', 'BADANIE_SKP_UDT', 'INNE'];
+    return DTR_DOC_CATEGORIES.filter(c => vehicleIds.includes(c.id));
+  }
+  if (industryProfile === 'facility') {
+    const facilityIds = [
+      'PROTOKOL_KONTROLI',
+      'EKSPERTYZA',
+      'DECYZJA_PINB',
+      'SWIADECTWO_ENERG',
+      'DOK_POWYKONAWCZA',
+      'DTR',
+      'INNE',
+    ];
+    return DTR_DOC_CATEGORIES.filter(c => facilityIds.includes(c.id));
+  }
+  const deviceIds = ['DTR', 'INNE'];
+  return DTR_DOC_CATEGORIES.filter(c => deviceIds.includes(c.id));
 }
 
 export const INDUSTRY_PROFILES = {

@@ -228,7 +228,7 @@
       "tile_history": "Historia zdarzeń",
       "tile_content": "Opis awarii, zdjęcia i części",
       "tile_stepper": "Kroki realizacji awarii (1–5)",
-      "tile_dtr": "Dokumentacja DTR i notatki techniczne",
+      "tile_dtr": "Dokumentacja i notatki techniczne",
       "ticket_prefix": "T",
       "machine_down": "POSTÓJ URZĄDZENIA",
       "object_data": "DANE OBIEKTU",
@@ -464,7 +464,7 @@
       "dbSaveError": "Błąd zapisu w bazie danych.",
       "confirmDeleteFile": "Czy na pewno chcesz usunąć plik {name}?",
       "deleteFileError": "Nie udało się usunąć pliku.",
-      "title": "Dokumentacja DTR",
+      "title": "Dokumentacja",
       "subtitle": "Tylko PDF. Max 50MB. Limit: 10 plików. Powyżej 30MB może działać wolniej. Przeciągnij i puść.",
       "chatWithDtr": "Analizuj wszystkie pliki DTR",
       "noPermissions": "Brak uprawnień do edycji DTR",
@@ -703,7 +703,7 @@
       "tile_resources": "Wymagane narzędzia i części",
       "tile_checklist": "Zakres prac do wykonania",
       "tile_timeline": "Kroki realizacji serwisu (1–5)",
-      "tile_dtr": "Dokumentacja DTR i notatki techniczne"
+      "tile_dtr": "Dokumentacja i notatki techniczne"
     },
     "dashboard": {
       "title": "Analiza Serwisów (KPI)",

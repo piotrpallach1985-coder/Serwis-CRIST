@@ -179,22 +179,6 @@ export default function Services() {
                       required
                     />
                   </div>
-                  <div className="lg:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {t(
-                        'admin.services.license_label',
-                        'Nr uprawnień budowlanych / świadectwa kwalifikacji (np. PIIB / SEP / F-Gaz)'
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="service-license-input"
-                      placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/27/00123/22"
-                      value={licenseNumber}
-                      onChange={e => setLicenseNumber(e.target.value)}
-                      className="w-full p-3 border rounded outline-none focus:border-blue-900"
-                    />
-                  </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-6 mt-2 border-t border-gray-100">
                   <button
@@ -241,11 +225,6 @@ export default function Services() {
                 </div>
                 <div>
                   <span className="font-bold text-gray-800 block">{s.name}</span>
-                  {s.licenseNumber && (
-                    <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-0.5">
-                      <i className="ph ph-certificate"></i> {s.licenseNumber}
-                    </span>
-                  )}
                 </div>
               </div>
               <div className="text-sm text-gray-600 flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">

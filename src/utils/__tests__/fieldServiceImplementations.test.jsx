@@ -16,6 +16,7 @@ import {
   getIndustryProfileConfig,
   checkCkob7DaysDeadline,
   getDtrDocCategoryInfo,
+  getDtrDocCategoriesForMachine,
   calculateDistanceMeters,
   verifyOnSiteGps,
   calculateWorkAndTravelMetrics,
@@ -921,9 +922,32 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       unmount();
     });
 
-    it('obsługuje kategorie dokumentacji obiektu pod c-KOB (docCategory) w MachineDTR', () => {
+    it('obsługuje kategorie dokumentacji zależnie od typu urządzenia/profilu (DTR / Pojazd / Budowlanka + Inne/Pozostałe) w MachineDTR', () => {
       expect(getDtrDocCategoryInfo('PROTOKOL_KONTROLI').shortLabel).toContain('Protokół c-KOB');
       expect(getDtrDocCategoryInfo('DECYZJA_PINB').shortLabel).toContain('Decyzja PINB/UDT');
+      expect(getDtrDocCategoryInfo('INNE').shortLabel).toContain('Inne / Pozostałe');
+
+      // 1) Urządzenie przemysłowe -> tylko DTR oraz Inne / Pozostałe
+      const indCats = getDtrDocCategoriesForMachine({ id: 'm1', assetCategory: 'device' }, 'industrial');
+      expect(indCats.map(c => c.id)).toEqual(['DTR', 'INNE']);
+
+      // 2) Pojazd -> dokumenty flotowe (Dowód, Polisa, SKP/UDT) oraz Inne / Pozostałe
+      const vehCats = getDtrDocCategoriesForMachine(
+        { id: 'v1', assetCategory: 'vehicle', licensePlate: 'GD 12345' },
+        'industrial'
+      );
+      expect(vehCats.map(c => c.id)).toEqual([
+        'DOWOD_POLISA_FLOTA',
+        'POLISA_FLOTA',
+        'BADANIE_SKP_UDT',
+        'INNE',
+      ]);
+
+      // 3) Budowlanka (facility) -> dokumenty c-KOB / budowlane + DTR + Inne / Pozostałe
+      const facCats = getDtrDocCategoriesForMachine({ id: 'b1', assetCategory: 'device' }, 'facility');
+      expect(facCats.map(c => c.id)).toContain('PROTOKOL_KONTROLI');
+      expect(facCats.map(c => c.id)).toContain('INNE');
+      expect(facCats.map(c => c.id)).not.toContain('DOWOD_POLISA_FLOTA');
 
       const machineWithFiles = {
         id: 'm-dtr-1',

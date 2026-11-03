@@ -293,26 +293,9 @@ export default function Users() {
                   </div>
                 </div>
 
-                {/* Uprawnienia budowlane / kwalifikacyjne oraz Dedykowany Serwis dla Serwisanta */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {t(
-                        'admin.users.license_label',
-                        'Nr uprawnień budowlanych / świadectwa kwalifikacji (np. PIIB / SEP / F-Gaz)'
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="user-license-input"
-                      value={licenseNumber}
-                      onChange={e => setLicenseNumber(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                      placeholder="np. POM/0123/OWOK/18, SEP E1/D1, FGAZ-O/27/00123/22"
-                    />
-                  </div>
-
-                  {role !== USER_ROLES.ADMIN && role !== USER_ROLES.SUPERADMIN && (
+                {/* Dedykowany Serwis dla Serwisanta */}
+                {role !== USER_ROLES.ADMIN && role !== USER_ROLES.SUPERADMIN && (
+                  <div className="pt-2 border-t border-gray-100">
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -326,10 +309,6 @@ export default function Users() {
                             setAssignedService(val);
                             if (val) {
                               setOnlyAssignedTasks(true);
-                              const srvObj = services.find(s => s.name === val);
-                              if (srvObj?.licenseNumber && !licenseNumber) {
-                                setLicenseNumber(srvObj.licenseNumber);
-                              }
                             }
                           }}
                           className="w-full p-2 border border-slate-300 rounded bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -355,8 +334,8 @@ export default function Users() {
                         </span>
                       </label>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-3 pt-6 mt-4 border-t border-gray-100 w-full">
                   <button
@@ -430,11 +409,6 @@ export default function Users() {
                           : rolesList.find(r => r.id === item.role)?.name || item.role}
                       </span>
                     </div>
-                    {item.licenseNumber && (
-                      <div className="text-xs text-indigo-700 font-semibold flex items-center gap-1">
-                        <i className="ph ph-certificate"></i> Uprawnienia: {item.licenseNumber}
-                      </div>
-                    )}
                     {item.assignedService && (
                       <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
                         <i className="ph ph-wrench"></i> Dedykowany serwis: {item.assignedService}
@@ -483,11 +457,6 @@ export default function Users() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-800">{u.name}</div>
-                      {u.licenseNumber && (
-                        <div className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-1">
-                          <i className="ph ph-certificate"></i> {u.licenseNumber}
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{u.email}</td>
                     <td className="px-6 py-4 text-gray-600">{u.phone || '-'}</td>

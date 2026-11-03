@@ -399,12 +399,12 @@ export const generateMachineHistoryPDF = async (machine, tickets = [], services 
       currentY += 10;
     }
 
-    // ----- 5. Notatki techniczne i dokumentacja DTR -----
+    // ----- 5. Notatki techniczne i dokumentacja -----
     if (machine.dtrFiles && machine.dtrFiles.length > 0) {
       if (currentY > 255) { doc.addPage(); currentY = 20; }
       doc.setFontSize(13);
       doc.setTextColor(40, 40, 40);
-      doc.text(n(`Zalaczone Pliki Dokumentacji DTR (${machine.dtrFiles.length})`), 14, currentY);
+      doc.text(n(`Zalaczone Pliki Dokumentacji (${machine.dtrFiles.length})`), 14, currentY);
       currentY += 4;
 
       const dtrRows = machine.dtrFiles.map(f => {

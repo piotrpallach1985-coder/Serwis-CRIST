@@ -11,16 +11,23 @@ import { updateMachine } from '../../services/machines.service';
 import { storage } from '../../firebase';
 import { safe } from '../../utils/safeRender';
 import { getCurrentTenant } from '../../utils/tenantHelper';
-import { DTR_DOC_CATEGORIES, getDtrDocCategoryInfo } from '../../utils/fieldServiceHelpers';
+import {
+  getDtrDocCategoryInfo,
+  getDtrDocCategoriesForMachine,
+} from '../../utils/fieldServiceHelpers';
 
 export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
   const { t } = useTranslation();
 
   const { user } = useAuth();
   const branding = useManagerStore(state => state.branding);
+  const industryProfile = branding?.industryProfile || 'industrial';
   const isDtrModuleEnabled = branding?.modules?.planned_services !== false;
+  const availableDocCategories = getDtrDocCategoriesForMachine(machine, industryProfile);
   const [uploading, setUploading] = useState(false);
-  const [selectedDocCategory, setSelectedDocCategory] = useState('DTR');
+  const [selectedDocCategory, setSelectedDocCategory] = useState(
+    () => availableDocCategories[0]?.id || 'DTR'
+  );
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatDocument, setChatDocument] = useState(null);
   const [progress, setProgress] = useState(0);
@@ -45,6 +52,12 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
     setLocalDtrFiles(machine.dtrFiles || []);
     setLocalNotes(machine.techNotes || []);
   }, [machine.dtrFiles, machine.techNotes]);
+
+  useEffect(() => {
+    if (!availableDocCategories.some(c => c.id === selectedDocCategory)) {
+      setSelectedDocCategory(availableDocCategories[0]?.id || 'DTR');
+    }
+  }, [machine?.id, machine?.assetCategory, machine?.licensePlate, industryProfile]);
 
   const handleDeleteNote = async noteId => {
     if (!window.confirm(t('machines.dtr.confirmDeleteNote'))) return;
@@ -220,10 +233,10 @@ export default function MachineDTR({ machine, canManage, canDeleteNotes }) {
                     onChange={e => setSelectedDocCategory(e.target.value)}
                     disabled={uploading}
                     data-testid="dtr-doc-category-select"
-                    title="Kategoria dokumentu (c-KOB / DTR)"
+                    title="Kategoria dokumentu"
                     className="p-1.5 border border-slate-300 rounded text-xs bg-white text-slate-700 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {DTR_DOC_CATEGORIES.map(cat => (
+                    {availableDocCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>
                         {cat.label}
                       </option>

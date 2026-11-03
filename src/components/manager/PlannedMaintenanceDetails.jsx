@@ -171,7 +171,7 @@ export default function PlannedMaintenanceDetails({
     if (targetMachine) {
       list.push({
         id: 'dtr',
-        title: t('planned.details.tile_dtr', 'Dokumentacja DTR i notatki techniczne'),
+        title: t('planned.details.tile_dtr', 'Dokumentacja i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (

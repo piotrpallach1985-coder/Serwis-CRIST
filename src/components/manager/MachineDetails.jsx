@@ -165,7 +165,7 @@ export default function MachineDetails({
       },
       {
         id: 'machine_dtr',
-        title: t('machines.details.dtrTileTitle', 'Dokumentacja DTR i notatki techniczne'),
+        title: t('machines.details.dtrTileTitle', 'Dokumentacja i notatki techniczne'),
         icon: 'ph-files',
         defaultColSpan: 12,
         render: () => (
