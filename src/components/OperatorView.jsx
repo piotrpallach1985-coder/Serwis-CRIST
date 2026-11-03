@@ -394,7 +394,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             <p className="font-bold text-sm">
               {t(
                 'operator.scanAnyQrTitle',
-                'Zeskanuj dowolny kod QR urządzenia w Twoim rejonie lub obiekcie'
+                'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
               )}
             </p>
             <p className="text-xs mt-1">
@@ -423,7 +423,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             <p className="text-gray-500 text-sm mt-2 mb-6">
               {t(
                 'operator.deviceNotConnectedDesc',
-                'Zeskanuj dowolny kod QR w Twoim rejonie, aby zgłosić awarię do odpowiedniego działu lub serwisu.'
+                'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
               )}
             </p>
             <button

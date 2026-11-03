@@ -1308,10 +1308,24 @@
     "quick_search_machine": "Szybkie szukanie urządzenia",
     "no_access": "Brak Dostępu",
     "select_scan_method": "Wybierz metodę skanowania",
-    "camera_qr": "Kamera (QR)",
-    "contactless_nfc": "Zbliżeniowo (NFC)",
+    "camera_qr": "Skanuj QR/Tablicę",
+    "contactless_nfc": "Zbliżeniowe NFC",
     "footer_subtitle": "© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu",
     "exit": "Wyjdź",
     "control_room": "Dyspozytornia"
+  },
+  "scanner": {
+    "internalTitle": "Zgłoszenie awarii"
+  },
+  "operator": {
+    "scanQrBtn": "Skanuj QR/Tablicę",
+    "scanQrOrPlateBtn": "Skanuj QR/Tablicę",
+    "scanNfcBtn": "Zbliżeniowe NFC",
+    "scanQrCardTitle": "Skanuj QR/Tablicę:",
+    "scanQrCardDesc": "Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.",
+    "scanNfcCardTitle": "Zbliżeniowe NFC:",
+    "scanNfcCardDesc": "Odczytaj przy pomocy NFC i zgłoś awarię.",
+    "otherMachineCardTitle": "Zgłoś inne urządzenie:",
+    "otherMachineCardDesc": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy."
   }
 }

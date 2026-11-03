@@ -1792,6 +1792,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const { unmount: unmountUnloggedScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={false} />
       );
+      expect(screen.getByText('Skanuj QR/Tablicę')).toBeTruthy();
+      expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
+        )
+      ).toBeTruthy();
       expect(screen.queryByTestId('operator-report-without-qr-btn')).toBeNull();
       expect(screen.queryByTestId('operator-license-plate-section')).toBeNull();
       unmountUnloggedScanner();
@@ -1801,6 +1808,8 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={true} />
       );
 
+      expect(screen.getByText('Skanuj QR/Tablicę')).toBeTruthy();
+      expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
       expect(screen.getByTestId('operator-report-without-qr-btn')).toBeTruthy();
       expect(screen.getByTestId('operator-license-plate-section')).toBeTruthy();
       expect(screen.queryByTestId('operator-plate-input')).toBeNull(); // Domyślnie zwinięte!

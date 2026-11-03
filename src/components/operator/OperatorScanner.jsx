@@ -365,9 +365,7 @@ export default function OperatorScanner({
               >
                 <i className="ph ph-qr-code text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
                 <span className="text-base sm:text-lg tracking-wide">
-                  {isInternal
-                    ? t('operator.scanQrOrPlateBtn', 'Skanuj QR / Tablicę')
-                    : t('operator.scanQrBtn', 'Skanuj QR')}
+                  {t('operator.scanQrOrPlateBtn', 'Skanuj QR/Tablicę')}
                 </span>
               </button>
 
@@ -377,7 +375,7 @@ export default function OperatorScanner({
               >
                 <i className="ph ph-waves text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
                 <span className="text-base sm:text-lg tracking-wide">
-                  {t('operator.scanNfcBtn', 'Odczyt NFC')}
+                  {t('operator.scanNfcBtn', 'Zbliżeniowe NFC')}
                 </span>
               </button>
 
@@ -407,10 +405,13 @@ export default function OperatorScanner({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
-                    {t('operator.scanQrCardTitle', 'Skanuj QR:')}
+                    {t('operator.scanQrCardTitle', 'Skanuj QR/Tablicę:')}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
-                    {t('operator.scanQrCardDesc', 'Zeskanuj kod QR i zgłoś awarię.')}
+                    {t(
+                      'operator.scanQrCardDesc',
+                      'Zeskanuj kod QR urządzenia lub tablicę rejestracyjną i zgłoś awarię.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -425,7 +426,7 @@ export default function OperatorScanner({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
-                    {t('operator.scanNfcCardTitle', 'Szybki odczyt NFC:')}
+                    {t('operator.scanNfcCardTitle', 'Zbliżeniowe NFC:')}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
                     {t('operator.scanNfcCardDesc', 'Odczytaj przy pomocy NFC i zgłoś awarię.')}
@@ -445,7 +446,7 @@ export default function OperatorScanner({
                   <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
                     {t(
                       'operator.otherMachineCardDesc',
-                      'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, a awaria zostanie zgłoszona do odpowiedniego działu lub serwisu.'
+                      'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
                     )}
                   </p>
                 </div>

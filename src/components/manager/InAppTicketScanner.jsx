@@ -124,7 +124,7 @@ export default function InAppTicketScanner() {
       <div className="mb-4 sm:mb-6 flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
           <i className="ph ph-warning-circle text-purple-600 text-3xl"></i>
-          {t('scanner.internalTitle', 'Zgłoszenie awarii (Wewnętrzne)')}
+          {t('scanner.internalTitle', 'Zgłoszenie awarii')}
         </h1>
         <button
           onClick={() => navigate(-1)}

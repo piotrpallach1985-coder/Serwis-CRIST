@@ -162,7 +162,7 @@ export default function HomeDashboard({ onLogout }) {
                 className="flex-1 py-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
                 <i className="ph ph-qr-code text-5xl"></i>
-                {t('login.camera_qr', 'Kamera (QR)')}
+                {t('login.camera_qr', 'Skanuj QR/Tablicę')}
               </button>
               <button
                 onClick={() => {
@@ -173,7 +173,7 @@ export default function HomeDashboard({ onLogout }) {
                 className="flex-1 py-6 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
                 <i className="ph ph-waves text-5xl"></i>
-                {t('login.contactless_nfc', 'Zbliżeniowo (NFC)')}
+                {t('login.contactless_nfc', 'Zbliżeniowe NFC')}
               </button>
             </div>
           </div>
@@ -186,11 +186,11 @@ export default function HomeDashboard({ onLogout }) {
         onClose={() => setIsScanning(false)}
         onScanSuccess={handleScanSuccess}
         mode={scannerMode}
-        title={scannerMode === 'qr' ? 'Skaner Kodów QR' : 'Odczyt NFC'}
+        title={scannerMode === 'qr' ? 'Skanuj QR/Tablicę' : 'Zbliżeniowe NFC'}
         subtitle={
           scannerMode === 'qr'
-            ? 'Skieruj aparat na kod QR, aby otworzyć maszynę.'
-            : 'Zbliż telefon do naklejki NFC maszyny.'
+            ? 'Skieruj aparat na kod QR lub tablicę rejestracyjną, aby otworzyć urządzenie.'
+            : 'Zbliż telefon do naklejki NFC urządzenia.'
         }
       />
 
@@ -232,7 +232,7 @@ export default function HomeDashboard({ onLogout }) {
               <i className="ph ph-magnifying-glass text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
               <i className="ph ph-qr-code text-2xl absolute top-6 right-6 opacity-50"></i>
               <h3 className="text-base sm:text-lg font-bold tracking-wide">
-                {t('login.quick_search_machine', 'Szybkie szukanie maszyny')}
+                {t('login.quick_search_machine', 'Szybkie szukanie urządzenia')}
               </h3>
             </button>
 
