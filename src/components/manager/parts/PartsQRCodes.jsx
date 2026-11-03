@@ -93,7 +93,7 @@ export default function PartsQRCodes() {
               top: 0;
               width: 100%;
               display: grid !important;
-              grid-template-columns: repeat(4, 1fr) !important;
+              grid-template-columns: repeat(3, 1fr) !important;
               gap: 16px !important;
               padding: 0 !important;
             }
@@ -106,7 +106,10 @@ export default function PartsQRCodes() {
             .qr-card {
               break-inside: avoid;
               page-break-inside: avoid;
-              border: 1px solid #ccc !important;
+              border: 2px solid #0f172a !important;
+              border-radius: 16px !important;
+              background: #ffffff !important;
+              opacity: 1 !important;
               box-shadow: none !important;
             }
           }
@@ -187,11 +190,13 @@ export default function PartsQRCodes() {
           {t("parts.qr.no_parts")}
         </div>
       ) : (
-        <div id="printable-qr-area" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div id="printable-qr-area" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {filteredParts.map(p => {
             const isSelected = selectedIds.has(p.id);
             const dateObj = getPartQrDateObj(p);
             const dateStr = dateObj ? dateObj.toLocaleDateString('pl-PL') : '—';
+            const partLocationStr = [p.building, p.location].filter(Boolean).join(' / ') || '-';
+            const partCodeStr = p.code || '-';
             const qrValue = buildPartQrValue(tenantId, p.id, {
               tenantName: tenantDisplayName,
               partName: p.name,
@@ -203,8 +208,8 @@ export default function PartsQRCodes() {
               <div
                 key={p.id}
                 onClick={() => toggleSelect(p.id)}
-                className={`qr-card print-only-selected ${isSelected ? 'is-selected' : ''} cursor-pointer bg-white p-4 rounded-2xl border-2 flex flex-col items-center text-center transition-all relative ${
-                  isSelected ? 'border-blue-500 shadow-md bg-blue-50/10' : 'border-gray-100 hover:border-gray-200 shadow-sm opacity-80'
+                className={`qr-card print-only-selected ${isSelected ? 'is-selected' : ''} cursor-pointer bg-white p-5 rounded-2xl border-2 flex flex-col items-center text-center transition-all relative ${
+                  isSelected ? 'border-slate-900 ring-2 ring-blue-500/40 shadow-md' : 'border-slate-300 hover:border-slate-500 shadow-sm opacity-90'
                 }`}
               >
                 {/* Checkbox (ukryty w druku) */}
@@ -217,34 +222,71 @@ export default function PartsQRCodes() {
                 </div>
 
                 {/* Nazwa tenanta na górze */}
-                <div className="text-[10px] font-black text-blue-700 uppercase tracking-wider mb-1 truncate w-full px-5">
-                  {tenantDisplayName}
+                <div className="flex items-center justify-center gap-1.5 mb-1.5 px-4 w-full">
+                  <svg
+                    className="w-4 h-4 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 21H21V10L16 13V10L11 13V6H3V21Z"
+                      fill="#cbd5e1"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6 3V6M9 3V6"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
+                    {tenantDisplayName}
+                  </span>
                 </div>
 
-                <div className="p-2 bg-white rounded-xl mb-2 border border-gray-100 flex items-center justify-center gap-1.5">
-                  <span
-                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  >
-                    system VexoNT
-                  </span>
-                  <QRCodeCanvas value={qrValue} size={110} level="M" />
-                  <span
-                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                    style={{ writingMode: 'vertical-rl' }}
-                  >
-                    system VexoNT
-                  </span>
+                <div className="text-[9px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3">
+                  VexoNT - MAGAZYN CZĘŚCI UR
                 </div>
 
-                <div className="font-extrabold text-gray-900 text-xs line-clamp-2 leading-tight mb-1 w-full">
+                <div className="my-1 flex items-center justify-center">
+                  <QRCodeCanvas value={qrValue} size={136} level="M" />
+                </div>
+
+                <div className="font-extrabold text-slate-900 text-sm leading-snug mt-3 mb-2.5 w-full break-words">
                   {p.name}
                 </div>
-                <div className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded w-full truncate">
-                  {p.code}
-                </div>
-                <div className="text-[9px] text-gray-500 mt-1.5 font-mono font-bold">
-                  {t("parts.qr.edited")} {dateStr}
+
+                <div className="w-full border-t-2 border-dashed border-slate-300 mb-2.5"></div>
+
+                <div className="w-full text-left space-y-1.5">
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      LOKALIZACJA
+                    </div>
+                    <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+                      {partLocationStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      NUMER WEWNĘTRZNY UR
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
+                      {partCodeStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      DATA KODU (OST. EDYCJA)
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
+                      {dateStr}
+                    </div>
+                  </div>
                 </div>
               </div>
             );

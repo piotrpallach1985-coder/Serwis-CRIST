@@ -323,44 +323,75 @@ export default function PartDetails({ part, onBack, onEdit }) {
         title: t('parts.details.qr_title'),
         icon: 'ph-qr-code',
         defaultColSpan: 4,
-        render: () => (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-              {t('parts.details.qr_title')}
-            </h3>
-            <div className="bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col items-center">
-              <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
-                {tenantName}
+        render: () => {
+          const partLocationStr = [part.building, part.location].filter(Boolean).join(' / ') || '-';
+          const partCodeStr = part.code || '-';
+          return (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col items-center">
+              <div className="w-full max-w-[280px] bg-white p-5 rounded-2xl border-2 border-slate-900 shadow-xs flex flex-col items-center text-center">
+                <div className="flex items-center justify-center gap-2 mb-1.5">
+                  <svg
+                    className="w-5 h-5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 21H21V10L16 13V10L11 13V6H3V21Z"
+                      fill="#cbd5e1"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M6 3V6M9 3V6" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <span className="text-base font-black text-slate-900 uppercase tracking-tight leading-tight">
+                    {tenantName}
+                  </span>
+                </div>
+                <div className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3.5">
+                  VexoNT - MAGAZYN CZĘŚCI UR
+                </div>
+                <div className="my-1 flex items-center justify-center">
+                  <QRCodeCanvas value={qrValue} size={140} level="M" />
+                </div>
+                <div className="text-base font-extrabold text-slate-900 mt-3.5 mb-3 text-center leading-snug break-words w-full">
+                  {part.name}
+                </div>
+                <div className="w-full border-t-2 border-dashed border-slate-300 mb-3"></div>
+                <div className="w-full text-left space-y-2">
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      LOKALIZACJA
+                    </div>
+                    <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+                      {partLocationStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      NUMER WEWNĘTRZNY UR
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
+                      {partCodeStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      DATA KODU (OST. EDYCJA)
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
+                      {qrDateStr}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-xs font-extrabold text-slate-800 mb-2 text-center line-clamp-1">
-                {part.name}
-              </div>
-              <div className="flex items-center justify-center gap-1.5">
-                <span
-                  className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                >
-                  system VexoNT
-                </span>
-                <QRCodeCanvas value={qrValue} size={140} level="M" />
-                <span
-                  className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                  style={{ writingMode: 'vertical-rl' }}
-                >
-                  system VexoNT
-                </span>
-              </div>
-              <div className="mt-3 text-center">
-                <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md">
-                  DATA: {qrDateStr}
-                </span>
-              </div>
+              <p className="text-[10px] text-slate-400 text-center mt-3 font-medium px-4">
+                {t('parts.details.qr_desc')}
+              </p>
             </div>
-            <p className="text-[10px] text-slate-400 text-center mt-3 font-medium px-4">
-              {t('parts.details.qr_desc')}
-            </p>
-          </div>
-        ),
+          );
+        },
       },
       {
         id: 'part_audit',

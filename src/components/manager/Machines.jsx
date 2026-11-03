@@ -49,6 +49,7 @@ import {
   getOrCreateQrKey,
   buildMachineQrValue,
   resolveTenantDisplayName,
+  resolveMachineQrLocation,
   formatQrDate,
   parseQrPayload,
   PART_QR_IN_MACHINE_SCANNER_MSG,
@@ -266,6 +267,8 @@ export default function Machines({
     if (!svgElement) return;
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const tenantDisplayName = resolveTenantDisplayName(getCurrentTenant(), branding);
+    const locationFormatted = resolveMachineQrLocation(machine, regions, '-');
+    const internalIdFormatted = machine.internalId || machine.licensePlate || '-';
     const qrDateFormatted = formatQrDate(machine, machines, '-');
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -274,26 +277,54 @@ export default function Machines({
         <head>
           <title>${escapeHtml(t('machines.print.printQr'))}${escapeHtml(name)}</title>
           <style>
-              body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-              .qr-container { text-align: center; border: 2px dashed #ccc; padding: 20px; border-radius: 10px; }
-              .tenant { font-size: 11px; font-weight: 800; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-              .qr-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0; }
-              .qr-side-brand { writing-mode: vertical-rl; font-size: 9px; font-weight: 600; color: #9ca3af; letter-spacing: 0.14em; user-select: none; }
-              .qr-side-brand.left { transform: rotate(180deg); }
-              h2 { margin: 10px 0 5px; font-size: 22px; }
-              p { margin: 2px 0; color: #555; font-size: 13px; }
+              * { box-sizing: border-box; }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; color: #0f172a; }
+              .qr-container { width: 320px; text-align: center; border: 2px solid #0f172a; padding: 26px 24px 22px; border-radius: 16px; background: #fff; }
+              .tenant-header { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
+              .tenant-icon { width: 22px; height: 22px; flex-shrink: 0; }
+              .tenant-name { font-size: 20px; font-weight: 900; color: #0f172a; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.15; }
+              .system-subtitle { font-size: 11px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.35; margin: 0 0 20px; }
+              .qr-row { display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+              .qr-row svg { width: 170px !important; height: 170px !important; display: block; }
+              .machine-name { margin: 0 0 16px; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.25; word-break: break-word; }
+              .divider { border-top: 2px dashed #cbd5e1; width: 100%; margin: 0 0 14px; }
+              .meta-list { text-align: left; width: 100%; }
+              .meta-item { margin-bottom: 11px; }
+              .meta-item:last-child { margin-bottom: 0; }
+              .meta-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+              .meta-value { font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.25; word-break: break-word; }
+              .meta-value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-weight: 700; letter-spacing: 0.02em; }
             </style>
           </head>
           <body>
             <div class="qr-container">
-              <div class="tenant">${escapeHtml(tenantDisplayName)}</div>
-              <div class="qr-row">
-                <span class="qr-side-brand left">system VexoNT</span>
-                ${svgData}
-                <span class="qr-side-brand">system VexoNT</span>
+              <div class="tenant-header">
+                <svg class="tenant-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 21H21V10L16 13V10L11 13V6H3V21Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="2" stroke-linejoin="round"/>
+                  <path d="M6 3V6M9 3V6" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span class="tenant-name">${escapeHtml(tenantDisplayName)}</span>
               </div>
-              <h2>${escapeHtml(name)}</h2>
-              <p>${escapeHtml(t('machines.print.date'))}${escapeHtml(qrDateFormatted)}</p>
+              <div class="system-subtitle">VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ</div>
+              <div class="qr-row">
+                ${svgData}
+              </div>
+              <h2 class="machine-name">${escapeHtml(name)}</h2>
+              <div class="divider"></div>
+              <div class="meta-list">
+                <div class="meta-item">
+                  <div class="meta-label">LOKALIZACJA</div>
+                  <div class="meta-value">${escapeHtml(locationFormatted)}</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">NUMER WEWNĘTRZNY UR</div>
+                  <div class="meta-value mono">${escapeHtml(internalIdFormatted)}</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">DATA KODU (OST. EDYCJA)</div>
+                  <div class="meta-value mono">${escapeHtml(qrDateFormatted)}</div>
+                </div>
+              </div>
             </div>
             <script>window.onload = function() { window.print(); window.close(); }</script>
           </body>

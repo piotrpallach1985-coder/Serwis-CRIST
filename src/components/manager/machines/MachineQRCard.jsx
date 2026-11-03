@@ -8,6 +8,7 @@ import {
   getOrCreateQrKey,
   buildMachineQrValue,
   resolveTenantDisplayName,
+  resolveMachineQrLocation,
   formatQrDate,
 } from '../../../services/qrAccess.service';
 
@@ -16,6 +17,7 @@ export default function MachineQRCard({ machine }) {
   const tenantId = getCurrentTenant();
   const branding = useManagerStore(state => state.branding);
   const machines = useManagerStore(state => state.machines || []);
+  const regions = useManagerStore(state => state.regions || []);
   const [qrKey, setQrKey] = useState(null);
 
   useEffect(() => {
@@ -32,7 +34,9 @@ export default function MachineQRCard({ machine }) {
 
   const isUnverified = machine.name && machine.name.includes('(DO WERYFIKACJI)');
   const tenantName = resolveTenantDisplayName(tenantId, branding);
-  const qrDateStr = formatQrDate(machine, machines, t('machines.print.noData', 'Brak danych'));
+  const locationStr = resolveMachineQrLocation(machine, regions, '-');
+  const internalIdStr = machine.internalId || machine.licensePlate || '-';
+  const qrDateStr = formatQrDate(machine, machines, t('machines.print.noData', '-'));
   const qrValue = buildMachineQrValue(machine, tenantId, qrKey, {
     branding,
     tenantName,
@@ -56,39 +60,75 @@ export default function MachineQRCard({ machine }) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col items-center justify-center text-center h-full">
-      <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
-        {tenantName}
+      <div className="w-full max-w-[280px] bg-white border-2 border-slate-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-xs">
+        <div className="flex items-center justify-center gap-2 mb-1.5">
+          <svg
+            className="w-5 h-5 shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3 21H21V10L16 13V10L11 13V6H3V21Z"
+              fill="#cbd5e1"
+              stroke="#0f172a"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <path d="M6 3V6M9 3V6" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span className="text-base font-black text-slate-900 uppercase tracking-tight leading-tight">
+            {tenantName}
+          </span>
+        </div>
+
+        <div className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3.5">
+          VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ
+        </div>
+
+        <div className="my-1 flex items-center justify-center">
+          <QRCodeSVG
+            id={`qr-svg-${machine.id}`}
+            value={qrValue}
+            size={148}
+            level="M"
+            includeMargin={false}
+          />
+        </div>
+
+        <h3 className="text-base font-extrabold text-slate-900 mt-3.5 mb-3 leading-snug break-words w-full">
+          {machine.name}
+        </h3>
+
+        <div className="w-full border-t-2 border-dashed border-slate-300 mb-3"></div>
+
+        <div className="w-full text-left space-y-2">
+          <div>
+            <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+              LOKALIZACJA
+            </div>
+            <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+              {locationStr}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+              NUMER WEWNĘTRZNY UR
+            </div>
+            <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
+              {internalIdStr}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+              DATA KODU (OST. EDYCJA)
+            </div>
+            <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
+              {qrDateStr}
+            </div>
+          </div>
+        </div>
       </div>
-      <h3 className="text-xs font-extrabold text-gray-800 mb-2 line-clamp-1 px-2">
-        {machine.name}
-      </h3>
-      <div className="p-2.5 bg-white border-2 border-dashed border-gray-300 rounded-xl mb-2.5 flex items-center justify-center gap-1.5">
-        <span
-          className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-        >
-          system VexoNT
-        </span>
-        <QRCodeSVG
-          id={`qr-svg-${machine.id}`}
-          value={qrValue}
-          size={130}
-          level="M"
-          includeMargin={false}
-        />
-        <span
-          className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-          style={{ writingMode: 'vertical-rl' }}
-        >
-          system VexoNT
-        </span>
-      </div>
-      <div className="text-[11px] font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full mb-1.5">
-        {t('machines.details.qrDate')} {qrDateStr}
-      </div>
-      <p className="text-[11px] text-gray-500 max-w-[220px] leading-snug">
-        {t('machines.details.qrHint')}
-      </p>
     </div>
   );
 }

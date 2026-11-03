@@ -7,6 +7,7 @@ import {
   getOrCreateQrKey,
   buildMachineQrValue,
   resolveTenantDisplayName,
+  resolveMachineQrLocation,
   resolveEntityQrDate,
   formatQrDate,
 } from '../../../services/qrAccess.service';
@@ -251,6 +252,9 @@ export default function MachinesQRCodes({ onBack }) {
             left: 0;
             top: 0;
             width: 100%;
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 16px !important;
           }
           .no-print {
             display: none !important;
@@ -260,8 +264,11 @@ export default function MachinesQRCodes({ onBack }) {
           }
           .print-only-selected.is-selected {
             display: flex !important;
-            border: 2px solid #000 !important;
+            border: 2px solid #0f172a !important;
+            border-radius: 16px !important;
+            background: #ffffff !important;
             box-shadow: none !important;
+            opacity: 1 !important;
             break-inside: avoid;
             page-break-inside: avoid;
           }
@@ -270,7 +277,7 @@ export default function MachinesQRCodes({ onBack }) {
 
       <div
         id="printable-machines-qr-area"
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"
       >
         {filteredMachines.length === 0 ? (
           <div className="col-span-full bg-white p-12 text-center rounded-2xl border border-gray-100 no-print">
@@ -289,7 +296,8 @@ export default function MachinesQRCodes({ onBack }) {
               date: qrDateStr,
             });
             const isSelected = selectedIds.includes(machine.id);
-            const regionName = getRegionName(machine.regionId);
+            const locationStr = resolveMachineQrLocation(machine, regions, '-');
+            const internalIdStr = machine.internalId || machine.licensePlate || '-';
             const parentMachine = machine.parentId
               ? machineByIdMap.get(machine.parentId) || null
               : null;
@@ -298,10 +306,10 @@ export default function MachinesQRCodes({ onBack }) {
               <div
                 key={machine.id}
                 onClick={() => toggleSelect(machine.id)}
-                className={`print-only-selected cursor-pointer bg-white p-4 rounded-2xl border-2 flex flex-col items-center text-center transition-all relative ${
+                className={`print-only-selected cursor-pointer bg-white p-5 rounded-2xl border-2 flex flex-col items-center text-center transition-all relative ${
                   isSelected
-                    ? 'is-selected border-blue-600 shadow-md bg-blue-50/10'
-                    : 'border-gray-100 hover:border-gray-200 shadow-sm opacity-80'
+                    ? 'is-selected border-slate-900 ring-2 ring-blue-500/40 shadow-md'
+                    : 'border-slate-300 hover:border-slate-500 shadow-sm opacity-90'
                 }`}
               >
                 <div className="no-print absolute top-3 right-3">
@@ -314,44 +322,77 @@ export default function MachinesQRCodes({ onBack }) {
                   </div>
                 </div>
 
-                <div className="text-[10px] font-black text-blue-700 uppercase tracking-wider mb-1 truncate w-full px-5">
-                  {tenantName}
+                <div className="flex items-center justify-center gap-1.5 mb-1.5 px-4 w-full">
+                  <svg
+                    className="w-4 h-4 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 21H21V10L16 13V10L11 13V6H3V21Z"
+                      fill="#cbd5e1"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6 3V6M9 3V6"
+                      stroke="#0f172a"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
+                    {tenantName}
+                  </span>
                 </div>
 
-                <div className="p-2 bg-white rounded-xl mb-2 border border-gray-100 flex items-center justify-center gap-1.5">
-                  <span
-                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  >
-                    system VexoNT
-                  </span>
-                  <QRCodeCanvas value={qrVal} size={120} level="M" />
-                  <span
-                    className="text-[8px] font-semibold text-slate-400 tracking-widest select-none"
-                    style={{ writingMode: 'vertical-rl' }}
-                  >
-                    system VexoNT
-                  </span>
+                <div className="text-[9px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3">
+                  VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ
                 </div>
 
-                <div className="font-extrabold text-gray-900 text-xs line-clamp-2 leading-tight mb-1 w-full">
+                <div className="my-1 flex items-center justify-center">
+                  <QRCodeCanvas value={qrVal} size={136} level="M" />
+                </div>
+
+                <div className="font-extrabold text-slate-900 text-sm leading-snug mt-3 mb-1 w-full break-words">
                   {machine.name}
                 </div>
 
                 {parentMachine && (
-                  <div className="text-[9px] font-semibold text-slate-500 truncate w-full mb-0.5">
+                  <div className="text-[10px] font-semibold text-slate-500 truncate w-full mb-1">
                     ↳ {parentMachine.name}
                   </div>
                 )}
 
-                {(machine.internalId || regionName) && (
-                  <div className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded w-full truncate">
-                    {[machine.internalId, regionName].filter(Boolean).join(' • ')}
-                  </div>
-                )}
+                <div className="w-full border-t-2 border-dashed border-slate-300 my-2.5"></div>
 
-                <div className="text-[9px] text-gray-500 mt-1.5 font-mono font-bold">
-                  {t('parts.qr.generated', 'Wygenerowano:')} {qrDateStr}
+                <div className="w-full text-left space-y-1.5">
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      LOKALIZACJA
+                    </div>
+                    <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+                      {locationStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      NUMER WEWNĘTRZNY UR
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
+                      {internalIdStr}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      DATA KODU (OST. EDYCJA)
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
+                      {qrDateStr}
+                    </div>
+                  </div>
                 </div>
               </div>
             );

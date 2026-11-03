@@ -76,12 +76,37 @@ export const resolveTenantDisplayName = (tenantId, branding) => {
   return branding?.companyName || branding?.name || (tenantId ? String(tenantId).toUpperCase() : 'FIRMA');
 };
 
+export const resolveMachineQrLocation = (machine, regions = [], fallback = '-') => {
+  if (!machine) return fallback;
+  let regionName = '';
+  if (machine.regionId === 'main_map') {
+    const isVeh = machine.assetCategory === 'vehicle' || Boolean(machine.licensePlate);
+    regionName = isVeh ? 'Cała Firma' : 'Mapa Główna';
+  } else if (machine.regionId && Array.isArray(regions)) {
+    const found = regions.find(r => r && r.id === machine.regionId);
+    if (found?.name) regionName = String(found.name).trim();
+  }
+  const bayStr = machine.bay ? String(machine.bay).trim() : '';
+  if (regionName && bayStr && bayStr.toLowerCase() !== regionName.toLowerCase()) {
+    return `${regionName} (${bayStr})`;
+  }
+  return regionName || bayStr || fallback;
+};
+
+const pickLatestEntityDate = (entity) => {
+  if (!entity) return null;
+  const candidates = [entity.updatedAt, entity.qrCreatedAt, entity.createdAt]
+    .map(v => safeParseDate(v))
+    .filter(Boolean);
+  if (candidates.length === 0) return null;
+  return new Date(Math.max(...candidates.map(dt => dt.getTime())));
+};
+
 export const resolveEntityQrDate = (entityOrDate, allMachines = [], parentId = null) => {
   if (!entityOrDate) return null;
   if (typeof entityOrDate === 'object' && !(entityOrDate instanceof Date) && !entityOrDate.toDate && entityOrDate.seconds === undefined) {
     const entity = entityOrDate;
-    const raw = entity.qrCreatedAt || entity.updatedAt || entity.createdAt;
-    let d = safeParseDate(raw);
+    let d = pickLatestEntityDate(entity);
     if (!d && entity.parentId && Array.isArray(allMachines) && allMachines.length > 0) {
       let currParentId = entity.parentId;
       const visited = new Set();
@@ -89,7 +114,7 @@ export const resolveEntityQrDate = (entityOrDate, allMachines = [], parentId = n
         visited.add(currParentId);
         const parent = allMachines.find(m => m.id === currParentId);
         if (!parent) break;
-        d = safeParseDate(parent.qrCreatedAt || parent.updatedAt || parent.createdAt);
+        d = pickLatestEntityDate(parent);
         if (d) break;
         currParentId = parent.parentId;
       }
