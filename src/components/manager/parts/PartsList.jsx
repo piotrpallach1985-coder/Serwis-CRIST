@@ -9,6 +9,7 @@ import { checkInventoryStatus } from '../../../utils/logicHelpers';
 import PartForm from './PartForm';
 import PartDetails from './PartDetails';
 import QRScannerModal from '../../shared/QRScannerModal';
+import BulkImportModal from '../BulkImportModal';
 
 export default function PartsList({ }) {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export default function PartsList({ }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null); // for details
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -116,6 +118,15 @@ export default function PartsList({ }) {
             >
               <i className="ph ph-qr-code text-lg"></i>
               {t('parts.buttons.scan_qr')}
+            </button>
+            <button
+              type="button"
+              data-testid="open-parts-bulk-import-btn"
+              onClick={() => setIsBulkImportOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <i className="ph ph-upload-simple text-lg"></i>
+              {t('parts.buttons.import_excel', 'Importuj (Excel/CSV)')}
             </button>
             <button
               onClick={() => { setIsFormOpen(true); setSelectedPartId(null); }}
@@ -289,6 +300,11 @@ export default function PartsList({ }) {
           />
       )}
       
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        mode="parts"
+      />
       {isScannerOpen && (
         <QRScannerModal
           isOpen={isScannerOpen}

@@ -491,6 +491,7 @@ export default function MachineForm({
           parentId: isVehicleSelected ? null : parentId || null,
           additionalDescription: additionalDescription.trim(),
           ...extraPayload,
+          needsVerification: false,
           qrCreatedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });

@@ -11,6 +11,7 @@ import {
   resolveEntityQrDate,
   formatQrDate,
 } from '../../../services/qrAccess.service';
+import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
 
 export default function MachinesQRCodes({ onBack }) {
   const { t } = useTranslation();
@@ -50,9 +51,11 @@ export default function MachinesQRCodes({ onBack }) {
   }, [tenantId]);
 
   const activeMachines = useMemo(() => {
-    return (machines || []).filter(
-      m => !m.isDeleted && !(m.name && m.name.includes('(DO WERYFIKACJI)'))
-    );
+    return (machines || []).filter(m => !m.isDeleted && !isMachineIncompleteForQr(m));
+  }, [machines]);
+
+  const unverifiedMachinesCount = useMemo(() => {
+    return (machines || []).filter(m => !m.isDeleted && isMachineIncompleteForQr(m)).length;
   }, [machines]);
 
   const filteredMachines = useMemo(() => {
@@ -274,6 +277,20 @@ export default function MachinesQRCodes({ onBack }) {
           }
         }
       `}</style>
+
+      {unverifiedMachinesCount > 0 && (
+        <div
+          data-testid="qr-unverified-machines-notice"
+          className="no-print bg-amber-50 border border-amber-300 text-amber-950 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2.5"
+        >
+          <i className="ph-fill ph-warning-circle text-amber-600 text-lg shrink-0"></i>
+          <span>
+            Ukryto <strong>{unverifiedMachinesCount}</strong> urządzeń oznaczonych jako{' '}
+            <strong>(DO WERYFIKACJI)</strong> lub bez przypisanego rejonu. Kody QR zostaną dla nich
+            wygenerowane po uzupełnieniu rejonu i zatwierdzeniu w edycji urządzenia.
+          </span>
+        </div>
+      )}
 
       <div
         id="printable-machines-qr-area"

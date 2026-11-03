@@ -46,8 +46,17 @@ import OperatorScanner from '../../components/operator/OperatorScanner';
 import OperatorForm from '../../components/OperatorForm';
 import Regions from '../../components/manager/Regions';
 import MachineInfoCard from '../../components/manager/machines/MachineInfoCard';
+import MachineQRCard from '../../components/manager/machines/MachineQRCard';
+import MachinesQRCodes from '../../components/manager/machines/MachinesQRCodes';
 import MachineForm from '../../components/manager/MachineForm';
+import BulkImportModal from '../../components/manager/BulkImportModal';
 import MachineDTR from '../../components/manager/MachineDTR';
+import {
+  isMachineIncompleteForQr,
+  autoDetectColumnMapping,
+  prepareMachinesImportPreview,
+  preparePartsImportPreview,
+} from '../bulkImportHelper';
 import PlannedMaintenanceFormModal from '../../components/manager/PlannedMaintenanceFormModal';
 import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
@@ -2086,6 +2095,161 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const fallbackMetrics = calculateWorkAndTravelMetrics(srvWithoutManualStopwatch, null, [], []);
       expect(fallbackMetrics.stopwatchWorkMinutes).toBe(90);
       expect(fallbackMetrics.stopwatchWorkHours).toBe(1.5);
+    });
+
+    it('obsługuje Kreator Masowego Importu z Excela/CSV (Urządzenia + Części) i generuje kod QR wyłącznie dla kompletnych urządzeń (z rejonem i zweryfikowanych)', async () => {
+      // 1) Walidacja reguły isMachineIncompleteForQr
+      expect(
+        isMachineIncompleteForQr({
+          id: 'm1',
+          name: 'Tokarka CNC',
+          regionId: 'reg-hala-a',
+          needsVerification: false,
+        })
+      ).toBe(false);
+      // Brak rejonu -> niekompletne -> brak kodu QR
+      expect(
+        isMachineIncompleteForQr({
+          id: 'm2',
+          name: 'Tokarka CNC',
+          regionId: '',
+        })
+      ).toBe(true);
+      // Dopisek (DO WERYFIKACJI) -> niekompletne -> brak kodu QR
+      expect(
+        isMachineIncompleteForQr({
+          id: 'm3',
+          name: 'Suwnica 16T (DO WERYFIKACJI)',
+          regionId: 'reg-hala-a',
+        })
+      ).toBe(true);
+
+      // 2) Przygotowanie podglądu importu maszyn (1 kompletna z istniejącym rejonem, 1 z nowym rejonem, 1 bez rejonu -> DO WERYFIKACJI bez QR)
+      const excelMachineRows = [
+        {
+          'Nazwa urządzenia *': 'Wycinarka laserowa Nukon',
+          'Miejsce montażu (Rejon)': 'Hala Cięcia',
+          'Numer wewnętrzny': 'UR-101',
+          'Stan licznika': '1250',
+        },
+        {
+          'Nazwa urządzenia *': 'Prasa krawędziowa TrumaBend',
+          'Miejsce montażu (Rejon)': 'Hala Nowa Spawalnia',
+          'Numer wewnętrzny': 'UR-102',
+          'Stan licznika': '400',
+        },
+        {
+          'Nazwa urządzenia *': 'Wiertarka kolumnowa bez rejonu',
+          'Miejsce montażu (Rejon)': '',
+          'Numer wewnętrzny': 'UR-103',
+          'Stan licznika': '0',
+        },
+      ];
+
+      const colMap = autoDetectColumnMapping(Object.keys(excelMachineRows[0]), 'machines');
+      expect(colMap.name).toBe('Nazwa urządzenia *');
+      expect(colMap.regionName).toBe('Miejsce montażu (Rejon)');
+      expect(colMap.internalId).toBe('Numer wewnętrzny');
+
+      const preview = prepareMachinesImportPreview(excelMachineRows, colMap, {
+        existingMachines: [],
+        existingRegions: [{ id: 'reg-ciecie', name: 'Hala Cięcia', isDeleted: false }],
+        duplicateStrategy: 'skip',
+        industryProfile: 'industrial',
+      });
+
+      expect(preview.summary.readyWithQrCount).toBe(2);
+      expect(preview.summary.incompleteWithoutQrCount).toBe(1);
+      expect(preview.summary.newRegions).toEqual(['Hala Nowa Spawalnia']);
+
+      const incompleteRow = preview.rows[2];
+      expect(incompleteRow.status).toBe('incomplete');
+      expect(incompleteRow.qrReady).toBe(false);
+      expect(incompleteRow.name).toBe('Wiertarka kolumnowa bez rejonu (DO WERYFIKACJI)');
+      expect(incompleteRow.payload.needsVerification).toBe(true);
+
+      // 3) Wykonanie importu w BulkImportModal i sprawdzenie, że maszyna bez rejonu ma qrCreatedAt=null i nie wyświetla kodu QR w MachineQRCard ani w MachinesQRCodes
+      useManagerStore.setState({
+        regions: [{ id: 'reg-ciecie', name: 'Hala Cięcia', isDeleted: false }],
+        machines: [],
+        parts: [],
+      });
+
+      const onImportDone = vi.fn();
+      const { unmount: unmountImportModal } = render(
+        <BulkImportModal
+          isOpen={true}
+          onClose={vi.fn()}
+          mode="machines"
+          initialRowsForTest={excelMachineRows}
+          onImportSuccess={onImportDone}
+        />
+      );
+
+      expect(screen.getByTestId('summary-ready-qr').textContent).toContain('2');
+      expect(screen.getByTestId('summary-incomplete-no-qr').textContent).toContain('1');
+      expect(screen.getByTestId('incomplete-qr-warning-banner')).toBeTruthy();
+
+      fireEvent.click(screen.getByTestId('execute-bulk-import-btn'));
+      await screen.findByTestId('bulk-import-success-summary');
+      expect(onImportDone).toHaveBeenCalledTimes(1);
+      unmountImportModal();
+
+      const importedMachines = useManagerStore.getState().machines;
+      expect(importedMachines.length).toBe(3);
+
+      const nukon = importedMachines.find(m => m.internalId === 'UR-101');
+      const wiertarkaUnverified = importedMachines.find(m => m.internalId === 'UR-103');
+
+      expect(nukon.qrCreatedAt).toBeTruthy();
+      expect(nukon.needsVerification).toBe(false);
+      expect(wiertarkaUnverified.qrCreatedAt).toBeNull();
+      expect(wiertarkaUnverified.needsVerification).toBe(true);
+      expect(wiertarkaUnverified.name).toContain('(DO WERYFIKACJI)');
+
+      // W MachineQRCard maszyna bez rejonu / do weryfikacji NIE ma wygenerowanego kodu QR
+      const { container: qrCardUnverified, unmount: unmountQrCard1 } = render(
+        <MachineQRCard machine={wiertarkaUnverified} />
+      );
+      expect(qrCardUnverified.querySelector('svg[id^="qr-svg-"]')).toBeNull();
+      unmountQrCard1();
+
+      // W MachineQRCard maszyna kompletna MA wygenerowany kod QR
+      const { container: qrCardVerified, unmount: unmountQrCard2 } = render(
+        <MachineQRCard machine={nukon} />
+      );
+      expect(qrCardVerified.querySelector('svg[id^="qr-svg-"]')).toBeTruthy();
+      unmountQrCard2();
+
+      // W Baza QR Urządzeń (MachinesQRCodes) widoczne są tylko 2 kompletne maszyny, a o 1 niezweryfikowanej informuje baner
+      const { unmount: unmountQrList } = render(<MachinesQRCodes onBack={vi.fn()} />);
+      expect(screen.getByTestId('qr-unverified-machines-notice').textContent).toContain('1');
+      expect(screen.queryByText(/Wiertarka kolumnowa bez rejonu/)).toBeNull();
+      expect(screen.getByText('Wycinarka laserowa Nukon')).toBeTruthy();
+      unmountQrList();
+
+      // 4) Podgląd importu części magazynowych z partią FIFO i powiązaniem z maszyną po numerze wewnętrznym UR-101
+      const partRows = [
+        {
+          'Nazwa części *': 'Soczewka ochronna lasera',
+          'Kod magazynowy *': 'SOCZ-NUK-01',
+          'Stan początkowy': '8',
+          'Jednostka miary': 'szt.',
+          'Stan minimalny': '2',
+          'Cena jedn. netto (PLN)': '190',
+          'Kompatybilne urządzenia': 'UR-101',
+        },
+      ];
+      const partColMap = autoDetectColumnMapping(Object.keys(partRows[0]), 'parts');
+      const partPreview = preparePartsImportPreview(partRows, partColMap, {
+        existingParts: [],
+        existingMachines: importedMachines,
+        duplicateStrategy: 'skip',
+      });
+      expect(partPreview.summary.createCount).toBe(1);
+      expect(partPreview.rows[0].batches.length).toBe(1);
+      expect(partPreview.rows[0].batches[0].qty).toBe(8);
+      expect(partPreview.rows[0].compatibleMachines).toEqual([nukon.id]);
     });
   });
 });

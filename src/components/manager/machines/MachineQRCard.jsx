@@ -11,6 +11,7 @@ import {
   resolveMachineQrLocation,
   formatQrDate,
 } from '../../../services/qrAccess.service';
+import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
 
 export default function MachineQRCard({ machine }) {
   const { t } = useTranslation();
@@ -32,7 +33,7 @@ export default function MachineQRCard({ machine }) {
     };
   }, [tenantId]);
 
-  const isUnverified = machine.name && machine.name.includes('(DO WERYFIKACJI)');
+  const isUnverified = isMachineIncompleteForQr(machine);
   const tenantName = resolveTenantDisplayName(tenantId, branding);
   const locationStr = resolveMachineQrLocation(machine, regions, '-');
   const internalIdStr = machine.internalId || machine.licensePlate || '-';

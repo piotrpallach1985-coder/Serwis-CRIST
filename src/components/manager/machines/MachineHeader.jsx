@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { TileLayoutButton } from '../../shared/CustomizableTileGrid';
+import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
 
 export default function MachineHeader({
   machine,
@@ -81,7 +82,7 @@ export default function MachineHeader({
           <i className="ph ph-trash text-xl md:text-base"></i>
           <span className="hidden md:inline">{t('machines.buttons.delete')}</span>
         </button>
-        {!machine.name.includes('(DO WERYFIKACJI)') && (
+        {!isMachineIncompleteForQr(machine) && (
           <button
             onClick={() => onPrint(machine)}
             className="flex items-center justify-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-1.5 rounded-lg font-bold text-sm border border-slate-300 transition-colors shrink-0"

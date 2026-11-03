@@ -33,6 +33,7 @@ import MachineDetails from './MachineDetails';
 import MachineFilters from './MachineFilters';
 import MachineTable from './MachineTable';
 import MachineForm from './MachineForm';
+import BulkImportModal from './BulkImportModal';
 import ConfirmModal from './ConfirmModal';
 import QRScannerModal from '../shared/QRScannerModal';
 import NFCScannerModal from '../shared/NFCScannerModal';
@@ -110,6 +111,7 @@ export default function Machines({
   const [isScanning, setIsScanning] = useState(false);
   const [isNfcScanning, setIsNfcScanning] = useState(false);
   const [isRefrigerantsModalOpen, setIsRefrigerantsModalOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [refrigerantTypesMap, setRefrigerantTypesMap] = useState(() => getAllRefrigerantTypes());
   const [customRefCode, setCustomRefCode] = useState('');
   const [customRefName, setCustomRefName] = useState('');
@@ -591,6 +593,16 @@ export default function Machines({
                   <i className="ph ph-file-xls text-lg"></i> {t('machines.buttons.excel')}
                 </button>
 
+                <button
+                  type="button"
+                  data-testid="open-machines-bulk-import-btn"
+                  onClick={() => setIsBulkImportOpen(true)}
+                  className="flex-1 md:flex-none bg-emerald-600 text-white border border-emerald-700 hover:bg-emerald-700 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                >
+                  <i className="ph ph-upload-simple text-lg"></i>{' '}
+                  {t('machines.buttons.importExcel', 'Importuj (Excel/CSV)')}
+                </button>
+
                 {onOpenMachinesQR && (
                   <button
                     onClick={onOpenMachinesQR}
@@ -818,6 +830,17 @@ export default function Machines({
           }
         }}
         onError={err => showToast(err, 'error')}
+      />
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        mode="machines"
+        onImportSuccess={summary => {
+          showToast(
+            `Zaimportowano: ${summary.readyWithQrCount} z QR, ${summary.incompleteWithoutQrCount} do weryfikacji (bez QR)`,
+            'success'
+          );
+        }}
       />
       <ConfirmModal
         isOpen={confirmModalConfig.isOpen}
