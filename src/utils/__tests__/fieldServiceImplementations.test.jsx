@@ -1865,6 +1865,73 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('sidebar-section-services').textContent).toBe('Serwisy');
       unmountSidebarHvac();
 
+      // 2b) W menu bocznym i widokach dla firmy Osiedla (facility): Awarie, Serwisy, Baza Obiektów/Urządzeń, Baza QR Obiektów/Urządzeń, Rejony/Adresy, Dodaj Obiekt/Urządzenie, Obiektów/Urządzenia oraz brak zakładki HVAC
+      useManagerStore.getState().setBranding({
+        companyName: 'Wspólnota Słoneczna',
+        industryProfile: 'facility',
+      });
+      const { unmount: unmountSidebarFacility } = render(
+        <SidebarNavUR
+          activeTab="tickets"
+          handleItemClick={vi.fn()}
+          branding={{ industryProfile: 'facility' }}
+        />
+      );
+      expect(screen.getByTestId('sidebar-section-tickets').textContent).toBe('Awarie');
+      expect(screen.getByTestId('sidebar-section-services').textContent).toBe('Serwisy');
+      expect(screen.getByTestId('sidebar-machines-menu').textContent).toBe(
+        'Baza Obiektów/Urządzeń'
+      );
+      expect(screen.getByTestId('sidebar-machines-qr-menu').textContent).toBe(
+        'Baza QR Obiektów/Urządzeń'
+      );
+      expect(screen.getByTestId('sidebar-regions-menu').textContent).toBe('Rejony/Adresy');
+      unmountSidebarFacility();
+
+      const { unmount: unmountFacilityForm } = render(
+        <MachineForm
+          isOpen={true}
+          onClose={vi.fn()}
+          editingMachine={null}
+          initialParentId=""
+          regions={[{ id: 'r1', name: 'ul. Słoneczna 12' }]}
+          onSaved={vi.fn()}
+          onError={vi.fn()}
+        />
+      );
+      expect(screen.queryByTestId('asset-category-hvac-btn')).toBeNull();
+      unmountFacilityForm();
+
+      const { unmount: unmountFacilityMachines } = render(
+        <MemoryRouter>
+          <Machines onOpenMachinesQR={vi.fn()} />
+        </MemoryRouter>
+      );
+      expect(screen.getByTestId('machines-header-title').textContent).toContain(
+        'Baza Obiektów/Urządzeń'
+      );
+      expect(screen.getByTestId('machines-add-btn').textContent).toContain(
+        'Dodaj Obiekt/Urządzenie'
+      );
+      expect(screen.getByTestId('machines-tab-device').textContent).toContain(
+        'Obiektów/Urządzenia'
+      );
+      expect(screen.queryByTestId('machines-tab-hvac')).toBeNull();
+      expect(screen.getByTestId('open-machines-qr-btn').textContent).toContain(
+        'Baza QR Obiektów/Urządzeń'
+      );
+      unmountFacilityMachines();
+
+      const { unmount: unmountFacilityQr } = render(<MachinesQRCodes onBack={vi.fn()} />);
+      expect(screen.getByTestId('machines-qr-title').textContent).toBe(
+        'Baza QR Obiektów/Urządzeń'
+      );
+      unmountFacilityQr();
+
+      const { unmount: unmountFacilityRegions } = render(<Regions />);
+      expect(screen.getByTestId('regions-header-title').textContent).toBe('Rejony/Adresy');
+      unmountFacilityRegions();
+
       // 3) W profilu 'industrial' (Przemysł) zakres HVAC nie jest widoczny, a przyciski nie zawierają napisu RBG
       useManagerStore.getState().setBranding({
         companyName: 'Zakład Przemysłowy',

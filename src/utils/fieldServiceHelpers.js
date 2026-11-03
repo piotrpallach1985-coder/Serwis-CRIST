@@ -270,7 +270,7 @@ export const INDUSTRY_PROFILES = {
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-300',
     bannerClass: 'bg-amber-900 text-white border-amber-800',
     machineLabel: 'Urządzenie',
-    regionLabel: 'Miejsce montażu',
+    regionLabel: 'Rejony/Adresy',
     bayLabel: 'Informacja dodatkowa',
     machineCardTitle: 'Karta Obiektu / Instalacji Budowlanej (Facility / c-KOB)',
     machinePdfTitle: 'Karta Obiektu / Instalacji Budowlanej (Facility / c-KOB)',

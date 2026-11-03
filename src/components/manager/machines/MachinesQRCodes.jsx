@@ -147,8 +147,10 @@ export default function MachinesQRCodes({ onBack }) {
               </button>
             )}
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                {t('machines.qr.title', 'Baza QR Urządzeń')}
+              <h2 data-testid="machines-qr-title" className="text-xl font-bold text-gray-800">
+                {branding?.industryProfile === 'facility'
+                  ? 'Baza QR Obiektów/Urządzeń'
+                  : t('machines.qr.title', 'Baza QR Urządzeń')}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
                 {t('machines.qr.subtitle', 'Wybierz urządzenia i podzespoły, aby wydrukować ich etykiety QR.')}

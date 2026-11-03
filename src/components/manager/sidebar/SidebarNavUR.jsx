@@ -125,10 +125,21 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const showMasterDataSection = ['machines', 'machines_qr', 'regions', 'services', 'topics'].some(canAccessTab);
 
   const industryProfile = branding?.industryProfile || 'industrial';
-  const ticketsSectionTitle =
-    industryProfile === 'hvac' ? 'Awarie' : t('sidebar.section_tickets');
-  const servicesSectionTitle =
-    industryProfile === 'hvac' ? 'Serwisy' : t('sidebar.section_services');
+  const isSimpleServiceTitles = industryProfile === 'hvac' || industryProfile === 'facility';
+  const ticketsSectionTitle = isSimpleServiceTitles ? 'Awarie' : t('sidebar.section_tickets');
+  const servicesSectionTitle = isSimpleServiceTitles ? 'Serwisy' : t('sidebar.section_services');
+  const equipmentBaseMenuTitle =
+    industryProfile === 'facility'
+      ? 'Baza Obiektów/Urządzeń'
+      : t('sidebar.equipment_base_menu');
+  const machinesQrMenuTitle =
+    industryProfile === 'facility'
+      ? 'Baza QR Obiektów/Urządzeń'
+      : t('sidebar.machines_qr_menu', 'Baza QR Urządzeń');
+  const regionsMenuTitle =
+    industryProfile === 'facility'
+      ? 'Rejony/Adresy'
+      : t('sidebar.regions_menu', 'Rejony/Miejsca montażu');
 
   return (
     <>
@@ -339,7 +350,9 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
             >
               <div className="flex items-center gap-2 truncate">
                 <i className="ph ph-database text-lg shrink-0"></i>
-                <span className="text-[13px] truncate">{t("sidebar.equipment_base_menu")}</span>
+                <span data-testid="sidebar-machines-menu" className="text-[13px] truncate">
+                  {equipmentBaseMenuTitle}
+                </span>
               </div>
               {unverifiedMachinesCount > 0 && (
                 <span className="bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shrink-0 shadow-xs">
@@ -355,7 +368,9 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
               className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'machines_qr' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
             >
               <i className="ph ph-qr-code text-lg shrink-0"></i>
-              <span className="text-[13px] truncate">{t("sidebar.machines_qr_menu", "Baza QR Urządzeń")}</span>
+              <span data-testid="sidebar-machines-qr-menu" className="text-[13px] truncate">
+                {machinesQrMenuTitle}
+              </span>
             </button>
           )}
 
@@ -365,7 +380,9 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
               className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'regions' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
             >
               <i className="ph ph-map-pin-line text-lg shrink-0"></i>
-              <span className="text-[13px]">{t("sidebar.regions_menu", "Rejony/Miejsca montażu")}</span>
+              <span data-testid="sidebar-regions-menu" className="text-[13px]">
+                {regionsMenuTitle}
+              </span>
             </button>
           )}
 

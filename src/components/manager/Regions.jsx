@@ -563,8 +563,13 @@ export default function Regions() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800">
-              {t('admin.regions.title', 'Rejony/Miejsca montażu')}
+            <h2
+              data-testid="regions-header-title"
+              className="text-sm uppercase tracking-wide md:text-lg font-bold text-gray-800"
+            >
+              {branding?.industryProfile === 'facility'
+                ? 'Rejony/Adresy'
+                : t('admin.regions.title', 'Rejony/Miejsca montażu')}
             </h2>
             <p className="text-[10px] md:text-xs text-gray-500 mt-1 leading-tight">
               {t('admin.regions.subtitle', 'Słownik rejonów i miejsc montażu przypisywanych do urządzeń')}

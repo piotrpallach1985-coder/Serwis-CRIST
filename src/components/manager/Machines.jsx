@@ -772,15 +772,19 @@ export default function Machines({
 
                 {onOpenMachinesQR && (
                   <button
+                    data-testid="open-machines-qr-btn"
                     onClick={onOpenMachinesQR}
                     className="flex-1 md:flex-none bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
                   >
                     <i className="ph ph-printer text-lg"></i>{' '}
-                    {t('machines.buttons.qrList', 'Baza QR Urządzeń')}
+                    {branding?.industryProfile === 'facility'
+                      ? 'Baza QR Obiektów/Urządzeń'
+                      : t('machines.buttons.qrList', 'Baza QR Urządzeń')}
                   </button>
                 )}
 
-                {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                {(branding?.industryProfile || 'industrial') !== 'industrial' &&
+                  (branding?.industryProfile || 'industrial') !== 'facility' && (
                   <button
                     type="button"
                     data-testid="open-refrigerants-modal-btn"

@@ -162,6 +162,7 @@ export default function MachineForm({
           editingMachine.assetCategory !== 'hvac');
       const isExistingHvac =
         industryProfile !== 'industrial' &&
+        industryProfile !== 'facility' &&
         !isExistingVehicle &&
         (editingMachine.assetCategory === 'hvac' ||
           Boolean(editingMachine.refrigerantType) ||
@@ -214,7 +215,10 @@ export default function MachineForm({
       const resolvedCategory =
         initialAssetCategory &&
         ['device', 'hvac', 'vehicle'].includes(initialAssetCategory) &&
-        !(industryProfile === 'industrial' && initialAssetCategory === 'hvac')
+        !(
+          (industryProfile === 'industrial' || industryProfile === 'facility') &&
+          initialAssetCategory === 'hvac'
+        )
           ? initialAssetCategory
           : industryProfile === 'fleet'
           ? 'vehicle'
@@ -541,7 +545,9 @@ export default function MachineForm({
             <div
               data-testid="machine-asset-category-switcher"
               className={`bg-slate-50 border border-slate-200 rounded-xl p-2 grid grid-cols-1 ${
-                industryProfile === 'industrial' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
+                industryProfile === 'industrial' || industryProfile === 'facility'
+                  ? 'sm:grid-cols-2'
+                  : 'sm:grid-cols-3'
               } gap-2`}
             >
               <button
@@ -560,7 +566,7 @@ export default function MachineForm({
                 <i className="ph ph-gear-six text-base"></i>
                 Urządzenie / Instalacja
               </button>
-              {industryProfile !== 'industrial' && (
+              {industryProfile !== 'industrial' && industryProfile !== 'facility' && (
                 <button
                   type="button"
                   data-testid="asset-category-hvac-btn"
@@ -1068,8 +1074,10 @@ export default function MachineForm({
               </div>
             )}
 
-            {/* Sekcja Klimatyzacji / HVAC (widoczna WYŁĄCZNIE w zakładce Klimatyzacja / HVAC poza profilem Przemysł) */}
-            {industryProfile !== 'industrial' && assetCategory === 'hvac' && (
+            {/* Sekcja Klimatyzacji / HVAC (widoczna WYŁĄCZNIE w zakładce Klimatyzacja / HVAC poza profilem Przemysł i Osiedla) */}
+            {industryProfile !== 'industrial' &&
+              industryProfile !== 'facility' &&
+              assetCategory === 'hvac' && (
               <div
                 data-testid="machine-form-domain-section"
                 className="border border-cyan-200 bg-cyan-50/40 rounded-xl overflow-hidden"

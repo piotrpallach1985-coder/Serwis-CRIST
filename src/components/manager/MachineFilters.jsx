@@ -26,16 +26,26 @@ export default function MachineFilters({
       {/* GŁÓWKA LISTY (Tytuł i główna akcja) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div className="hidden md:block">
-          <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <i className="ph ph-engine text-blue-600"></i> {t('machines.filters.title')}
+          <h2
+            data-testid="machines-header-title"
+            className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2"
+          >
+            <i className="ph ph-engine text-blue-600"></i>{' '}
+            {industryProfile === 'facility'
+              ? 'Baza Obiektów/Urządzeń'
+              : t('machines.filters.title')}
           </h2>
           <p className="text-sm text-slate-500 mt-1">{t('machines.filters.subtitle')}</p>
         </div>
         <button
+          data-testid="machines-add-btn"
           onClick={onAddMachine}
           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
-          <i className="ph ph-plus text-lg"></i> {t('machines.buttons.addMachine')}
+          <i className="ph ph-plus text-lg"></i>{' '}
+          {industryProfile === 'facility'
+            ? 'Dodaj Obiekt/Urządzenie'
+            : t('machines.buttons.addMachine')}
         </button>
       </div>
 
@@ -47,8 +57,16 @@ export default function MachineFilters({
         >
           {[
             { id: '', label: 'Wszystkie zasoby', icon: 'ph-squares-four', activeClass: 'bg-slate-800 text-white' },
-            { id: 'device', label: 'Urządzenia / Maszyny', icon: 'ph-gear-six', activeClass: 'bg-blue-600 text-white' },
-            ...(industryProfile !== 'industrial'
+            {
+              id: 'device',
+              label:
+                industryProfile === 'facility'
+                  ? 'Obiektów/Urządzenia'
+                  : 'Urządzenia / Maszyny',
+              icon: industryProfile === 'facility' ? 'ph-buildings' : 'ph-gear-six',
+              activeClass: 'bg-blue-600 text-white',
+            },
+            ...(industryProfile !== 'industrial' && industryProfile !== 'facility'
               ? [{ id: 'hvac', label: 'Klimatyzacja / HVAC', icon: 'ph-snowflake', activeClass: 'bg-cyan-600 text-white' }]
               : []),
             { id: 'vehicle', label: 'Pojazdy / Flota', icon: 'ph-truck', activeClass: 'bg-emerald-600 text-white' },
