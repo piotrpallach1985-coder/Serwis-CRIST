@@ -295,7 +295,7 @@ export const INDUSTRY_PROFILES = {
     badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-300',
     bannerClass: 'bg-cyan-900 text-white border-cyan-800',
     machineLabel: 'Urządzenie',
-    regionLabel: 'Miejsce montażu',
+    regionLabel: 'Miejsce/rejon montażu',
     bayLabel: 'Informacja dodatkowa',
     machineCardTitle: 'Karta Urządzenia Chłodniczego HVAC / F-Gaz (CRO)',
     machinePdfTitle: 'Karta Urzadzenia Chlodniczego HVAC / F-Gaz (CRO)',
@@ -2361,15 +2361,12 @@ export function resolveRegionReportPin(
 }
 
 /**
- * Wyznacza wymagany PIN dla zgłoszenia anonimowego (dla nieruchomości / rejonu lub dla pojazdu / floty).
+ * Wyznacza wymagany PIN dla zgłoszenia anonimowego / spoza serwisu.
  * Zasady:
- * - Dla pojazdów (Flota):
- *   1. Indywidualny PIN przypisany do pojazdu (`machine.reportPin`) ma najwyższy priorytet.
- *   2. Jeśli pojazd nie ma indywidualnego PIN-u, obowiązuje Globalny PIN Floty (`branding.globalFleetPin` lub `mainMapSettings.globalFleetPin`).
- *   3. W dalszej kolejności sprawdzany jest PIN bazy/oddziału pojazdu (`regionId`).
- * - Dla nieruchomości / urządzeń stacjonarnych:
- *   1. Indywidualny PIN urządzenia (`machine.reportPin`), jeśli ustawiono.
- *   2. PIN lokalizacji / rejonu (`regionId`) lub Mapy Głównej.
+ * - Samochody / pojazdy firmowe (Flota): nie posiadają PIN-u zgłoszeń anonimowych.
+ * - Urządzenia / instalacje / HVAC / obiekty (Osiedla):
+ *   1. Indywidualny PIN przypisany konkretnie do danego urządzenia (`machine.reportPin`) ma najwyższy priorytet.
+ *   2. Jeśli urządzenie nie ma indywidualnego PIN-u, obowiązuje globalny PIN ustawiony dla rejonu (`regionId`) lub Mapy Głównej.
  */
 export function resolveAnonymousReportPin(
   machine,
@@ -2382,46 +2379,11 @@ export function resolveAnonymousReportPin(
   }
 
   const isVehicle = isVehicleAsset(machine, branding?.industryProfile);
-  const directMachinePin = String(machine.reportPin || '').trim();
-  const globalFleetPin = String(
-    branding?.globalFleetPin || mainMapSettings?.globalFleetPin || ''
-  ).trim();
-
   if (isVehicle) {
-    if (directMachinePin) {
-      return {
-        required: true,
-        pin: directMachinePin,
-        source: 'vehicle',
-        sourceLabel: `Indywidualny PIN pojazdu (${
-          machine.licensePlate || machine.name || 'Pojazd'
-        })`,
-      };
-    }
-    if (globalFleetPin) {
-      return {
-        required: true,
-        pin: globalFleetPin,
-        source: 'fleet_global',
-        sourceLabel: 'Globalny PIN Floty',
-      };
-    }
-    const regResolved = resolveRegionReportPin(
-      machine.regionId,
-      regions,
-      mainMapSettings,
-      branding
-    );
-    if (regResolved.pin) {
-      return {
-        required: true,
-        pin: regResolved.pin,
-        source: regResolved.source,
-        sourceLabel: `PIN bazy / lokalizacji (${regResolved.sourceName})`,
-      };
-    }
     return { required: false, pin: '', source: 'none', sourceLabel: '' };
   }
+
+  const directMachinePin = String(machine.reportPin || '').trim();
 
   // Nieruchomości / Urządzenia / HVAC
   if (directMachinePin) {

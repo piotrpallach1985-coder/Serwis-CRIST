@@ -20,6 +20,7 @@ import {
   deleteCustomRefrigerant,
   isHvacAsset,
   generateRandomReportPin,
+  resolveRegionReportPin,
 } from '../../utils/fieldServiceHelpers';
 
 export function formatPhoneXxx(raw) {
@@ -388,7 +389,7 @@ export default function MachineForm({
     const extraPayload = {
       assetCategory: isVehicleSelected ? 'vehicle' : isHvacSelected ? 'hvac' : 'device',
       counterUnit: isVehicleSelected ? counterUnit || 'km' : 'RBG',
-      reportPin: reportPin.trim(),
+      reportPin: isVehicleSelected ? '' : reportPin.trim(),
       ...(isVehicleSelected
         ? {
             licensePlate: licensePlate.trim().toUpperCase(),
@@ -622,9 +623,14 @@ export default function MachineForm({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">
+                <label
+                  data-testid="machine-form-region-label"
+                  className="block text-sm font-bold text-gray-700 mb-1"
+                >
                   {assetCategory === 'vehicle'
                     ? 'Baza / Oddział macierzysty *'
+                    : assetCategory === 'hvac'
+                    ? 'Miejsce/rejon montażu *'
                     : t('machines.form.region', 'Miejsce montażu *')}
                 </label>
                 <select
@@ -637,6 +643,8 @@ export default function MachineForm({
                   <option value="">
                     {assetCategory === 'vehicle'
                       ? '-- Wybierz bazę / oddział --'
+                      : assetCategory === 'hvac'
+                      ? '-- Wybierz miejsce/rejon montażu --'
                       : t('machines.form.selectRegion', '-- Wybierz miejsce montażu --')}
                   </option>
                   <option value="main_map">
@@ -711,6 +719,75 @@ export default function MachineForm({
                 {t('machines.form.additionalDescriptionHint')}
               </p>
             </div>
+
+            {/* Indywidualny PIN dla zgłoszeń na to urządzenie przez inne osoby niż serwisanci (dla urządzeń / HVAC / osiedli — niedostępny dla pojazdów) */}
+            {assetCategory !== 'vehicle' && (() => {
+              const resolvedRegPin = resolveRegionReportPin(
+                regionId,
+                regions,
+                useManagerStore.getState().mapSettings || {},
+                branding
+              );
+              return (
+                <div
+                  data-testid="machine-report-pin-section"
+                  className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 space-y-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs sm:text-sm font-extrabold text-amber-950 flex items-center gap-1.5">
+                      <i className="ph-fill ph-key text-amber-600 text-base"></i>
+                      <span>
+                        Kod PIN dla zgłoszeń na to urządzenie przez inne osoby niż serwisanci (opcjonalnie)
+                      </span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      {resolvedRegPin?.pin && (
+                        <span
+                          data-testid="machine-inherited-region-pin-badge"
+                          className="text-[10px] font-bold bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded border border-indigo-200"
+                        >
+                          PIN rejonu ({resolvedRegPin.sourceName}): {resolvedRegPin.pin}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        data-testid="machine-generate-pin-btn"
+                        onClick={() => setReportPin(generateRandomReportPin(4))}
+                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <i className="ph ph-shuffle"></i> Losuj PIN
+                      </button>
+                      {reportPin && (
+                        <button
+                          type="button"
+                          onClick={() => setReportPin('')}
+                          className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                          {resolvedRegPin?.pin ? 'Użyj PIN-u rejonu' : 'Wyczyść (Otwarte)'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <input
+                      type="text"
+                      data-testid="machine-report-pin-input"
+                      value={reportPin}
+                      onChange={e => setReportPin(e.target.value)}
+                      placeholder={
+                        resolvedRegPin?.pin
+                          ? `Domyślnie: PIN rejonu (${resolvedRegPin.pin}) — lub wpisz indywidualny`
+                          : 'Brak PIN-u (lub wpisz indywidualny PIN dla urządzenia, np. 7410)'
+                      }
+                      className="w-full sm:max-w-xs p-2 border border-amber-300 rounded-lg text-xs font-mono font-black tracking-widest bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <span className="text-[11px] text-amber-800 leading-snug">
+                      Wymagany przy zgłoszeniach anonimowych (przez klientów detalicznych HVAC, mieszkańców osiedli lub inne osoby spoza serwisu). Jeśli pozostawisz puste, obowiązuje globalny PIN ustawiony dla rejonu w zakładce Rejony.
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Sekcja Floty Samochodowej i Sprzętu Mobilnego (VexoNT Fleet / Pojazd) */}
             {assetCategory === 'vehicle' && (
@@ -987,55 +1064,6 @@ export default function MachineForm({
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-4 bg-amber-50/80 border border-amber-200 rounded-lg p-3 space-y-1.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
-                        <i className="ph-fill ph-key text-amber-600 text-sm"></i>
-                        <span>Indywidualny PIN zgłoszeń anonimowych dla tego pojazdu (opcjonalnie)</span>
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        {branding?.globalFleetPin && (
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-200">
-                            Globalny PIN Floty: {branding.globalFleetPin}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          data-testid="fleet-generate-pin-btn"
-                          onClick={() => setReportPin(generateRandomReportPin(4))}
-                          className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <i className="ph ph-shuffle"></i> Losuj PIN
-                        </button>
-                        {reportPin && (
-                          <button
-                            type="button"
-                            onClick={() => setReportPin('')}
-                            className="px-2 py-0.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded transition-colors cursor-pointer"
-                          >
-                            Użyj globalnego
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <input
-                        type="text"
-                        data-testid="fleet-report-pin-input"
-                        value={reportPin}
-                        onChange={e => setReportPin(e.target.value)}
-                        placeholder={
-                          branding?.globalFleetPin
-                            ? `Domyślnie: Globalny PIN Floty (${branding.globalFleetPin})`
-                            : 'Wpisz indywidualny PIN pojazdu (np. 7410)'
-                        }
-                        className="w-full sm:max-w-xs p-2 border border-amber-300 rounded-lg text-xs font-mono font-black tracking-widest bg-white outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                      <span className="text-[11px] text-amber-800 leading-snug">
-                        Chroni przed fałszywymi zgłoszeniami awarii po numerze tablicy lub QR (dotyczy tylko zgłoszeń anonimowych). Jeśli puste, dla pojazdu obowiązuje Globalny PIN Floty.
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -1118,134 +1146,6 @@ export default function MachineForm({
                             Wybierz czynnik i wagę, aby obliczyć ekwiwalent CO2e.
                           </div>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Edytowalna lista czynników chłodniczych (zawsze widoczna w zakładce HVAC) */}
-                    <div
-                      data-testid="refrigerant-manager-panel"
-                      className="bg-cyan-50/70 border border-cyan-200 rounded-xl p-3 space-y-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-xs font-extrabold text-cyan-950 flex items-center gap-1.5">
-                          <i className="ph ph-list-bullets text-base text-cyan-700"></i>
-                          <span>
-                            Edytowalna lista czynników chłodniczych (kliknij czynnik, aby edytować lub dodaj nowy):
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          data-testid="toggle-refrigerant-manager-btn"
-                          onClick={() => {
-                            setShowRefrigerantManager(true);
-                            setCustomRefCode('');
-                            setCustomRefName('');
-                            setCustomRefGwp('');
-                            setCustomRefFluorinated(true);
-                          }}
-                          className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-300 bg-white hover:bg-cyan-100 text-cyan-900 transition-colors cursor-pointer"
-                        >
-                          <i className="ph ph-plus-circle"></i>
-                          + Edytuj / Dodaj czynnik chłodniczy
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {Object.values(refrigerantTypesMap).map(rt => (
-                          <div
-                            key={rt.code}
-                            className={`inline-flex items-center gap-1.5 bg-white border rounded-lg px-2.5 py-1 text-xs shadow-2xs transition-colors ${
-                              customRefCode === rt.code
-                                ? 'border-cyan-600 ring-2 ring-cyan-300 bg-cyan-50'
-                                : 'border-cyan-200 text-slate-700'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => handleEditRefrigerantPill(rt)}
-                              className="font-bold text-cyan-900 hover:underline cursor-pointer flex items-center gap-1"
-                              title="Kliknij, aby edytować czynnik"
-                            >
-                              <i className="ph ph-pencil-simple text-cyan-600"></i>
-                              <span>
-                                {rt.code} (GWP: {rt.gwp})
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              data-testid={`delete-refrigerant-${rt.code}`}
-                              onClick={() => handleDeleteRefrigerantPill(rt.code)}
-                              className="text-slate-400 hover:text-red-600 font-bold ml-1 cursor-pointer"
-                              title="Usuń czynnik z listy"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end pt-2 border-t border-cyan-200/60">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                            Kod czynnika *
-                          </label>
-                          <input
-                            type="text"
-                            data-testid="custom-refrigerant-code-input"
-                            value={customRefCode}
-                            onChange={e => setCustomRefCode(e.target.value)}
-                            placeholder="np. R452B / R513A"
-                            className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                            Nazwa / Opis
-                          </label>
-                          <input
-                            type="text"
-                            data-testid="custom-refrigerant-name-input"
-                            value={customRefName}
-                            onChange={e => setCustomRefName(e.target.value)}
-                            placeholder="np. R452B (Opteon XL55)"
-                            className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                            Współczynnik GWP *
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            data-testid="custom-refrigerant-gwp-input"
-                            value={customRefGwp}
-                            onChange={e => setCustomRefGwp(e.target.value)}
-                            placeholder="np. 698"
-                            className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white outline-none focus:ring-2 focus:ring-cyan-500"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              data-testid="custom-refrigerant-fluorinated-checkbox"
-                              checked={customRefFluorinated}
-                              onChange={e => setCustomRefFluorinated(e.target.checked)}
-                              className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-                            />
-                            F-Gaz (CRO)
-                          </label>
-                          <button
-                            type="button"
-                            data-testid="save-custom-refrigerant-btn"
-                            onClick={handleSaveCustomRefrigerant}
-                            className="ml-auto px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-                          >
-                            Zapisz czynnik
-                          </button>
-                        </div>
                       </div>
                     </div>
                   </div>

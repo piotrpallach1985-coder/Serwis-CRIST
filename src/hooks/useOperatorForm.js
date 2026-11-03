@@ -106,7 +106,7 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     if (!isInternal) {
       if (pinRequirement.required && !verifyAnonymousReportPin(reportPin, pinRequirement.pin)) {
         const msg =
-          'Nieprawidłowy kod PIN autoryzacji zgłoszenia! Podaj poprawny kod PIN przypisany do tej lokalizacji lub pojazdu.';
+          'Nieprawidłowy kod PIN autoryzacji zgłoszenia! Podaj poprawny kod PIN przypisany do tego urządzenia lub rejonu.';
         setErrorMsg(msg);
         showToast(msg, 'error');
         return;

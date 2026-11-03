@@ -218,6 +218,17 @@ export default function MachineInfoCard({
             {totalPartsCost.toFixed(2)} {t('machines.details.pln')}
           </div>
         </div>
+        {!isVehicle && machine?.reportPin && (
+          <div data-testid="machine-info-report-pin">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">
+              PIN zgłoszeń urządzenia:
+            </div>
+            <div className="inline-flex items-center gap-1.5 font-mono font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-lg text-sm mt-0.5">
+              <i className="ph-fill ph-key text-amber-600"></i>
+              <span>{machine.reportPin}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* DANE BRANŻOWE: FLOTA SAMOCHODOWA (POJAZD), ADRES GPS, KLIENT, c-KOB, F-GAZY (HVAC) */}

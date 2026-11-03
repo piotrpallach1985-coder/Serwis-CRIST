@@ -51,6 +51,7 @@ import MachinesQRCodes from '../../components/manager/machines/MachinesQRCodes';
 import MachineForm from '../../components/manager/MachineForm';
 import BulkImportModal from '../../components/manager/BulkImportModal';
 import PartForm from '../../components/manager/parts/PartForm';
+import SidebarNavUR from '../../components/manager/sidebar/SidebarNavUR';
 import MachineDTR from '../../components/manager/MachineDTR';
 import {
   isMachineIncompleteForQr,
@@ -1836,7 +1837,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       unmountOpScanner();
     });
 
-    it('obsługuje edytowalną listę czynników chłodniczych (dodawanie nowych, edycja GWP, usuwanie) oraz niezależną zakładkę Klimatyzacja / HVAC w MachineForm', () => {
+    it('obsługuje nazwy w menu bocznym dla HVAC (Awarie, Serwisy), etykietę Miejsce/rejon montażu oraz brak wbudowanego edytora czynników w MachineForm', () => {
       // 1) Dodanie nowego czynnika R452B (GWP 698) i przeliczenie CO2e
       const updatedTypes = saveCustomRefrigerant({
         code: 'R452B',
@@ -1851,7 +1852,19 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(calc.co2EquivalentTons).toBe(6.98);
       expect(calc.requiresCroCard).toBe(true);
 
-      // 2) W profilu 'industrial' (Przemysł) zakres HVAC nie jest widoczny, a przyciski nie zawierają napisu RBG
+      // 2) W menu bocznym (SidebarNavUR) dla firmy HVAC nazwy sekcji to "Awarie" i "Serwisy" (bez dopisku UR)
+      const { unmount: unmountSidebarHvac } = render(
+        <SidebarNavUR
+          activeTab="tickets"
+          handleItemClick={vi.fn()}
+          branding={{ industryProfile: 'hvac' }}
+        />
+      );
+      expect(screen.getByTestId('sidebar-section-tickets').textContent).toBe('Awarie');
+      expect(screen.getByTestId('sidebar-section-services').textContent).toBe('Serwisy');
+      unmountSidebarHvac();
+
+      // 3) W profilu 'industrial' (Przemysł) zakres HVAC nie jest widoczny, a przyciski nie zawierają napisu RBG
       useManagerStore.getState().setBranding({
         companyName: 'Zakład Przemysłowy',
         industryProfile: 'industrial',
@@ -1875,7 +1888,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('asset-category-vehicle-btn').textContent).toBe('Pojazd / Flota');
       unmountInd();
 
-      // 3) W profilu 'hvac' widoczna jest zakładka Klimatyzacja / HVAC oraz edytor czynników chłodniczych
+      // 4) W profilu 'hvac' w zakładce Klimatyzacja / HVAC etykieta to "Miejsce/rejon montażu *", a lista edycji czynników jest usunięta z okna dodawania urządzenia
       useManagerStore.getState().setBranding({
         companyName: 'Klima-Serwis',
         industryProfile: 'hvac',
@@ -1896,32 +1909,24 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       // Kliknięcie zakładki "Klimatyzacja / HVAC (F-Gazy / CRO)"
       fireEvent.click(screen.getByTestId('asset-category-hvac-btn'));
       expect(screen.getByTestId('machine-form-fgas-section')).toBeTruthy();
+      expect(screen.getByTestId('machine-form-region-label').textContent).toBe(
+        'Miejsce/rejon montażu *'
+      );
+      // Zakres "Edytowalna lista czynników chłodniczych" usunięty z okienka dodawania urządzenia (zarządzany w osobnej liście)
+      expect(screen.queryByTestId('refrigerant-manager-panel')).toBeNull();
+      expect(screen.queryByTestId('toggle-refrigerant-manager-btn')).toBeNull();
 
-      // Otwarcie edytora czynników chłodniczych w formularzu
-      fireEvent.click(screen.getByTestId('toggle-refrigerant-manager-btn'));
-      expect(screen.getByTestId('refrigerant-manager-panel')).toBeTruthy();
-
-      fireEvent.change(screen.getByTestId('custom-refrigerant-code-input'), {
-        target: { value: 'R513A' },
+      // Wybór czynnika z listy rozwijanej nadal działa (w tym czynnika R452B dodanego w osobnej liście)
+      fireEvent.change(screen.getByTestId('machine-form-refrigerant-select'), {
+        target: { value: 'R452B' },
       });
-      fireEvent.change(screen.getByTestId('custom-refrigerant-name-input'), {
-        target: { value: 'R513A (Opteon XP10)' },
-      });
-      fireEvent.change(screen.getByTestId('custom-refrigerant-gwp-input'), {
-        target: { value: '631' },
-      });
-      fireEvent.click(screen.getByTestId('save-custom-refrigerant-btn'));
+      expect(screen.getByTestId('machine-form-refrigerant-select').value).toBe('R452B');
 
-      expect(getAllRefrigerantTypes().R513A?.gwp).toBe(631);
-      expect(screen.getByTestId('machine-form-refrigerant-select').value).toBe('R513A');
-
-      // Usunięcie dodanego czynnika
       deleteCustomRefrigerant('R452B');
-      deleteCustomRefrigerant('R513A');
       unmount();
     });
 
-    it('obsługuje PIN autoryzacji dla zgłoszeń anonimowych (lokalizacja/rejon, indywidualny PIN pojazdu, globalny PIN floty) oraz widoczność w zestawieniu rejonów', () => {
+    it('obsługuje PIN autoryzacji dla zgłoszeń anonimowych (globalny PIN rejonu oraz indywidualny PIN urządzenia, przy całkowitym usunięciu PIN-u dla samochodów)', () => {
       const randPin = generateRandomReportPin(4);
       expect(randPin).toMatch(/^[1-9]\d{3}$/);
 
@@ -1953,7 +1958,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(mainFallbackPin.pin).toBe('9000');
       expect(mainFallbackPin.isInherited).toBe(true);
 
-      // 2) Rozwiązywanie PIN-u dla nieruchomości vs floty pojazdów
+      // 2) Rozwiązywanie PIN-u dla urządzeń (globalny dla rejonu vs indywidualny dla konkretnego urządzenia) oraz brak PIN-u dla samochodów
       const elevatorInBuildingA = {
         id: 'm-elev-1',
         name: 'Winda Osobowa Klatka B',
@@ -1963,57 +1968,78 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       const elevPinReq = resolveAnonymousReportPin(elevatorInBuildingA, testRegions, {}, {});
       expect(elevPinReq.required).toBe(true);
       expect(elevPinReq.pin).toBe('4821');
+      expect(elevPinReq.source).toBe('parent_region');
 
-      const carWithGlobalPin = {
+      // Urządzenie z własnym indywidualnym PIN-em nadpisuje PIN rejonu
+      const hvacUnitWithOwnPin = {
+        id: 'm-hvac-1',
+        name: 'Pompa Ciepła Daikin Altherma',
+        regionId: 'reg-floor-2',
+        assetCategory: 'hvac',
+        reportPin: '7788',
+      };
+      const deviceIndivReq = resolveAnonymousReportPin(hvacUnitWithOwnPin, testRegions, {}, {});
+      expect(deviceIndivReq.required).toBe(true);
+      expect(deviceIndivReq.pin).toBe('7788');
+      expect(deviceIndivReq.source).toBe('machine');
+
+      // Samochody firmowe NIE mają PIN-u zgłoszeń anonimowych (ani indywidualnego, ani globalnego floty)
+      const companyCar = {
         id: 'veh-1',
         name: 'Toyota Proace',
         licensePlate: 'GD 11111',
         assetCategory: 'vehicle',
-        regionId: 'reg-open',
+        regionId: 'reg-building-a',
+        reportPin: '9999',
       };
-      const fleetGlobalReq = resolveAnonymousReportPin(
-        carWithGlobalPin,
+      const carPinReq = resolveAnonymousReportPin(
+        companyCar,
         testRegions,
         { globalFleetPin: '5520' },
         {}
       );
-      expect(fleetGlobalReq.required).toBe(true);
-      expect(fleetGlobalReq.pin).toBe('5520');
-      expect(fleetGlobalReq.source).toBe('fleet_global');
-
-      const carWithIndividualPin = {
-        ...carWithGlobalPin,
-        id: 'veh-2',
-        reportPin: '7788',
-      };
-      const fleetIndivReq = resolveAnonymousReportPin(
-        carWithIndividualPin,
-        testRegions,
-        { globalFleetPin: '5520' },
-        {}
-      );
-      expect(fleetIndivReq.required).toBe(true);
-      expect(fleetIndivReq.pin).toBe('7788');
-      expect(fleetIndivReq.source).toBe('vehicle');
+      expect(carPinReq.required).toBe(false);
+      expect(carPinReq.pin).toBe('');
 
       expect(verifyAnonymousReportPin('7788', '7788')).toBe(true);
-      expect(verifyAnonymousReportPin('5520', '7788')).toBe(false);
+      expect(verifyAnonymousReportPin('4821', '7788')).toBe(false);
 
-      // 3) OperatorForm: wymaga PIN-u TYLKO dla zgłoszeń anonimowych (isInternal=false), a NIE dla zalogowanych (isInternal=true)
+      // 3) W MachineForm: zakładka Urządzenie oraz HVAC mają pole PIN-u dla konkretnego urządzenia, a zakładka Pojazd / Flota NIE ma pola PIN-u
+      const { unmount: unmountMachinePinForm } = render(
+        <MachineForm
+          isOpen={true}
+          onClose={vi.fn()}
+          editingMachine={null}
+          initialParentId=""
+          regions={testRegions}
+          onSaved={vi.fn()}
+          onError={vi.fn()}
+        />
+      );
+      // W zakładce Urządzenie / Instalacja ( lub HVAC ) pole PIN dla urządzenia jest widoczne
+      expect(screen.getByTestId('machine-report-pin-section')).toBeTruthy();
+      expect(screen.getByTestId('machine-report-pin-input')).toBeTruthy();
+      // Po przełączeniu na Pojazd / Flota pole PIN znika całkowicie
+      fireEvent.click(screen.getByTestId('asset-category-vehicle-btn'));
+      expect(screen.queryByTestId('machine-report-pin-section')).toBeNull();
+      expect(screen.queryByTestId('fleet-report-pin-input')).toBeNull();
+      unmountMachinePinForm();
+
+      // 4) OperatorForm: wymaga PIN-u dla urządzenia przez inne osoby niż serwisanci (isInternal=false), a NIE dla zalogowanych serwisantów (isInternal=true)
       useManagerStore.getState().setBranding({
-        companyName: 'Flota & Nieruchomości',
-        globalFleetPin: '5520',
+        companyName: 'HVAC & Nieruchomości',
+        industryProfile: 'hvac',
       });
 
       const { unmount: unmountAnonForm } = render(
         <OperatorForm
-          machines={[carWithIndividualPin, elevatorInBuildingA]}
-          selectedMachine={carWithIndividualPin}
+          machines={[hvacUnitWithOwnPin, elevatorInBuildingA]}
+          selectedMachine={hvacUnitWithOwnPin}
           setSelectedMachine={vi.fn()}
           regions={testRegions}
           handleStepChange={vi.fn()}
           isOnline={true}
-          topicsList={['Awaria hamulców']}
+          topicsList={['Brak chłodzenia']}
           reportersList={[]}
           isInternal={false}
         />
@@ -2024,13 +2050,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       const { unmount: unmountInternalForm } = render(
         <OperatorForm
-          machines={[carWithIndividualPin, elevatorInBuildingA]}
-          selectedMachine={carWithIndividualPin}
+          machines={[hvacUnitWithOwnPin, elevatorInBuildingA]}
+          selectedMachine={hvacUnitWithOwnPin}
           setSelectedMachine={vi.fn()}
           regions={testRegions}
           handleStepChange={vi.fn()}
           isOnline={true}
-          topicsList={['Awaria hamulców']}
+          topicsList={['Brak chłodzenia']}
           reportersList={[]}
           isInternal={true}
         />
@@ -2038,26 +2064,24 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByTestId('operator-report-pin-section')).toBeNull();
       unmountInternalForm();
 
-      // 4) Zestawienie rejonów (Regions.jsx): wyświetla kolumnę PIN-u dla rejonów oraz pasek Globalnego PIN-u Floty
+      // 5) Zestawienie rejonów (Regions.jsx): wyświetla globalny PIN dla rejonów, natomiast okienko Globalnego PIN-u Floty Samochodowej jest usunięte
       useManagerStore.setState({
         regions: testRegions,
-        machines: [elevatorInBuildingA, carWithIndividualPin],
+        machines: [elevatorInBuildingA, hvacUnitWithOwnPin],
         branding: {
-          companyName: 'Flota & Nieruchomości',
-          globalFleetPin: '5520',
+          companyName: 'HVAC & Nieruchomości',
           mainMapReportPin: '1010',
         },
       });
 
       const { unmount: unmountRegions } = render(<Regions />);
-      expect(screen.getByTestId('regions-global-fleet-pin-bar')).toBeTruthy();
-      expect(screen.getByTestId('regions-active-fleet-pin-badge').textContent).toContain('5520');
+      expect(screen.queryByTestId('regions-global-fleet-pin-bar')).toBeNull();
       expect(screen.getByTestId('region-pin-badge-main_map').textContent).toContain('1010');
       expect(screen.getByTestId('region-pin-badge-reg-building-a').textContent).toContain('4821');
       expect(screen.getByTestId('region-pin-badge-reg-floor-2').textContent).toContain('4821');
       unmountRegions();
 
-      // 5) Ochrona przed ominięciem PIN-u przy przełączeniu na "Inne Urządzenie" i zmianie rejonu na pusty
+      // 6) Ochrona przed ominięciem PIN-u przy przełączeniu na "Inne Urządzenie" i zmianie rejonu na pusty
       function WrapperAnonForm() {
         const [mach, setMach] = React.useState(elevatorInBuildingA);
         return (
@@ -2081,7 +2105,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
       unmountBypass();
 
-      // 6) Hydratacja czynników chłodniczych z Firestore (branding.customRefrigerants) oraz fallback assignedAt w metrykach
+      // 7) Hydratacja czynników chłodniczych z Firestore (branding.customRefrigerants) oraz fallback assignedAt w metrykach
       const hydrated = hydrateCustomRefrigerants({
         R513A: { code: 'R513A', name: 'R513A (Opteon XP10)', gwp: 631, isFluorinated: true, isCustom: true },
       });

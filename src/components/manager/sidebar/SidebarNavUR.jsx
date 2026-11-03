@@ -124,13 +124,19 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const showInventorySection = isInventoryModuleEnabled && (branding?.modules?.inventory !== false) && ['parts_kpi', 'parts_inventory', 'parts_transactions', 'parts_qr'].some(canAccessTab);
   const showMasterDataSection = ['machines', 'machines_qr', 'regions', 'services', 'topics'].some(canAccessTab);
 
+  const industryProfile = branding?.industryProfile || 'industrial';
+  const ticketsSectionTitle =
+    industryProfile === 'hvac' ? 'Awarie' : t('sidebar.section_tickets');
+  const servicesSectionTitle =
+    industryProfile === 'hvac' ? 'Serwisy' : t('sidebar.section_services');
+
   return (
     <>
       {/* SEKCJA 1: AWARIE */}
       {showTicketsSection && (
         <div className="space-y-1">
           <div className="px-3 py-1.5 text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t("sidebar.section_tickets")}</span>
+            <span data-testid="sidebar-section-tickets">{ticketsSectionTitle}</span>
             {criticalTicketsCount > 0 && (
               <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30">
                 {criticalTicketsCount} {t("sidebar.crit_short", "kryt.")}
@@ -191,7 +197,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
       {showServicesSection && (
         <div className="space-y-1 pt-2 border-t border-gray-800/80">
           <div className="px-3 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{t("sidebar.section_services")}</span>
+            <span data-testid="sidebar-section-services">{servicesSectionTitle}</span>
             {overdueServicesCount > 0 && (
               <span className="bg-red-600/30 text-red-300 text-[10px] px-1.5 py-0.5 rounded font-bold border border-red-500/30 animate-pulse">
                 {overdueServicesCount} {t("sidebar.crit_short", "kryt.")}

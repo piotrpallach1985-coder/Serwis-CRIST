@@ -221,7 +221,7 @@ export default function OperatorForm({
                     )}
                   </div>
                   <p className="text-xs text-amber-800 leading-snug">
-                    Dla tej lokalizacji lub pojazdu wymagane jest podanie kodu PIN chroniącego przed nieautoryzowanymi zgłoszeniami.
+                    Dla tego urządzenia lub rejonu wymagane jest podanie kodu PIN chroniącego przed nieautoryzowanymi zgłoszeniami.
                   </p>
                   <input
                     id="operator-report-pin-input"

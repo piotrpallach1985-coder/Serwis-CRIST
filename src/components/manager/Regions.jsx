@@ -707,7 +707,7 @@ export default function Regions() {
                             className="w-full sm:max-w-xs p-2.5 border border-amber-300 rounded-lg font-mono font-bold text-sm tracking-widest bg-white focus:ring-2 focus:ring-amber-500 outline-none"
                           />
                           <p className="text-xs text-amber-800 leading-snug">
-                            Chroni przed przypadkowymi zgłoszeniami z kodów QR (np. w częściach wspólnych nieruchomości). Dotyczy wyłącznie zgłoszeń anonimowych — zalogowani pracownicy nie podają PIN-u.
+                            Ustawiany globalnie dla tego rejonu dla zgłoszeń anonimowych (przez osoby inne niż serwisanci). Jeśli konkretne urządzenie ma przypisany własny PIN, ma on pierwszeństwo przed PIN-em rejonu.
                           </p>
                         </div>
                       </div>
@@ -1117,78 +1117,6 @@ export default function Regions() {
               </div>
             </div>
           )}
-
-          {/* Pasek zarządzania Globalnym PIN-em Floty oraz informacja o PIN-ach rejonów */}
-          <div
-            data-testid="regions-global-fleet-pin-bar"
-            className="mx-3 sm:mx-4 my-3 bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3"
-          >
-            <div className="space-y-0.5">
-              <div className="text-xs sm:text-sm font-extrabold text-emerald-950 flex items-center gap-2">
-                <i className="ph-fill ph-truck text-emerald-600 text-lg"></i>
-                <span>Globalny PIN Zgłoszeń Floty Samochodowej (dla wszystkich pojazdów)</span>
-                {(branding?.globalFleetPin || mainMapSettings?.globalFleetPin) ? (
-                  <span
-                    data-testid="regions-active-fleet-pin-badge"
-                    className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[11px] font-mono font-black tracking-wider"
-                  >
-                    PIN: {branding?.globalFleetPin || mainMapSettings?.globalFleetPin}
-                  </span>
-                ) : (
-                  <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    Brak (Otwarte)
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-emerald-800 leading-snug">
-                Obowiązuje przy zgłoszeniach anonimowych dla wszystkich samochodów nieposiadających indywidualnego PIN-u (indywidualny PIN pojazdu ustawisz w edycji pojazdu).
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <input
-                type="text"
-                data-testid="regions-global-fleet-pin-input"
-                value={globalFleetPinInput}
-                onChange={e => setGlobalFleetPinInput(e.target.value)}
-                placeholder="Wpisz PIN floty (np. 5520)"
-                className="w-44 px-3 py-1.5 border border-emerald-300 rounded-lg text-xs font-mono font-bold tracking-widest bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-              <button
-                type="button"
-                data-testid="regions-generate-fleet-pin-btn"
-                onClick={() => {
-                  const newPin = generateRandomReportPin(4);
-                  handleSaveGlobalFleetPin(newPin);
-                }}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                title="Wylosuj i zapisz nowy 4-cyfrowy Globalny PIN Floty"
-              >
-                <i className="ph ph-shuffle"></i> Losuj nowy
-              </button>
-              <button
-                type="button"
-                data-testid="regions-save-fleet-pin-btn"
-                onClick={() => handleSaveGlobalFleetPin(globalFleetPinInput)}
-                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <i className="ph ph-floppy-disk"></i> Zapisz PIN Floty
-              </button>
-              {(branding?.globalFleetPin || mainMapSettings?.globalFleetPin) && (
-                <button
-                  type="button"
-                  onClick={() => handleSaveGlobalFleetPin('')}
-                  className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                >
-                  Wyłącz
-                </button>
-              )}
-              {fleetPinSavedMsg && (
-                <span className="text-xs font-bold text-emerald-700 bg-white px-2 py-1 rounded border border-emerald-200">
-                  {fleetPinSavedMsg}
-                </span>
-              )}
-            </div>
-          </div>
 
           <div className="overflow-x-auto">
             <div className="lg:hidden flex flex-col gap-1.5 p-2">
