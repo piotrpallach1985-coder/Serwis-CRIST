@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useManagerStore } from '../../store/managerStore';
 import { generateAuditorReport } from '../../utils/reports/auditorExport';
 import KPIReportPanel from './reports/KPIReportPanel';
-import ApiSettingsPanel from './reports/ApiSettingsPanel';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
@@ -15,7 +14,7 @@ export default function Reports() {
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines);
   const roles = useManagerStore(state => state.roles || []);
-  const { isAdmin, onlyAssignedTasks } = usePermissions(user, roles);
+  const { onlyAssignedTasks } = usePermissions(user, roles);
 
   const [loading, setLoading] = useState(false);
   const [plannedWarningDays, setPlannedWarningDaysState] = useState(30);
@@ -69,7 +68,6 @@ export default function Reports() {
           user={user}
           onlyAssignedTasks={onlyAssignedTasks}
         />
-        {isAdmin && <ApiSettingsPanel />}
 
         {/* Raport Audytorski */}
         <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">
