@@ -45,6 +45,7 @@ export default function PlannedMaintenanceCompletionModal({
   const [clientSignerName, setClientSignerName] = useState('');
   const [inspectorLicense, setInspectorLicense] = useState('');
   const [licenseError, setLicenseError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const requiresInspectorLicense = isInspectorLicenseRequired(industryProfile);
 
   const parts = useManagerStore(state => state.parts || []);
@@ -135,6 +136,7 @@ export default function PlannedMaintenanceCompletionModal({
 
   const handleSubmit = async e => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (requiresInspectorLicense && !inspectorLicense.trim()) {
       setLicenseError(
         'Podaj numer uprawnień kontrolującego / inspektora (wymagane dla profilu HVAC i Facility c-KOB).'
@@ -142,6 +144,7 @@ export default function PlannedMaintenanceCompletionModal({
       return;
     }
     setLicenseError('');
+    setIsSubmitting(true);
     try {
       let nextPlanData = null;
       if (createNewPlan) {
@@ -340,6 +343,8 @@ export default function PlannedMaintenanceCompletionModal({
     } catch (err) {
       console.error(err);
       alert('Błąd: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -775,9 +780,10 @@ export default function PlannedMaintenanceCompletionModal({
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('planned.confirm_exec')}
+            {isSubmitting ? 'Zapisywanie...' : t('planned.confirm_exec')}
           </button>
         </div>
       </form>

@@ -147,19 +147,22 @@ export function useManagerData() {
       }
     });
 
-    const unsubTenantRegistry = onSnapshot(doc(db, 'tenant_registry', tenantId), (snap) => {
-      if (snap.exists()) {
-        const regData = snap.data();
-        const prevBranding = useManagerStore.getState().branding || {};
-        setBranding({
-          ...prevBranding,
-          companyName: prevBranding.companyName || regData.name || tenantId.toUpperCase(),
-          companyLogoUrl: prevBranding.companyLogoUrl || regData.companyLogoUrl || '',
-          industryProfile: regData.industryProfile || prevBranding.industryProfile || 'industrial',
-          modules: regData.modules || prevBranding.modules
-        });
-      }
-    }, () => {});
+    let unsubTenantRegistry = () => {};
+    if (user?.role === 'superadmin') {
+      unsubTenantRegistry = onSnapshot(doc(db, 'tenant_registry', tenantId), (snap) => {
+        if (snap.exists()) {
+          const regData = snap.data();
+          const prevBranding = useManagerStore.getState().branding || {};
+          setBranding({
+            ...prevBranding,
+            companyName: prevBranding.companyName || regData.name || tenantId.toUpperCase(),
+            companyLogoUrl: prevBranding.companyLogoUrl || regData.companyLogoUrl || '',
+            industryProfile: regData.industryProfile || prevBranding.industryProfile || 'industrial',
+            modules: regData.modules || prevBranding.modules
+          });
+        }
+      }, () => {});
+    }
 
     const unsubMapSettings = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'map'), (snap) => {
       if (snap.exists()) {

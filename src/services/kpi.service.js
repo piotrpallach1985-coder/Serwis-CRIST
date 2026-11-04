@@ -93,7 +93,11 @@ export const computeClientKPIStats = async (
     if (statusNum === TICKET_STATUS.CLOSED || t.status === 'closed') {
       closedTicketsCount++;
       const closedAt = safeParseDate(t.closedAt);
-      const startRef = safeParseDate(t.startedAt) || createdAt;
+      const startRef =
+        safeParseDate(t.workStartedAt) ||
+        safeParseDate(t.inProgressAt) ||
+        safeParseDate(t.startedAt) ||
+        createdAt;
       if (closedAt && startRef) {
         const diffMins = (closedAt - startRef) / (1000 * 60);
         if (diffMins > 0) {
@@ -105,7 +109,11 @@ export const computeClientKPIStats = async (
 
     const machineObj = machineMap.get(t.machineId);
     const mName = machineObj?.name || t.machineName || 'Nieznana maszyna';
-    machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
+    const mKey = t.machineId && t.machineId !== 'manual' ? String(t.machineId) : mName;
+    if (!machineFaultCounts[mKey]) {
+      machineFaultCounts[mKey] = { name: mName, count: 0 };
+    }
+    machineFaultCounts[mKey].count += 1;
 
     const dateKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(
       2,
@@ -117,8 +125,7 @@ export const computeClientKPIStats = async (
   const avgRepairMinutes =
     repairedWithTimeCount > 0 ? Math.round(totalRepairTimeMinutes / repairedWithTimeCount) : 0;
 
-  const topMachines = Object.entries(machineFaultCounts)
-    .map(([name, count]) => ({ name, count }))
+  const topMachines = Object.values(machineFaultCounts)
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 

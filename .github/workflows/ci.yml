@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "source-code" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "source-code" ]
 
 jobs:
   build-and-test:
@@ -32,8 +32,8 @@ jobs:
       env:
         ESLINT_USE_FLAT_CONFIG: "false"
 
-    - name: Run Critical Tests
-      run: npx vitest run src/components/__tests__/OperatorForm.test.jsx src/components/__tests__/PartsIssueReceive.test.jsx
+    - name: Run Unit & Integration Tests
+      run: npx vitest run src/ --exclude "src/components/manager/__tests__/anon-tenant-rules.test.jsx"
 
     - name: Test Build (Dry-run)
       run: npm run build

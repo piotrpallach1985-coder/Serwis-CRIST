@@ -1,4 +1,4 @@
-﻿import { collection, doc, addDoc, updateDoc, getDocs, query, where, orderBy, limit, startAfter, serverTimestamp, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, getDocs, query, where, orderBy, limit, startAfter, serverTimestamp, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import { logAudit } from './audit.service';
@@ -25,15 +25,24 @@ export const fetchMachineTickets = async (machineId, machineName) => {
   let docs = snapById.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
 
   if (machineName) {
+    const isUnassignedOrSameMachine = t =>
+      !t.machineId || t.machineId === 'manual' || t.machineId === machineId;
     const qByName = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineName', '==', machineName));
     const snapByName = await getDocs(qByName);
-    const byNameDocs = snapByName.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
-    
-    const cleanName = machineName.replace(/\\s*\\(.*\\)\\s*/g, '');
-    const qByClean = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineName', '==', cleanName));
-    const snapByClean = await getDocs(qByClean);
-    const byCleanDocs = snapByClean.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.isDeleted);
-    
+    const byNameDocs = snapByName.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => !t.isDeleted && isUnassignedOrSameMachine(t));
+
+    const cleanName = machineName.replace(/\s*\(DO WERYFIKACJI\)\s*$/i, '').trim();
+    let byCleanDocs = [];
+    if (cleanName && cleanName !== machineName) {
+      const qByClean = query(collection(db, 'tenants', tenantId, 'tickets'), where('machineName', '==', cleanName));
+      const snapByClean = await getDocs(qByClean);
+      byCleanDocs = snapByClean.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(t => !t.isDeleted && isUnassignedOrSameMachine(t));
+    }
+
     const map = new Map();
     [...docs, ...byNameDocs, ...byCleanDocs].forEach(t => map.set(t.id, t));
     docs = Array.from(map.values());

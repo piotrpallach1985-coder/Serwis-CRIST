@@ -288,7 +288,11 @@ export default function PlannedMaintenanceInfo({
             {/* Pasek statusu 7-dniowego terminu wpisu do rządowego c-KOB (art. 60k ust. 2 Prawa budowlanego) */}
             {srv.status === 'completed' &&
               industryProfile !== 'industrial' &&
-              (industryProfile === 'facility' || Boolean(machine?.inspectionCategory)) && (
+              Boolean(
+                machine?.inspectionCategory ||
+                  String(srv.category || '').startsWith('ckob_') ||
+                  srv?.ckobCategory
+              ) && (
                 <div
                   data-testid="ckob-7days-banner"
                   className={`mb-4 rounded-xl border p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${

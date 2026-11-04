@@ -1,8 +1,8 @@
 export const getTicketStatusConfig = (t) => ({
-  1: { id: 1, key: 'new', label: t ? t('tickets.statuses.status_1', 'Nowe') : 'Nowe', color: 'bg-red-100 text-red-800 border-red-200', hex: '#f87171' },
-  2: { id: 2, key: 'in_progress', label: t ? t('tickets.statuses.status_2', 'Weryfikacja / W toku') : 'W toku', color: 'bg-orange-100 text-orange-800 border-orange-200', hex: '#fbbf24' },
-  3: { id: 3, key: 'pending', label: t ? t('tickets.statuses.status_3', 'Oczekujące') : 'Oczekujące', color: 'bg-gray-100 text-gray-800 border-gray-200', hex: '#9ca3af' },
-  4: { id: 4, key: 'rejected', label: t ? t('tickets.statuses.status_4', 'Odrzucone') : 'Odrzucone', color: 'bg-slate-100 text-slate-800 border-slate-200', hex: '#6b7280' },
+  1: { id: 1, key: 'new', label: t ? t('tickets.statuses.status_1', 'Zgłoszone') : 'Zgłoszone', color: 'bg-red-100 text-red-800 border-red-200', hex: '#f87171' },
+  2: { id: 2, key: 'in_progress', label: t ? t('tickets.statuses.status_2', 'Weryfikacja UT') : 'Weryfikacja UT', color: 'bg-orange-100 text-orange-800 border-orange-200', hex: '#fbbf24' },
+  3: { id: 3, key: 'pending', label: t ? t('tickets.statuses.status_3', 'Oczek. na naprawę') : 'Oczek. na naprawę', color: 'bg-blue-100 text-blue-800 border-blue-200', hex: '#60a5fa' },
+  4: { id: 4, key: 'repairing', label: t ? t('tickets.statuses.status_4', 'Naprawa w trakcie') : 'Naprawa w trakcie', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', hex: '#6366f1' },
   5: { id: 5, key: 'completed', label: t ? t('tickets.statuses.status_5', 'Zakończone') : 'Zakończone', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', hex: '#34d399' }
 });
 

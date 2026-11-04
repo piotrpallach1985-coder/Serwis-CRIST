@@ -40,6 +40,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && isActiveUser() && (request.auth.uid == userId || isSuperAdmin() || getUserData().tenantId == resource.data.tenantId);
       allow write: if isAdmin() 
           && (resource == null || resource.data.tenantId == getUserData().tenantId || isSuperAdmin())
+          && (resource == null || !('role' in resource.data) || resource.data.role != 'superadmin' || isSuperAdmin())
           && (request.resource.data.tenantId == getUserData().tenantId || isSuperAdmin()) 
           && (!('role' in request.resource.data) || request.resource.data.role != 'superadmin' || isSuperAdmin());
     }
@@ -115,33 +116,48 @@ service cloud.firestore {
       return !(field in d) || d[field] == null || (d[field] is string && d[field].size() <= maxLen);
     }
 
-    function anonPinMatchesRegion(tenantId, d) {
-      let rDoc = get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId)).data;
-      return !('reportPin' in rDoc)
-        || !(rDoc.reportPin is string)
-        || rDoc.reportPin.size() == 0
-        || ('reportPin' in d && d.reportPin == rDoc.reportPin);
+    function isIndustrialTenant(tenantId) {
+      return exists(/databases/$(database)/documents/tenants/$(tenantId)/settings/branding)
+        && get(/databases/$(database)/documents/tenants/$(tenantId)/settings/branding).data.get('industryProfile', 'industrial') == 'industrial';
+    }
+
+    function anonPinMatchesRegionId(tenantId, regionId, d) {
+      let rDoc = get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(regionId)).data;
+      return ('reportPin' in rDoc && rDoc.reportPin is string && rDoc.reportPin.size() > 0)
+        ? ('reportPin' in d && d.reportPin == rDoc.reportPin)
+        : (
+            !('parentId' in rDoc) || !(rDoc.parentId is string) || rDoc.parentId.size() == 0
+            || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId))
+            || !('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data)
+            || !(get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin is string)
+            || get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin.size() == 0
+            || ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin)
+          );
     }
 
     function anonTicketPinValid(tenantId, d) {
-      return d.machineId != 'manual'
-        ? (
-            ('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data
-             && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin is string
-             && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin.size() > 0)
-              ? ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin)
-              : (
-                  get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('assetCategory', 'device') == 'vehicle'
-                  || !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
-                  || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
-                  || anonPinMatchesRegion(tenantId, d)
-                )
-          )
-        : (
-            !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
-            || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
-            || anonPinMatchesRegion(tenantId, d)
-          );
+      return isIndustrialTenant(tenantId)
+        || (d.machineId != 'manual'
+          ? (
+              get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('assetCategory', 'device') == 'vehicle'
+              || (
+                  ('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data
+                   && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin is string
+                   && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin.size() > 0)
+                    ? ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin)
+                    : (
+                        get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')) == ''
+                        || get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')) == 'main_map'
+                        || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', ''))))
+                        || anonPinMatchesRegionId(tenantId, get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')), d)
+                      )
+                 )
+            )
+          : (
+              !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
+              || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
+              || anonPinMatchesRegionId(tenantId, d.regionId, d)
+            ));
     }
 
     // Zgłoszenie anonima: tylko pola formularza, status "Nowe" (1), bez przypisań/zamknięć/kosztów
@@ -250,12 +266,16 @@ service cloud.firestore {
 
       match /settings/branding {
         allow read: if true;
-        allow write: if isTenantUser(tenantId) && isAdmin();
+        allow write: if isSuperAdmin()
+          || (isTenantUser(tenantId) && isAdmin()
+              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules'])));
       }
 
       match /settings/general {
         allow read: if true;
-        allow write: if isTenantUser(tenantId) && isAdmin();
+        allow write: if isSuperAdmin()
+          || (isTenantUser(tenantId) && isAdmin()
+              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules'])));
       }
 
       // Klucz QR firmy: odczyt dla personelu (generowanie naklejek), utworzenie przez personel (gdy brak),
@@ -299,7 +319,8 @@ service cloud.firestore {
       }
 
       match /part_transactions/{document=**} {
-        allow read, create, update: if isTenantUser(tenantId);
+        allow read, create: if isTenantUser(tenantId);
+        allow update: if false;
         allow delete: if isSuperAdmin();
       }
       match /action_items/{document=**} {
@@ -310,7 +331,8 @@ service cloud.firestore {
       match /audit_logs/{document=**} {
         allow create: if isTenantUser(tenantId);
         allow read: if isTenantUser(tenantId) && isStaff();
-        allow update, delete: if isSuperAdmin();
+        allow update: if false;
+        allow delete: if isSuperAdmin();
       }
 
       match /crash_reports/{document=**} {

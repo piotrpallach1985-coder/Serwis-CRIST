@@ -521,7 +521,12 @@ export function isMachineIncompleteForQr(machine) {
   const nameUpper = String(machine.name || '').toUpperCase();
   if (nameUpper.includes('(DO WERYFIKACJI)')) return true;
   const regionId = String(machine.regionId || '').trim();
-  if (!regionId) return true;
+  if (!regionId) {
+    if (machine.qrCode && String(machine.qrCode).trim().length > 0 && machine.qrCreatedAt !== null) {
+      return false;
+    }
+    return true;
+  }
   return false;
 }
 

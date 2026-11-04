@@ -41,19 +41,33 @@ describe('usePermissions', () => {
     expect(result.current.canAccessCompanyAdmin).toBe(true);
   });
 
-  it('should grant specific defaults to manager', () => {
-    const user = { role: 'manager' };
+  it('should grant specific defaults to manager (both "manager" and USER_ROLES.MANAGER "kierownik")', () => {
+    for (const roleVal of ['manager', USER_ROLES.MANAGER]) {
+      const user = { role: roleVal };
+      const { result } = renderHook(() => usePermissions(user, []));
+
+      expect(result.current.isAdmin).toBe(false);
+      expect(result.current.isManager).toBe(true);
+      expect(result.current.canEditPlanned).toBe(true);
+      expect(result.current.canViewReports).toBe(true);
+
+      expect(result.current.canDeletePlanned).toBe(false);
+      expect(result.current.canManageUsers).toBe(false);
+      expect(result.current.canDeleteTickets).toBe(false);
+    }
+  });
+
+  it('should restrict default operator role from accessing master data and admin tabs', () => {
+    const user = { role: USER_ROLES.OPERATOR };
     const { result } = renderHook(() => usePermissions(user, []));
-    
+
     expect(result.current.isAdmin).toBe(false);
-    expect(result.current.isManager).toBe(true);
-    expect(result.current.canEditPlanned).toBe(true); // Managers can edit planned
-    expect(result.current.canViewReports).toBe(true); // Managers can view reports
-    
-    // They shouldn't have these unless explicitly granted
-    expect(result.current.canDeletePlanned).toBe(false);
-    expect(result.current.canManageUsers).toBe(false);
-    expect(result.current.canDeleteTickets).toBe(false);
+    expect(result.current.isManager).toBe(false);
+    expect(result.current.canAccessTab('home')).toBe(true);
+    expect(result.current.canAccessTab('new_ticket_scanner')).toBe(true);
+    expect(result.current.canAccessTab('tickets')).toBe(true);
+    expect(result.current.canAccessTab('machines')).toBe(false);
+    expect(result.current.canAccessTab('users')).toBe(false);
   });
 
   it('should read permissions from firestore roles config', () => {

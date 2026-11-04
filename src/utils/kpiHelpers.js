@@ -7,23 +7,27 @@ export const calculateKPIs = (tickets) => {
   let mtbfSum = 0;
   let mttfSum = 0;
 
-  // Grupujemy awarie po maszynach by obliczy czas midzy awariami (MTBF)
+  // Grupujemy awarie po maszynach by obliczyć czas między awariami (MTBF)
   const machineIncidents = {};
 
   tickets.forEach(ticket => {
-    // MTTR (Tylko zakoczone i odrzucone)
+    // MTTR (Tylko zakończone)
     if (ticket.status === TICKET_STATUS.CLOSED || ticket.status === 6) {
-      if (ticket.createdAt && ticket.closedAt) {
-        const start = safeParseDate(ticket.createdAt);
+      if ((ticket.workStartedAt || ticket.inProgressAt || ticket.startedAt || ticket.createdAt) && ticket.closedAt) {
+        const start =
+          safeParseDate(ticket.workStartedAt) ||
+          safeParseDate(ticket.inProgressAt) ||
+          safeParseDate(ticket.startedAt) ||
+          safeParseDate(ticket.createdAt);
         const end = safeParseDate(ticket.closedAt);
-        if (start && end) {
+        if (start && end && end >= start) {
           mttrSum += (end - start);
           closedCount++;
         }
       }
     }
 
-    // Zbieramy do MTBF (potrzebujemy dat awarii dla kadej maszyny)
+    // Zbieramy do MTBF (potrzebujemy dat awarii dla każdej maszyny)
     if (ticket.machineId && ticket.createdAt) {
       if (!machineIncidents[ticket.machineId]) {
         machineIncidents[ticket.machineId] = [];
@@ -47,9 +51,8 @@ export const calculateKPIs = (tickets) => {
       mtbfSum += (diffSum / (dates.length - 1));
       machinesWithMultipleIncidents++;
     }
-    // MTTF - czas pierwszej awarii od uruchomienia/poprzedniego (uproszczone: tak samo jak MTBF dla potrzeb demo)
     if (dates.length > 0) {
-      mttfSum += 0; // W prawdziwym CMMS potrzebujemy daty instalacji
+      mttfSum += 0;
     }
   });
 
@@ -65,4 +68,3 @@ export const calculateKPIs = (tickets) => {
     openIncidents: tickets.length - closedCount
   };
 };
-

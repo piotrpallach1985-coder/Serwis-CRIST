@@ -1056,11 +1056,13 @@ export function checkCkob7DaysDeadline(
 
   if (!service) return defaultResult;
 
-  const hasCkobCategory = Boolean(
-    machine?.inspectionCategory ||
-      industryProfile === 'facility' ||
-      String(service.category || '').startsWith('ckob_')
-  );
+  const hasCkobCategory =
+    industryProfile !== 'industrial' &&
+    Boolean(
+      machine?.inspectionCategory ||
+        String(service.category || '').startsWith('ckob_') ||
+        service?.ckobCategory
+    );
 
   if (!hasCkobCategory || service.status !== 'completed') {
     return defaultResult;

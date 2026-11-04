@@ -43,7 +43,8 @@ export function usePermissions(user, roles = [], customModules = null) {
 
     const isSuperAdmin = user.role === USER_ROLES.SUPERADMIN;
     const isAdmin = user.role === USER_ROLES.ADMIN || isSuperAdmin;
-    const isManager = user.role === 'manager' || isAdmin;
+    const isManager = user.role === 'manager' || user.role === USER_ROLES.MANAGER || isAdmin;
+    const isOperator = user.role === USER_ROLES.OPERATOR;
 
     const roleConfig = (effectiveRoles || []).find(
       r => r.id === user.role || r.name === user.role
@@ -93,7 +94,12 @@ export function usePermissions(user, roles = [], customModules = null) {
         return false;
       }
 
-      // 4. Domyślna rola manager (bez indywidualnej konfiguracji)
+      // 4. Domyślna rola operator (bez indywidualnej konfiguracji)
+      if (isOperator) {
+        return ['home', 'new_ticket_scanner', 'tickets', 'archive', 'map_preview'].includes(tabId);
+      }
+
+      // 5. Domyślna rola manager / serwisant (bez indywidualnej konfiguracji)
       if (ADMIN_TABS.includes(tabId)) {
         return tabId === 'reports' && isManager;
       }

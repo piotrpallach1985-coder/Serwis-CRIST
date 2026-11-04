@@ -827,6 +827,16 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(resEntered.requiresCkobEntry).toBe(false);
       expect(resEntered.ckobEntered).toBe(true);
       expect(resEntered.isOverdue7Days).toBe(false);
+
+      // 4) Zwykły serwis prewencyjny na obiekcie bez kategorii c-KOB w profilu facility NIE uruchamia fałszywego alarmu 7 dni c-KOB
+      const resNonCkob = checkCkob7DaysDeadline(
+        { id: 's4', status: 'completed', category: 'preventive', completedAt: completed9DaysAgo, ckobEntered: false },
+        { id: 'm-gate', name: 'Szlaban wjazdowy', inspectionCategory: '' },
+        'facility',
+        nowMs
+      );
+      expect(resNonCkob.requiresCkobEntry).toBe(false);
+      expect(resNonCkob.isOverdue7Days).toBe(false);
     });
 
     it('renderuje Metryczkę techniczną obiektu budowlanego (art. 60j PB) w MachineInfoCard oraz uprawnienia inspektora i pasek 7 dni c-KOB w PlannedMaintenanceInfo', () => {

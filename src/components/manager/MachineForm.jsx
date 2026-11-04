@@ -6,6 +6,7 @@ import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import { useManagerStore } from '../../store/managerStore';
 import { addMachine, updateMachine } from '../../services/machines.service';
+import { getMachineDescendantIds } from '../../utils/treeHelpers';
 import {
   REFRIGERANT_TYPES,
   CKOB_CATEGORIES,
@@ -705,13 +706,19 @@ export default function MachineForm({
                   className="w-full p-2 border border-gray-300 rounded outline-none bg-white"
                 >
                   <option value="">{t('machines.form.noParent', '-- Brak (Urządzenie główne) --')}</option>
-                  {machines
-                    .filter(m => m.id !== (editingMachine ? editingMachine.id : null))
-                    .map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} {m.licensePlate ? `[${m.licensePlate}]` : ''}
-                      </option>
-                    ))}
+                  {(() => {
+                    const excludedIds = editingMachine?.id
+                      ? getMachineDescendantIds(machines, editingMachine.id)
+                      : new Set();
+                    if (editingMachine?.id) excludedIds.add(editingMachine.id);
+                    return machines
+                      .filter(m => !excludedIds.has(m.id))
+                      .map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} {m.licensePlate ? `[${m.licensePlate}]` : ''}
+                        </option>
+                      ));
+                  })()}
                 </select>
               </div>
             )}

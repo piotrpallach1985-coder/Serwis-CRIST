@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTree } from '../treeHelpers';
+import { buildTree, getMachineDescendantIds } from '../treeHelpers';
 
 describe('treeHelpers', () => {
   describe('buildTree', () => {
@@ -41,6 +41,31 @@ describe('treeHelpers', () => {
       expect(buildTree(null)).toEqual([]);
       expect(buildTree(undefined)).toEqual([]);
       expect(buildTree([])).toEqual([]);
+    });
+
+    it('chroni przed cyklami (A -> B -> C -> B) i zwraca wszystkie identyfikatory potomków w getMachineDescendantIds', () => {
+      const cyclic = [
+        { id: 'root', name: 'Główna', parentId: '' },
+        { id: 'child1', name: 'Podzespół 1', parentId: 'root' },
+        { id: 'child2', name: 'Podzespół 2', parentId: 'child1' },
+        { id: 'loop', name: 'Pętla', parentId: 'child2' },
+      ];
+      // Wprowadzamy cykl: child1 -> loop -> child1
+      cyclic[1].parentId = 'loop';
+      cyclic[3].parentId = 'root';
+
+      expect(() => buildTree(cyclic)).not.toThrow();
+
+      const descendants = getMachineDescendantIds(
+        [
+          { id: 'm1', name: 'Linia', parentId: '' },
+          { id: 'm2', name: 'Stacja A', parentId: 'm1' },
+          { id: 'm3', name: 'Silnik A1', parentId: 'm2' },
+          { id: 'm4', name: 'Inna linia', parentId: '' },
+        ],
+        'm1'
+      );
+      expect(Array.from(descendants)).toEqual(['m2', 'm3']);
     });
   });
 });

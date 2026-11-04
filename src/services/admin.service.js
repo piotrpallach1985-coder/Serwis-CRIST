@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 
@@ -39,7 +39,7 @@ export const fetchAllTenantsStats = async (tenants) => {
   return usages;
 };
 
-export const saveGlobalAIConfig = async (transcribeModel, geminiPrice = 0.60, transcribePrice = 0.40, geminiModel = 'gemini-3.8-flash') => {
+export const saveGlobalAIConfig = async (transcribeModel, geminiPrice = 0.60, transcribePrice = 0.40, geminiModel = 'gemini-2.5-flash') => {
   return setDoc(doc(db, 'tenant_registry', '_global_secrets_'), { transcribeModel: (transcribeModel || '').trim(), geminiPrice, transcribePrice, geminiModel: (geminiModel || '').trim() }, { merge: true });
 };
 
@@ -105,5 +105,47 @@ export const saveTenant = async (formData, isEditing) => {
 };
 
 export const deleteTenant = async (id) => {
+  if (!id) return;
+  const subcollections = [
+    'machines',
+    'tickets',
+    'planned_services',
+    'parts',
+    'part_transactions',
+    'regions',
+    'services',
+    'topics',
+    'reporters',
+    'roles',
+    'notifications',
+    'action_items',
+    'audit_logs',
+    'settings',
+  ];
+
+  for (const sub of subcollections) {
+    try {
+      const snap = await getDocs(collection(db, 'tenants', id, sub));
+      if (!snap.empty) {
+        let batch = writeBatch(db);
+        let count = 0;
+        for (const docSnap of snap.docs) {
+          batch.delete(docSnap.ref);
+          count++;
+          if (count >= 450) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+        if (count > 0) {
+          await batch.commit();
+        }
+      }
+    } catch (e) {
+      console.warn(`Pominięto czyszczenie kolekcji tenants/${id}/${sub}:`, e);
+    }
+  }
+
   return deleteDoc(doc(db, 'tenant_registry', id));
 };

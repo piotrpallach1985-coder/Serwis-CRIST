@@ -158,7 +158,11 @@ exports.onTicketStatusUpdated = functions.region('europe-west1').firestore
     if (!uniqueTokens.length) return null;
     
     const statusMap = {
-      1: 'Nowa', 2: 'W trakcie', 3: 'Wstrzymana', 4: 'Odrzucona', 5: 'Zakończona'
+      1: 'Zgłoszone',
+      2: 'Weryfikacja UT',
+      3: 'Oczekuje na naprawę',
+      4: 'Naprawa w trakcie',
+      5: 'Zakończone'
     };
 
     const payload = {
@@ -194,7 +198,10 @@ exports.transcribeAudio = functions.region('europe-west1').https.onCall(async (d
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
     let actualModel = (globalDoc.exists && globalDoc.data().transcribeModel) ? globalDoc.data().transcribeModel : (model || "chirp_2");
-    actualModel = actualModel.trim().toLowerCase().replace(/\s+/g, "-");
+    actualModel = String(actualModel).trim().toLowerCase().replace(/\s+/g, "-");
+    if (!/^[a-z0-9_.-]{1,64}$/.test(actualModel)) {
+      actualModel = "chirp_2";
+    }
     
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || "serwis-crist";
     let text = "";
@@ -486,11 +493,13 @@ exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubs
             }
 
             if (!shouldAlert && (data.triggerType === 'hours' || data.triggerType === 'mixed')) {
-              if (data.targetWorkHours && machine.currentWorkHours) {
+              if (data.targetWorkHours && machine.currentWorkHours != null) {
                 const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
-                if (hoursLeft <= CRITICAL_HOURS_WARNING && hoursLeft >= 0) {
+                if (hoursLeft <= CRITICAL_HOURS_WARNING) {
                   shouldAlert = true;
-                  alertMessage = 'Zbliża się termin przeglądu liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zostało ' + hoursLeft + ' rbg).';
+                  alertMessage = hoursLeft < 0
+                    ? 'Przekroczono termin przeglądu liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (o ' + Math.abs(hoursLeft) + ' rbg).'
+                    : 'Zbliża się termin przeglądu liczonego w roboczogodzinach "' + (data.name || 'Brak nazwy') + '" (zostało ' + hoursLeft + ' rbg).';
                 }
               }
             }
@@ -593,13 +602,20 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
         closedTicketsCount++;
         if (t.closedAt) {
           const closedAt = t.closedAt.toDate ? t.closedAt.toDate() : new Date(t.closedAt);
-          const diffMins = (closedAt - createdAt) / (1000 * 60);
+          const rawStart = t.workStartedAt || t.inProgressAt || t.startedAt || t.createdAt;
+          const parsedStart = rawStart && rawStart.toDate ? rawStart.toDate() : new Date(rawStart);
+          const startRef = !isNaN(parsedStart.getTime()) ? parsedStart : createdAt;
+          const diffMins = (closedAt - startRef) / (1000 * 60);
           if (diffMins > 0) totalRepairTimeMinutes += diffMins;
         }
       }
 
       const mName = t.machineName || 'Nieznana maszyna';
-      machineFaultCounts[mName] = (machineFaultCounts[mName] || 0) + 1;
+      const mKey = t.machineId && t.machineId !== 'manual' ? String(t.machineId) : mName;
+      if (!machineFaultCounts[mKey]) {
+        machineFaultCounts[mKey] = { name: mName, count: 0 };
+      }
+      machineFaultCounts[mKey].count += 1;
 
       if (!isNaN(createdAt.getTime())) {
         const dateKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
@@ -609,8 +625,7 @@ exports.getKPIStats = functions.region('europe-west1').https.onCall(async (data,
 
     const avgRepairMinutes = closedTicketsCount > 0 ? Math.round(totalRepairTimeMinutes / closedTicketsCount) : 0;
     
-    const topMachines = Object.entries(machineFaultCounts)
-      .map(([name, count]) => ({ name, count }))
+    const topMachines = Object.values(machineFaultCounts)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 

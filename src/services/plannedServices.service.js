@@ -189,12 +189,15 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
 
         // Sprawdzanie dla triggera LICZNIKOWEGO (roboczogodziny)
         if (!shouldAlert && (data.triggerType === 'hours' || data.triggerType === 'mixed')) {
-          if (data.targetWorkHours && machine.currentWorkHours) {
+          if (data.targetWorkHours && machine.currentWorkHours != null) {
             const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
-            // Alert jeśli pozostało mniej niż próg roboczogodzin
-            if (hoursLeft <= TIME_THRESHOLDS.CRITICAL_HOURS_WARNING && hoursLeft >= 0) {
+            // Alert jeśli pozostało mniej niż próg roboczogodzin lub termin został przekroczony
+            if (hoursLeft <= TIME_THRESHOLDS.CRITICAL_HOURS_WARNING) {
               shouldAlert = true;
-              alertMessage = `Zbliża się termin przeglądu liczonego w roboczogodzinach "${data.name}" (zostało ${hoursLeft} rbg).`;
+              alertMessage =
+                hoursLeft < 0
+                  ? `Przekroczono termin przeglądu liczonego w roboczogodzinach "${data.name}" (o ${Math.abs(hoursLeft)} rbg).`
+                  : `Zbliża się termin przeglądu liczonego w roboczogodzinach "${data.name}" (zostało ${hoursLeft} rbg).`;
             }
           }
         }
@@ -389,9 +392,12 @@ export const completeServiceWithTransaction = async (serviceToComplete, completi
        }
     }
 
-    // Odczyt opcjonalny - sam serwis do update'u upewnia nas, że dokument nadal istnieje
+    // Odczyt serwisu i weryfikacja, czy nie został już wcześniej zamknięty (ochrona przed podwójnym zakończeniem)
     const serviceRef = doc(db, 'tenants', tenantId, 'planned_services', serviceToComplete.id);
-    await transaction.get(serviceRef); 
+    const serviceSnap = await transaction.get(serviceRef);
+    if (serviceSnap.exists() && serviceSnap.data()?.status === SERVICE_STATUS.COMPLETED) {
+      throw new Error('Ten serwis został już zakończony.');
+    }
 
     // 4. Faza ZAPISÓW (WRITES)
     let finalCost = 0;

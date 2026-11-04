@@ -27,6 +27,7 @@ export default function Login({ onLogin, currentUser }) {
   const [loading, setLoading] = useState(false);
   const [partScanAlert, setPartScanAlert] = useState(null);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [loginModalTarget, setLoginModalTarget] = useState(null);
 
   const currentLang = (i18n.language || 'pl').startsWith('pl') ? 'pl' : 'en';
   const toggleLanguage = () => {
@@ -116,8 +117,6 @@ export default function Login({ onLogin, currentUser }) {
 
   const [, setModSettings] = useState({ enableTickets: true, enablePlanned: true });
   const [errorMsg, setErrorMsg] = useState('');
-
-  const [loginModalTarget, setLoginModalTarget] = useState(null);
 
   const tenantId = useManagerStore(state => state.tenantId);
   const [branding, setBranding] = useState({

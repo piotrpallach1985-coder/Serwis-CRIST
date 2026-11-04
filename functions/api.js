@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const Joi = require('joi');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(cors({ origin: true }));
 app.use(express.json());
@@ -69,9 +70,10 @@ const stockSchema = Joi.object({
 });
 
 const telemetrySchema = Joi.object({
-  workHours: Joi.number().optional(),
-  status: Joi.string().optional(),
-  lastReading: Joi.string().optional()
+  workHours: Joi.number().min(0).optional(),
+  currentWorkHours: Joi.number().min(0).optional(),
+  status: Joi.string().max(100).optional(),
+  lastReading: Joi.string().max(200).optional()
 });
 
 /**
@@ -81,16 +83,19 @@ app.get('/v1/machines', async (req, res) => {
   try {
     const snapshot = await db.collection('tenants').doc(req.tenantId).collection('machines')
       .where('isDeleted', '!=', true)
+      .limit(500)
       .get();
       
     const machines = [];
     snapshot.forEach(doc => {
-      machines.push({ id: doc.id, ...doc.data() });
+      const { reportPin: _reportPin, ...safeData } = doc.data();
+      machines.push({ id: doc.id, ...safeData });
     });
     
     res.status(200).json({ success: true, count: machines.length, data: machines });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('GET /v1/machines error:', err);
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
   }
 });
 
@@ -125,7 +130,8 @@ app.post('/v1/tickets', async (req, res) => {
     const docRef = await db.collection('tenants').doc(req.tenantId).collection('tickets').add(newTicket);
     res.status(201).json({ success: true, ticketId: docRef.id, message: 'Ticket utworzony pomyślnie' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('POST /v1/tickets error:', err);
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
   }
 });
 
@@ -136,6 +142,7 @@ app.get('/v1/parts', async (req, res) => {
   try {
     const snapshot = await db.collection('tenants').doc(req.tenantId).collection('parts')
       .where('isDeleted', '!=', true)
+      .limit(500)
       .get();
       
     const parts = [];
@@ -143,7 +150,8 @@ app.get('/v1/parts', async (req, res) => {
     
     res.status(200).json({ success: true, count: parts.length, data: parts });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('GET /v1/parts error:', err);
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
   }
 });
 
@@ -238,7 +246,8 @@ app.patch('/v1/parts/:id/stock', async (req, res) => {
     if (err.message?.startsWith('BAD_REQUEST:')) {
       return res.status(400).json({ error: err.message.replace('BAD_REQUEST:', '') });
     }
-    res.status(500).json({ error: err.message });
+    console.error('PATCH /v1/parts/:id/stock error:', err);
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
   }
 });
 
@@ -250,7 +259,7 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
     const { error, value } = telemetrySchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
     
-    const { workHours, status, lastReading } = value;
+    const { workHours, currentWorkHours, status, lastReading } = value;
     
     const machineRef = db.collection('tenants').doc(req.tenantId).collection('machines').doc(req.params.id);
     const machineSnap = await machineRef.get();
@@ -260,7 +269,8 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
 
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     
-    if (workHours !== undefined) updates.currentWorkHours = Number(workHours);
+    if (currentWorkHours !== undefined) updates.currentWorkHours = Number(currentWorkHours);
+    else if (workHours !== undefined) updates.currentWorkHours = Number(workHours);
     if (status) updates.status = status;
     if (lastReading) updates.lastReading = lastReading;
 
@@ -268,7 +278,8 @@ app.patch('/v1/machines/:id/telemetry', async (req, res) => {
     
     res.status(200).json({ success: true, message: 'Dane telemetryczne zaktualizowane' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('PATCH /v1/machines/:id/telemetry error:', err);
+    res.status(500).json({ error: 'Wewnętrzny błąd serwera' });
   }
 });
 
