@@ -126,12 +126,6 @@ export default function InAppTicketScanner() {
           <i className="ph ph-warning-circle text-purple-600 text-3xl"></i>
           {t('scanner.internalTitle', 'Zgłoszenie awarii')}
         </h1>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-slate-500 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
-        >
-          <i className="ph ph-arrow-left"></i> {t('common.back', 'Wróć')}
-        </button>
         {(toastConfig.show || toastConfig.visible) && (
           <Toast {...toastConfig} onClose={hideToast} />
         )}

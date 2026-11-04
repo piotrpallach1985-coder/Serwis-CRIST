@@ -218,7 +218,7 @@ export default function MachineInfoCard({
             {totalPartsCost.toFixed(2)} {t('machines.details.pln')}
           </div>
         </div>
-        {!isVehicle && machine?.reportPin && (
+        {!isVehicle && industryProfile !== 'industrial' && machine?.reportPin && (
           <div data-testid="machine-info-report-pin">
             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0">
               PIN zgłoszeń urządzenia:

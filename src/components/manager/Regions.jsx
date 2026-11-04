@@ -676,46 +676,51 @@ export default function Regions() {
                           })()}
                         </select>
                       </div>
-                      <div className="md:col-span-3 bg-amber-50/70 border border-amber-200 rounded-xl p-3.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                          <label className="text-sm font-bold text-amber-950 flex items-center gap-1.5">
-                            <i className="ph-fill ph-key text-amber-600 text-base"></i>
-                            <span>Kod PIN dla zgłoszeń anonimowych w tej lokalizacji (opcjonalnie)</span>
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              data-testid="region-generate-pin-btn"
-                              onClick={() => setReportPin(generateRandomReportPin(4))}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              <i className="ph ph-shuffle"></i> Losuj PIN (4 cyfry)
-                            </button>
-                            {reportPin && (
+                      {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                        <div
+                          data-testid="region-report-pin-section"
+                          className="md:col-span-3 bg-amber-50/70 border border-amber-200 rounded-xl p-3.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                            <label className="text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                              <i className="ph-fill ph-key text-amber-600 text-base"></i>
+                              <span>Kod PIN dla zgłoszeń anonimowych w tej lokalizacji (opcjonalnie)</span>
+                            </label>
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => setReportPin('')}
-                                className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                data-testid="region-generate-pin-btn"
+                                onClick={() => setReportPin(generateRandomReportPin(4))}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
                               >
-                                Wyczyść (Otwarte)
+                                <i className="ph ph-shuffle"></i> Losuj PIN (4 cyfry)
                               </button>
-                            )}
+                              {reportPin && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReportPin('')}
+                                  className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                >
+                                  Wyczyść (Otwarte)
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <input
+                              type="text"
+                              data-testid="region-report-pin-input"
+                              value={reportPin}
+                              onChange={e => setReportPin(e.target.value)}
+                              placeholder="Brak PIN-u (lub wpisz np. 4829)"
+                              className="w-full sm:max-w-xs p-2.5 border border-amber-300 rounded-lg font-mono font-bold text-sm tracking-widest bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                            />
+                            <p className="text-xs text-amber-800 leading-snug">
+                              Ustawiany globalnie dla tego rejonu dla zgłoszeń anonimowych (przez osoby inne niż serwisanci). Jeśli konkretne urządzenie ma przypisany własny PIN, ma on pierwszeństwo przed PIN-em rejonu.
+                            </p>
                           </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                          <input
-                            type="text"
-                            data-testid="region-report-pin-input"
-                            value={reportPin}
-                            onChange={e => setReportPin(e.target.value)}
-                            placeholder="Brak PIN-u (lub wpisz np. 4829)"
-                            className="w-full sm:max-w-xs p-2.5 border border-amber-300 rounded-lg font-mono font-bold text-sm tracking-widest bg-white focus:ring-2 focus:ring-amber-500 outline-none"
-                          />
-                          <p className="text-xs text-amber-800 leading-snug">
-                            Ustawiany globalnie dla tego rejonu dla zgłoszeń anonimowych (przez osoby inne niż serwisanci). Jeśli konkretne urządzenie ma przypisany własny PIN, ma on pierwszeństwo przed PIN-em rejonu.
-                          </p>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Konfiguracja podmapy miejsca montażu (opcjonalnie; lokalizację pineski ustawia się podczas edycji mapy) */}
@@ -1202,27 +1207,29 @@ export default function Regions() {
                       {mainMapSettings?.description ||
                         'Główna mapa zakładu / obiektów (nadrzędna dla wszystkich rejonów)'}
                     </p>
-                    <div className="flex items-center justify-between gap-2 bg-white/80 border border-blue-200 rounded-lg px-2.5 py-1.5 mb-2">
-                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                        <i className="ph-fill ph-key text-amber-600"></i> PIN zgłoszeń (Anonim):
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {mainMapSettings?.reportPin || branding?.mainMapReportPin ? (
-                          <span className="font-mono font-black text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
-                            {mainMapSettings?.reportPin || branding?.mainMapReportPin}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-semibold">Brak (Otwarte)</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleQuickUpdateRegionPin('main_map', generateRandomReportPin(4))}
-                          className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded cursor-pointer"
-                        >
-                          Losuj PIN
-                        </button>
+                    {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                      <div className="flex items-center justify-between gap-2 bg-white/80 border border-blue-200 rounded-lg px-2.5 py-1.5 mb-2">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                          <i className="ph-fill ph-key text-amber-600"></i> PIN zgłoszeń (Anonim):
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {mainMapSettings?.reportPin || branding?.mainMapReportPin ? (
+                            <span className="font-mono font-black text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                              {mainMapSettings?.reportPin || branding?.mainMapReportPin}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-semibold">Brak (Otwarte)</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleQuickUpdateRegionPin('main_map', generateRandomReportPin(4))}
+                            className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded cursor-pointer"
+                          >
+                            Losuj PIN
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="text-xs text-gray-500 mb-2 font-bold uppercase">
                       {t('admin.regions.machines_in_region', 'Urządzenia w miejscu montażu')}
                     </div>
@@ -1310,7 +1317,7 @@ export default function Regions() {
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-1">{item.description || '-'}</p>
-                      {(() => {
+                      {(branding?.industryProfile || 'industrial') !== 'industrial' && (() => {
                         const resolvedMobilePin = resolveRegionReportPin(
                           item.id,
                           regions,
@@ -1401,9 +1408,11 @@ export default function Regions() {
                   <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
                     {t('admin.regions.machines_in_region', 'Urządzenia w miejscu montażu')}
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    PIN zgłoszeń (Anonim)
-                  </th>
+                  {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      PIN zgłoszeń (Anonim)
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                     {t('admin.regions.submap', 'MAPA')}
                   </th>
@@ -1465,49 +1474,51 @@ export default function Regions() {
                           </span>
                         )}
                       </td>
-                      <td
-                        data-testid="region-pin-cell-main_map"
-                        className="px-6 py-4 text-center"
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          {mainMapSettings?.reportPin || branding?.mainMapReportPin ? (
-                            <span
-                              data-testid="region-pin-badge-main_map"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 text-xs font-mono font-black tracking-wider"
-                            >
-                              <i className="ph-fill ph-key text-amber-600"></i>
-                              {mainMapSettings?.reportPin || branding?.mainMapReportPin}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400 font-medium">
-                              Brak (Otwarte)
-                            </span>
-                          )}
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              data-testid="quick-rotate-pin-main_map"
-                              onClick={() =>
-                                handleQuickUpdateRegionPin('main_map', generateRandomReportPin(4))
-                              }
-                              className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
-                              title="Wylosuj nowy 4-cyfrowy PIN dla Mapy Głównej"
-                            >
-                              <i className="ph ph-shuffle"></i> Zmień PIN
-                            </button>
-                            {(mainMapSettings?.reportPin || branding?.mainMapReportPin) && (
+                      {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                        <td
+                          data-testid="region-pin-cell-main_map"
+                          className="px-6 py-4 text-center"
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            {mainMapSettings?.reportPin || branding?.mainMapReportPin ? (
+                              <span
+                                data-testid="region-pin-badge-main_map"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 text-xs font-mono font-black tracking-wider"
+                              >
+                                <i className="ph-fill ph-key text-amber-600"></i>
+                                {mainMapSettings?.reportPin || branding?.mainMapReportPin}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-medium">
+                                Brak (Otwarte)
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleQuickUpdateRegionPin('main_map', '')}
-                                className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
-                                title="Wyłącz wymóg PIN-u dla Mapy Głównej"
+                                data-testid="quick-rotate-pin-main_map"
+                                onClick={() =>
+                                  handleQuickUpdateRegionPin('main_map', generateRandomReportPin(4))
+                                }
+                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                                title="Wylosuj nowy 4-cyfrowy PIN dla Mapy Głównej"
                               >
-                                Wyłącz
+                                <i className="ph ph-shuffle"></i> Zmień PIN
                               </button>
-                            )}
+                              {(mainMapSettings?.reportPin || branding?.mainMapReportPin) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickUpdateRegionPin('main_map', '')}
+                                  className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                                  title="Wyłącz wymóg PIN-u dla Mapy Głównej"
+                                >
+                                  Wyłącz
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
                           {mainReady && isMainGoogle ? (
@@ -1632,71 +1643,73 @@ export default function Regions() {
                           </span>
                         )}
                       </td>
-                      <td
-                        data-testid={`region-pin-cell-${r.id}`}
-                        className="px-6 py-4 text-center"
-                      >
-                        {(() => {
-                          const resolvedPin = resolveRegionReportPin(
-                            r.id,
-                            regions,
-                            mainMapSettings,
-                            branding
-                          );
-                          return (
-                            <div className="flex flex-col items-center gap-1">
-                              {r.reportPin ? (
-                                <span
-                                  data-testid={`region-pin-badge-${r.id}`}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 text-xs font-mono font-black tracking-wider"
-                                >
-                                  <i className="ph-fill ph-key text-amber-600"></i>
-                                  {r.reportPin}
-                                </span>
-                              ) : resolvedPin.pin ? (
-                                <span
-                                  data-testid={`region-pin-badge-${r.id}`}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-mono font-bold"
-                                  title={`Dziedziczy PIN z: ${resolvedPin.sourceName}`}
-                                >
-                                  ↳ {resolvedPin.pin}{' '}
-                                  <span className="font-sans font-normal text-[10px] text-indigo-600">
-                                    ({resolvedPin.sourceName})
+                      {(branding?.industryProfile || 'industrial') !== 'industrial' && (
+                        <td
+                          data-testid={`region-pin-cell-${r.id}`}
+                          className="px-6 py-4 text-center"
+                        >
+                          {(() => {
+                            const resolvedPin = resolveRegionReportPin(
+                              r.id,
+                              regions,
+                              mainMapSettings,
+                              branding
+                            );
+                            return (
+                              <div className="flex flex-col items-center gap-1">
+                                {r.reportPin ? (
+                                  <span
+                                    data-testid={`region-pin-badge-${r.id}`}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 text-xs font-mono font-black tracking-wider"
+                                  >
+                                    <i className="ph-fill ph-key text-amber-600"></i>
+                                    {r.reportPin}
                                   </span>
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400 font-medium">
-                                  Brak (Otwarte)
-                                </span>
-                              )}
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  data-testid={`quick-rotate-pin-${r.id}`}
-                                  onClick={() =>
-                                    handleQuickUpdateRegionPin(r.id, generateRandomReportPin(4))
-                                  }
-                                  className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
-                                  title="Wylosuj nowy 4-cyfrowy PIN dla tej lokalizacji"
-                                >
-                                  <i className="ph ph-shuffle"></i>{' '}
-                                  {r.reportPin ? 'Zmień PIN' : 'Ustaw PIN'}
-                                </button>
-                                {r.reportPin && (
+                                ) : resolvedPin.pin ? (
+                                  <span
+                                    data-testid={`region-pin-badge-${r.id}`}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-mono font-bold"
+                                    title={`Dziedziczy PIN z: ${resolvedPin.sourceName}`}
+                                  >
+                                    ↳ {resolvedPin.pin}{' '}
+                                    <span className="font-sans font-normal text-[10px] text-indigo-600">
+                                      ({resolvedPin.sourceName})
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400 font-medium">
+                                    Brak (Otwarte)
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => handleQuickUpdateRegionPin(r.id, '')}
-                                    className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
-                                    title="Wyłącz własny PIN tej lokalizacji"
+                                    data-testid={`quick-rotate-pin-${r.id}`}
+                                    onClick={() =>
+                                      handleQuickUpdateRegionPin(r.id, generateRandomReportPin(4))
+                                    }
+                                    className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                                    title="Wylosuj nowy 4-cyfrowy PIN dla tej lokalizacji"
                                   >
-                                    Wyłącz
+                                    <i className="ph ph-shuffle"></i>{' '}
+                                    {r.reportPin ? 'Zmień PIN' : 'Ustaw PIN'}
                                   </button>
-                                )}
+                                  {r.reportPin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickUpdateRegionPin(r.id, '')}
+                                      className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                                      title="Wyłącz własny PIN tej lokalizacji"
+                                    >
+                                      Wyłącz
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
+                            );
+                          })()}
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-center">
                         {(() => {
                           const configuredSubs = getRegionSubmaps(r).filter(s => s.submapConfigured);

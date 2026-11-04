@@ -123,11 +123,21 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     
     let machineToSubmit = { ...selectedMachine };
     
-    if (machineToSubmit.id === 'manual' && machineToSubmit.name) {
-      const typedName = machineToSubmit.name.trim().toLowerCase();
-      const existingMachine = machines.find(m => m.name.toLowerCase() === typedName);
+    if (
+      machineToSubmit.id === 'manual' &&
+      (machineToSubmit.matchedMachineId || machineToSubmit.name)
+    ) {
+      const typedName = String(machineToSubmit.name || '').trim().toLowerCase();
+      const existingMachine =
+        (machineToSubmit.matchedMachineId &&
+          machines.find(m => m.id === machineToSubmit.matchedMachineId)) ||
+        machines.find(m => String(m.name || '').toLowerCase() === typedName) ||
+        findMachineByIdentifierOrPlate(machines, machineToSubmit.name);
       if (existingMachine) {
-        machineToSubmit = { ...existingMachine };
+        machineToSubmit = {
+          ...existingMachine,
+          regionId: machineToSubmit.regionId || existingMachine.regionId || '',
+        };
         setSelectedMachine(machineToSubmit);
       }
     }

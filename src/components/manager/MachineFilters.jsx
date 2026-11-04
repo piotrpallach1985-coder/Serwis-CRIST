@@ -61,7 +61,7 @@ export default function MachineFilters({
               id: 'device',
               label:
                 industryProfile === 'facility'
-                  ? 'Obiektów/Urządzenia'
+                  ? 'Obiekty/Urządzenia'
                   : 'Urządzenia / Maszyny',
               icon: industryProfile === 'facility' ? 'ph-buildings' : 'ph-gear-six',
               activeClass: 'bg-blue-600 text-white',

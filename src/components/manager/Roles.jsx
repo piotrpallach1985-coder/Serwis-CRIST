@@ -52,7 +52,10 @@ export default function Roles() {
         { id: 'machines', label: 'Rejestr Urządzeń' },
         {
           id: 'only_assigned_tasks',
-          label: 'Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)',
+          label:
+            (branding?.industryProfile || 'industrial') === 'industrial'
+              ? 'Tylko przypisane zlecenia (Serwis Zewnętrzny)'
+              : 'Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)',
         },
         { id: 'regions', label: 'Rejony i Mapy' },
         { id: 'services', label: 'Podwykonawcy / Serwis' },

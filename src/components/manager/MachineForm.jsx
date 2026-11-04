@@ -563,8 +563,12 @@ export default function MachineForm({
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
-                <i className="ph ph-gear-six text-base"></i>
-                Urządzenie / Instalacja
+                <i
+                  className={`ph ${
+                    industryProfile === 'facility' ? 'ph-buildings' : 'ph-gear-six'
+                  } text-base`}
+                ></i>
+                {industryProfile === 'facility' ? 'Obiekt/Urządzenie' : 'Urządzenie / Instalacja'}
               </button>
               {industryProfile !== 'industrial' && industryProfile !== 'facility' && (
                 <button
@@ -726,8 +730,8 @@ export default function MachineForm({
               </p>
             </div>
 
-            {/* Indywidualny PIN dla zgłoszeń na to urządzenie przez inne osoby niż serwisanci (dla urządzeń / HVAC / osiedli — niedostępny dla pojazdów) */}
-            {assetCategory !== 'vehicle' && (() => {
+            {/* Indywidualny PIN dla zgłoszeń na to urządzenie przez inne osoby niż serwisanci (dla HVAC / osiedli — niedostępny dla pojazdów oraz firm przemysłowych) */}
+            {assetCategory !== 'vehicle' && industryProfile !== 'industrial' && (() => {
               const resolvedRegPin = resolveRegionReportPin(
                 regionId,
                 regions,

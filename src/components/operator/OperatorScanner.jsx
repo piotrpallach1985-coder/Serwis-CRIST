@@ -272,7 +272,7 @@ export default function OperatorScanner({
   };
 
   return (
-    <div className="w-full flex-1 bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200 text-center flex flex-col justify-between">
+    <div className="w-full max-w-4xl mx-auto flex-1 bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200 text-center flex flex-col justify-between">
       <div>
         <h2 className="text-xl font-black mb-6 uppercase tracking-wider text-slate-800">
           {t('operator.optionsTitle', 'OPCJE ZGŁOSZEŃ')}
@@ -355,16 +355,19 @@ export default function OperatorScanner({
         ) : (
           <div className="space-y-6 w-full">
             <div
+              data-testid="operator-scanner-tiles-grid"
               className={`grid ${
-                isInternal ? 'grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5' : 'grid-cols-2 gap-4 sm:gap-6'
-              } w-full`}
+                isInternal
+                  ? 'grid-cols-1 sm:grid-cols-3 md:max-w-3xl gap-4 sm:gap-5'
+                  : 'grid-cols-2 md:max-w-xl gap-4 sm:gap-6'
+              } w-full mx-auto justify-items-center`}
             >
               <button
                 onClick={startLiveScanner}
-                className="py-7 sm:py-9 px-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
+                className="w-full md:max-w-[220px] md:aspect-square py-7 sm:py-9 md:py-6 px-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
               >
                 <i className="ph ph-qr-code text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
-                <span className="text-base sm:text-lg tracking-wide">
+                <span className="text-base sm:text-lg tracking-wide text-center leading-tight">
                   {isInternal
                     ? t('operator.scanQrOrPlateBtn', 'Skanuj QR/Tablicę')
                     : t('operator.scanQrBtn', 'Skanuj QR')}
@@ -373,10 +376,10 @@ export default function OperatorScanner({
 
               <button
                 onClick={startNfcLive}
-                className="py-7 sm:py-9 px-4 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
+                className="w-full md:max-w-[220px] md:aspect-square py-7 sm:py-9 md:py-6 px-4 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
               >
                 <i className="ph ph-waves text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
-                <span className="text-base sm:text-lg tracking-wide">
+                <span className="text-base sm:text-lg tracking-wide text-center leading-tight">
                   {t('operator.scanNfcBtn', 'Zbliżeniowe NFC')}
                 </span>
               </button>
@@ -389,10 +392,10 @@ export default function OperatorScanner({
                     stopLiveScanner();
                     onScanSuccess('manual', 'manual');
                   }}
-                  className="py-7 sm:py-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
+                  className="w-full md:max-w-[220px] md:aspect-square py-7 sm:py-9 md:py-6 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
                 >
                   <i className="ph ph-note-pencil text-5xl sm:text-6xl group-hover:scale-110 transition-transform font-light"></i>
-                  <span className="text-base sm:text-lg tracking-wide">
+                  <span className="text-base sm:text-lg tracking-wide text-center leading-tight">
                     {t('operator.reportWithoutQrBtn', 'Zgłoś bez QR / NFC')}
                   </span>
                 </button>
@@ -449,11 +452,19 @@ export default function OperatorScanner({
                   <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
                     {t('operator.otherMachineCardTitle', 'Zgłoś inne urządzenie:')}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug">
-                    {t(
-                      'operator.otherMachineCardDesc',
-                      'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
-                    )}
+                  <p
+                    data-testid="operator-other-machine-card-desc"
+                    className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug"
+                  >
+                    {isInternal
+                      ? t(
+                          'operator.otherMachineInternalCardDesc',
+                          'Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC'
+                        )
+                      : t(
+                          'operator.otherMachineCardDesc',
+                          'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
+                        )}
                   </p>
                 </div>
               </div>

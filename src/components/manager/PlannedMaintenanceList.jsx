@@ -3,7 +3,7 @@ import EmptyState from '../shared/EmptyState';
 import React from 'react';
 import { usePagination } from '../../hooks/usePagination';
 import ServiceCalendar from './ServiceCalendar';
-import { safeParseDate } from '../../utils/dateHelpers';
+import { safeParseDate, getPlannedDateRelativeInfo } from '../../utils/dateHelpers';
 import { checkServiceUrgency } from '../../utils/logicHelpers';
 import { SERVICE_STATUS } from '../../utils/constants';
 
@@ -124,11 +124,28 @@ export default function PlannedMaintenanceList({
                               </div>
                             ) : srv.triggerType === 'calendar' || srv.triggerType === 'mixed' ? (
                               <div className="text-sm">
-                                <div className="font-bold text-slate-800">
-                                  {srv.nextDate
-                                    ? safeParseDate(srv.nextDate)?.toLocaleDateString('pl-PL') ||
-                                      '-'
-                                    : '-'}
+                                <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                  <span>
+                                    {srv.nextDate
+                                      ? safeParseDate(srv.nextDate)?.toLocaleDateString('pl-PL') ||
+                                        '-'
+                                      : '-'}
+                                  </span>
+                                  {(() => {
+                                    const rel =
+                                      !isCompleted && srv.nextDate
+                                        ? getPlannedDateRelativeInfo(srv.nextDate)
+                                        : null;
+                                    if (!rel) return null;
+                                    return (
+                                      <span
+                                        data-testid={`planned-days-badge-${srv.id}`}
+                                        className={`text-[11px] font-extrabold px-1.5 py-0.5 rounded ${rel.badgeClass}`}
+                                      >
+                                        ({rel.label})
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="text-[10px] font-bold text-slate-400 mt-0.5">
                                   CO {srv.calendarIntervalDays} DNI
@@ -315,11 +332,25 @@ export default function PlannedMaintenanceList({
                           </span>
                         ) : (
                           (srv.triggerType === 'calendar' || srv.triggerType === 'mixed') && (
-                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                              <i className="ph ph-calendar text-blue-500 mr-1.5"></i>
-                              {srv.nextDate
-                                ? safeParseDate(srv.nextDate)?.toLocaleDateString('pl-PL') || '-'
-                                : '-'}
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1 flex-wrap">
+                              <i className="ph ph-calendar text-blue-500 mr-1"></i>
+                              <span>
+                                {srv.nextDate
+                                  ? safeParseDate(srv.nextDate)?.toLocaleDateString('pl-PL') || '-'
+                                  : '-'}
+                              </span>
+                              {(() => {
+                                const rel =
+                                  !isCompleted && srv.nextDate
+                                    ? getPlannedDateRelativeInfo(srv.nextDate)
+                                    : null;
+                                if (!rel) return null;
+                                return (
+                                  <span className={`font-bold ${rel.textClass}`}>
+                                    ({rel.label})
+                                  </span>
+                                );
+                              })()}
                             </span>
                           )
                         )}

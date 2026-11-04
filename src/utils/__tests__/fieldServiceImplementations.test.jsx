@@ -1825,6 +1825,11 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
 
       expect(screen.getByText('Skanuj QR/Tablicę')).toBeTruthy();
       expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC'
+        )
+      ).toBeTruthy();
       expect(screen.getByTestId('operator-report-without-qr-btn')).toBeTruthy();
       expect(screen.getByTestId('operator-license-plate-section')).toBeTruthy();
       expect(screen.queryByTestId('operator-plate-input')).toBeNull(); // Domyślnie zwinięte!
@@ -1900,6 +1905,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
       expect(screen.queryByTestId('asset-category-hvac-btn')).toBeNull();
+      expect(screen.getByTestId('asset-category-device-btn').textContent).toBe('Obiekt/Urządzenie');
       unmountFacilityForm();
 
       const { unmount: unmountFacilityMachines } = render(
@@ -1914,7 +1920,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         'Dodaj Obiekt/Urządzenie'
       );
       expect(screen.getByTestId('machines-tab-device').textContent).toContain(
-        'Obiektów/Urządzenia'
+        'Obiekty/Urządzenia'
       );
       expect(screen.queryByTestId('machines-tab-hvac')).toBeNull();
       expect(screen.getByTestId('open-machines-qr-btn').textContent).toContain(
@@ -1954,7 +1960,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         'Urządzenie / Instalacja'
       );
       expect(screen.getByTestId('asset-category-vehicle-btn').textContent).toBe('Pojazd / Flota');
+      // Dla firmy przemysłowej (industrial) wymogi PIN w Dodaj Urządzenie są usunięte
+      expect(screen.queryByTestId('machine-report-pin-section')).toBeNull();
       unmountInd();
+
+      const { unmount: unmountIndRegions } = render(<Regions />);
+      expect(screen.queryByTestId('region-pin-cell-main_map')).toBeNull();
+      unmountIndRegions();
 
       // 4) W profilu 'hvac' w zakładce Klimatyzacja / HVAC etykieta to "Miejsce/rejon montażu *", a lista edycji czynników jest usunięta z okna dodawania urządzenia
       useManagerStore.getState().setBranding({
@@ -2132,12 +2144,13 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByTestId('operator-report-pin-section')).toBeNull();
       unmountInternalForm();
 
-      // 5) Zestawienie rejonów (Regions.jsx): wyświetla globalny PIN dla rejonów, natomiast okienko Globalnego PIN-u Floty Samochodowej jest usunięte
+      // 5) Zestawienie rejonów (Regions.jsx): wyświetla globalny PIN dla rejonów (dla HVAC / Osiedli), natomiast okienko Globalnego PIN-u Floty Samochodowej jest usunięte
       useManagerStore.setState({
         regions: testRegions,
         machines: [elevatorInBuildingA, hvacUnitWithOwnPin],
         branding: {
           companyName: 'HVAC & Nieruchomości',
+          industryProfile: 'hvac',
           mainMapReportPin: '1010',
         },
       });

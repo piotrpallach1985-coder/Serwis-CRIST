@@ -1328,6 +1328,7 @@
     "scanNfcCardTitle": "Zbliżeniowe NFC:",
     "scanNfcCardDesc": "Odczytaj przy pomocy NFC i zgłoś awarię.",
     "otherMachineCardTitle": "Zgłoś inne urządzenie:",
-    "otherMachineCardDesc": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy."
+    "otherMachineCardDesc": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.",
+    "otherMachineInternalCardDesc": "Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC"
   }
 }

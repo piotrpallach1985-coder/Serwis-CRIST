@@ -2378,6 +2378,10 @@ export function resolveAnonymousReportPin(
     return { required: false, pin: '', source: 'none', sourceLabel: '' };
   }
 
+  if (branding?.industryProfile === 'industrial') {
+    return { required: false, pin: '', source: 'none', sourceLabel: '' };
+  }
+
   const isVehicle = isVehicleAsset(machine, branding?.industryProfile);
   if (isVehicle) {
     return { required: false, pin: '', source: 'none', sourceLabel: '' };

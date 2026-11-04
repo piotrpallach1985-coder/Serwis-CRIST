@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../../shared/EmptyState';
-import { safeParseDate } from '../../../utils/dateHelpers';
+import { safeParseDate, getPlannedDateRelativeInfo } from '../../../utils/dateHelpers';
 import { TICKET_STATUS } from '../../../utils/constants';
 
 export default function MachineHistoryPanels({
@@ -138,8 +138,17 @@ export default function MachineHistoryPanels({
                     {s.completedAt
                       ? safeParseDate(s.completedAt).toLocaleDateString('pl-PL')
                       : s.nextDate
-                      ? t('machines.details.plannedDate') +
-                        safeParseDate(s.nextDate).toLocaleDateString('pl-PL')
+                      ? (() => {
+                          const rel =
+                            s.status !== 'completed'
+                              ? getPlannedDateRelativeInfo(s.nextDate)
+                              : null;
+                          return (
+                            t('machines.details.plannedDate') +
+                            safeParseDate(s.nextDate).toLocaleDateString('pl-PL') +
+                            (rel ? ` (${rel.label})` : '')
+                          );
+                        })()
                       : '-'}
                   </span>
                 </div>

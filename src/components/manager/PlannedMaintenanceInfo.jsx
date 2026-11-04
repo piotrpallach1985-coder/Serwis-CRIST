@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
-import { safeParseDate } from '../../utils/dateHelpers';
+import { safeParseDate, getPlannedDateRelativeInfo } from '../../utils/dateHelpers';
 import { useManagerStore } from '../../store/managerStore';
 import { useAuth } from '../../hooks/useAuth';
 import { updatePlannedService } from '../../services/plannedServices.service';
@@ -383,18 +383,37 @@ export default function PlannedMaintenanceInfo({
                     ? 'Termin / Przebieg (km)'
                     : t('planned.info.dueOrHours', 'Termin / RBG')}
                 </div>
-                <div className="font-bold text-slate-800 text-sm">
-                  {srv.triggerType === 'calendar'
-                    ? srv.nextDate
-                      ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-'
-                      : '-'
-                    : srv.triggerType === 'hours'
-                    ? srv.targetWorkHours
-                      ? `${srv.targetWorkHours} ${counterUnitLower}`
-                      : '-'
-                    : `${
-                        srv.nextDate ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-' : '-'
-                      } / ${srv.targetWorkHours ? srv.targetWorkHours + ' ' + counterUnitLower : '-'}`}
+                <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    {srv.triggerType === 'calendar'
+                      ? srv.nextDate
+                        ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-'
+                        : '-'
+                      : srv.triggerType === 'hours'
+                      ? srv.targetWorkHours
+                        ? `${srv.targetWorkHours} ${counterUnitLower}`
+                        : '-'
+                      : `${
+                          srv.nextDate ? safeParseDate(srv.nextDate)?.toLocaleDateString() || '-' : '-'
+                        } / ${srv.targetWorkHours ? srv.targetWorkHours + ' ' + counterUnitLower : '-'}`}
+                  </span>
+                  {(() => {
+                    const rel =
+                      srv.status !== 'completed' &&
+                      (srv.triggerType === 'calendar' || srv.triggerType === 'mixed') &&
+                      srv.nextDate
+                        ? getPlannedDateRelativeInfo(srv.nextDate)
+                        : null;
+                    if (!rel) return null;
+                    return (
+                      <span
+                        data-testid="planned-info-days-badge"
+                        className={`text-[11px] font-extrabold px-1.5 py-0.5 rounded ${rel.badgeClass}`}
+                      >
+                        ({rel.label})
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
