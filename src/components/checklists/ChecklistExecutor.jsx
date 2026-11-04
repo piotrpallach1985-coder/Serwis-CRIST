@@ -21,7 +21,7 @@ export default function ChecklistExecutor({
       try {
         const saved = localStorage.getItem('checklist_values_' + storageKey);
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch (err) { console.warn('[Checklist: odczyt zapisanych wartości]', err); }
     }
     return initialResponses?.values || initialResponses || {};
   });
@@ -31,7 +31,7 @@ export default function ChecklistExecutor({
       try {
         const saved = localStorage.getItem('checklist_notes_' + storageKey);
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch (err) { console.warn('[Checklist: odczyt zapisanych notatek]', err); }
     }
     return initialResponses?.notes || {};
   });
@@ -41,7 +41,7 @@ export default function ChecklistExecutor({
       try {
         const saved = localStorage.getItem('checklist_photos_' + storageKey);
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch (err) { console.warn('[Checklist: odczyt zapisanych zdjęć]', err); }
     }
     return initialResponses?.photos || {};
   });

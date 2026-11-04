@@ -6,7 +6,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { Crown, RefreshCw } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 
-export default function TenantSwitcherBanner({ }) {
+export default function TenantSwitcherBanner() {
   const { user } = useAuth();
   const [tenants, setTenants] = useState([]);
   const tenantId = useManagerStore(state => state.tenantId);

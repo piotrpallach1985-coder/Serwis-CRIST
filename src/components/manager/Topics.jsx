@@ -6,9 +6,11 @@ import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import DictationButton from '../shared/DictationButton';
 import { addTopic, updateTopic, checkTopicInUse } from '../../services/dictionary.service';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Topics() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [topics, setTopics] = useState([]);
   const [newTopic, setNewTopic] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,7 +51,7 @@ export default function Topics() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten temat z listy podpowiedzi?')) {
-      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: (typeof user !== 'undefined' && user?.name) ? user.name : 'System' });
+      await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'topics', id), { isDeleted: true, deletedAt: serverTimestamp(), deletedBy: user?.name || 'System' });
     }
   };
 

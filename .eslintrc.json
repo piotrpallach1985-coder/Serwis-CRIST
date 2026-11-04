@@ -26,6 +26,12 @@
     "no-undef": "error",
     "react/jsx-key": "error",
     "react/no-unescaped-entities": "off",
+    "no-empty": ["error", { "allowEmptyCatch": false }],
+    "react-hooks/set-state-in-effect": "warn",
+    "react-hooks/immutability": "warn",
+    "react-hooks/refs": "warn",
+    "react-hooks/preserve-manual-memoization": "warn",
+    "react-hooks/purity": "warn",
     "check-file/filename-naming-convention": [
       "error",
       {
@@ -54,6 +60,30 @@
     }
   },
   "overrides": [
+    {
+      "files": [
+        "**/__tests__/**/*.{js,jsx,ts,tsx}",
+        "**/*.test.{js,jsx,ts,tsx}",
+        "src/setupTests.{js,ts}"
+      ],
+      "env": {
+        "node": true
+      },
+      "globals": {
+        "vi": "readonly",
+        "describe": "readonly",
+        "it": "readonly",
+        "test": "readonly",
+        "expect": "readonly",
+        "beforeEach": "readonly",
+        "afterEach": "readonly",
+        "beforeAll": "readonly",
+        "afterAll": "readonly"
+      },
+      "rules": {
+        "check-file/filename-naming-convention": "off"
+      }
+    },
     {
       "files": [
         "**/*.ts",

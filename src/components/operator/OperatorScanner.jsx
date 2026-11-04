@@ -129,7 +129,7 @@ export default function OperatorScanner({
       if (html5QrcodeRef.current) {
         try {
           html5QrcodeRef.current.stop().catch(() => {});
-        } catch {}
+        } catch { /* skaner mógł być już zatrzymany */ }
       }
     };
   }, []);
@@ -164,7 +164,7 @@ export default function OperatorScanner({
         if (html5QrcodeRef.current) {
           try {
             html5QrcodeRef.current.stop().catch(() => {});
-          } catch {}
+          } catch { /* skaner mógł być już zatrzymany */ }
         }
         const container = document.getElementById('qr-reader');
         if (container) container.innerHTML = '';

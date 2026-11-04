@@ -387,7 +387,7 @@ export default function InteractiveGoogleMap({
     if (e.currentTarget.setPointerCapture && e.pointerId !== undefined) {
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
-      } catch (_) {}
+      } catch { /* setPointerCapture nieobsługiwane w tej przeglądarce – bez wpływu na działanie */ }
     }
   };
 

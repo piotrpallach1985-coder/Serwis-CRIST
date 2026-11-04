@@ -96,14 +96,14 @@ export default function InAppTicketScanner() {
           );
           return;
         }
-      } catch {}
+      } catch (err) { console.warn('[InAppTicketScanner: sprawdzenie kodu części]', err); }
 
       try {
         const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', machineId));
         if (d.exists()) {
           targetMachine = { id: d.id, ...d.data() };
         }
-      } catch {}
+      } catch (err) { console.warn('[InAppTicketScanner: pobranie maszyny]', err); }
     }
 
     if (targetMachine) {

@@ -11,7 +11,7 @@ import PartDetails from './PartDetails';
 import QRScannerModal from '../../shared/QRScannerModal';
 import BulkImportModal from '../BulkImportModal';
 
-export default function PartsList({ }) {
+export default function PartsList() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();

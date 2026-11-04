@@ -173,7 +173,7 @@ export default function BulkImportModal({
         batch.commit().catch(() => {}),
         new Promise(resolve => setTimeout(resolve, timeoutMs)),
       ]);
-    } catch {}
+    } catch (err) { console.warn('[BulkImport: zapis paczki]', err); }
   };
 
   const handleExecuteImport = async () => {
@@ -256,7 +256,7 @@ export default function BulkImportModal({
                 docId = ref.id;
                 allocatedRefByRowIndex.set(row.rowIndex, ref);
               }
-            } catch {}
+            } catch (err) { console.warn('[BulkImport: przydział ID urządzenia]', err); }
             allocatedIdByRowIndex.set(row.rowIndex, docId);
           }
         });
@@ -314,7 +314,7 @@ export default function BulkImportModal({
                 if (batch && ref) {
                   batch.update(ref, firestoreDocData);
                 }
-              } catch {}
+              } catch (err) { console.warn('[BulkImport: aktualizacja urządzenia]', err); }
               updatedById.set(row.existingId, storeDocData);
             } else {
               const docId =
@@ -327,7 +327,7 @@ export default function BulkImportModal({
                     createdAt: serverTimestamp(),
                   });
                 }
-              } catch {}
+              } catch (err) { console.warn('[BulkImport: utworzenie rejonu/urządzenia]', err); }
               addedForStore.push({
                 id: docId,
                 ...storeDocData,
@@ -356,7 +356,7 @@ export default function BulkImportModal({
             'BULK_IMPORT',
             `Zaimportowano z Excela: ${previewData.summary.readyWithQrCount} kompletnych (z QR), ${previewData.summary.incompleteWithoutQrCount} do weryfikacji (bez QR), podzespołów: ${previewData.summary.subassembliesCount || 0}`
           );
-        } catch {}
+        } catch (err) { console.warn('[BulkImport: wpis do dziennika zdarzeń]', err); }
 
         const summaryResult = {
           mode: 'machines',
@@ -403,7 +403,7 @@ export default function BulkImportModal({
                 if (batch && ref) {
                   batch.update(ref, firestorePartData);
                 }
-              } catch {}
+              } catch (err) { console.warn('[BulkImport: aktualizacja części]', err); }
               updatedPartsById.set(row.existingId, storePartData);
             } else {
               let partId = `imp-p-${Date.now()}-${i + idxInChunk}`;
@@ -433,7 +433,7 @@ export default function BulkImportModal({
                     });
                   }
                 }
-              } catch {}
+              } catch (err) { console.warn('[BulkImport: utworzenie części]', err); }
               addedPartsForStore.push({
                 id: partId,
                 ...storePartData,
@@ -462,7 +462,7 @@ export default function BulkImportModal({
             'BULK_IMPORT',
             `Zaimportowano części z Excela: ${previewData.summary.createCount} nowych, zaktualizowano: ${previewData.summary.updateCount}`
           );
-        } catch {}
+        } catch (err) { console.warn('[BulkImport: wpis do dziennika zdarzeń (części)]', err); }
 
         const summaryResult = {
           mode: 'parts',

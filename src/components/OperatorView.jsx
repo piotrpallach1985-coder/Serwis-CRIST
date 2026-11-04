@@ -151,7 +151,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             targetMachine = { id: snap.docs[0].id, ...snap.docs[0].data() };
           }
         }
-      } catch {}
+      } catch (err) { console.warn('[OperatorView: wyszukanie maszyny po kodzie]', err); }
     }
 
     if (targetMachine) {

@@ -635,7 +635,7 @@ export default function CustomizableTileGrid({ tiles, layoutState, className = '
                 e.dataTransfer.effectAllowed = 'move';
                 try {
                   e.dataTransfer.setData('text/plain', tileItem.id);
-                } catch {}
+                } catch { /* starsze przeglądarki nie obsługują setData – bez wpływu na przeciąganie */ }
               }}
               onDragOver={e => {
                 if (!isEditing || !draggedId) return;

@@ -117,7 +117,7 @@ export default function DictationButton({ onResult, onStart, className = '', mod
               } catch (parseErr) {
                 const match = resData.match(/\{[\s\S]*\}/);
                 if (match) {
-                  try { resData = JSON.parse(match[0]); } catch (e) {}
+                  try { resData = JSON.parse(match[0]); } catch { /* odpowiedź AI nie zawiera poprawnego JSON – zostaje surowy tekst */ }
                 }
               }
             }

@@ -549,7 +549,7 @@ export default function Regions() {
         await updateRegion(id, {
           isDeleted: true,
           deletedAt: serverTimestamp(),
-          deletedBy: typeof user !== 'undefined' && user?.name ? user.name : 'System',
+          deletedBy: user?.name || 'System',
         });
       }
     } catch (err) {

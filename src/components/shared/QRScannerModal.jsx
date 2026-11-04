@@ -138,7 +138,7 @@ export default function QRScannerModal({
                     const urlParams = new URLSearchParams(qs);
                     machineId = urlParams.get('machine') || urlParams.get('part') || machineId;
                     tenantFromQr = urlParams.get('tenant');
-                  } catch {}
+                  } catch { /* kod QR nie jest adresem URL – używany jest surowy identyfikator */ }
                 }
 
                 const currentTenantId = useManagerStore.getState().tenantId;
@@ -169,10 +169,10 @@ export default function QRScannerModal({
           try {
             const p = scanner.stop();
             if (p && p.catch) p.catch(() => {});
-          } catch {}
+          } catch { /* skaner mógł być już zatrzymany */ }
           try {
             scanner.clear();
-          } catch {}
+          } catch { /* skaner mógł być już wyczyszczony */ }
         }
       };
     }
@@ -207,7 +207,7 @@ export default function QRScannerModal({
                   const urlParams = new URLSearchParams(qs);
                   machineId = urlParams.get('machine') || urlParams.get('part') || machineId;
                   tenantFromQr = urlParams.get('tenant');
-                } catch {}
+                } catch { /* kod QR nie jest adresem URL – używany jest surowy identyfikator */ }
               }
 
               const currentTenantId = useManagerStore.getState().tenantId;
@@ -269,7 +269,7 @@ export default function QRScannerModal({
                 const urlParams = new URLSearchParams(qs);
                 machineId = urlParams.get('machine') || machineId;
                 tenantFromQr = urlParams.get('tenant');
-              } catch {}
+              } catch { /* kod QR nie jest adresem URL – używany jest surowy identyfikator */ }
             }
 
             const currentTenantId = useManagerStore.getState().tenantId;
