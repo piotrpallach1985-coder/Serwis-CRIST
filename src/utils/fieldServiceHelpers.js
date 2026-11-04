@@ -2427,5 +2427,6 @@ export function verifyAnonymousReportPin(enteredPin, expectedPin) {
   if (!cleanExpected) return true;
   const cleanEntered = String(enteredPin || '').trim();
   if (!cleanEntered) return false;
-  return cleanEntered.toUpperCase() === cleanExpected.toUpperCase();
+  // Porównanie dokładne (wielkość liter ma znaczenie) — zgodne z regułą anonTicketPinValid w firestore.rules
+  return cleanEntered === cleanExpected;
 }

@@ -121,43 +121,55 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/tenants/$(tenantId)/settings/branding).data.get('industryProfile', 'industrial') == 'industrial';
     }
 
+    // PIN Mapy Głównej (settings/map.reportPin lub settings/branding.mainMapReportPin) – zgodnie z resolveRegionReportPin()
+    function mainMapPinOk(tenantId, d) {
+      let mapPath = /databases/$(database)/documents/tenants/$(tenantId)/settings/map;
+      let brandPath = /databases/$(database)/documents/tenants/$(tenantId)/settings/branding;
+      let mapPin = exists(mapPath) ? get(mapPath).data.get('reportPin', '') : '';
+      let brandPin = exists(brandPath) ? get(brandPath).data.get('mainMapReportPin', '') : '';
+      let pin = (mapPin is string && mapPin.size() > 0) ? mapPin : brandPin;
+      return !(pin is string) || pin.size() == 0 || ('reportPin' in d && d.reportPin == pin);
+    }
+
+    function parentRegionPinOk(tenantId, parentId, d) {
+      let pPath = /databases/$(database)/documents/tenants/$(tenantId)/regions/$(parentId);
+      return (exists(pPath) && get(pPath).data.get('reportPin', '') is string
+          && get(pPath).data.get('reportPin', '').size() > 0)
+        ? ('reportPin' in d && d.reportPin == get(pPath).data.reportPin)
+        : mainMapPinOk(tenantId, d);
+    }
+
     function anonPinMatchesRegionId(tenantId, regionId, d) {
       let rDoc = get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(regionId)).data;
-      return ('reportPin' in rDoc && rDoc.reportPin is string && rDoc.reportPin.size() > 0)
+      let parentId = rDoc.get('parentId', '');
+      return (rDoc.get('reportPin', '') is string && rDoc.get('reportPin', '').size() > 0)
         ? ('reportPin' in d && d.reportPin == rDoc.reportPin)
-        : (
-            !('parentId' in rDoc) || !(rDoc.parentId is string) || rDoc.parentId.size() == 0
-            || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId))
-            || !('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data)
-            || !(get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin is string)
-            || get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin.size() == 0
-            || ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(rDoc.parentId)).data.reportPin)
-          );
+        : ((parentId is string && parentId.size() > 0)
+            ? parentRegionPinOk(tenantId, parentId, d)
+            : mainMapPinOk(tenantId, d));
+    }
+
+    // Rejon dla urządzenia brany jest WYŁĄCZNIE z dokumentu urządzenia (zgłaszający nie może podmienić regionId)
+    function anonRegionPinOk(tenantId, regionId, d) {
+      return (!(regionId is string) || regionId == '' || regionId == 'main_map'
+          || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(regionId)))
+        ? mainMapPinOk(tenantId, d)
+        : anonPinMatchesRegionId(tenantId, regionId, d);
     }
 
     function anonTicketPinValid(tenantId, d) {
+      let mPath = /databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId);
       return isIndustrialTenant(tenantId)
         || (d.machineId != 'manual'
           ? (
-              get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('assetCategory', 'device') == 'vehicle'
+              get(mPath).data.get('assetCategory', 'device') == 'vehicle'
               || (
-                  ('reportPin' in get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data
-                   && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin is string
-                   && get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin.size() > 0)
-                    ? ('reportPin' in d && d.reportPin == get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.reportPin)
-                    : (
-                        get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')) == ''
-                        || get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')) == 'main_map'
-                        || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', ''))))
-                        || anonPinMatchesRegionId(tenantId, get(/databases/$(database)/documents/tenants/$(tenantId)/machines/$(d.machineId)).data.get('regionId', d.get('regionId', '')), d)
-                      )
+                  (get(mPath).data.get('reportPin', '') is string && get(mPath).data.get('reportPin', '').size() > 0)
+                    ? ('reportPin' in d && d.reportPin == get(mPath).data.reportPin)
+                    : anonRegionPinOk(tenantId, get(mPath).data.get('regionId', ''), d)
                  )
             )
-          : (
-              !('regionId' in d) || !(d.regionId is string) || d.regionId.size() == 0 || d.regionId == 'main_map'
-              || !exists(/databases/$(database)/documents/tenants/$(tenantId)/regions/$(d.regionId))
-              || anonPinMatchesRegionId(tenantId, d.regionId, d)
-            ));
+          : anonRegionPinOk(tenantId, d.get('regionId', ''), d));
     }
 
     // Zgłoszenie anonima: tylko pola formularza, status "Nowe" (1), bez przypisań/zamknięć/kosztów

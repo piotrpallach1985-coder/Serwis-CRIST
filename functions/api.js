@@ -81,14 +81,16 @@ const telemetrySchema = Joi.object({
  */
 app.get('/v1/machines', async (req, res) => {
   try {
+    // UWAGA: bez where('isDeleted','!=',true) - taki filtr pomija dokumenty BEZ pola isDeleted
     const snapshot = await db.collection('tenants').doc(req.tenantId).collection('machines')
-      .where('isDeleted', '!=', true)
-      .limit(500)
+      .limit(1000)
       .get();
       
     const machines = [];
     snapshot.forEach(doc => {
-      const { reportPin: _reportPin, ...safeData } = doc.data();
+      const data = doc.data();
+      if (data.isDeleted === true) return;
+      const { reportPin: _reportPin, ...safeData } = data;
       machines.push({ id: doc.id, ...safeData });
     });
     
@@ -110,7 +112,10 @@ app.post('/v1/tickets', async (req, res) => {
     const { machineId, topic, description, priority, reporterName } = value;
 
     const machineSnap = await db.collection('tenants').doc(req.tenantId).collection('machines').doc(machineId).get();
-    const machineData = machineSnap.exists ? machineSnap.data() : null;
+    if (!machineSnap.exists || machineSnap.data()?.isDeleted === true) {
+      return res.status(404).json({ error: 'Maszyna nie istnieje' });
+    }
+    const machineData = machineSnap.data();
     
     const newTicket = {
       machineId,
@@ -141,12 +146,15 @@ app.post('/v1/tickets', async (req, res) => {
 app.get('/v1/parts', async (req, res) => {
   try {
     const snapshot = await db.collection('tenants').doc(req.tenantId).collection('parts')
-      .where('isDeleted', '!=', true)
-      .limit(500)
+      .limit(1000)
       .get();
       
     const parts = [];
-    snapshot.forEach(doc => parts.push({ id: doc.id, ...doc.data() }));
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.isDeleted === true) return;
+      parts.push({ id: doc.id, ...data });
+    });
     
     res.status(200).json({ success: true, count: parts.length, data: parts });
   } catch (err) {
