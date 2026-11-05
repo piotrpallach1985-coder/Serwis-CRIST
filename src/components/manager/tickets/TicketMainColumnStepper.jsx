@@ -61,7 +61,7 @@ export default function TicketMainColumnStepper({
   const [refrigerantRecoveredKg, setRefrigerantRecoveredKg] = useState('');
   const [clientSignature, setClientSignature] = useState(currentTicket?.clientSignature || '');
   const [clientSignerName, setClientSignerName] = useState(currentTicket?.clientSignerName || '');
-  const matchedServiceForLicense = (services || []).find(
+  const matchedServiceForLicense = (contractorOptions || []).find(
     s =>
       s.name === (selectedService || currentTicket?.assignedTo) ||
       s.id === (selectedService || currentTicket?.assignedTo)

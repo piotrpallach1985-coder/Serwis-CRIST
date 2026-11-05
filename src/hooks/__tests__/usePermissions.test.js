@@ -147,4 +147,53 @@ describe('usePermissions', () => {
     expect(result.current.canAccessTab('dashboard_tickets')).toBe(false);
     expect(result.current.canAccessTab('users')).toBe(false);
   });
+
+  it('should allow only tickets when only_assigned_tasks and tickets are checked (without planned_maintenance)', () => {
+    const user = { role: 'role-only-tickets' };
+    const roles = [
+      {
+        id: 'role-only-tickets',
+        name: 'Serwis Tylko Awarie',
+        permissions: ['tickets', 'only_assigned_tasks'],
+      },
+    ];
+    const { result } = renderHook(() => usePermissions(user, roles));
+
+    expect(result.current.onlyAssignedTasks).toBe(true);
+    expect(result.current.canAccessTab('tickets')).toBe(true);
+    expect(result.current.canAccessTab('planned_maintenance')).toBe(false);
+    expect(result.current.canAccessTab('archive')).toBe(false);
+    expect(result.current.canAccessTab('archive_planned')).toBe(false);
+  });
+
+  it('should control machines and machines_qr independently 1:1', () => {
+    const roles = [
+      { id: 'role-machines-only', name: 'Tylko Maszyny', permissions: ['machines'] },
+      { id: 'role-qr-only', name: 'Tylko QR', permissions: ['machines_qr'] },
+    ];
+
+    const { result: resMachines } = renderHook(() =>
+      usePermissions({ role: 'role-machines-only' }, roles)
+    );
+    expect(resMachines.current.canAccessTab('machines')).toBe(true);
+    expect(resMachines.current.canAccessTab('machines_qr')).toBe(false);
+
+    const { result: resQr } = renderHook(() =>
+      usePermissions({ role: 'role-qr-only' }, roles)
+    );
+    expect(resQr.current.canAccessTab('machines')).toBe(false);
+    expect(resQr.current.canAccessTab('machines_qr')).toBe(true);
+  });
+
+  it('should not leak default UR staff tabs when custom role config has not loaded from Firestore yet', () => {
+    const user = { role: 'custom-unloaded-role-id' };
+    const { result } = renderHook(() => usePermissions(user, []));
+
+    expect(result.current.canAccessTab('home')).toBe(true);
+    expect(result.current.canAccessTab('tickets')).toBe(false);
+    expect(result.current.canAccessTab('planned_maintenance')).toBe(false);
+    expect(result.current.canAccessTab('machines')).toBe(false);
+    expect(result.current.canAccessTab('machines_qr')).toBe(false);
+    expect(result.current.canAccessTab('parts')).toBe(false);
+  });
 });

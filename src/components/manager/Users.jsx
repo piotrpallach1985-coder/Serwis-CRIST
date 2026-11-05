@@ -25,9 +25,10 @@ export default function Users() {
   const { t } = useTranslation();
   const tenantId = getCurrentTenant();
   const limits = useManagerStore(state => state.limits);
-  const services = useManagerStore(state => state.services) || [];
+  const storeRoles = useManagerStore(state => state.roles) || [];
   const [usersList, setUsersList] = useState([]);
-  const [rolesList, setRolesList] = useState([]);
+  const [localRolesList, setRolesList] = useState([]);
+  const rolesList = localRolesList.length > 0 ? localRolesList : storeRoles;
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('admin');
