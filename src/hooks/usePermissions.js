@@ -86,6 +86,12 @@ export function usePermissions(user, roles = [], customModules = null) {
 
       // 3. Niestandardowa rola z przypisaną listą uprawnień
       if (hasCustomPerms) {
+        if (
+          onlyAssignedTasks &&
+          ['tickets', 'archive', 'planned_maintenance', 'archive_planned'].includes(tabId)
+        ) {
+          return true;
+        }
         if (perms.includes(tabId)) return true;
         if (tabId === 'machines_qr' && perms.includes('machines')) return true;
         if (tabId.startsWith('parts_') && perms.includes('parts')) return true;

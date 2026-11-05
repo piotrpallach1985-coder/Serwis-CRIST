@@ -77,13 +77,18 @@ export function useManagerData() {
     const syncFilteredDataToStore = () => {
       const restricted = hasOnlyAssignedFlag();
       if (restricted) {
-        const filteredTickets = filterTasksForFieldTechnician(rawTickets, user, true);
-        const filteredPlanned = filterTasksForFieldTechnician(rawPlannedServices, user, true);
+        const roleConfig = (currentRoles || []).find(
+          r => r.id === user?.role || r.name === user?.role
+        );
+        const enrichedUser =
+          roleConfig?.name && user ? { ...user, roleName: roleConfig.name } : user;
+        const filteredTickets = filterTasksForFieldTechnician(rawTickets, enrichedUser, true);
+        const filteredPlanned = filterTasksForFieldTechnician(rawPlannedServices, enrichedUser, true);
         const filteredMachines = filterMachinesForFieldTechnician(
           rawMachines,
           filteredTickets,
           filteredPlanned,
-          user,
+          enrichedUser,
           true
         );
         setTickets(filteredTickets);

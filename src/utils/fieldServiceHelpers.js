@@ -923,6 +923,14 @@ export function isTaskAssignedToUser(task, user) {
     ? [user.dedicatedServices]
     : [];
 
+  const customRoleIdentifier =
+    user.role &&
+    !['admin', 'superadmin', 'kierownik', 'manager', 'operator', 'serwisant'].includes(
+      String(user.role).trim().toLowerCase()
+    )
+      ? user.role
+      : null;
+
   const userIdentifiers = [
     user.uid,
     user.id,
@@ -930,6 +938,8 @@ export function isTaskAssignedToUser(task, user) {
     user.email,
     user.serviceName,
     user.assignedService,
+    user.roleName,
+    customRoleIdentifier,
     ...dedicatedList,
     user.companyName,
   ]
@@ -941,6 +951,9 @@ export function isTaskAssignedToUser(task, user) {
   const taskAssignees = [
     task.assignedTo,
     task.assignedService,
+    task.service,
+    task.contractor,
+    task.subcontractor,
     task.executor,
     task.assignedUserId,
     task.completedBy,

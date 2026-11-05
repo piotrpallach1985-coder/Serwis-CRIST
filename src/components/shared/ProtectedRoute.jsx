@@ -3,11 +3,18 @@ import { Navigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/useAuth';
 
-export default function ProtectedRoute({ allowedRoles, children }) {
+export default function ProtectedRoute({ allowedRoles, disallowedRoles, children }) {
   const { user } = useAuth();
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (Array.isArray(disallowedRoles) && disallowedRoles.includes(user.role)) {
+    if (user.role === 'operator') {
+      return <Navigate to="/operator" replace />;
+    }
+    return <Navigate to="/manager/home/home" replace />;
   }
 
   // Jeśli nie określono ról (tylko weryfikacja logowania), przepuść
@@ -32,5 +39,6 @@ export default function ProtectedRoute({ allowedRoles, children }) {
 
 ProtectedRoute.propTypes = {
   allowedRoles: PropTypes.arrayOf(PropTypes.string),
+  disallowedRoles: PropTypes.arrayOf(PropTypes.string),
   children: PropTypes.node.isRequired,
 };

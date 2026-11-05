@@ -50,6 +50,8 @@ export const addMachine = async (machineData) => {
     createdAt: machineData.createdAt || serverTimestamp(),
     updatedAt: machineData.updatedAt || serverTimestamp(),
     qrCreatedAt: machineData.qrCreatedAt || serverTimestamp(),
+    qrNeedsPrint: machineData.qrNeedsPrint !== undefined ? machineData.qrNeedsPrint : true,
+    qrPrintedAt: null,
   };
   const res = await addDoc(collection(db, 'tenants', getCurrentTenant(), 'machines'), payload);
   logAudit('CREATE', 'MACHINE', res.id, `Dodano maszynę: ${machineData.name}`);
@@ -60,6 +62,12 @@ export const updateMachine = async (machineId, machineData) => {
   const payload = {
     ...machineData,
     updatedAt: machineData.updatedAt || serverTimestamp(),
+    ...(machineData.qrNeedsPrint === false
+      ? {}
+      : {
+          qrNeedsPrint: true,
+          qrPrintedAt: null,
+        }),
   };
   const res = await updateDoc(doc(db, 'tenants', getCurrentTenant(), 'machines', machineId), payload);
   logAudit('UPDATE', 'MACHINE', machineId, payload);

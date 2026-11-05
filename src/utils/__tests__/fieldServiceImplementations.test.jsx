@@ -73,6 +73,9 @@ import Login from '../../components/Login';
 import { MemoryRouter } from 'react-router-dom';
 import { useManagerStore } from '../../store/managerStore';
 import { formatDetails } from '../../services/audit.service';
+import { isQrUnprintedNew } from '../../services/qrAccess.service';
+import plTranslations from '../../locales/pl/translation.json';
+import enTranslations from '../../locales/en/translation.json';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -2488,6 +2491,109 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         expect(updatedWiertarka.qrCreatedAt).toBeTruthy();
       });
       unmountMachinesView();
+    });
+
+    it('obsługuje: (1) pełne pokrycie języka EN względem PL, (2) odznakę NOWY dla niewydrukowanych/zaktualizowanych kodów QR, (3) Numer tablicy rejestracyjnej na kodach QR dla floty oraz (4) dopasowanie zleceń serwisanta zewnętrznego po roli/podwykonawcy', () => {
+      // 1) Weryfikacja 100% pokrycia kluczy PL -> EN w plikach tłumaczeń
+      const getByPath = (obj, p) =>
+        p.split('.').reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj);
+      const missingInEn = [];
+      const walkKeys = (obj, prefix = '') => {
+        for (const [k, v] of Object.entries(obj)) {
+          const key = prefix ? `${prefix}.${k}` : k;
+          if (v && typeof v === 'object' && !Array.isArray(v)) {
+            walkKeys(v, key);
+          } else if (getByPath(enTranslations, key) === undefined) {
+            missingInEn.push(key);
+          }
+        }
+      };
+      walkKeys(plTranslations);
+      expect(missingInEn).toEqual([]);
+      expect(enTranslations.machines.print.licensePlateLabel).toBe('LICENSE PLATE NUMBER');
+      expect(enTranslations.machines.qr.newBadge).toBe('NEW');
+
+      // 2) Odznaka NOWY (isQrUnprintedNew) dla wygenerowanego lub zaktualizowanego i niewydrukowanego kodu QR
+      const unprintedMachine = {
+        id: 'veh-1',
+        name: 'Renault Master Serwisowy',
+        assetCategory: 'vehicle',
+        licensePlate: 'GD 77889',
+        internalId: 'FLOTA-01',
+        regionId: 'reg-ciecie',
+        qrCreatedAt: '2026-11-05T10:00:00.000Z',
+        qrNeedsPrint: true,
+        qrPrintedAt: null,
+      };
+      expect(isQrUnprintedNew(unprintedMachine)).toBe(true);
+
+      const printedMachine = {
+        ...unprintedMachine,
+        id: 'veh-2',
+        name: 'Fiat Ducato Serwisowy',
+        licensePlate: 'GD 99112',
+        qrNeedsPrint: false,
+        qrPrintedAt: '2026-11-05T11:00:00.000Z',
+      };
+      expect(isQrUnprintedNew(printedMachine)).toBe(false);
+
+      // Ponowna aktualizacja kodu QR po wcześniejszym wydruku znów oznacza kod jako NOWY
+      const regeneratedMachine = {
+        ...printedMachine,
+        qrCreatedAt: '2026-11-05T12:00:00.000Z',
+      };
+      expect(isQrUnprintedNew(regeneratedMachine)).toBe(true);
+
+      // 3) Karta QR pojazdu floty wyświetla "NUMER TABLICY REJESTRACYJNEJ" oraz numer tablicy (zamiast NUMER WEWNĘTRZNY UR) + odznakę NOWY
+      useManagerStore.getState().setBranding({
+        companyName: 'Flota Transportowa',
+        industryProfile: 'fleet',
+      });
+      useManagerStore.getState().setMachines([unprintedMachine, printedMachine]);
+
+      const { unmount: unmountFleetSingleQr } = render(<MachineQRCard machine={unprintedMachine} />);
+      expect(screen.getByTestId('machine-qr-new-badge').textContent).toContain('NOWY');
+      expect(screen.getByTestId('machine-qr-internal-id-label').textContent).toContain(
+        'NUMER TABLICY REJESTRACYJNEJ'
+      );
+      expect(screen.getByText('GD 77889')).toBeTruthy();
+      unmountFleetSingleQr();
+
+      const { unmount: unmountFleetBulkQr } = render(<MachinesQRCodes onBack={vi.fn()} />);
+      expect(screen.getByTestId(`qr-new-badge-${unprintedMachine.id}`).textContent).toContain(
+        'NOWY'
+      );
+      expect(screen.queryByTestId(`qr-new-badge-${printedMachine.id}`)).toBeNull();
+      expect(
+        screen.getByTestId(`qr-card-internal-id-label-${unprintedMachine.id}`).textContent
+      ).toContain('NUMER TABLICY REJESTRACYJNEJ');
+      expect(screen.getAllByText('GD 77889').length).toBeGreaterThanOrEqual(1);
+      unmountFleetBulkQr();
+
+      // 4) Serwisant zewnętrzny z niestandardową rolą i przypisanym serwisem widzi swoje awarie i serwisy
+      const externalTechUser = {
+        uid: 'tech-andrzej',
+        name: 'Andrzej Andrzej',
+        email: 'andrzej@plazma.com.pl',
+        role: 'Serwis Zewnętrzyn Pla',
+        assignedService: 'Serwis Zewnętrzny',
+      };
+      const ticketForSubcontractor = {
+        id: 't-ext-1',
+        contractor: 'Serwis Zewnętrzny',
+      };
+      const serviceForRoleName = {
+        id: 's-ext-1',
+        assignedTo: 'Serwis Zewnętrzyn Pla',
+      };
+      const unrelatedTicket = {
+        id: 't-other',
+        contractor: 'Inna Firma Sp. z o.o.',
+      };
+
+      expect(isTaskAssignedToUser(ticketForSubcontractor, externalTechUser)).toBe(true);
+      expect(isTaskAssignedToUser(serviceForRoleName, externalTechUser)).toBe(true);
+      expect(isTaskAssignedToUser(unrelatedTicket, externalTechUser)).toBe(false);
     });
   });
 });

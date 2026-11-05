@@ -10,9 +10,11 @@ import {
   resolveMachineQrLocation,
   resolveEntityQrDate,
   formatQrDate,
+  isQrUnprintedNew,
+  markEntitiesQrPrinted,
 } from '../../../services/qrAccess.service';
 import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
-import { resolveAnonymousReportPin } from '../../../utils/fieldServiceHelpers';
+import { resolveAnonymousReportPin, isVehicleAsset } from '../../../utils/fieldServiceHelpers';
 
 export default function MachinesQRCodes({ onBack }) {
   const { t } = useTranslation();
@@ -124,6 +126,17 @@ export default function MachinesQRCodes({ onBack }) {
       return;
     }
     window.print();
+    const nowIso = new Date().toISOString();
+    const selectedSet = new Set(selectedIds);
+    const storeState = useManagerStore.getState?.();
+    if (storeState?.setMachines) {
+      storeState.setMachines(
+        (storeState.machines || []).map(m =>
+          selectedSet.has(m.id) ? { ...m, qrNeedsPrint: false, qrPrintedAt: nowIso } : m
+        )
+      );
+    }
+    markEntitiesQrPrinted(tenantId, 'machines', selectedIds);
   };
 
   const getRegionName = regionId => {
@@ -341,11 +354,20 @@ export default function MachinesQRCodes({ onBack }) {
             });
             const isSelected = selectedIds.includes(machine.id);
             const locationStr = resolveMachineQrLocation(machine, regions, '-');
-            const internalIdStr = machine.internalId || machine.licensePlate || '-';
+            const isFleetQr =
+              isVehicleAsset(machine, branding?.industryProfile) ||
+              branding?.industryProfile === 'fleet';
+            const internalIdLabel = isFleetQr
+              ? t('machines.print.licensePlateLabel', 'NUMER TABLICY REJESTRACYJNEJ')
+              : t('machines.print.internalIdLabel', 'NUMER WEWNĘTRZNY UR');
+            const internalIdStr = isFleetQr
+              ? machine.licensePlate || machine.internalId || '-'
+              : machine.internalId || machine.licensePlate || '-';
             const parentMachine = machine.parentId
               ? machineByIdMap.get(machine.parentId) || null
               : null;
             const pinReq = resolveAnonymousReportPin(machine, regions, branding, mapSettings);
+            const isNewQr = isQrUnprintedNew(machine);
 
             return (
               <div
@@ -357,6 +379,14 @@ export default function MachinesQRCodes({ onBack }) {
                     : 'border-slate-300 hover:border-slate-500 shadow-sm opacity-90'
                 }`}
               >
+                {isNewQr && (
+                  <span
+                    data-testid={`qr-new-badge-${machine.id}`}
+                    className="no-print absolute top-3 left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs"
+                  >
+                    {t('machines.qr.newBadge', 'NOWY')}
+                  </span>
+                )}
                 <div className="no-print absolute top-3 right-3">
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center border ${
@@ -394,7 +424,7 @@ export default function MachinesQRCodes({ onBack }) {
                 </div>
 
                 <div className="text-[9px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3">
-                  VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ
+                  {t('machines.print.systemSubtitle', 'VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ')}
                 </div>
 
                 <div className="my-1 flex items-center justify-center">
@@ -416,15 +446,18 @@ export default function MachinesQRCodes({ onBack }) {
                 <div className="w-full text-left space-y-1.5">
                   <div>
                     <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      LOKALIZACJA
+                      {t('machines.print.locationLabel', 'LOKALIZACJA')}
                     </div>
                     <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
                       {locationStr}
                     </div>
                   </div>
                   <div>
-                    <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      NUMER WEWNĘTRZNY UR
+                    <div
+                      data-testid={`qr-card-internal-id-label-${machine.id}`}
+                      className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider"
+                    >
+                      {internalIdLabel}
                     </div>
                     <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
                       {internalIdStr}
@@ -432,7 +465,7 @@ export default function MachinesQRCodes({ onBack }) {
                   </div>
                   <div>
                     <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      DATA KODU (OST. EDYCJA)
+                      {t('machines.print.qrDateLabel', 'DATA KODU (OST. EDYCJA)')}
                     </div>
                     <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
                       {qrDateStr}
@@ -444,7 +477,7 @@ export default function MachinesQRCodes({ onBack }) {
                       className="pt-1.5 mt-1 border-t border-dashed border-slate-300"
                     >
                       <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                        KOD PIN ZGŁOSZEŃ
+                        {t('machines.print.pinLabel', 'KOD PIN ZGŁOSZEŃ')}
                       </div>
                       <div className="text-xs font-extrabold font-mono text-slate-900 tracking-widest leading-snug">
                         {pinReq.pin}

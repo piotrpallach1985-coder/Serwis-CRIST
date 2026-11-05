@@ -90,9 +90,13 @@ export default function Users() {
     if (!email.trim() || !name.trim()) return alert('Podaj e-mail i imię z nazwiskiem');
     setLoading(true);
 
+    const selectedRoleObj = rolesList.find(r => r.id === role || r.name === role);
+    const roleHasOnlyAssigned = Boolean(selectedRoleObj?.permissions?.includes('only_assigned_tasks'));
     const effectiveDedicated = role === USER_ROLES.ADMIN ? '' : assignedService.trim();
     const effectiveOnlyAssigned =
-      role === USER_ROLES.ADMIN ? false : Boolean(onlyAssignedTasks || effectiveDedicated);
+      role === USER_ROLES.ADMIN
+        ? false
+        : Boolean(roleHasOnlyAssigned || effectiveDedicated || onlyAssignedTasks);
 
     try {
       if (editingId) {
@@ -293,46 +297,44 @@ export default function Users() {
                   </div>
                 </div>
 
-                {/* Dedykowany Serwis dla Serwisanta */}
+                {/* Powiązany Podwykonawca / Serwis (opcjonalnie) */}
                 {role !== USER_ROLES.ADMIN && role !== USER_ROLES.SUPERADMIN && (
                   <div className="pt-2 border-t border-gray-100">
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Dedykowany Serwis / Zakres (Serwisant widzi tylko ten zakres)
-                        </label>
-                        <select
-                          data-testid="user-dedicated-service-select"
-                          value={assignedService}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setAssignedService(val);
-                            if (val) {
-                              setOnlyAssignedTasks(true);
-                            }
-                          }}
-                          className="w-full p-2 border border-slate-300 rounded bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">-- Wszystkie zakresy (wg uprawnień roli) --</option>
-                          {services.map(s => (
-                            <option key={s.id} value={s.name}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(onlyAssignedTasks || assignedService)}
-                          onChange={e => setOnlyAssignedTasks(e.target.checked)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span>
-                          Ukryj inne zakresy — pokazuj wyłącznie zlecenia i urządzenia przypisane do
-                          tego serwisanta / działu
-                        </span>
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        {t(
+                          'admin.users.dedicated_service_label',
+                          'Powiązany Podwykonawca / Serwis (opcjonalnie — z zakładki Podwykonawcy / Serwis)'
+                        )}
                       </label>
+                      <select
+                        data-testid="user-dedicated-service-select"
+                        value={assignedService}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setAssignedService(val);
+                          setOnlyAssignedTasks(Boolean(val));
+                        }}
+                        className="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">
+                          {t(
+                            'admin.users.all_scopes_by_role',
+                            '-- Brak przypisania do konkretnej firmy (dostęp wg wybranej Roli) --'
+                          )}
+                        </option>
+                        {services.map(s => (
+                          <option key={s.id} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        {t(
+                          'admin.users.dedicated_service_hint',
+                          'Uprawnienia do modułów oraz ograniczenie widoku ("Tylko przypisane zlecenia") ustawiasz w zakładce Role i Uprawnienia. Tutaj możesz dodatkowo powiązać konto z konkretną firmą z listy Podwykonawcy / Serwis, aby serwisant widział zlecenia przypisane na nazwę tej firmy.'
+                        )}
+                      </p>
                     </div>
                   </div>
                 )}

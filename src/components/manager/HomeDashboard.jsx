@@ -78,6 +78,20 @@ export default function HomeDashboard({ onLogout }) {
   const firstAdminTab =
     ['users', 'roles', 'reports', 'audit', 'ai_stats'].find(tab => canAccessTab(tab)) || 'users';
 
+  const firstUrTab =
+    [
+      'dashboard_tickets',
+      'tickets',
+      'planned_maintenance',
+      'dashboard_planned',
+      'machines',
+      'regions',
+      'action_items',
+      'parts_list',
+      'services',
+      'topics',
+    ].find(tab => canAccessTab(tab)) || 'tickets';
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-slate-50 text-slate-800">
       {/* GÓRNY PASEK PULPITU GŁÓWNEGO */}
@@ -251,7 +265,7 @@ export default function HomeDashboard({ onLogout }) {
             {/* PANEL UR */}
             <button
               type="button"
-              onClick={() => navigateToModule('ur', 'dashboard_tickets')}
+              onClick={() => navigateToModule('ur', firstUrTab)}
               className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
             >
               <i className="ph ph-wrench text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>

@@ -73,6 +73,26 @@ function ManagerViewInner() {
   // --- Uprawnienia (hook) ---
   const { canEditPlanned, canDeletePlanned, canAccessTab } = usePermissions(user, roles);
 
+  useEffect(() => {
+    if (currentModule === 'ur' && activeTab && !canAccessTab(activeTab)) {
+      const fallbackUrTab = [
+        'dashboard_tickets',
+        'tickets',
+        'planned_maintenance',
+        'dashboard_planned',
+        'machines',
+        'regions',
+        'action_items',
+        'parts_list',
+        'services',
+        'topics',
+      ].find(tab => canAccessTab(tab));
+      if (fallbackUrTab && fallbackUrTab !== activeTab) {
+        handleTabChange(fallbackUrTab);
+      }
+    }
+  }, [currentModule, activeTab, canAccessTab, handleTabChange]);
+
   // --- Widok Pulpitu Głównego (Home) — bez paska bocznego ---
   if (currentModule === 'home' || activeTab === 'home') {
     return (

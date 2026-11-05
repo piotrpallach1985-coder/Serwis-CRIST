@@ -297,6 +297,8 @@ export default function BulkImportModal({
               needsVerification: !hasCompleteDataForQr,
               updatedAt: serverTimestamp(),
               qrCreatedAt: hasCompleteDataForQr ? serverTimestamp() : null,
+              qrNeedsPrint: hasCompleteDataForQr,
+              qrPrintedAt: null,
             };
 
             const storeDocData = {
@@ -306,6 +308,8 @@ export default function BulkImportModal({
               needsVerification: !hasCompleteDataForQr,
               updatedAt: nowIso,
               qrCreatedAt: hasCompleteDataForQr ? nowIso : null,
+              qrNeedsPrint: hasCompleteDataForQr,
+              qrPrintedAt: null,
             };
 
             if (row.status === 'update' && row.existingId) {
@@ -390,11 +394,15 @@ export default function BulkImportModal({
               ...row.payload,
               updatedAt: serverTimestamp(),
               qrCreatedAt: serverTimestamp(),
+              qrNeedsPrint: true,
+              qrPrintedAt: null,
             };
             const storePartData = {
               ...row.payload,
               updatedAt: nowIso,
               qrCreatedAt: nowIso,
+              qrNeedsPrint: true,
+              qrPrintedAt: null,
             };
 
             if (row.status === 'update' && row.existingId) {

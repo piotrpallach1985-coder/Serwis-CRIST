@@ -15,67 +15,72 @@ export default function Roles() {
   // Lista wszystkich dostępnych zakładek (uprawnień) podzielona na moduły
   const availablePermissionsGrouped = [
     {
-      module: 'Awarie UR',
+      moduleKey: 'tickets',
+      module: t('admin.roles.mod_tickets', 'Awarie UR'),
       permissions: [
-        { id: 'kpi', label: 'Analiza KPI Awarii' },
-        { id: 'dashboard_tickets', label: 'Mapa Awarii' },
-        { id: 'edit_map', label: 'Edycja Mapy' },
-        { id: 'tickets', label: 'Zgłoszenia Awarii' },
-        { id: 'archive', label: 'Archiwum Awarii' },
+        { id: 'kpi', label: t('admin.roles.perm_kpi', 'Analiza KPI Awarii') },
+        { id: 'dashboard_tickets', label: t('admin.roles.perm_dashboard_tickets', 'Mapa Awarii') },
+        { id: 'edit_map', label: t('admin.roles.perm_edit_map', 'Edycja Mapy') },
+        { id: 'tickets', label: t('admin.roles.perm_tickets', 'Zgłoszenia Awarii') },
+        { id: 'archive', label: t('admin.roles.perm_archive', 'Archiwum Awarii') },
       ],
     },
     {
-      module: 'Panel Serwisu (DTR)',
+      moduleKey: 'planned',
+      module: t('admin.roles.mod_planned', 'Panel Serwisu (DTR)'),
       permissions: [
-        { id: 'planned_kpi', label: 'Analiza KPI Serwisów' },
-        { id: 'dashboard_planned', label: 'Mapa Serwisów' },
-        { id: 'planned_maintenance', label: 'Planowane Serwisy' },
-        { id: 'action_items', label: 'Tematy do realizacji' },
-        { id: 'archive_planned', label: 'Archiwum Serwisów' },
-        { id: 'edit_planned', label: 'Edycja Serwisów Planowanych' },
-        { id: 'delete_planned', label: 'Usuwanie Serwisów Planowanych' },
-        { id: 'manage_dtr', label: 'Zarządzanie plikami DTR' },
+        { id: 'planned_kpi', label: t('admin.roles.perm_planned_kpi', 'Analiza KPI Serwisów') },
+        { id: 'dashboard_planned', label: t('admin.roles.perm_dashboard_planned', 'Mapa Serwisów') },
+        { id: 'planned_maintenance', label: t('admin.roles.perm_planned_maintenance', 'Planowane Serwisy') },
+        { id: 'action_items', label: t('admin.roles.perm_action_items', 'Tematy do realizacji') },
+        { id: 'archive_planned', label: t('admin.roles.perm_archive_planned', 'Archiwum Serwisów') },
+        { id: 'edit_planned', label: t('admin.roles.perm_edit_planned', 'Edycja Serwisów Planowanych') },
+        { id: 'delete_planned', label: t('admin.roles.perm_delete_planned', 'Usuwanie Serwisów Planowanych') },
+        { id: 'manage_dtr', label: t('admin.roles.perm_manage_dtr', 'Zarządzanie plikami DTR') },
       ],
     },
     {
-      module: 'Magazyn części zamiennych',
+      moduleKey: 'inventory',
+      module: t('admin.roles.mod_inventory', 'Magazyn części zamiennych'),
       permissions: [
-        { id: 'parts_kpi', label: 'KPI Magazynu' },
-        { id: 'parts_inventory', label: 'Baza Części' },
-        { id: 'parts_transactions', label: 'Operacje Magazynowe' },
-        { id: 'parts_qr', label: 'Baza QR Części' },
+        { id: 'parts_kpi', label: t('admin.roles.perm_parts_kpi', 'KPI Magazynu') },
+        { id: 'parts_inventory', label: t('admin.roles.perm_parts_inventory', 'Baza Części') },
+        { id: 'parts_transactions', label: t('admin.roles.perm_parts_transactions', 'Operacje Magazynowe') },
+        { id: 'parts_qr', label: t('admin.roles.perm_parts_qr', 'Baza QR Części') },
       ],
     },
     {
-      module: 'Administracja i Dane Bazowe',
+      moduleKey: 'admin',
+      module: t('admin.roles.mod_admin', 'Administracja i Dane Bazowe'),
       permissions: [
-        { id: 'machines', label: 'Rejestr Urządzeń' },
+        { id: 'machines', label: t('admin.roles.perm_machines', 'Rejestr Urządzeń') },
         {
           id: 'only_assigned_tasks',
           label:
             (branding?.industryProfile || 'industrial') === 'industrial'
-              ? 'Tylko przypisane zlecenia (Serwis Zewnętrzny)'
-              : 'Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)',
+              ? t('admin.roles.perm_only_assigned_industrial', 'Tylko przypisane zlecenia (Serwis Zewnętrzny)')
+              : t('admin.roles.perm_only_assigned_b2c', 'Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)'),
         },
-        { id: 'regions', label: 'Rejony i Mapy' },
-        { id: 'services', label: 'Podwykonawcy / Serwis' },
-        { id: 'topics', label: 'Tematy Zgłoszeń' },
-        { id: 'delete_tech_notes', label: 'Usuwanie notatek technicznych' },
-        { id: 'users', label: 'Użytkownicy' },
+        { id: 'regions', label: t('admin.roles.perm_regions', 'Rejony i Mapy') },
+        { id: 'services', label: t('admin.roles.perm_services', 'Podwykonawcy / Serwis') },
+        { id: 'topics', label: t('admin.roles.perm_topics', 'Tematy Zgłoszeń') },
+        { id: 'delete_tech_notes', label: t('admin.roles.perm_delete_tech_notes', 'Usuwanie notatek technicznych') },
+        { id: 'users', label: t('admin.roles.perm_users', 'Użytkownicy') },
         { id: 'roles', label: t('admin.roles.title') },
-        { id: 'reports', label: 'Raportowanie' },
-        { id: 'audit', label: 'Dziennik Zdarzeń (ISO 55000)' },
-        { id: 'ai_stats', label: 'Statystyki AI' },
+        { id: 'reports', label: t('admin.roles.perm_reports', 'Raportowanie') },
+        { id: 'audit', label: t('admin.roles.perm_audit', 'Dziennik Zdarzeń (ISO 55000)') },
+        { id: 'ai_stats', label: t('admin.roles.perm_ai_stats', 'Statystyki AI') },
       ],
     },
     {
-      module: 'Powiadomienia Push',
+      moduleKey: 'push',
+      module: t('admin.roles.mod_push', 'Powiadomienia Push'),
       permissions: [
-        { id: 'push_new_critical', label: 'Nowe Awarie Krytyczne' },
-        { id: 'push_new_all', label: 'Wszystkie Nowe Awarie' },
-        { id: 'push_status_updates', label: 'Zmiany statusów powiązanych zgłoszeń' },
-        { id: 'push_new_comments', label: 'Nowe komentarze w powiązanych zgłoszeniach' },
-        { id: 'push_planned_services', label: 'Powiadomienia o zbliżających się serwisach' },
+        { id: 'push_new_critical', label: t('admin.roles.perm_push_critical', 'Nowe Awarie Krytyczne') },
+        { id: 'push_new_all', label: t('admin.roles.perm_push_all', 'Wszystkie Nowe Awarie') },
+        { id: 'push_status_updates', label: t('admin.roles.perm_push_status', 'Zmiany statusów powiązanych zgłoszeń') },
+        { id: 'push_new_comments', label: t('admin.roles.perm_push_comments', 'Nowe komentarze w powiązanych zgłoszeniach') },
+        { id: 'push_planned_services', label: t('admin.roles.perm_push_planned', 'Powiadomienia o zbliżających się serwisach') },
       ],
     },
   ];
@@ -242,15 +247,15 @@ export default function Roles() {
                     <div className="space-y-6">
                       {availablePermissionsGrouped
                         .filter(g => {
-                          if (g.module === 'Awarie UR' && !modSettings.enableTickets) return false;
+                          if (g.moduleKey === 'tickets' && !modSettings.enableTickets) return false;
                           if (
-                            g.module === 'Panel Serwisu (DTR)' &&
+                            g.moduleKey === 'planned' &&
                             (!modSettings.enablePlanned ||
                               branding?.modules?.planned_services === false)
                           )
                             return false;
                           if (
-                            g.module === 'Magazyn części zamiennych' &&
+                            g.moduleKey === 'inventory' &&
                             branding?.modules?.inventory === false
                           )
                             return false;

@@ -32,7 +32,7 @@ export default function MachineFilters({
           >
             <i className="ph ph-engine text-blue-600"></i>{' '}
             {industryProfile === 'facility'
-              ? 'Baza Obiektów/Urządzeń'
+              ? t('sidebar.equipment_base_facility', 'Baza Obiektów/Urządzeń')
               : t('machines.filters.title')}
           </h2>
           <p className="text-sm text-slate-500 mt-1">{t('machines.filters.subtitle')}</p>
@@ -44,7 +44,7 @@ export default function MachineFilters({
         >
           <i className="ph ph-plus text-lg"></i>{' '}
           {industryProfile === 'facility'
-            ? 'Dodaj Obiekt/Urządzenie'
+            ? t('machines.buttons.addFacilityAsset', 'Dodaj Obiekt/Urządzenie')
             : t('machines.buttons.addMachine')}
         </button>
       </div>
@@ -56,20 +56,37 @@ export default function MachineFilters({
           className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-slate-100"
         >
           {[
-            { id: '', label: 'Wszystkie zasoby', icon: 'ph-squares-four', activeClass: 'bg-slate-800 text-white' },
+            {
+              id: '',
+              label: t('machines.filters.tabAllAssets', 'Wszystkie zasoby'),
+              icon: 'ph-squares-four',
+              activeClass: 'bg-slate-800 text-white',
+            },
             {
               id: 'device',
               label:
                 industryProfile === 'facility'
-                  ? 'Obiekty/Urządzenia'
-                  : 'Urządzenia / Maszyny',
+                  ? t('machines.filters.tabFacilityAssets', 'Obiekty/Urządzenia')
+                  : t('machines.filters.tabDeviceAssets', 'Urządzenia / Maszyny'),
               icon: industryProfile === 'facility' ? 'ph-buildings' : 'ph-gear-six',
               activeClass: 'bg-blue-600 text-white',
             },
             ...(industryProfile !== 'industrial' && industryProfile !== 'facility'
-              ? [{ id: 'hvac', label: 'Klimatyzacja / HVAC', icon: 'ph-snowflake', activeClass: 'bg-cyan-600 text-white' }]
+              ? [
+                  {
+                    id: 'hvac',
+                    label: t('machines.filters.tabHvacAssets', 'Klimatyzacja / HVAC'),
+                    icon: 'ph-snowflake',
+                    activeClass: 'bg-cyan-600 text-white',
+                  },
+                ]
               : []),
-            { id: 'vehicle', label: 'Pojazdy / Flota', icon: 'ph-truck', activeClass: 'bg-emerald-600 text-white' },
+            {
+              id: 'vehicle',
+              label: t('machines.filters.tabVehicleAssets', 'Pojazdy / Flota'),
+              icon: 'ph-truck',
+              activeClass: 'bg-emerald-600 text-white',
+            },
           ].map(tab => {
             const isActive = filterAssetCategory === tab.id;
             return (

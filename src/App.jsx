@@ -70,13 +70,13 @@ export default function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           <Route path="/operator" element={
-              <ProtectedRoute allowedRoles={[USER_ROLES.OPERATOR, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN, USER_ROLES.KIEROWNIK, 'admin', 'superadmin', 'kierownik', 'operator']}>
+              <ProtectedRoute>
                 <OperatorView />
               </ProtectedRoute>
             } />
           
           <Route path="/manager/:module/:tab" element={
-              <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.KIEROWNIK, USER_ROLES.SUPERADMIN, 'admin', 'kierownik', 'superadmin']}>
+              <ProtectedRoute disallowedRoles={[USER_ROLES.OPERATOR, 'operator']}>
                 <ManagerView />
               </ProtectedRoute>
             } />

@@ -20,12 +20,16 @@ export default function PlannedMaintenanceRbgModal({
         className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-scale-in"
       >
         <h3 className="text-lg font-bold text-slate-800 mb-4">
-          {isKm ? 'Aktualizacja przebiegu pojazdu (km)' : t('planned.update_machine_counter')}
+          {isKm
+            ? t('planned.update_vehicle_mileage', 'Aktualizacja przebiegu pojazdu (km)')
+            : t('planned.update_machine_counter', 'Aktualizacja licznika roboczogodzin (RBG)')}
         </h3>
         <p className="text-sm text-slate-600 mb-4">{rbgUpdateModal.name}</p>
         <div className="mb-6">
           <label className="block text-sm font-bold text-slate-700 mb-1">
-            {isKm ? 'Nowy stan licznika (km):' : t('planned.new_counter_state')}
+            {isKm
+              ? t('planned.new_mileage_state', 'Nowy stan licznika (km):')
+              : t('planned.new_counter_state', 'Nowy stan licznika (RBG):')}
           </label>
           <input
             type="number"

@@ -10,9 +10,10 @@ import {
   resolveTenantDisplayName,
   resolveMachineQrLocation,
   formatQrDate,
+  isQrUnprintedNew,
 } from '../../../services/qrAccess.service';
 import { isMachineIncompleteForQr } from '../../../utils/bulkImportHelper';
-import { resolveAnonymousReportPin } from '../../../utils/fieldServiceHelpers';
+import { resolveAnonymousReportPin, isVehicleAsset } from '../../../utils/fieldServiceHelpers';
 
 export default function MachineQRCard({ machine }) {
   const { t } = useTranslation();
@@ -39,9 +40,17 @@ export default function MachineQRCard({ machine }) {
   const isUnverified = isMachineIncompleteForQr(machine);
   const tenantName = resolveTenantDisplayName(tenantId, branding);
   const locationStr = resolveMachineQrLocation(machine, regions, '-');
-  const internalIdStr = machine.internalId || machine.licensePlate || '-';
+  const isFleetQr =
+    isVehicleAsset(machine, branding?.industryProfile) || branding?.industryProfile === 'fleet';
+  const internalIdLabel = isFleetQr
+    ? t('machines.print.licensePlateLabel', 'NUMER TABLICY REJESTRACYJNEJ')
+    : t('machines.print.internalIdLabel', 'NUMER WEWNĘTRZNY UR');
+  const internalIdStr = isFleetQr
+    ? machine.licensePlate || machine.internalId || '-'
+    : machine.internalId || machine.licensePlate || '-';
   const qrDateStr = formatQrDate(machine, machines, t('machines.print.noData', '-'));
   const pinReq = resolveAnonymousReportPin(machine, regions, branding, mapSettings);
+  const isNewQr = isQrUnprintedNew(machine);
   const qrValue = buildMachineQrValue(machine, tenantId, qrKey, {
     branding,
     tenantName,
@@ -65,7 +74,15 @@ export default function MachineQRCard({ machine }) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col items-center justify-center text-center h-full">
-      <div className="w-full max-w-[280px] bg-white border-2 border-slate-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-xs">
+      <div className="w-full max-w-[280px] bg-white border-2 border-slate-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-xs relative">
+        {isNewQr && (
+          <span
+            data-testid="machine-qr-new-badge"
+            className="no-print absolute -top-2.5 left-3 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-sm border border-white"
+          >
+            {t('machines.qr.newBadge', 'NOWY')}
+          </span>
+        )}
         <div className="flex items-center justify-center gap-2 mb-1.5">
           <svg
             className="w-5 h-5 shrink-0"
@@ -88,7 +105,7 @@ export default function MachineQRCard({ machine }) {
         </div>
 
         <div className="text-[10px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3.5">
-          VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ
+          {t('machines.print.systemSubtitle', 'VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ')}
         </div>
 
         <div className="my-1 flex items-center justify-center">
@@ -110,15 +127,18 @@ export default function MachineQRCard({ machine }) {
         <div className="w-full text-left space-y-2">
           <div>
             <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-              LOKALIZACJA
+              {t('machines.print.locationLabel', 'LOKALIZACJA')}
             </div>
             <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
               {locationStr}
             </div>
           </div>
           <div>
-            <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-              NUMER WEWNĘTRZNY UR
+            <div
+              data-testid="machine-qr-internal-id-label"
+              className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider"
+            >
+              {internalIdLabel}
             </div>
             <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
               {internalIdStr}
@@ -126,7 +146,7 @@ export default function MachineQRCard({ machine }) {
           </div>
           <div>
             <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-              DATA KODU (OST. EDYCJA)
+              {t('machines.print.qrDateLabel', 'DATA KODU (OST. EDYCJA)')}
             </div>
             <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
               {qrDateStr}
@@ -138,7 +158,7 @@ export default function MachineQRCard({ machine }) {
               className="pt-1.5 mt-1 border-t border-dashed border-slate-300"
             >
               <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                KOD PIN ZGŁOSZEŃ
+                {t('machines.print.pinLabel', 'KOD PIN ZGŁOSZEŃ')}
               </div>
               <div className="text-xs font-extrabold font-mono text-slate-900 tracking-widest leading-snug">
                 {pinReq.pin}
@@ -159,7 +179,9 @@ export default function MachineQRCard({ machine }) {
             className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
           />
           <i className="ph ph-key text-amber-600"></i>
-          <span>Drukuj PIN na etykiecie ({pinReq.pin})</span>
+          <span>
+            {t('machines.print.printPinCheckbox', 'Drukuj PIN na etykiecie')} ({pinReq.pin})
+          </span>
         </label>
       )}
     </div>

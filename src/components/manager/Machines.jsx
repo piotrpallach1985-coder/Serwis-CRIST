@@ -56,6 +56,7 @@ import {
   formatQrDate,
   parseQrPayload,
   PART_QR_IN_MACHINE_SCANNER_MSG,
+  markEntitiesQrPrinted,
 } from '../../services/qrAccess.service';
 
 export default function Machines({
@@ -290,6 +291,8 @@ export default function Machines({
           regionId: bulkVerifyRegionId,
           needsVerification: false,
           qrCreatedAt: m.qrCreatedAt || nowIso,
+          qrNeedsPrint: true,
+          qrPrintedAt: null,
           updatedAt: nowIso,
         };
         updatedMap.set(m.id, patch);
@@ -350,7 +353,14 @@ export default function Machines({
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const tenantDisplayName = resolveTenantDisplayName(getCurrentTenant(), branding);
     const locationFormatted = resolveMachineQrLocation(machine, regions, '-');
-    const internalIdFormatted = machine.internalId || machine.licensePlate || '-';
+    const isFleetQr =
+      isVehicleAsset(machine, branding?.industryProfile) || branding?.industryProfile === 'fleet';
+    const internalIdLabel = isFleetQr
+      ? t('machines.print.licensePlateLabel', 'NUMER TABLICY REJESTRACYJNEJ')
+      : t('machines.print.internalIdLabel', 'NUMER WEWNĘTRZNY UR');
+    const internalIdFormatted = isFleetQr
+      ? machine.licensePlate || machine.internalId || '-'
+      : machine.internalId || machine.licensePlate || '-';
     const qrDateFormatted = formatQrDate(machine, machines, '-');
     const pinCheckbox = document.getElementById(`qr-show-pin-${id}`);
     const pinReq = resolveAnonymousReportPin(machine, regions, branding, mapSettings);
@@ -390,7 +400,7 @@ export default function Machines({
                 </svg>
                 <span class="tenant-name">${escapeHtml(tenantDisplayName)}</span>
               </div>
-              <div class="system-subtitle">VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ</div>
+              <div class="system-subtitle">${escapeHtml(t('machines.print.systemSubtitle', 'VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ'))}</div>
               <div class="qr-row">
                 ${svgData}
               </div>
@@ -398,21 +408,21 @@ export default function Machines({
               <div class="divider"></div>
               <div class="meta-list">
                 <div class="meta-item">
-                  <div class="meta-label">LOKALIZACJA</div>
+                  <div class="meta-label">${escapeHtml(t('machines.print.locationLabel', 'LOKALIZACJA'))}</div>
                   <div class="meta-value">${escapeHtml(locationFormatted)}</div>
                 </div>
                 <div class="meta-item">
-                  <div class="meta-label">NUMER WEWNĘTRZNY UR</div>
+                  <div class="meta-label">${escapeHtml(internalIdLabel)}</div>
                   <div class="meta-value mono">${escapeHtml(internalIdFormatted)}</div>
                 </div>
                 <div class="meta-item">
-                  <div class="meta-label">DATA KODU (OST. EDYCJA)</div>
+                  <div class="meta-label">${escapeHtml(t('machines.print.qrDateLabel', 'DATA KODU (OST. EDYCJA)'))}</div>
                   <div class="meta-value mono">${escapeHtml(qrDateFormatted)}</div>
                 </div>
                 ${
                   shouldPrintPin
                     ? `<div class="meta-item" style="padding-top: 8px; border-top: 1px dashed #cbd5e1;">
-                  <div class="meta-label">KOD PIN ZGŁOSZEŃ</div>
+                  <div class="meta-label">${escapeHtml(t('machines.print.pinLabel', 'KOD PIN ZGŁOSZEŃ'))}</div>
                   <div class="meta-value mono">${escapeHtml(pinReq.pin)}</div>
                 </div>`
                     : ''
@@ -424,6 +434,22 @@ export default function Machines({
         </html>
       `);
     printWindow.document.close();
+
+    const nowIso = new Date().toISOString();
+    const storeState = useManagerStore.getState?.();
+    if (storeState?.setMachines) {
+      storeState.setMachines(
+        (storeState.machines || []).map(m =>
+          m.id === id ? { ...m, qrNeedsPrint: false, qrPrintedAt: nowIso } : m
+        )
+      );
+    }
+    if (selectedMachine?.id === id) {
+      setSelectedMachine(prev =>
+        prev ? { ...prev, qrNeedsPrint: false, qrPrintedAt: nowIso } : prev
+      );
+    }
+    markEntitiesQrPrinted(getCurrentTenant(), 'machines', [id]);
   };
 
   const handleCopyNfc = async machine => {
@@ -441,8 +467,28 @@ export default function Machines({
 
   const handleGenerateNewQR = async machineId => {
     try {
+      const nowIso = new Date().toISOString();
       const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
-      await updateDoc(machineRef, { qrCreatedAt: serverTimestamp() });
+      await updateDoc(machineRef, {
+        qrCreatedAt: serverTimestamp(),
+        qrNeedsPrint: true,
+        qrPrintedAt: null,
+      });
+      const storeState = useManagerStore.getState?.();
+      if (storeState?.setMachines) {
+        storeState.setMachines(
+          (storeState.machines || []).map(m =>
+            m.id === machineId
+              ? { ...m, qrCreatedAt: nowIso, qrNeedsPrint: true, qrPrintedAt: null }
+              : m
+          )
+        );
+      }
+      if (selectedMachine?.id === machineId) {
+        setSelectedMachine(prev =>
+          prev ? { ...prev, qrCreatedAt: nowIso, qrNeedsPrint: true, qrPrintedAt: null } : prev
+        );
+      }
       showToast(t('machines.toasts.newQrGenerated'), 'success');
     } catch {
       showToast(t('machines.toasts.newQrError'), 'error');

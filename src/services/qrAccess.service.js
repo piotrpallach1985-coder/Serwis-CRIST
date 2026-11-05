@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { safeParseDate } from '../utils/dateHelpers';
 
@@ -154,6 +154,53 @@ export const formatQrDate = (entityOrDate, allMachines = [], fallbackOrParentId 
 export const getMachineQrDateString = (machine, allMachines = [], fallback = '') => {
   if (!machine) return fallback;
   return formatQrDate(machine, allMachines, fallback);
+};
+
+/**
+ * Sprawdza, czy kod QR dla urządzenia lub części został nowo wygenerowany / zaktualizowany
+ * i nie został jeszcze wydrukowany (powinien mieć oznaczenie NOWY / NEW).
+ */
+export const isQrUnprintedNew = (entity) => {
+  if (!entity) return false;
+  if (entity.needsVerification || String(entity.name || '').includes('(DO WERYFIKACJI)')) {
+    return false;
+  }
+  if (entity.qrNeedsPrint === true) return true;
+  if (entity.qrNeedsPrint === false) {
+    const printedDate = safeParseDate(entity.qrPrintedAt);
+    const qrDate = safeParseDate(entity.qrCreatedAt);
+    if (printedDate && qrDate && qrDate.getTime() > printedDate.getTime() + 1000) {
+      return true;
+    }
+    return false;
+  }
+  if (!entity.qrPrintedAt && (entity.qrCreatedAt || entity.createdAt || entity.updatedAt)) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Oznacza wybrane urządzenia lub części jako wydrukowane w Firestore (w tle).
+ */
+export const markEntitiesQrPrinted = async (tenantId, collectionName, ids = []) => {
+  if (!tenantId || !collectionName || !Array.isArray(ids) || ids.length === 0) return;
+  await Promise.all(
+    ids.map(async id => {
+      if (!id) return;
+      try {
+        const ref = doc(db, 'tenants', tenantId, collectionName, id);
+        if (ref && typeof updateDoc === 'function') {
+          await updateDoc(ref, {
+            qrNeedsPrint: false,
+            qrPrintedAt: serverTimestamp(),
+          });
+        }
+      } catch {
+        // Ignoruj błąd w trybie offline / testowym
+      }
+    })
+  );
 };
 
 export const getOrCreateQrKey = async (tenantId) => {

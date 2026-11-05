@@ -42,16 +42,42 @@ export default function PlannedMaintenanceList({
             <table className="w-full text-sm text-left">
               <thead className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-white border-b-2 border-slate-100 sticky top-0 z-10">
                 <tr>
-                  {columns.name && <th className="px-6 py-4">Typ Serwisu</th>}
-                  {columns.machine && <th className="px-6 py-4">Urządzenie / Pojazd</th>}
-                  {columns.region && <th className="px-6 py-4">Rejon / Lokalizacja</th>}
-                  {columns.nextDate && (
-                    <th className="px-6 py-4">{isArchive ? 'Zakończono' : 'Termin'}</th>
+                  {columns.name && (
+                    <th className="px-6 py-4">{t('planned.col_service_type', 'Typ Serwisu')}</th>
                   )}
-                  {columns.rbg && <th className="px-6 py-4">Termin (Licznik)</th>}
-                  {columns.priority && <th className="px-6 py-4">Priorytet</th>}
-                  {columns.status && <th className="px-6 py-4">Status</th>}
-                  {columns.actions && <th className="px-6 py-4 w-12 text-center">Akcje</th>}
+                  {columns.machine && (
+                    <th className="px-6 py-4">
+                      {t('planned.col_machine', 'Urządzenie / Pojazd')}
+                    </th>
+                  )}
+                  {columns.region && (
+                    <th className="px-6 py-4">
+                      {t('planned.col_region', 'Rejon / Lokalizacja')}
+                    </th>
+                  )}
+                  {columns.nextDate && (
+                    <th className="px-6 py-4">
+                      {isArchive
+                        ? t('planned.col_completed_at', 'Zakończono')
+                        : t('planned.col_deadline', 'Termin')}
+                    </th>
+                  )}
+                  {columns.rbg && (
+                    <th className="px-6 py-4">
+                      {t('planned.col_counter_deadline', 'Termin (Licznik)')}
+                    </th>
+                  )}
+                  {columns.priority && (
+                    <th className="px-6 py-4">{t('planned.col_priority', 'Priorytet')}</th>
+                  )}
+                  {columns.status && (
+                    <th className="px-6 py-4">{t('planned.col_status', 'Status')}</th>
+                  )}
+                  {columns.actions && (
+                    <th className="px-6 py-4 w-12 text-center">
+                      {t('planned.col_actions', 'Akcje')}
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -86,7 +112,7 @@ export default function PlannedMaintenanceList({
                           <td className="px-6 py-4">
                             <div className="font-bold text-slate-800 text-sm">{srv.name}</div>
                             <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">
-                              Wymagany status:{' '}
+                              {t('planned.required_status', 'Wymagany status:')}{' '}
                               <span className="text-slate-600">{srv.machineStatus}</span>
                             </div>
                           </td>
@@ -95,7 +121,7 @@ export default function PlannedMaintenanceList({
                           <td className="px-6 py-4 font-bold text-slate-800 text-sm">
                             {machine?.name || (
                               <>
-                                {srv.machineName || 'Nieznane'}{' '}
+                                {srv.machineName || t('planned.unknown_machine', 'Nieznane')}{' '}
                                 <span className="text-red-500 font-bold ml-1">
                                   {t('planned.machine_deleted')}
                                 </span>
@@ -148,7 +174,10 @@ export default function PlannedMaintenanceList({
                                   })()}
                                 </div>
                                 <div className="text-[10px] font-bold text-slate-400 mt-0.5">
-                                  CO {srv.calendarIntervalDays} DNI
+                                  {t('planned.every_n_days', {
+                                    days: srv.calendarIntervalDays,
+                                    defaultValue: `CO ${srv.calendarIntervalDays} DNI`,
+                                  })}
                                 </div>
                               </div>
                             ) : (
@@ -161,14 +190,14 @@ export default function PlannedMaintenanceList({
                             {srv.triggerType === 'hours' || srv.triggerType === 'mixed' ? (
                               <div className="text-sm">
                                 <div className="font-bold text-slate-800">
-                                  Cel:{' '}
+                                  {t('planned.target_label', 'Cel:')}{' '}
                                   <span className="font-mono">
                                     {srv.targetWorkHours} {unitLabel}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1 mt-0.5">
                                   <span className="text-[10px] font-bold text-slate-400">
-                                    OBECNIE:{' '}
+                                    {t('planned.current_label', 'OBECNIE:')}{' '}
                                     <span className="font-mono">
                                       {machine?.currentWorkHours || 0} {unitLabel}
                                     </span>
@@ -217,7 +246,7 @@ export default function PlannedMaintenanceList({
                               className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${rowColor}`}
                             >
                               {isCompleted
-                                ? 'Zakończone'
+                                ? t('planned.status_completed', 'Zakończone')
                                 : srv.status === SERVICE_STATUS.IN_PROGRESS
                                 ? t('planned.status_in_progress')
                                 : isOverdue

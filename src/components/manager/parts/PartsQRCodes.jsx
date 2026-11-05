@@ -4,7 +4,11 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useManagerStore } from '../../../store/managerStore';
 import { safeParseDate } from '../../../utils/dateHelpers';
 import { getCurrentTenant } from '../../../utils/tenantHelper';
-import { buildPartQrValue } from '../../../services/qrAccess.service';
+import {
+  buildPartQrValue,
+  isQrUnprintedNew,
+  markEntitiesQrPrinted,
+} from '../../../services/qrAccess.service';
 
 export default function PartsQRCodes() {
   const { t } = useTranslation();
@@ -74,6 +78,19 @@ export default function PartsQRCodes() {
 
   const handlePrint = () => {
     window.print();
+    const idsArray = Array.from(selectedIds);
+    if (idsArray.length > 0) {
+      const nowIso = new Date().toISOString();
+      const storeState = useManagerStore.getState?.();
+      if (storeState?.setParts) {
+        storeState.setParts(
+          (storeState.parts || []).map(p =>
+            selectedIds.has(p.id) ? { ...p, qrNeedsPrint: false, qrPrintedAt: nowIso } : p
+          )
+        );
+      }
+      markEntitiesQrPrinted(tenantId, 'parts', idsArray);
+    }
   };
 
   return (
@@ -203,6 +220,7 @@ export default function PartsQRCodes() {
               partCode: p.code,
               qrDate: dateStr !== '—' ? dateStr : ''
             });
+            const isNewQr = isQrUnprintedNew(p);
 
             return (
               <div
@@ -212,6 +230,14 @@ export default function PartsQRCodes() {
                   isSelected ? 'border-slate-900 ring-2 ring-blue-500/40 shadow-md' : 'border-slate-300 hover:border-slate-500 shadow-sm opacity-90'
                 }`}
               >
+                {isNewQr && (
+                  <span
+                    data-testid={`part-qr-new-badge-${p.id}`}
+                    className="no-print absolute top-3 left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs"
+                  >
+                    {t('machines.qr.newBadge', 'NOWY')}
+                  </span>
+                )}
                 {/* Checkbox (ukryty w druku) */}
                 <div className="no-print absolute top-3 right-3">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
@@ -249,7 +275,7 @@ export default function PartsQRCodes() {
                 </div>
 
                 <div className="text-[9px] font-extrabold text-slate-800 uppercase tracking-wider leading-snug mb-3">
-                  VexoNT - MAGAZYN CZĘŚCI UR
+                  {t('parts.qr.card_subtitle', 'VexoNT - MAGAZYN CZĘŚCI UR')}
                 </div>
 
                 <div className="my-1 flex items-center justify-center">
@@ -265,7 +291,7 @@ export default function PartsQRCodes() {
                 <div className="w-full text-left space-y-1.5">
                   <div>
                     <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      LOKALIZACJA
+                      {t('machines.print.locationLabel', 'LOKALIZACJA')}
                     </div>
                     <div className="text-xs font-extrabold text-slate-900 leading-snug break-words">
                       {partLocationStr}
@@ -273,7 +299,7 @@ export default function PartsQRCodes() {
                   </div>
                   <div>
                     <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      NUMER WEWNĘTRZNY UR
+                      {t('machines.print.internalIdLabel', 'NUMER WEWNĘTRZNY UR')}
                     </div>
                     <div className="text-xs font-bold font-mono text-slate-900 leading-snug break-words">
                       {partCodeStr}
@@ -281,7 +307,7 @@ export default function PartsQRCodes() {
                   </div>
                   <div>
                     <div className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                      DATA KODU (OST. EDYCJA)
+                      {t('machines.print.qrDateLabel', 'DATA KODU (OST. EDYCJA)')}
                     </div>
                     <div className="text-xs font-bold font-mono text-slate-900 leading-snug">
                       {dateStr}

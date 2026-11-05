@@ -106,4 +106,20 @@ describe('usePermissions', () => {
     expect(result.current.canAccessTab('parts_inventory')).toBe(false);
     expect(result.current.canAccessTab('tickets')).toBe(true);
   });
+
+  it('should automatically grant access to tickets and planned_maintenance tabs when only_assigned_tasks is enabled on custom role', () => {
+    const user = { role: 'Serwis Zewnętrzyn Pla', assignedService: 'Serwis Zewnętrzny' };
+    const roles = [
+      { id: 'Serwis Zewnętrzyn Pla', name: 'Serwis Zewnętrzyn Pla', permissions: ['only_assigned_tasks'] },
+    ];
+    const { result } = renderHook(() => usePermissions(user, roles));
+
+    expect(result.current.onlyAssignedTasks).toBe(true);
+    expect(result.current.canAccessTab('tickets')).toBe(true);
+    expect(result.current.canAccessTab('archive')).toBe(true);
+    expect(result.current.canAccessTab('planned_maintenance')).toBe(true);
+    expect(result.current.canAccessTab('archive_planned')).toBe(true);
+    expect(result.current.canAccessTab('dashboard_tickets')).toBe(false);
+    expect(result.current.canAccessTab('users')).toBe(false);
+  });
 });

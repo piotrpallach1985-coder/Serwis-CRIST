@@ -8,12 +8,19 @@ export const addPart = async (tenantId, payload) => {
   payload.createdAt = serverTimestamp();
   payload.qrCreatedAt = serverTimestamp();
   payload.updatedAt = serverTimestamp();
+  payload.qrNeedsPrint = payload.qrNeedsPrint !== undefined ? payload.qrNeedsPrint : true;
+  payload.qrPrintedAt = null;
   return await addDoc(collection(db, 'tenants', tenantId, 'parts'), payload);
 };
 
 export const updatePart = async (tenantId, partId, payload) => {
   logAudit('UPDATE', 'PART', partId, payload);
   payload.updatedAt = serverTimestamp();
+  if (payload.qrNeedsPrint !== false) {
+    payload.qrCreatedAt = serverTimestamp();
+    payload.qrNeedsPrint = true;
+    payload.qrPrintedAt = null;
+  }
   const ref = doc(db, 'tenants', tenantId, 'parts', partId);
   return await updateDoc(ref, payload);
 };

@@ -4,7 +4,12 @@
     "unknown": "Nieznana",
     "other": "Inne",
     "cancel": "Anuluj",
-    "save": "Zapisz"
+    "save": "Zapisz",
+    "are_you_sure": "Czy na pewno?",
+    "yes_delete": "Tak, usuń",
+    "status": "Status",
+    "delete": "Usuń",
+    "yes": "Tak"
   },
   "sidebar": {
     "title": "VexoNT",
@@ -77,7 +82,12 @@
     "install_app_step2": "Alternatywnie otwórz menu przeglądarki (⋮) → Zapisz i udostępnij (lub Aplikacje) → Zainstaluj VexoNT.",
     "install_app_close": "Rozumiem",
     "master_data_section": "Dane Bazowe",
-    "crit_short": "kryt."
+    "crit_short": "kryt.",
+    "equipment_base_facility": "Baza Obiektów/Urządzeń",
+    "section_tickets_simple": "Awarie",
+    "section_services_simple": "Serwisy",
+    "machines_qr_facility": "Baza QR Obiektów/Urządzeń",
+    "regions_facility": "Rejony/Adresy"
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -138,7 +148,16 @@
     "no_contractor_assigned": "Brak przypisanych wykonawców.",
     "unknown_machine": "Nieznana",
     "other": "Inne",
-    "unassigned": "Nieprzypisane"
+    "unassigned": "Nieprzypisane",
+    "summary_tile": "Podsumowanie wskaźników KPI",
+    "total_tickets": "Ilość zgłoszeń",
+    "critical_tickets": "Awarii krytycznych",
+    "closed_tickets": "Zgłoszeń zamkniętych",
+    "mttr": "Średni czas (MTTR)",
+    "top_machines": "Top 5 Najbardziej Awaryjnych Maszyn",
+    "breakdowns_label": "Awarie",
+    "status_chart": "Status Zgłoszeń",
+    "trend_chart": "Trend Zgłoszeń (Ilość awarii w czasie)"
   },
   "tickets": {
     "active_tickets_count": "Aktywne awarie",
@@ -279,7 +298,36 @@
       "finished_repair_action": "Zakończono naprawę",
       "reverted_contractor": "Cofnięto do wyboru wykonawcy",
       "resumed_work": "Wznowiono prace (awaria powróciła)",
-      "closed_false_alarm_action": "Zamknięto awarię (fałszywy alarm)"
+      "closed_false_alarm_action": "Zamknięto awarię (fałszywy alarm)",
+      "stepperHeader": "DZIAŁ TECHNICZNY - KROKI REALIZACJI",
+      "expandStepHint": "Kliknij, aby rozwinąć ten krok",
+      "activeStageBadge": "Aktywny etap",
+      "previewStageNotice": "Podgląd innego etapu — akcje są aktywne tylko dla aktualnego etapu.",
+      "selectContractorLabel": "Wybierz wykonawcę (serwis wewnętrzny lub podwykonawca):",
+      "selectContractorPlaceholder": "Wybierz wykonawcę z listy...",
+      "confirmContractorBtn": "Zatwierdź Wykonawcę i Przejdź Dalej",
+      "assignedContractor": "Wyznaczony wykonawca",
+      "addNoteOrPhotoLabel": "Dodaj notatkę lub zdjęcie z prac:",
+      "notePlaceholder": "Wpisz treść notatki lub użyj mikrofonu...",
+      "addPhotoBtn": "Dodaj zdjęcie",
+      "cameraBtn": "Aparat",
+      "saveNotePhotoBtn": "Zapisz notatkę/zdjęcie",
+      "selectedFiles": "Wybrano plików",
+      "takeExtraPartBtn": "Pobierz dodatkową część z magazynu",
+      "step1Desc": "Zgłoszenie awarii oczekuje na przyjęcie do realizacji i przydzielenie zespołu technicznego.",
+      "finishRepairBtn": "Zakończ Naprawę",
+      "completedBanner": "Naprawa została pomyślnie zrealizowana i przeniesiona do historii.",
+      "completedByLabel": "Zrealizował",
+      "step5PendingDesc": "Naprawa jest w trakcie realizacji. Możesz zamknąć zgłoszenie przyciskiem na dole lub zakończyć je w Kroku 4.",
+      "closeFalseAlarmBtn": "Zamknij awarię (fałszywy alarm / błędne zgłoszenie)",
+      "uploading": "Przesy?anie..."
+    },
+    "status": {
+      "closed": "Zakończona",
+      "in_progress": "Naprawa w trakcie",
+      "assigned": "Przekazana do wykonawcy",
+      "contractor_selection": "Wybór wykonawcy",
+      "pending": "Oczekująca"
     }
   },
   "machines": {
@@ -306,12 +354,21 @@
       "machineLoaded": "Wczytano urządzenie: ",
       "machineNotFound": "Nie znaleziono urządzenia: ",
       "machineUpdated": "Zaktualizowano urządzenie",
-      "machineAdded": "Urządzenie zostało dodane pomyślnie."
+      "machineAdded": "Urządzenie zostało dodane pomyślnie.",
+      "wrongTenant": "Ta maszyna należy do innej firmy!",
+      "scannedPartSubtext": "Zeskanowany kod QR należy do części magazynowej, a nie do urządzenia."
     },
     "print": {
       "printQr": "Drukuj QR - ",
       "date": "Data: ",
-      "noData": "Brak danych"
+      "noData": "Brak danych",
+      "licensePlateLabel": "NUMER TABLICY REJESTRACYJNEJ",
+      "internalIdLabel": "NUMER WEWNĘTRZNY UR",
+      "systemSubtitle": "VexoNT - SKANUJ ABY ZGŁOSIĆ AWARIĘ",
+      "locationLabel": "LOKALIZACJA",
+      "qrDateLabel": "DATA KODU (OST. EDYCJA)",
+      "pinLabel": "KOD PIN ZGŁOSZEŃ",
+      "printPinCheckbox": "Drukuj PIN na etykiecie"
     },
     "qr": {
       "title": "Baza QR Urządzeń",
@@ -329,7 +386,8 @@
       "print_selected": "Drukuj wybrane",
       "no_machines": "Brak urządzeń spełniających kryteria",
       "generated": "Wygenerowano:",
-      "print_alert": "Wybierz przynajmniej jedno urządzenie do druku."
+      "print_alert": "Wybierz przynajmniej jedno urządzenie do druku.",
+      "newBadge": "NOWY"
     },
     "scanner": {
       "qrTitle": "Skanuj kod QR lub tablicę rejestracyjną (Baza Urządzeń)",
@@ -355,7 +413,11 @@
       "add": "Dodaj",
       "uploadDtr": "Wgraj DTR",
       "deleteFile": "Usuń plik",
-      "deleteNote": "Usuń notatkę"
+      "deleteNote": "Usuń notatkę",
+      "addFacilityAsset": "Dodaj Obiekt/Urządzenie",
+      "importExcel": "Importuj (Excel/CSV)",
+      "qrList": "Baza QR Urządzeń",
+      "loadMore": "Wczytaj więcej"
     },
     "table": {
       "machineName": "Nazwa Urządzenia",
@@ -371,7 +433,12 @@
       "subtitle": "Zarządzaj bazą urządzeń i przeglądaj historię serwisów",
       "searchPlaceholder": "Szukaj (nazwa, nr rej., VIN, nr wew.)...",
       "allRegions": "Wszystkie miejsca montażu",
-      "noRegion": "Bez miejsca montażu"
+      "noRegion": "Bez miejsca montażu",
+      "tabAllAssets": "Wszystkie zasoby",
+      "tabFacilityAssets": "Obiekty/Urządzenia",
+      "tabDeviceAssets": "Urządzenia / Maszyny",
+      "tabHvacAssets": "Klimatyzacja / HVAC",
+      "tabVehicleAssets": "Pojazdy / Flota"
     },
     "form": {
       "limitReached": "Osiągnięto limit urządzeń (",
@@ -392,7 +459,11 @@
       "additionalDescriptionHint": "Ten opis będzie widoczny pod nazwą urządzenia, może pomóc w dokładniejszej identyfikacji.",
       "qrWarningTitle": "Uwaga dotycząca kodów QR",
       "qrWarningText": "Jeśli zmieniasz nazwę urządzenia, stary, wydrukowany kod QR (naklejka) będzie miał nieaktualny napis. Pamiętaj, aby po zapisaniu zmian wygenerować i wydrukować ",
-      "newQr": "nowy kod QR"
+      "newQr": "nowy kod QR",
+      "wholeCompanyRegion": "Cała Firma",
+      "mainMapRegion": "Mapa Główna",
+      "hvacSectionTitle": "Parametry Chłodnicze HVAC / Pompy Ciepła (F-Gazy UE 2024/573 & CRO) oraz Dane Klienta",
+      "facilitySectionTitle": "Dane Obiektu / Lokalu oraz Kategoria Przeglądu c-KOB (art. 62 Prawa budowlanego)"
     },
     "details": {
       "unknownRegion": "Nieznane miejsce montażu",
@@ -441,7 +512,11 @@
       "noPartsMsg": "Nie wydano jeszcze żadnych części dla tego urządzenia.",
       "unknownPart": "Nieznana część",
       "quantity": "Ilość: ",
-      "pcs": "szt."
+      "pcs": "szt.",
+      "infoTileTitle": "Dane urządzenia, podzespoły i części (BOM)",
+      "qrTileTitle": "Kod QR urządzenia",
+      "dtrTileTitle": "Dokumentacja i notatki techniczne",
+      "navigateGps": "Nawiguj GPS"
     },
     "card": {
       "verification": "WERYFIKACJA",
@@ -475,7 +550,9 @@
       "techNotesTitle": "Notatki Działu Technicznego",
       "addNotePlaceholder": "Dodaj nową notatkę...",
       "noTechNotes": "Brak notatek technicznych."
-    }
+    },
+    "unknownMachine": "Nieznana maszyna",
+    "deletedMachine": "maszyna usunięta"
   },
   "parts": {
     "tabs": {
@@ -522,7 +599,11 @@
       "batch_stock_label": "Partia ({{qty}} {{unit}}):",
       "total_stock_label": "Ogółem: {{stock}} {{unit}}",
       "status_expired": "PRZETERMINOWANE ({{days}} dni temu)",
-      "status_expires_in": "Wygasa za {{days}} dni"
+      "status_expires_in": "Wygasa za {{days}} dni",
+      "total_indices": "Liczba Indeksów",
+      "reserved_services": "Zarezerwowane (Serwisy)",
+      "out_of_stock": "Brak Na Stanie (0 szt)",
+      "estimated_value": "Szacowana Wartość Magazynu (wg fizycznych stanów)"
     },
     "layout": {
       "title": "Baza Magazynowa",
@@ -541,7 +622,8 @@
       "saving": "Zapisywanie...",
       "select_all": "Zaznacz wszystkie",
       "deselect_all": "Odznacz wszystkie",
-      "print_selected": "Drukuj wybrane"
+      "print_selected": "Drukuj wybrane",
+      "import_excel": "Importuj (Excel/CSV)"
     },
     "list": {
       "search_placeholder": "Szukaj po nazwie, kodzie, lokalizacji...",
@@ -656,7 +738,8 @@
       "of_visible": "z {total} widocznych",
       "no_parts": "Brak części",
       "edited": "Edycja:",
-      "print_alert": "Wybierz przynajmniej jedną część do druku."
+      "print_alert": "Wybierz przynajmniej jedną część do druku.",
+      "card_subtitle": "VexoNT - MAGAZYN CZĘŚCI UR"
     },
     "tx_list": {
       "title": "Operacje magazynowe",
@@ -751,7 +834,31 @@
       "priority_high": "Wysoki",
       "priority_standard": "Standard",
       "unknown_machine": "Nieznana",
-      "unassigned_region": "Nieprzypisane"
+      "unassigned_region": "Nieprzypisane",
+      "noData": "Brak danych",
+      "noDataPeriod": "Brak danych w wybranym okresie",
+      "periods": {
+        "7days": "Ostatnie 7 dni",
+        "30days": "Ostatnie 30 dni",
+        "90days": "Ostatnie 90 dni",
+        "all": "Od początku (Wszystko)"
+      },
+      "types": {
+        "calendar": "Kalendarz",
+        "hours": "Motogodziny",
+        "mixed": "Mieszane"
+      },
+      "summaryTile": "Podsumowanie wskaźników serwisów",
+      "stats": {
+        "total": "Serwisy",
+        "completed": "Wykonane",
+        "overdue": "Po terminie",
+        "onTimePercentage": "Terminowość"
+      },
+      "charts": {
+        "typeDistribution": "Podział wg wyzwalacza",
+        "trend": "Trend Wykonywania (Ilość w czasie)"
+      }
     },
     "status_completed": "Zakończone",
     "status_in_progress": "W trakcie",
@@ -846,7 +953,92 @@
     "services_by_region": "Serwisy według Rejonu",
     "planned": "Zaplanowane",
     "no_data": "Brak danych do wyświetlenia",
-    "generate_pdf": "Generuj PDF"
+    "generate_pdf": "Generuj PDF",
+    "checklist": {
+      "empty": "Brak przypisanej listy kontrolnej do tego serwisu.",
+      "required": "Wymagane",
+      "addNoteHint": "Dodaj uwagę lub zdjęcie",
+      "done": "Wykonano",
+      "mark": "Zaznacz",
+      "valuePlaceholder": "Wartość...",
+      "noteInputPlaceholder": "Wpisz uwagę techniczną do tego punktu...",
+      "saving": "Zapisywanie checklisty...",
+      "confirmBtn": "Zatwierdź checklistę i przejdź do Podsumowania",
+      "skipMissingBtn": "Pomiń brakujące i przejdź dalej"
+    },
+    "priority": {
+      "critical": "KRYTYCZNY",
+      "standard": "Standard"
+    },
+    "info": {
+      "trigger": "Wyzwalacz",
+      "calendar": "Kalendarz",
+      "mixed": "Mieszany",
+      "dueOrHours": "Termin / RBG",
+      "personnel": "Personel",
+      "downtime": "Przestój (h)",
+      "machineStatus": "Status maszyny",
+      "requiredTools": "Wymagane narzędzia",
+      "specialTools": "Specjalne",
+      "otherTools": "Inne",
+      "basicTools": "Podstawowe (skrzynka narzędziowa)",
+      "requiredParts": "Wymagane części",
+      "plannedUsage": "PLANOWANE ZUŻYCIE",
+      "qty": "Ilość",
+      "plannedCost": "Koszt plan.",
+      "noPlannedParts": "Brak zdefiniowanych części planowanych.",
+      "actuallyTaken": "FAKTYCZNIE POBRANE",
+      "taken": "Pobrano",
+      "cost": "Koszt",
+      "workScope": "Zakres prac do wykonania",
+      "typeCheckbox": "Checkbox",
+      "typePhoto": "Zdjęcie",
+      "typeValue": "Pomiar",
+      "requiredBadge": "Wymagane",
+      "dtrStandard": "Przegląd według obowiązującego standardu DTR maszyny."
+    },
+    "col_completed_at": "Zakończono",
+    "col_deadline": "Termin",
+    "col_counter_deadline": "Termin (Licznik)",
+    "col_actions": "Akcje",
+    "required_status": "Wymagany status:",
+    "target_label": "Cel:",
+    "current_label": "OBECNIE:",
+    "every_n_days": "CO {{days}} DNI",
+    "timeline": {
+      "step1": "Przyjęcie do realizacji",
+      "step2": "Wybór wykonawcy",
+      "step3": "Realizacja serwisu (W trakcie)",
+      "step4": "Podsumowanie serwisu",
+      "step5": "Zakończony i rozliczony",
+      "step1Desc": "Przegląd oczekuje na przyjęcie do realizacji i przydzielenie zespołu technicznego.",
+      "acceptServiceBtn": "Przyjęcie do realizacji",
+      "checklistTitle": "Lista Kontrolna (Checklista do wykonania)",
+      "takePartBtn": "Pobierz część z magazynu do serwisu",
+      "goToSummaryBtn": "Przejdź do Podsumowania",
+      "completeHeader": "Zakończ Serwis",
+      "smartAiHint": "Różdżka AI: podyktuj podsumowanie – uzupełni czas pracy, części, notatkę i tematy do realizacji.",
+      "manHoursLabel": "Czas pracy (RBG / Godziny)",
+      "inspectorLicenseLabel": "Nr uprawnień kontrolującego / inspektora (do protokołu c-KOB / F-Gaz)",
+      "confirmPartsUsed": "Potwierdzam zużycie wymaganych części",
+      "skipStepsCompleteBtn": "Zakończ serwis (Pomiń Kroki)"
+    },
+    "status": {
+      "in_progress": "W trakcie",
+      "completed": "Zakończony",
+      "pending": "Oczekujący"
+    },
+    "tab_kpi": "KPI Serwisu",
+    "tab_map": "Mapa Serwis?w",
+    "tab_list": "Planowane Serwisy",
+    "tab_tasks": "Tematy do realizacji",
+    "tab_archive": "Archiwum Serwis?w",
+    "update_machine_counter": "Aktualizacja licznika roboczogodzin (RBG)",
+    "update_vehicle_mileage": "Aktualizacja przebiegu pojazdu (km)",
+    "new_counter_state": "Nowy stan licznika (RBG):",
+    "new_mileage_state": "Nowy stan licznika (km):",
+    "cancel": "Anuluj",
+    "save": "Zapisz"
   },
   "dashboards": {
     "reports_title": "Raportowanie oraz Ustawienia",
@@ -1037,7 +1229,22 @@
       "profile_short_facility": "Facility / Osiedla (c-KOB)",
       "profile_short_hvac": "Serwis HVAC (F-Gazy / CRO)",
       "profile_short_fleet": "VexoNT Fleet (Pojazdy)"
-    }
+    },
+    "api_panel": {
+      "enter_name_alert": "Podaj nazwę dla klucza API (np. Integracja BIM)",
+      "new_key_created": "Twój nowy klucz API to:",
+      "save_key_warning": "Zapisz go teraz, ponieważ nie zostanie wyświetlony w całości ze względów bezpieczeństwa!",
+      "delete_confirm": "Czy na pewno chcesz usunąć ten klucz API? Systemy zewnętrzne korzystające z tego klucza stracą dostęp.",
+      "title": "Integracje API (np. BIM, ERP)",
+      "desc": "Zarządzaj kluczami dostępu do API REST. Przekaż wygenerowany klucz w nagłówku x-api-key swoim systemom zewnętrznym, aby mogły automatycznie komunikować się z aplikacją.",
+      "name_placeholder": "Nazwa systemu (np. BIM Zdalny)",
+      "generate_btn": "Generuj nowy klucz",
+      "active_keys": "Aktywne klucze",
+      "key_label": "Klucz:"
+    },
+    "kpi_pdf_title": "Raport KPI (PDF)",
+    "kpi_pdf_desc": "Wizualny raport podsumowujący statystyki, MTTR (Średni czas naprawy), czasy reakcji i statusy serwisów dla zarządu.",
+    "period_label": "Okres:"
   },
   "superadmin": {},
   "admin": {
@@ -1070,7 +1277,10 @@
       "role": "Rola",
       "actions": "Akcje",
       "empty_list": "Brak użytkowników. Dodaj pierwszego powyżej.",
-      "delete": "Usuń"
+      "delete": "Usuń",
+      "dedicated_service_label": "Powiązany Podwykonawca / Serwis (opcjonalnie — z zakładki Podwykonawcy / Serwis)",
+      "all_scopes_by_role": "-- Brak przypisania do konkretnej firmy (dostęp wg wybranej Roli) --",
+      "dedicated_service_hint": "Uprawnienia do modułów oraz ograniczenie widoku (\"Tylko przypisane zlecenia\") ustawiasz w zakładce Role i Uprawnienia. Tutaj możesz dodatkowo powiązać konto z konkretną firmą z listy Podwykonawcy / Serwis, aby serwisant widział zlecenia przypisane na nazwę tej firmy."
     },
     "roles": {
       "title": "Role i Uprawnienia",
@@ -1091,7 +1301,45 @@
       "actions": "Akcje",
       "delete": "Usuń",
       "no_access": "Brak dostępów",
-      "empty_list": "Brak zdefiniowanych ról. Utwórz pierwszą powyżej."
+      "empty_list": "Brak zdefiniowanych ról. Utwórz pierwszą powyżej.",
+      "mod_tickets": "Awarie UR",
+      "perm_kpi": "Analiza KPI Awarii",
+      "perm_dashboard_tickets": "Mapa Awarii",
+      "perm_edit_map": "Edycja Mapy",
+      "perm_tickets": "Zgłoszenia Awarii",
+      "perm_archive": "Archiwum Awarii",
+      "mod_planned": "Panel Serwisu (DTR)",
+      "perm_planned_kpi": "Analiza KPI Serwisów",
+      "perm_dashboard_planned": "Mapa Serwisów",
+      "perm_planned_maintenance": "Planowane Serwisy",
+      "perm_action_items": "Tematy do realizacji",
+      "perm_archive_planned": "Archiwum Serwisów",
+      "perm_edit_planned": "Edycja Serwisów Planowanych",
+      "perm_delete_planned": "Usuwanie Serwisów Planowanych",
+      "perm_manage_dtr": "Zarządzanie plikami DTR",
+      "mod_inventory": "Magazyn części zamiennych",
+      "perm_parts_kpi": "KPI Magazynu",
+      "perm_parts_inventory": "Baza Części",
+      "perm_parts_transactions": "Operacje Magazynowe",
+      "perm_parts_qr": "Baza QR Części",
+      "mod_admin": "Administracja i Dane Bazowe",
+      "perm_machines": "Rejestr Urządzeń",
+      "perm_only_assigned_industrial": "Tylko przypisane zlecenia (Serwis Zewnętrzny)",
+      "perm_only_assigned_b2c": "Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)",
+      "perm_regions": "Rejony i Mapy",
+      "perm_services": "Podwykonawcy / Serwis",
+      "perm_topics": "Tematy Zgłoszeń",
+      "perm_delete_tech_notes": "Usuwanie notatek technicznych",
+      "perm_users": "Użytkownicy",
+      "perm_reports": "Raportowanie",
+      "perm_audit": "Dziennik Zdarzeń (ISO 55000)",
+      "perm_ai_stats": "Statystyki AI",
+      "mod_push": "Powiadomienia Push",
+      "perm_push_critical": "Nowe Awarie Krytyczne",
+      "perm_push_all": "Wszystkie Nowe Awarie",
+      "perm_push_status": "Zmiany statusów powiązanych zgłoszeń",
+      "perm_push_comments": "Nowe komentarze w powiązanych zgłoszeniach",
+      "perm_push_planned": "Powiadomienia o zbliżających się serwisach"
     },
     "regions": {
       "title": "Rejony/Miejsca montażu",
@@ -1281,7 +1529,23 @@
     "framing_hint": "Przesuń mapę myszką i przybliż płynnie rolką w wybrane miejsce",
     "save_google_view": "Wgraj ustawiony widok mapy",
     "pin_by_address_full": "Przypnij po adresie (miejscowość, ulica, nr)",
-    "frame_google_map_btn": "Kadruj Mapę Google"
+    "frame_google_map_btn": "Kadruj Mapę Google",
+    "main_map": "Mapa Główna",
+    "level_up": "Poziom wyżej",
+    "map_options": "Opcje Mapy",
+    "main_short": "Główna",
+    "background_label": "Podkład",
+    "default_frame_zoom": "Domyślny kadr i powiększenie (ustaw ręcznie obraz i zoom)",
+    "set_as_default_frame": "Ustaw jako domyślny kadr",
+    "map_style": "Typ mapy",
+    "style_hybrid": "Satelita + Ulice",
+    "style_satellite": "Satelita (czysty)",
+    "style_road": "Mapa drogowa",
+    "pending_services": "Zaległe/Oczekujące serwisy:",
+    "subregion_submap": "Podrejon / Podmapa",
+    "search_address_btn": "Szukaj",
+    "already_pinned_items": "Już przypięte (zmień lokalizację)",
+    "no_free_regions": "Brak rejonów/podmap do przypięcia (dodaj nowy rejon w Słownikach -> Rejony)."
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
@@ -1312,10 +1576,18 @@
     "contactless_nfc": "Zbliżeniowe NFC",
     "footer_subtitle": "© 2026 VexoNT. Wszelkie prawa zastrzeżone. • System Obsługi Awarii & Serwisu",
     "exit": "Wyjdź",
-    "control_room": "Dyspozytornia"
+    "control_room": "Dyspozytornia",
+    "report_without_qr": "Zgłoś awarię (Bez QR/NFC)"
   },
   "scanner": {
-    "internalTitle": "Zgłoszenie awarii"
+    "internalTitle": "Zgłoszenie awarii",
+    "formTitle": "Formularz zgłoszenia",
+    "sentTitle": "Zgłoszenie wysłane",
+    "reportAnother": "Zgłoś kolejną awarię",
+    "goToTickets": "Przejdź do zgłoszeń",
+    "licensePlateLookupLabel": "Wpisz ręcznie (Tablica rejestracyjna / VIN / Kod urządzenia)",
+    "licensePlatePlaceholder": "np. GD 12345, WE 9876A, VIN lub nazwa urządzenia...",
+    "openByPlateBtn": "Wybierz"
   },
   "operator": {
     "scanQrBtn": "Skanuj QR",
@@ -1329,6 +1601,20 @@
     "scanNfcCardDesc": "Odczytaj przy pomocy NFC i zgłoś awarię.",
     "otherMachineCardTitle": "Zgłoś inne urządzenie:",
     "otherMachineCardDesc": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.",
-    "otherMachineInternalCardDesc": "Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC"
+    "otherMachineInternalCardDesc": "Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC",
+    "optionsTitle": "OPCJE ZGŁOSZEŃ",
+    "nfcActive": "NFC Aktywne",
+    "nfcHint": "Zbliż plecki telefonu do naklejki NFC.",
+    "cameraScanner": "Skaner aparatu (QR + Tablica Rejestracyjna)",
+    "cameraQrOnly": "Skaner aparatu (Kod QR)",
+    "closeCamera": "Zamknij kamerę",
+    "reportWithoutQrBtn": "Zgłoś bez QR / NFC",
+    "scanAnyQrTitle": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.",
+    "scanAnyQrDesc": "Awaria zostanie zgłoszona bezpośrednio do odpowiedniego działu lub serwisu. Jednorazowe zeskanowanie połączy telefon z systemem obsługującym zgłoszenia.",
+    "scanDeviceQrHeading": "Zeskanuj kod QR urządzenia",
+    "deviceNotConnectedDesc": "Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy."
+  },
+  "map": {
+    "submapLabel": "Podmapa"
   }
 }

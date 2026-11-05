@@ -4,7 +4,12 @@
     "unknown": "Unknown",
     "other": "Other",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "are_you_sure": "Are you sure?",
+    "yes_delete": "Yes, delete",
+    "status": "Status",
+    "delete": "Delete",
+    "yes": "Yes"
   },
   "sidebar": {
     "title": "VexoNT",
@@ -77,7 +82,12 @@
     "install_app_step2": "Alternatively, open the browser menu (⋮) → Save and share (or Apps) → Install VexoNT.",
     "install_app_close": "Got it",
     "master_data_section": "Master Data",
-    "crit_short": "crit."
+    "crit_short": "crit.",
+    "equipment_base_facility": "Facilities / Assets Base",
+    "section_tickets_simple": "Breakdowns",
+    "section_services_simple": "Services",
+    "machines_qr_facility": "Facilities/Assets QR Base",
+    "regions_facility": "Regions/Addresses"
   },
   "notifications": {
     "title": "Notifications",
@@ -138,7 +148,16 @@
     "no_contractor_assigned": "No assigned contractors.",
     "unknown_machine": "Unknown",
     "other": "Other",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "summary_tile": "KPI Summary",
+    "total_tickets": "Total Tickets",
+    "critical_tickets": "Critical Breakdowns",
+    "closed_tickets": "Closed Tickets",
+    "mttr": "Average Repair Time (MTTR)",
+    "top_machines": "Top 5 Most Fault-Prone Assets",
+    "breakdowns_label": "Breakdowns",
+    "status_chart": "Ticket Status Distribution",
+    "trend_chart": "Ticket Trend (Breakdowns over time)"
   },
   "tickets": {
     "active_tickets_count": "Active tickets",
@@ -279,7 +298,36 @@
       "finished_repair_action": "Finished repair",
       "reverted_contractor": "Reverted to contractor selection",
       "resumed_work": "Resumed work (failure returned)",
-      "closed_false_alarm_action": "Closed ticket (false alarm)"
+      "closed_false_alarm_action": "Closed ticket (false alarm)",
+      "stepperHeader": "TECHNICAL DEPARTMENT - EXECUTION STEPS",
+      "expandStepHint": "Click to expand this step",
+      "activeStageBadge": "Active stage",
+      "previewStageNotice": "Previewing another stage ? actions are only active for the current stage.",
+      "selectContractorLabel": "Select contractor (internal team or subcontractor):",
+      "selectContractorPlaceholder": "Select a contractor from the list...",
+      "confirmContractorBtn": "Confirm Contractor and Continue",
+      "assignedContractor": "Assigned contractor",
+      "addNoteOrPhotoLabel": "Add work note or photo:",
+      "notePlaceholder": "Enter note text or use the microphone...",
+      "addPhotoBtn": "Add photo",
+      "cameraBtn": "Camera",
+      "saveNotePhotoBtn": "Save note/photo",
+      "selectedFiles": "Selected files",
+      "takeExtraPartBtn": "Withdraw additional part from warehouse",
+      "step1Desc": "The breakdown ticket is waiting to be accepted for execution and assigned to a technical team.",
+      "finishRepairBtn": "Complete Repair",
+      "completedBanner": "The repair has been successfully completed and moved to the archive.",
+      "completedByLabel": "Completed by",
+      "step5PendingDesc": "Repair is in progress. You can close the ticket using the button below or finish it in Step 4.",
+      "closeFalseAlarmBtn": "Close breakdown (false alarm / invalid report)",
+      "uploading": "Uploading..."
+    },
+    "status": {
+      "closed": "Closed",
+      "in_progress": "Repair in progress",
+      "assigned": "Assigned to contractor",
+      "contractor_selection": "Contractor selection",
+      "pending": "Pending"
     }
   },
   "machines": {
@@ -306,12 +354,21 @@
       "machineLoaded": "Machine loaded: ",
       "machineNotFound": "Machine not found: ",
       "machineUpdated": "Machine updated",
-      "machineAdded": "Machine added successfully."
+      "machineAdded": "Machine added successfully.",
+      "wrongTenant": "This machine belongs to another company!",
+      "scannedPartSubtext": "The scanned QR code belongs to a spare part, not a machine."
     },
     "print": {
       "printQr": "Print QR - ",
       "date": "Date: ",
-      "noData": "No data"
+      "noData": "No data",
+      "licensePlateLabel": "LICENSE PLATE NUMBER",
+      "internalIdLabel": "INTERNAL ASSET ID",
+      "systemSubtitle": "VexoNT - SCAN TO REPORT BREAKDOWN",
+      "locationLabel": "LOCATION",
+      "qrDateLabel": "QR DATE (LAST UPDATED)",
+      "pinLabel": "REPORT PIN CODE",
+      "printPinCheckbox": "Print PIN on label"
     },
     "qr": {
       "title": "Machines QR Codes Summary",
@@ -329,7 +386,8 @@
       "print_selected": "Print selected",
       "no_machines": "No machines matching criteria",
       "generated": "Generated:",
-      "print_alert": "Select at least one machine to print."
+      "print_alert": "Select at least one machine to print.",
+      "newBadge": "NEW"
     },
     "scanner": {
       "qrTitle": "Scan QR code or license plate (Equipment Base)",
@@ -355,7 +413,11 @@
       "add": "Add",
       "uploadDtr": "Upload DTR",
       "deleteFile": "Delete file",
-      "deleteNote": "Delete note"
+      "deleteNote": "Delete note",
+      "addFacilityAsset": "Add Facility/Asset",
+      "importExcel": "Import (Excel/CSV)",
+      "qrList": "Equipment QR Base",
+      "loadMore": "Load more"
     },
     "table": {
       "machineName": "Machine Name",
@@ -371,7 +433,12 @@
       "subtitle": "Manage the machine park and view service history",
       "searchPlaceholder": "Search (name, plate no., VIN, int. no.)...",
       "allRegions": "All Regions",
-      "noRegion": "No region"
+      "noRegion": "No region",
+      "tabAllAssets": "All assets",
+      "tabFacilityAssets": "Facilities/Assets",
+      "tabDeviceAssets": "Equipment / Machines",
+      "tabHvacAssets": "Air Conditioning / HVAC",
+      "tabVehicleAssets": "Vehicles / Fleet"
     },
     "form": {
       "limitReached": "Machine limit reached (",
@@ -392,7 +459,11 @@
       "additionalDescriptionHint": "This description will be visible under the machine name, it can help in more accurate identification.",
       "qrWarningTitle": "QR codes note",
       "qrWarningText": "If you change the machine name, the old, printed QR code (sticker) will have an outdated text. Remember to generate and print a ",
-      "newQr": "new QR code"
+      "newQr": "new QR code",
+      "wholeCompanyRegion": "Entire Company",
+      "mainMapRegion": "Main Map",
+      "hvacSectionTitle": "HVAC / Heat Pump Refrigerant Parameters (EU F-Gas 2024/573 & CRO) and Client Data",
+      "facilitySectionTitle": "Facility / Unit Details and Inspection Category (Building Law Art. 62)"
     },
     "details": {
       "unknownRegion": "Unknown region",
@@ -441,7 +512,11 @@
       "noPartsMsg": "No parts have been issued for this machine yet.",
       "unknownPart": "Unknown part",
       "quantity": "Quantity: ",
-      "pcs": "pcs."
+      "pcs": "pcs.",
+      "infoTileTitle": "Asset details, subassemblies and parts (BOM)",
+      "qrTileTitle": "Asset QR Code",
+      "dtrTileTitle": "Documentation and technical notes",
+      "navigateGps": "Navigate GPS"
     },
     "card": {
       "verification": "VERIFICATION",
@@ -475,7 +550,9 @@
       "techNotesTitle": "Technical Department Notes",
       "addNotePlaceholder": "Add new note...",
       "noTechNotes": "No technical notes."
-    }
+    },
+    "unknownMachine": "Unknown machine",
+    "deletedMachine": "machine deleted"
   },
   "parts": {
     "tabs": {
@@ -522,7 +599,11 @@
       "batch_stock_label": "Batch ({{qty}} {{unit}}):",
       "total_stock_label": "Total: {{stock}} {{unit}}",
       "status_expired": "EXPIRED ({{days}} days ago)",
-      "status_expires_in": "Expires in {{days}} days"
+      "status_expires_in": "Expires in {{days}} days",
+      "total_indices": "Total SKU Items",
+      "reserved_services": "Reserved (Services)",
+      "out_of_stock": "Out of Stock (0 pcs)",
+      "estimated_value": "Estimated Inventory Value (by physical stock)"
     },
     "layout": {
       "title": "Warehouse Base",
@@ -541,7 +622,8 @@
       "saving": "Saving...",
       "select_all": "Select all",
       "deselect_all": "Deselect all",
-      "print_selected": "Print selected"
+      "print_selected": "Print selected",
+      "import_excel": "Import (Excel/CSV)"
     },
     "list": {
       "search_placeholder": "Search by name, code, location...",
@@ -656,7 +738,8 @@
       "of_visible": "of {total} visible",
       "no_parts": "No parts",
       "edited": "Edited:",
-      "print_alert": "Select at least one part to print."
+      "print_alert": "Select at least one part to print.",
+      "card_subtitle": "VexoNT - SPARE PARTS WAREHOUSE"
     },
     "tx_list": {
       "title": "Warehouse operations",
@@ -751,7 +834,31 @@
       "priority_high": "High",
       "priority_standard": "Standard",
       "unknown_machine": "Unknown",
-      "unassigned_region": "Unassigned"
+      "unassigned_region": "Unassigned",
+      "noData": "No data",
+      "noDataPeriod": "No data in the selected period",
+      "periods": {
+        "7days": "Last 7 days",
+        "30days": "Last 30 days",
+        "90days": "Last 90 days",
+        "all": "All time (Everything)"
+      },
+      "types": {
+        "calendar": "Calendar",
+        "hours": "Operating Hours",
+        "mixed": "Mixed"
+      },
+      "summaryTile": "Maintenance KPI Summary",
+      "stats": {
+        "total": "Services",
+        "completed": "Completed",
+        "overdue": "Overdue",
+        "onTimePercentage": "On-time rate"
+      },
+      "charts": {
+        "typeDistribution": "Distribution by trigger",
+        "trend": "Completion Trend (Count over time)"
+      }
     },
     "status_completed": "Completed",
     "status_in_progress": "In progress",
@@ -846,7 +953,92 @@
     "services_by_region": "Services by Region",
     "planned": "Planned",
     "no_data": "No data to display",
-    "generate_pdf": "Generate PDF"
+    "generate_pdf": "Generate PDF",
+    "checklist": {
+      "empty": "No checklist assigned to this maintenance service.",
+      "required": "Required",
+      "addNoteHint": "Add note or photo",
+      "done": "Completed",
+      "mark": "Check",
+      "valuePlaceholder": "Value...",
+      "noteInputPlaceholder": "Enter a technical note for this item...",
+      "saving": "Saving checklist...",
+      "confirmBtn": "Confirm checklist and proceed to Summary",
+      "skipMissingBtn": "Skip missing items and continue"
+    },
+    "priority": {
+      "critical": "CRITICAL",
+      "standard": "Standard"
+    },
+    "info": {
+      "trigger": "Trigger",
+      "calendar": "Calendar",
+      "mixed": "Mixed",
+      "dueOrHours": "Due Date / Hours",
+      "personnel": "Personnel",
+      "downtime": "Downtime (h)",
+      "machineStatus": "Machine status",
+      "requiredTools": "Required tools",
+      "specialTools": "Special",
+      "otherTools": "Other",
+      "basicTools": "Basic (standard toolbox)",
+      "requiredParts": "Required parts",
+      "plannedUsage": "PLANNED USAGE",
+      "qty": "Qty",
+      "plannedCost": "Planned cost",
+      "noPlannedParts": "No planned spare parts defined.",
+      "actuallyTaken": "ACTUALLY TAKEN",
+      "taken": "Taken",
+      "cost": "Cost",
+      "workScope": "Scope of work to be performed",
+      "typeCheckbox": "Checkbox",
+      "typePhoto": "Photo",
+      "typeValue": "Measurement",
+      "requiredBadge": "Required",
+      "dtrStandard": "Inspection according to the applicable machine manual (DTR) standard."
+    },
+    "col_completed_at": "Completed",
+    "col_deadline": "Due Date",
+    "col_counter_deadline": "Due (Counter)",
+    "col_actions": "Actions",
+    "required_status": "Required status:",
+    "target_label": "Target:",
+    "current_label": "CURRENT:",
+    "every_n_days": "EVERY {{days}} DAYS",
+    "timeline": {
+      "step1": "Accepted for execution",
+      "step2": "Contractor selection",
+      "step3": "Service execution (In progress)",
+      "step4": "Service summary",
+      "step5": "Completed and settled",
+      "step1Desc": "The inspection is waiting to be accepted for execution and assigned to a technical team.",
+      "acceptServiceBtn": "Accept for execution",
+      "checklistTitle": "Checklist (Items to complete)",
+      "takePartBtn": "Withdraw part from warehouse for service",
+      "goToSummaryBtn": "Proceed to Summary",
+      "completeHeader": "Complete Service",
+      "smartAiHint": "AI Wand: dictate a summary ? it will fill in work time, parts, notes, and follow-up action items.",
+      "manHoursLabel": "Work time (Man-hours / Hours)",
+      "inspectorLicenseLabel": "Inspector license / certificate number (for c-KOB / F-Gas protocol)",
+      "confirmPartsUsed": "I confirm the usage of required spare parts",
+      "skipStepsCompleteBtn": "Complete service (Skip Steps)"
+    },
+    "status": {
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "pending": "Pending"
+    },
+    "tab_kpi": "Service KPI",
+    "tab_map": "Service Map",
+    "tab_list": "Planned Maintenance",
+    "tab_tasks": "Action Items",
+    "tab_archive": "Service Archive",
+    "update_machine_counter": "Update Operating Hours Counter (RBG)",
+    "update_vehicle_mileage": "Update Vehicle Mileage (km)",
+    "new_counter_state": "New counter value (RBG):",
+    "new_mileage_state": "New mileage value (km):",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "dashboards": {
     "reports_title": "Reporting and Settings",
@@ -1037,7 +1229,22 @@
       "profile_short_facility": "Facility / Estates (c-KOB)",
       "profile_short_hvac": "HVAC Service (F-Gas / CRO)",
       "profile_short_fleet": "VexoNT Fleet (Vehicles)"
-    }
+    },
+    "api_panel": {
+      "enter_name_alert": "Enter a name for the API key (e.g. BIM Integration)",
+      "new_key_created": "Your new API key is:",
+      "save_key_warning": "Save it now, as it will not be shown in full again for security reasons!",
+      "delete_confirm": "Are you sure you want to delete this API key? External systems using this key will lose access.",
+      "title": "API Integrations (e.g. BIM, ERP)",
+      "desc": "Manage REST API access keys. Pass the generated key in the x-api-key header to your external systems so they can communicate automatically with the platform.",
+      "name_placeholder": "System name (e.g. Remote BIM)",
+      "generate_btn": "Generate new key",
+      "active_keys": "Active keys",
+      "key_label": "Key:"
+    },
+    "kpi_pdf_title": "KPI Report (PDF)",
+    "kpi_pdf_desc": "Visual summary report of statistics, MTTR (Mean Time To Repair), response times, and service statuses for management.",
+    "period_label": "Period:"
   },
   "superadmin": {},
   "admin": {
@@ -1070,7 +1277,10 @@
       "role": "Role",
       "actions": "Actions",
       "empty_list": "No users. Add the first one above.",
-      "delete": "Delete"
+      "delete": "Delete",
+      "dedicated_service_label": "Linked Subcontractor / Service Team (optional ? from Subcontractors / Service tab)",
+      "all_scopes_by_role": "-- No specific company assigned (access according to selected Role) --",
+      "dedicated_service_hint": "Module access and view isolation (\"Only assigned orders\") are configured in the Roles & Permissions tab. Here you can optionally link the user account to a specific company from the Subcontractors / Service list so the technician sees orders assigned to that company."
     },
     "roles": {
       "title": "Roles and Permissions",
@@ -1091,7 +1301,45 @@
       "actions": "Actions",
       "delete": "Delete",
       "no_access": "No access",
-      "empty_list": "No roles defined. Create the first one above."
+      "empty_list": "No roles defined. Create the first one above.",
+      "mod_tickets": "Breakdowns (Maintenance)",
+      "perm_kpi": "Breakdown KPI Analysis",
+      "perm_dashboard_tickets": "Breakdown Map",
+      "perm_edit_map": "Map Editing",
+      "perm_tickets": "Breakdown Tickets",
+      "perm_archive": "Breakdown Archive",
+      "mod_planned": "Service Panel (DTR)",
+      "perm_planned_kpi": "Service KPI Analysis",
+      "perm_dashboard_planned": "Service Map",
+      "perm_planned_maintenance": "Planned Maintenance",
+      "perm_action_items": "Action Items",
+      "perm_archive_planned": "Service Archive",
+      "perm_edit_planned": "Edit Planned Services",
+      "perm_delete_planned": "Delete Planned Services",
+      "perm_manage_dtr": "Manage DTR Documentation",
+      "mod_inventory": "Spare Parts Warehouse",
+      "perm_parts_kpi": "Warehouse KPI",
+      "perm_parts_inventory": "Parts Inventory",
+      "perm_parts_transactions": "Warehouse Transactions",
+      "perm_parts_qr": "Parts QR Codes",
+      "mod_admin": "Administration & Master Data",
+      "perm_machines": "Equipment Registry",
+      "perm_only_assigned_industrial": "Only assigned orders (External Service)",
+      "perm_only_assigned_b2c": "Only assigned orders & clients (B2C GDPR Isolation / Mobile Service)",
+      "perm_regions": "Regions & Maps",
+      "perm_services": "Subcontractors / Service",
+      "perm_topics": "Ticket Topics",
+      "perm_delete_tech_notes": "Delete technical notes",
+      "perm_users": "Users",
+      "perm_reports": "Reporting",
+      "perm_audit": "Audit Log (ISO 55000)",
+      "perm_ai_stats": "AI Statistics",
+      "mod_push": "Push Notifications",
+      "perm_push_critical": "New Critical Breakdowns",
+      "perm_push_all": "All New Breakdowns",
+      "perm_push_status": "Status changes on related tickets",
+      "perm_push_comments": "New comments on related tickets",
+      "perm_push_planned": "Upcoming maintenance reminders"
     },
     "regions": {
       "title": "Regions (Locations)",
@@ -1280,7 +1528,24 @@
     "framing_hint": "Drag the map with the mouse and scroll to zoom into the desired location",
     "save_google_view": "Save configured map view",
     "pin_by_address_full": "Pin by address (city, street, number)",
-    "frame_google_map_btn": "Frame Google Map"
+    "frame_google_map_btn": "Frame Google Map",
+    "setup_region_map": "Configure region map",
+    "main_map": "Main Map",
+    "level_up": "Up one level",
+    "map_options": "Map Options",
+    "main_short": "Main",
+    "background_label": "Background",
+    "default_frame_zoom": "Default view & zoom (pan and zoom manually)",
+    "set_as_default_frame": "Save as default view",
+    "map_style": "Map style",
+    "style_hybrid": "Satellite + Streets",
+    "style_satellite": "Satellite (clean)",
+    "style_road": "Road map",
+    "pending_services": "Overdue/Pending services:",
+    "subregion_submap": "Subregion / Submap",
+    "search_address_btn": "Search",
+    "already_pinned_items": "Already pinned (change location)",
+    "no_free_regions": "No regions/submaps available to pin (add a new region in Dictionaries -> Regions)."
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
@@ -1311,6 +1576,45 @@
     "contactless_nfc": "Contactless (NFC)",
     "footer_subtitle": "© 2026 VexoNT. All rights reserved. • Breakdown & Maintenance Management System",
     "exit": "Exit",
-    "control_room": "Control Room"
+    "control_room": "Control Room",
+    "report_without_qr": "Report Breakdown (Without QR/NFC)"
+  },
+  "scanner": {
+    "internalTitle": "Report a breakdown",
+    "formTitle": "Report Form",
+    "sentTitle": "Report Submitted",
+    "reportAnother": "Report another breakdown",
+    "goToTickets": "Go to tickets",
+    "licensePlateLookupLabel": "Enter manually (License plate / VIN / Asset code)",
+    "licensePlatePlaceholder": "e.g. GD 12345, WE 9876A, VIN or asset name...",
+    "openByPlateBtn": "Select"
+  },
+  "operator": {
+    "scanQrBtn": "Scan QR",
+    "scanQrOrPlateBtn": "Scan QR / Plate",
+    "scanNfcBtn": "Tap NFC",
+    "scanQrCardTitle": "Scan QR:",
+    "scanQrCardDesc": "Scan the machine QR code and report a breakdown.",
+    "scanQrPlateCardTitle": "Scan QR / Plate:",
+    "scanQrPlateCardDesc": "Scan the machine QR code or license plate and report a breakdown.",
+    "scanNfcCardTitle": "Tap NFC:",
+    "scanNfcCardDesc": "Read via NFC tag and report a breakdown.",
+    "otherMachineCardTitle": "Report another asset:",
+    "otherMachineCardDesc": "Scan any QR or NFC tag in your area and report a breakdown for any company asset.",
+    "otherMachineInternalCardDesc": "Report a breakdown of any asset in the company if no QR/NFC code is visible",
+    "optionsTitle": "REPORTING OPTIONS",
+    "nfcActive": "NFC Active",
+    "nfcHint": "Hold the back of your phone near the NFC tag.",
+    "cameraScanner": "Camera scanner (QR + License Plate)",
+    "cameraQrOnly": "Camera scanner (QR Code)",
+    "closeCamera": "Close camera",
+    "reportWithoutQrBtn": "Report without QR / NFC",
+    "scanAnyQrTitle": "Scan any QR or NFC code in your area and report a breakdown for any asset in the company.",
+    "scanAnyQrDesc": "The breakdown will be reported directly to the appropriate department or service team. Scanning once connects your phone to the reporting system.",
+    "scanDeviceQrHeading": "Scan asset QR code",
+    "deviceNotConnectedDesc": "Scan any QR or NFC code in your area and report a breakdown for any asset in the company."
+  },
+  "map": {
+    "submapLabel": "Submap"
   }
 }

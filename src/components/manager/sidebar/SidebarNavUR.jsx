@@ -126,19 +126,23 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
 
   const industryProfile = branding?.industryProfile || 'industrial';
   const isSimpleServiceTitles = industryProfile === 'hvac' || industryProfile === 'facility';
-  const ticketsSectionTitle = isSimpleServiceTitles ? 'Awarie' : t('sidebar.section_tickets');
-  const servicesSectionTitle = isSimpleServiceTitles ? 'Serwisy' : t('sidebar.section_services');
+  const ticketsSectionTitle = isSimpleServiceTitles
+    ? t('sidebar.section_tickets_simple', 'Awarie')
+    : t('sidebar.section_tickets');
+  const servicesSectionTitle = isSimpleServiceTitles
+    ? t('sidebar.section_services_simple', 'Serwisy')
+    : t('sidebar.section_services');
   const equipmentBaseMenuTitle =
     industryProfile === 'facility'
-      ? 'Baza Obiektów/Urządzeń'
+      ? t('sidebar.equipment_base_facility', 'Baza Obiektów/Urządzeń')
       : t('sidebar.equipment_base_menu');
   const machinesQrMenuTitle =
     industryProfile === 'facility'
-      ? 'Baza QR Obiektów/Urządzeń'
+      ? t('sidebar.machines_qr_facility', 'Baza QR Obiektów/Urządzeń')
       : t('sidebar.machines_qr_menu', 'Baza QR Urządzeń');
   const regionsMenuTitle =
     industryProfile === 'facility'
-      ? 'Rejony/Adresy'
+      ? t('sidebar.regions_facility', 'Rejony/Adresy')
       : t('sidebar.regions_menu', 'Rejony/Miejsca montażu');
 
   return (
