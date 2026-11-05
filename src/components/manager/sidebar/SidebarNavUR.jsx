@@ -122,7 +122,7 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
   const showTicketsSection = ['kpi', 'dashboard_tickets', 'tickets', 'archive'].some(canAccessTab);
   const showServicesSection = isPlannedServicesModuleEnabled && ['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'action_items', 'archive_planned'].some(canAccessTab);
   const showInventorySection = isInventoryModuleEnabled && (branding?.modules?.inventory !== false) && ['parts_kpi', 'parts_inventory', 'parts_transactions', 'parts_qr'].some(canAccessTab);
-  const showMasterDataSection = ['machines', 'machines_qr', 'regions', 'services', 'topics'].some(canAccessTab);
+  const showMasterDataSection = ['machines', 'machines_qr', 'regions', 'topics'].some(canAccessTab);
 
   const industryProfile = branding?.industryProfile || 'industrial';
   const isSimpleServiceTitles = industryProfile === 'hvac' || industryProfile === 'facility';
@@ -387,16 +387,6 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
               <span data-testid="sidebar-regions-menu" className="text-[13px]">
                 {regionsMenuTitle}
               </span>
-            </button>
-          )}
-
-          {canAccessTab('services') && (
-            <button
-              onClick={() => handleItemClick('services')}
-              className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-200 group text-left ${activeTab === 'services' ? 'bg-blue-600/30 text-blue-200 font-semibold shadow-xs' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-            >
-              <i className="ph ph-wrench text-lg shrink-0"></i>
-              <span className="text-[13px]">{t("sidebar.subcontractors_menu")}</span>
             </button>
           )}
 

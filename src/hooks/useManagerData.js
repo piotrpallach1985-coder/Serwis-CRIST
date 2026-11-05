@@ -111,13 +111,10 @@ export function useManagerData() {
       syncFilteredDataToStore();
     });
 
-    const unsubServices = onSnapshot(collection(db, 'tenants', tenantId, 'services'), (snap) => {
-      setServices(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true));
-    });
-
     const unsubRoles = onSnapshot(collection(db, 'tenants', tenantId, 'roles'), (snap) => {
       currentRoles = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.isDeleted !== true);
       setRoles(currentRoles);
+      setServices(currentRoles);
       syncFilteredDataToStore();
     });
 
@@ -242,7 +239,6 @@ export function useManagerData() {
     return () => {
       unsubRegions();
       unsubMachines();
-      unsubServices();
       unsubRoles();
       unsubSettings();
       unsubBranding();

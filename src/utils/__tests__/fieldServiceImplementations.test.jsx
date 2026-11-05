@@ -2570,17 +2570,23 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getAllByText('GD 77889').length).toBeGreaterThanOrEqual(1);
       unmountFleetBulkQr();
 
-      // 4) Serwisant zewnętrzny z niestandardową rolą i przypisanym serwisem widzi swoje awarie i serwisy
+      // 4) Serwisant zewnętrzny z niestandardową rolą (zarówno po nazwie, jak i ID dokumentu roli z Firestore) widzi swoje awarie i serwisy
+      useManagerStore.getState().setRoles([
+        {
+          id: 'role-doc-plazma',
+          name: 'Serwis Zewnętrzyn Pla',
+          permissions: ['tickets', 'only_assigned_tasks'],
+        },
+      ]);
       const externalTechUser = {
         uid: 'tech-andrzej',
         name: 'Andrzej Andrzej',
         email: 'andrzej@plazma.com.pl',
-        role: 'Serwis Zewnętrzyn Pla',
-        assignedService: 'Serwis Zewnętrzny',
+        role: 'role-doc-plazma',
       };
-      const ticketForSubcontractor = {
+      const ticketForRoleName = {
         id: 't-ext-1',
-        contractor: 'Serwis Zewnętrzny',
+        contractor: 'Serwis Zewnętrzyn Pla',
       };
       const serviceForRoleName = {
         id: 's-ext-1',
@@ -2591,7 +2597,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         contractor: 'Inna Firma Sp. z o.o.',
       };
 
-      expect(isTaskAssignedToUser(ticketForSubcontractor, externalTechUser)).toBe(true);
+      expect(isTaskAssignedToUser(ticketForRoleName, externalTechUser)).toBe(true);
       expect(isTaskAssignedToUser(serviceForRoleName, externalTechUser)).toBe(true);
       expect(isTaskAssignedToUser(unrelatedTicket, externalTechUser)).toBe(false);
     });

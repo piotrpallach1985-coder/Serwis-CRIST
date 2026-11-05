@@ -92,11 +92,18 @@ export default function Users() {
 
     const selectedRoleObj = rolesList.find(r => r.id === role || r.name === role);
     const roleHasOnlyAssigned = Boolean(selectedRoleObj?.permissions?.includes('only_assigned_tasks'));
-    const effectiveDedicated = role === USER_ROLES.ADMIN ? '' : assignedService.trim();
+    const effectiveRoleName =
+      role === USER_ROLES.ADMIN || role === USER_ROLES.SUPERADMIN
+        ? ''
+        : selectedRoleObj?.name || role || '';
+    const effectivePermissions =
+      role === USER_ROLES.ADMIN || role === USER_ROLES.SUPERADMIN
+        ? []
+        : selectedRoleObj?.permissions || [];
     const effectiveOnlyAssigned =
-      role === USER_ROLES.ADMIN
+      role === USER_ROLES.ADMIN || role === USER_ROLES.SUPERADMIN
         ? false
-        : Boolean(roleHasOnlyAssigned || effectiveDedicated || onlyAssignedTasks);
+        : Boolean(roleHasOnlyAssigned);
 
     try {
       if (editingId) {
@@ -104,10 +111,12 @@ export default function Users() {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           role: role,
+          roleName: effectiveRoleName,
+          permissions: effectivePermissions,
           tenantId: tenantId,
           phone: phone,
           licenseNumber: licenseNumber.trim(),
-          assignedService: effectiveDedicated,
+          assignedService: '',
           onlyAssignedTasks: effectiveOnlyAssigned,
         });
         resetForm();
@@ -129,9 +138,11 @@ export default function Users() {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           role: role,
+          roleName: effectiveRoleName,
+          permissions: effectivePermissions,
           phone: phone,
           licenseNumber: licenseNumber.trim(),
-          assignedService: effectiveDedicated,
+          assignedService: '',
           onlyAssignedTasks: effectiveOnlyAssigned,
           tenantId: tenantId,
         });
@@ -297,48 +308,6 @@ export default function Users() {
                   </div>
                 </div>
 
-                {/* Powiązany Podwykonawca / Serwis (opcjonalnie) */}
-                {role !== USER_ROLES.ADMIN && role !== USER_ROLES.SUPERADMIN && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-700">
-                        {t(
-                          'admin.users.dedicated_service_label',
-                          'Powiązany Podwykonawca / Serwis (opcjonalnie — z zakładki Podwykonawcy / Serwis)'
-                        )}
-                      </label>
-                      <select
-                        data-testid="user-dedicated-service-select"
-                        value={assignedService}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setAssignedService(val);
-                          setOnlyAssignedTasks(Boolean(val));
-                        }}
-                        className="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">
-                          {t(
-                            'admin.users.all_scopes_by_role',
-                            '-- Brak przypisania do konkretnej firmy (dostęp wg wybranej Roli) --'
-                          )}
-                        </option>
-                        {services.map(s => (
-                          <option key={s.id} value={s.name}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        {t(
-                          'admin.users.dedicated_service_hint',
-                          'Uprawnienia do modułów oraz ograniczenie widoku ("Tylko przypisane zlecenia") ustawiasz w zakładce Role i Uprawnienia. Tutaj możesz dodatkowo powiązać konto z konkretną firmą z listy Podwykonawcy / Serwis, aby serwisant widział zlecenia przypisane na nazwę tej firmy.'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 <div className="flex justify-end gap-3 pt-6 mt-4 border-t border-gray-100 w-full">
                   <button
                     type="button"
@@ -408,14 +377,9 @@ export default function Users() {
                       <span className="font-bold">
                         {item.role === USER_ROLES.ADMIN || item.role === USER_ROLES.SUPERADMIN
                           ? t('admin.users.administrator')
-                          : rolesList.find(r => r.id === item.role)?.name || item.role}
+                          : rolesList.find(r => r.id === item.role)?.name || item.roleName || item.role}
                       </span>
                     </div>
-                    {item.assignedService && (
-                      <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                        <i className="ph ph-wrench"></i> Dedykowany serwis: {item.assignedService}
-                      </div>
-                    )}
                   </div>
                   <div className="mt-2 flex gap-1.5 justify-end border-t border-slate-100 pt-2">
                     <button
@@ -473,13 +437,8 @@ export default function Users() {
                         >
                           {u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN
                             ? t('admin.users.administrator')
-                            : rolesList.find(r => r.id === u.role)?.name || u.role}
+                            : rolesList.find(r => r.id === u.role)?.name || u.roleName || u.role}
                         </span>
-                        {u.assignedService && (
-                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                            Zakres: {u.assignedService}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">

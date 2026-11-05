@@ -1339,7 +1339,8 @@
       "perm_push_all": "All New Breakdowns",
       "perm_push_status": "Status changes on related tickets",
       "perm_push_comments": "New comments on related tickets",
-      "perm_push_planned": "Upcoming maintenance reminders"
+      "perm_push_planned": "Upcoming maintenance reminders",
+      "perm_machines_qr": "Equipment QR Base"
     },
     "regions": {
       "title": "Regions (Locations)",

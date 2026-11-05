@@ -54,6 +54,7 @@ export default function Roles() {
       module: t('admin.roles.mod_admin', 'Administracja i Dane Bazowe'),
       permissions: [
         { id: 'machines', label: t('admin.roles.perm_machines', 'Rejestr Urządzeń') },
+        { id: 'machines_qr', label: t('admin.roles.perm_machines_qr', 'Baza QR Urządzeń') },
         {
           id: 'only_assigned_tasks',
           label:
@@ -62,7 +63,6 @@ export default function Roles() {
               : t('admin.roles.perm_only_assigned_b2c', 'Tylko przypisane zlecenia i klienci (Izolacja RODO B2C / Serwis Mobilny)'),
         },
         { id: 'regions', label: t('admin.roles.perm_regions', 'Rejony i Mapy') },
-        { id: 'services', label: t('admin.roles.perm_services', 'Podwykonawcy / Serwis') },
         { id: 'topics', label: t('admin.roles.perm_topics', 'Tematy Zgłoszeń') },
         { id: 'delete_tech_notes', label: t('admin.roles.perm_delete_tech_notes', 'Usuwanie notatek technicznych') },
         { id: 'users', label: t('admin.roles.perm_users', 'Użytkownicy') },

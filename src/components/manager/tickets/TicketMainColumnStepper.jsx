@@ -38,6 +38,8 @@ export default function TicketMainColumnStepper({
 }) {
   const { t } = useTranslation();
   const machines = useManagerStore(state => state.machines || []);
+  const roles = useManagerStore(state => state.roles || []);
+  const contractorOptions = roles.length > 0 ? roles : services || [];
 
   // Pozwala na swobodne przeglądanie kroków (aktywne są jednak wyłącznie przyciski z aktywnego etapu)
   const [selectedStepOverride, setSelectedStepOverride] = useState(null);
@@ -457,7 +459,7 @@ export default function TicketMainColumnStepper({
                                   'Wybierz wykonawcę z listy...'
                                 )}
                               </option>
-                              {services?.map(s => (
+                              {contractorOptions?.map(s => (
                                 <option key={s.id} value={s.name}>
                                   {s.name}
                                 </option>

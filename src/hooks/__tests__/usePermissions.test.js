@@ -107,8 +107,33 @@ describe('usePermissions', () => {
     expect(result.current.canAccessTab('tickets')).toBe(true);
   });
 
-  it('should automatically grant access to tickets and planned_maintenance tabs when only_assigned_tasks is enabled on custom role', () => {
-    const user = { role: 'Serwis Zewnętrzyn Pla', assignedService: 'Serwis Zewnętrzny' };
+  it('should strictly follow checked tab permissions 1:1 on custom role without enabling unchecked tabs', () => {
+    const user = { role: 'role-doc-id-123' };
+    const roles = [
+      {
+        id: 'role-doc-id-123',
+        name: 'Serwis Zewnętrzyn Pla',
+        permissions: ['tickets', 'planned_maintenance', 'only_assigned_tasks'],
+      },
+    ];
+    const { result } = renderHook(() => usePermissions(user, roles));
+
+    expect(result.current.onlyAssignedTasks).toBe(true);
+    expect(result.current.canAccessTab('tickets')).toBe(true);
+    expect(result.current.canAccessTab('planned_maintenance')).toBe(true);
+    // Unchecked tabs must remain false!
+    expect(result.current.canAccessTab('archive')).toBe(false);
+    expect(result.current.canAccessTab('archive_planned')).toBe(false);
+    expect(result.current.canAccessTab('planned_kpi')).toBe(false);
+    expect(result.current.canAccessTab('action_items')).toBe(false);
+    expect(result.current.canAccessTab('dashboard_tickets')).toBe(false);
+    expect(result.current.canAccessTab('machines')).toBe(false);
+    expect(result.current.canAccessTab('machines_qr')).toBe(false);
+    expect(result.current.canAccessTab('users')).toBe(false);
+  });
+
+  it('should fallback to tickets and planned_maintenance only when only_assigned_tasks is checked with zero tab permissions', () => {
+    const user = { role: 'Serwis Zewnętrzyn Pla' };
     const roles = [
       { id: 'Serwis Zewnętrzyn Pla', name: 'Serwis Zewnętrzyn Pla', permissions: ['only_assigned_tasks'] },
     ];
@@ -116,9 +141,9 @@ describe('usePermissions', () => {
 
     expect(result.current.onlyAssignedTasks).toBe(true);
     expect(result.current.canAccessTab('tickets')).toBe(true);
-    expect(result.current.canAccessTab('archive')).toBe(true);
     expect(result.current.canAccessTab('planned_maintenance')).toBe(true);
-    expect(result.current.canAccessTab('archive_planned')).toBe(true);
+    expect(result.current.canAccessTab('archive')).toBe(false);
+    expect(result.current.canAccessTab('archive_planned')).toBe(false);
     expect(result.current.canAccessTab('dashboard_tickets')).toBe(false);
     expect(result.current.canAccessTab('users')).toBe(false);
   });

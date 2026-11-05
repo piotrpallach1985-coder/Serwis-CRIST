@@ -45,13 +45,17 @@ export function usePermissions(user, roles = [], customModules = null) {
     const isAdmin = user.role === USER_ROLES.ADMIN || isSuperAdmin;
     const isManager = user.role === 'manager' || user.role === USER_ROLES.MANAGER || isAdmin;
     const isOperator = user.role === USER_ROLES.OPERATOR;
+    const isDefaultStaffRole =
+      isManager || isOperator || user.role === 'serwisant' || user.role === USER_ROLES.SERWISANT;
 
     const roleConfig = (effectiveRoles || []).find(
       r => r.id === user.role || r.name === user.role
     );
     const perms = roleConfig?.permissions || user.permissions || [];
     const hasCustomPerms = Boolean(
-      roleConfig || (Array.isArray(user.permissions) && user.permissions.length > 0)
+      roleConfig ||
+        (Array.isArray(user.permissions) && user.permissions.length > 0) ||
+        !isDefaultStaffRole
     );
 
     const hasPermission = (perm) => isAdmin || perms.includes(perm);
@@ -67,6 +71,31 @@ export function usePermissions(user, roles = [], customModules = null) {
 
     const PLANNED_TABS = ['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'planned_services', 'archive_planned'];
     const ADMIN_TABS = ['users', 'roles', 'reports', 'audit', 'ai_stats', 'api_settings'];
+    const ALL_SELECTABLE_TABS = [
+      'kpi',
+      'dashboard_tickets',
+      'tickets',
+      'archive',
+      'planned_kpi',
+      'dashboard_planned',
+      'planned_maintenance',
+      'action_items',
+      'archive_planned',
+      'parts_kpi',
+      'parts_inventory',
+      'parts_transactions',
+      'parts_qr',
+      'machines',
+      'machines_qr',
+      'regions',
+      'topics',
+      'users',
+      'roles',
+      'reports',
+      'audit',
+      'ai_stats',
+    ];
+    const hasAnyExplicitTabPerm = perms.some(p => ALL_SELECTABLE_TABS.includes(p));
 
     const canAccessTab = (tabId) => {
       if (!tabId) return false;
@@ -84,19 +113,18 @@ export function usePermissions(user, roles = [], customModules = null) {
       // 2. Administrator firmy ma dostęp do wszystkich aktywnych modułów
       if (isAdmin) return true;
 
-      // 3. Niestandardowa rola z przypisaną listą uprawnień
+      // 3. Niestandardowa rola z przypisaną listą uprawnień (ścisłe dopasowanie 1:1 do zaznaczonych opcji w Role i Uprawnienia)
       if (hasCustomPerms) {
+        if (perms.includes(tabId)) return true;
+        if (tabId.startsWith('parts_') && perms.includes('parts')) return true;
+        // Fallback bezpieczeństwa: wyłącznie gdy rola ma zaznaczone samo "only_assigned_tasks" bez żadnej wybranej zakładki
         if (
           onlyAssignedTasks &&
-          ['tickets', 'archive', 'planned_maintenance', 'archive_planned'].includes(tabId)
+          !hasAnyExplicitTabPerm &&
+          (tabId === 'tickets' || tabId === 'planned_maintenance')
         ) {
           return true;
         }
-        if (perms.includes(tabId)) return true;
-        if (tabId === 'machines_qr' && perms.includes('machines')) return true;
-        if (tabId.startsWith('parts_') && perms.includes('parts')) return true;
-        if (tabId === 'planned_kpi' && perms.includes('planned_maintenance')) return true;
-        if (tabId === 'action_items' && (perms.includes('planned_maintenance') || perms.includes('tickets'))) return true;
         return false;
       }
 

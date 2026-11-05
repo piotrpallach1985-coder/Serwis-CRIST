@@ -16,7 +16,9 @@ export default function PlannedMaintenanceFormModal({
   const { t } = useTranslation();
   const { user } = useAuth();
   const parts = useManagerStore(state => state.parts || []);
-  const services = useManagerStore(state => state.services || []);
+  const storeRoles = useManagerStore(state => state.roles || []);
+  const storeServices = useManagerStore(state => state.services || []);
+  const services = storeRoles.length > 0 ? storeRoles : storeServices;
   const branding = useManagerStore(state => state.branding || {});
   const industryProfile = branding?.industryProfile || 'industrial';
 

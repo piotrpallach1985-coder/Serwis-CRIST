@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { subscribePWAInstallState, triggerPWAInstall } from '../../../utils/pwaHelper';
+import { useManagerStore } from '../../../store/managerStore';
 
 export default function SidebarFooter({ user, onNavigate, handleReturnHome, onLogout }) {
   const { t, i18n } = useTranslation();
+  const roles = useManagerStore(state => state.roles) || [];
+  const roleDisplayName =
+    roles.find(r => r.id === user?.role || r.name === user?.role)?.name ||
+    user?.roleName ||
+    user?.role ||
+    'Brak roli';
   const [pwaState, setPwaState] = useState({ canInstall: false, isInstalled: false });
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -30,7 +37,7 @@ export default function SidebarFooter({ user, onNavigate, handleReturnHome, onLo
           </div>
           <div className="overflow-hidden flex-1">
             <div className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Użytkownik'}</div>
-            <div className="text-[11px] text-blue-400 font-medium truncate capitalize leading-tight">{user?.role || 'Brak roli'}</div>
+            <div className="text-[11px] text-blue-400 font-medium truncate capitalize leading-tight">{roleDisplayName}</div>
           </div>
         </div>
 

@@ -39,7 +39,9 @@ export default function PlannedMaintenanceTimeline({
   actualPartsUsed = [],
 }) {
   const { t } = useTranslation();
-  const services = useManagerStore(state => state.services || []);
+  const storeRoles = useManagerStore(state => state.roles || []);
+  const storeServices = useManagerStore(state => state.services || []);
+  const services = storeRoles.length > 0 ? storeRoles : storeServices;
   const machines = useManagerStore(state => state.machines || []);
   const parts = useManagerStore(state => state.parts || []);
   const branding = useManagerStore(state => state.branding || {});

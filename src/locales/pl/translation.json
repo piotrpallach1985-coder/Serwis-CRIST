@@ -1339,7 +1339,8 @@
       "perm_push_all": "Wszystkie Nowe Awarie",
       "perm_push_status": "Zmiany statusów powiązanych zgłoszeń",
       "perm_push_comments": "Nowe komentarze w powiązanych zgłoszeniach",
-      "perm_push_planned": "Powiadomienia o zbliżających się serwisach"
+      "perm_push_planned": "Powiadomienia o zbliżających się serwisach",
+      "perm_machines_qr": "Baza QR Urządzeń"
     },
     "regions": {
       "title": "Rejony/Miejsca montażu",

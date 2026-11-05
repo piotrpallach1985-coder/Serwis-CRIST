@@ -8,6 +8,8 @@
  * 5. Ochrona anty-spamowa publicznych kodów QR (np. klatki schodowe na osiedlach)
  */
 
+import { useManagerStore } from '../store/managerStore';
+
 export const REFRIGERANT_TYPES = {
   R32: { code: 'R32', name: 'R32 (Difluorometan)', gwp: 675, isFluorinated: true },
   R410A: { code: 'R410A', name: 'R410A', gwp: 2088, isFluorinated: true },
@@ -931,6 +933,23 @@ export function isTaskAssignedToUser(task, user) {
       ? user.role
       : null;
 
+  let resolvedRoleName = null;
+  let resolvedRoleId = null;
+  if (customRoleIdentifier) {
+    try {
+      const storeRoles = useManagerStore.getState?.()?.roles || [];
+      const foundRole = storeRoles.find(
+        r => r && (r.id === user.role || r.name === user.role)
+      );
+      if (foundRole) {
+        resolvedRoleName = foundRole.name || null;
+        resolvedRoleId = foundRole.id || null;
+      }
+    } catch {
+      // ignore store access error
+    }
+  }
+
   const userIdentifiers = [
     user.uid,
     user.id,
@@ -939,6 +958,8 @@ export function isTaskAssignedToUser(task, user) {
     user.serviceName,
     user.assignedService,
     user.roleName,
+    resolvedRoleName,
+    resolvedRoleId,
     customRoleIdentifier,
     ...dedicatedList,
     user.companyName,
