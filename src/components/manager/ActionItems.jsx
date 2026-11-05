@@ -118,11 +118,7 @@ export default function ActionItems() {
     future90.setDate(now.getDate() + 90);
 
     const filtered = items.filter(item => {
-      if (
-        onlyAssignedTasks &&
-        !allowedMachineIds.has(item.machineId) &&
-        !isTaskAssignedToUser(item, user)
-      ) {
+      if (onlyAssignedTasks && !isTaskAssignedToUser(item, user)) {
         return false;
       }
 
@@ -575,9 +571,13 @@ export default function ActionItems() {
                     <div className="mt-3 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <select
                         value={currentContractor}
-                        disabled={onlyAssignedTasks}
+                        disabled={
+                          onlyAssignedTasks ||
+                          isCompleted ||
+                          item.status === ACTION_ITEM_STATUS.CANCELLED
+                        }
                         onChange={e => handleContractorChange(item.id, e.target.value)}
-                        className="text-xs font-semibold px-2 py-1.5 rounded outline-none border border-slate-200 bg-slate-50 text-slate-700 cursor-pointer disabled:opacity-70"
+                        className="text-xs font-semibold px-2 py-1.5 rounded outline-none border border-slate-200 bg-slate-50 text-slate-700 cursor-pointer disabled:opacity-70 disabled:cursor-default"
                       >
                         <option value="">
                           {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
@@ -591,8 +591,13 @@ export default function ActionItems() {
 
                       <select
                         value={item.status}
+                        disabled={
+                          onlyAssignedTasks &&
+                          (item.status === ACTION_ITEM_STATUS.COMPLETED ||
+                            item.status === ACTION_ITEM_STATUS.CANCELLED)
+                        }
                         onChange={e => handleStatusChange(item.id, e.target.value)}
-                        className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
+                        className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-default ${
                           item.status === ACTION_ITEM_STATUS.COMPLETED
                             ? 'bg-green-50 text-green-700 border-green-200'
                             : item.status === ACTION_ITEM_STATUS.IN_PROGRESS
@@ -663,7 +668,11 @@ export default function ActionItems() {
                       <td className="px-6 py-4">
                         <select
                           value={currentContractor}
-                          disabled={onlyAssignedTasks}
+                          disabled={
+                            onlyAssignedTasks ||
+                            item.status === ACTION_ITEM_STATUS.COMPLETED ||
+                            item.status === ACTION_ITEM_STATUS.CANCELLED
+                          }
                           data-testid={`action-item-contractor-${item.id}`}
                           onChange={e => handleContractorChange(item.id, e.target.value)}
                           className="text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none border border-slate-200 bg-white hover:border-blue-400 focus:ring-2 focus:ring-blue-500 text-slate-700 cursor-pointer disabled:bg-slate-50 disabled:cursor-default"
@@ -713,8 +722,14 @@ export default function ActionItems() {
                       <td className="px-6 py-4 text-right">
                         <select
                           value={item.status}
+                          data-testid={`action-item-status-${item.id}`}
+                          disabled={
+                            onlyAssignedTasks &&
+                            (item.status === ACTION_ITEM_STATUS.COMPLETED ||
+                              item.status === ACTION_ITEM_STATUS.CANCELLED)
+                          }
                           onChange={e => handleStatusChange(item.id, e.target.value)}
-                          className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
+                          className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-default ${
                             item.status === ACTION_ITEM_STATUS.COMPLETED
                               ? 'bg-green-50 text-green-700 border-green-200'
                               : item.status === ACTION_ITEM_STATUS.IN_PROGRESS

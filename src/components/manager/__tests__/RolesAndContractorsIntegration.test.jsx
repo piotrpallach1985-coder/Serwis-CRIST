@@ -8,6 +8,7 @@ import SidebarNavUR from '../sidebar/SidebarNavUR';
 import SidebarFooter from '../sidebar/SidebarFooter';
 import TicketMainColumnStepper from '../tickets/TicketMainColumnStepper';
 import PlannedMaintenanceFormModal from '../PlannedMaintenanceFormModal';
+import PlannedMaintenanceTimeline from '../PlannedMaintenanceTimeline';
 import { useManagerStore } from '../../../store/managerStore';
 import { TICKET_STATUS } from '../../../utils/constants';
 
@@ -222,5 +223,203 @@ describe('Skondensowany model Ról i Wykonawców oraz ścisłe uprawnienia zakł
     const modalContractorSelect = screen.getByTestId('new-action-item-contractor-select');
     expect(within(modalContractorSelect).getByText('Serwis Zewnętrzny Plazma')).toBeTruthy();
     expect(within(modalContractorSelect).getByText('Automatycy UR')).toBeTruthy();
+  });
+
+  it('ActionItems.jsx: dla serwisu zewnętrznego (onlyAssignedTasks) pokazuje wyłącznie tematy przypisane do tego wykonawcy i blokuje edycję wykonawcy oraz wykonanych tematów', () => {
+    mockCurrentUser = {
+      uid: 'user-andrzej',
+      name: 'Andrzej Andrzej',
+      email: 'andrzej@plazma.com.pl',
+      role: 'role-doc-plazma',
+    };
+
+    // Nawet jeśli maszyna m-1 ma awarię przypisaną do Serwisu Zewnętrznego Plazma,
+    // temat przypisany do Automatyków UR lub bez wykonawcy NIE może być widoczny
+    useManagerStore.getState().setTickets([
+      {
+        id: 't-plazma',
+        machineId: 'm-1',
+        assignedTo: 'Serwis Zewnętrzny Plazma',
+        status: 3,
+      },
+    ]);
+
+    useManagerStore.getState().setActionItems([
+      {
+        id: 'ai-plazma-pending',
+        machineId: 'm-1',
+        machineName: 'Przecinarka Plazmowa #1',
+        problem: 'Kalibracja palnika plazmowego',
+        status: 'pending',
+        createdAt: '2026-11-05T10:00:00Z',
+        createdBy: 'Admin Główny',
+        assignedService: 'Serwis Zewnętrzny Plazma',
+      },
+      {
+        id: 'ai-automatycy',
+        machineId: 'm-1',
+        machineName: 'Przecinarka Plazmowa #1',
+        problem: 'Aktualizacja PLC sterownika',
+        status: 'pending',
+        createdAt: '2026-11-05T11:00:00Z',
+        createdBy: 'Admin Główny',
+        assignedService: 'Automatycy UR',
+      },
+      {
+        id: 'ai-unassigned',
+        machineId: 'm-1',
+        machineName: 'Przecinarka Plazmowa #1',
+        problem: 'Malowanie osłony bocznej',
+        status: 'pending',
+        createdAt: '2026-11-05T12:00:00Z',
+        createdBy: 'Admin Główny',
+        assignedService: '',
+      },
+      {
+        id: 'ai-plazma-done',
+        machineId: 'm-1',
+        machineName: 'Przecinarka Plazmowa #1',
+        problem: 'Wymiana elektrody zakończona',
+        status: 'completed',
+        createdAt: '2026-11-04T10:00:00Z',
+        completedAt: '2026-11-05T09:00:00Z',
+        completedBy: 'Andrzej Andrzej',
+        assignedService: 'Serwis Zewnętrzny Plazma',
+      },
+    ]);
+
+    render(<ActionItems />);
+
+    // Widoczny tylko temat przypisany do Serwis Zewnętrzny Plazma
+    expect(screen.getAllByText('Kalibracja palnika plazmowego').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Aktualizacja PLC sterownika')).toBeNull();
+    expect(screen.queryByText('Malowanie osłony bocznej')).toBeNull();
+
+    // Pole wyboru wykonawcy jest zablokowane dla serwisu zewnętrznego
+    const contractorSelect = screen.getByTestId('action-item-contractor-ai-plazma-pending');
+    expect(contractorSelect.disabled).toBe(true);
+
+    // Przełączenie na zakładkę Zrealizowane: wykonany temat ma zablokowaną zmianę statusu
+    const completedFilterBtn = screen.getByRole('button', {
+      name: /admin\.action_items\.filter_completed|Zrealizowane/i,
+    });
+    fireEvent.click(completedFilterBtn);
+
+    const completedStatusSelect = screen.getByTestId('action-item-status-ai-plazma-done');
+    expect(completedStatusSelect.disabled).toBe(true);
+  });
+
+  it('TicketMainColumnStepper.jsx oraz PlannedMaintenanceTimeline.jsx: blokują serwisowi zewnętrznemu edycję już wykonanych zdarzeń (np. zmianę wykonawcy lub wznowienie zamkniętej awarii)', () => {
+    mockCurrentUser = {
+      uid: 'user-andrzej',
+      name: 'Andrzej Andrzej',
+      email: 'andrzej@plazma.com.pl',
+      role: 'role-doc-plazma',
+    };
+
+    // 1) Awaria na etapie 3 (przydzielony wykonawca): brak przycisku "Zmień wykonawcę"
+    const { unmount } = render(
+      <TicketMainColumnStepper
+        currentTicket={{
+          id: 't-step3',
+          machineName: 'Przecinarka Plazmowa #1',
+          status: 3,
+          assignedTo: 'Serwis Zewnętrzny Plazma',
+          priority: 'Krytyczny',
+        }}
+        user={mockCurrentUser}
+        loading={false}
+        isArchive={false}
+        selectedService="Serwis Zewnętrzny Plazma"
+        setSelectedService={vi.fn()}
+        services={[]}
+        etr=""
+        comment=""
+        setComment={vi.fn()}
+        handleUpdate={vi.fn()}
+        handleArchiveTicket={vi.fn()}
+        handleDeleteTicket={vi.fn()}
+        allowTicketDeletion={false}
+        uploadedPhotos={[]}
+        setUploadedPhotos={vi.fn()}
+        uploadError=""
+        branding={{ industryProfile: 'industrial' }}
+        setIsPartModalOpen={vi.fn()}
+        isUploading={false}
+        uploadProgress={0}
+      />
+    );
+
+    expect(screen.queryByText(/tickets\.details\.change_contractor|Zmień wykonawcę/i)).toBeNull();
+    unmount();
+
+    // 2) Awaria już zakończona (Krok 5): brak przycisku "Wznów pracę nad zgłoszeniem"
+    const { unmount: unmountClosed } = render(
+      <TicketMainColumnStepper
+        currentTicket={{
+          id: 't-step5',
+          machineName: 'Przecinarka Plazmowa #1',
+          status: 5,
+          assignedTo: 'Serwis Zewnętrzny Plazma',
+          priority: 'Krytyczny',
+        }}
+        user={mockCurrentUser}
+        loading={false}
+        isArchive={false}
+        selectedService="Serwis Zewnętrzny Plazma"
+        setSelectedService={vi.fn()}
+        services={[]}
+        etr=""
+        comment=""
+        setComment={vi.fn()}
+        handleUpdate={vi.fn()}
+        handleArchiveTicket={vi.fn()}
+        handleDeleteTicket={vi.fn()}
+        allowTicketDeletion={false}
+        uploadedPhotos={[]}
+        setUploadedPhotos={vi.fn()}
+        uploadError=""
+        branding={{ industryProfile: 'industrial' }}
+        setIsPartModalOpen={vi.fn()}
+        isUploading={false}
+        uploadProgress={0}
+      />
+    );
+
+    expect(screen.queryByText(/tickets\.details\.reopen_ticket|Wznów pracę/i)).toBeNull();
+    unmountClosed();
+
+    // 3) Serwis planowany na etapie 3: brak przycisku "Zmień wykonawcę" oraz brak "Zakończ serwis (Pomiń Kroki)"
+    render(
+      <PlannedMaintenanceTimeline
+        srv={{
+          id: 'srv-step3',
+          name: 'Przegląd kwartalny plazmy',
+          machineId: 'm-1',
+          machineName: 'Przecinarka Plazmowa #1',
+          status: 'in_progress',
+          currentStep: 3,
+          assignedService: 'Serwis Zewnętrzny Plazma',
+        }}
+        isCompleted={false}
+        user={mockCurrentUser}
+        onAddFutureNote={vi.fn()}
+        setServiceToComplete={vi.fn()}
+        onComplete={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenPartModal={vi.fn()}
+        canEditPlanned={false}
+        canDeletePlanned={false}
+        isArchive={false}
+        allowTicketDeletion={false}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/tickets\.details\.change_contractor|Zmień wykonawcę/i)).toBeNull();
+    expect(
+      screen.queryByText(/planned\.timeline\.skipStepsCompleteBtn|Zakończ serwis \(Pomiń Kroki\)/i)
+    ).toBeNull();
   });
 });

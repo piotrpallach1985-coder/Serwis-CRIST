@@ -4,6 +4,7 @@ import { USER_ROLES, TICKET_STATUS } from '../../../utils/constants';
 import DictationButton from '../../shared/DictationButton';
 import SignaturePad from '../../shared/SignaturePad';
 import { useManagerStore } from '../../../store/managerStore';
+import { usePermissions } from '../../../hooks/usePermissions';
 import {
   REFRIGERANT_TYPES,
   getAllRefrigerantTypes,
@@ -40,6 +41,7 @@ export default function TicketMainColumnStepper({
   const machines = useManagerStore(state => state.machines || []);
   const roles = useManagerStore(state => state.roles || []);
   const contractorOptions = roles.length > 0 ? roles : services || [];
+  const { onlyAssignedTasks } = usePermissions(user, roles);
 
   // Pozwala na swobodne przeglądanie kroków (aktywne są jednak wyłącznie przyciski z aktywnego etapu)
   const [selectedStepOverride, setSelectedStepOverride] = useState(null);
@@ -414,7 +416,7 @@ export default function TicketMainColumnStepper({
                               'Zgłoszenie awarii oczekuje na przyjęcie do realizacji i przydzielenie zespołu technicznego.'
                             )}
                           </p>
-                          {!isClosed && !isArchive && (
+                          {!isClosed && !isArchive && !onlyAssignedTasks && (
                             <button
                               type="button"
                               data-testid="ticket-accept-btn"
@@ -450,7 +452,13 @@ export default function TicketMainColumnStepper({
                             <select
                               value={selectedService || ''}
                               onChange={e => setSelectedService(e.target.value)}
-                              disabled={!isActualStatus || loading || isClosed || isArchive}
+                              disabled={
+                                !isActualStatus ||
+                                loading ||
+                                isClosed ||
+                                isArchive ||
+                                onlyAssignedTasks
+                              }
                               className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm disabled:opacity-50 disabled:bg-slate-100"
                             >
                               <option value="">
@@ -467,7 +475,7 @@ export default function TicketMainColumnStepper({
                             </select>
                           </div>
 
-                          {!isClosed && !isArchive && (
+                          {!isClosed && !isArchive && !onlyAssignedTasks && (
                             <div className="flex flex-col sm:flex-row gap-3">
                               <button
                                 type="button"
@@ -545,23 +553,25 @@ export default function TicketMainColumnStepper({
                                 <i className="ph ph-play-circle text-xl"></i>{' '}
                                 {t('tickets.details.startRepairBtn', 'Rozpocznij naprawę')}
                               </button>
-                              <button
-                                type="button"
-                                disabled={!isActualStatus || loading}
-                                onClick={() => {
-                                  handleUpdate(
-                                    currentTicket.id,
-                                    2,
-                                    t('tickets.details.reverted_contractor'),
-                                    etr
-                                  );
-                                  setSelectedStepOverride(2);
-                                }}
-                                className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                              >
-                                <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
-                                {t('tickets.details.change_contractor')}
-                              </button>
+                              {!onlyAssignedTasks && (
+                                <button
+                                  type="button"
+                                  disabled={!isActualStatus || loading}
+                                  onClick={() => {
+                                    handleUpdate(
+                                      currentTicket.id,
+                                      2,
+                                      t('tickets.details.reverted_contractor'),
+                                      etr
+                                    );
+                                    setSelectedStepOverride(2);
+                                  }}
+                                  className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
+                                  {t('tickets.details.change_contractor')}
+                                </button>
+                              )}
                             </div>
                           )}
 
@@ -865,23 +875,25 @@ export default function TicketMainColumnStepper({
                                 <i className="ph ph-check-circle text-xl"></i>{' '}
                                 {t('tickets.details.finishRepairBtn', 'Zakończ Naprawę')}
                               </button>
-                              <button
-                                type="button"
-                                disabled={!isActualStatus || loading}
-                                onClick={() => {
-                                  handleUpdate(
-                                    currentTicket.id,
-                                    2,
-                                    t('tickets.details.reverted_contractor'),
-                                    etr
-                                  );
-                                  setSelectedStepOverride(2);
-                                }}
-                                className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                              >
-                                <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
-                                {t('tickets.details.change_contractor')}
-                              </button>
+                              {!onlyAssignedTasks && (
+                                <button
+                                  type="button"
+                                  disabled={!isActualStatus || loading}
+                                  onClick={() => {
+                                    handleUpdate(
+                                      currentTicket.id,
+                                      2,
+                                      t('tickets.details.reverted_contractor'),
+                                      etr
+                                    );
+                                    setSelectedStepOverride(2);
+                                  }}
+                                  className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
+                                  {t('tickets.details.change_contractor')}
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -941,7 +953,7 @@ export default function TicketMainColumnStepper({
                             </p>
                           )}
 
-                          {isClosed && !isArchive && (
+                          {isClosed && !isArchive && !onlyAssignedTasks && (
                             <button
                               type="button"
                               disabled={!isActualStatus || loading}
@@ -999,7 +1011,7 @@ export default function TicketMainColumnStepper({
         </div>
 
         {/* ==================== PRZYCISK ZAMKNIJ AWARIĘ (POMIŃ KROKI / BŁĘDNA AWARIA) NA SAMYM DOLE — ZAWSZE AKTYWNY ==================== */}
-        {!isClosed && !isArchive && (
+        {!isClosed && !isArchive && !onlyAssignedTasks && (
           <div className="pt-3 border-t border-slate-200">
             <button
               type="button"

@@ -49,13 +49,10 @@ export default function SidebarNavUR({ activeTab, handleItemClick, branding }) {
       ),
     [rawMachines, rawTickets, rawPlannedServices, user, onlyAssignedTasks]
   );
-  const actionItems = React.useMemo(() => {
-    if (!onlyAssignedTasks) return rawActionItems;
-    const allowedMachineIds = new Set(machines.map(m => m.id));
-    return rawActionItems.filter(
-      i => allowedMachineIds.has(i.machineId) || isTaskAssignedToUser(i, user)
-    );
-  }, [rawActionItems, machines, onlyAssignedTasks, user]);
+  const actionItems = React.useMemo(
+    () => filterTasksForFieldTechnician(rawActionItems, user, onlyAssignedTasks),
+    [rawActionItems, user, onlyAssignedTasks]
+  );
 
   const hasLowStockAlarm = React.useMemo(() => {
     if (!parts || parts.length === 0) return false;

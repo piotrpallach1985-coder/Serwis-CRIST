@@ -7,6 +7,7 @@ import DictationButton from '../shared/DictationButton';
 import SignaturePad from '../shared/SignaturePad';
 import ChecklistExecutor from '../checklists/ChecklistExecutor';
 import { useManagerStore } from '../../store/managerStore';
+import { usePermissions } from '../../hooks/usePermissions';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import {
   updatePlannedService,
@@ -42,6 +43,7 @@ export default function PlannedMaintenanceTimeline({
   const storeRoles = useManagerStore(state => state.roles || []);
   const storeServices = useManagerStore(state => state.services || []);
   const services = storeRoles.length > 0 ? storeRoles : storeServices;
+  const { onlyAssignedTasks } = usePermissions(user, storeRoles);
   const machines = useManagerStore(state => state.machines || []);
   const parts = useManagerStore(state => state.parts || []);
   const branding = useManagerStore(state => state.branding || {});
@@ -636,7 +638,7 @@ export default function PlannedMaintenanceTimeline({
                               'Przegląd oczekuje na przyjęcie do realizacji i przydzielenie zespołu technicznego.'
                             )}
                           </p>
-                          {!isCompleted && srv.status !== 'completed' && (
+                          {!isCompleted && srv.status !== 'completed' && !onlyAssignedTasks && (
                             <button
                               type="button"
                               data-testid="planned-accept-btn"
@@ -665,7 +667,10 @@ export default function PlannedMaintenanceTimeline({
                               value={selectedService || ''}
                               onChange={e => setSelectedService(e.target.value)}
                               disabled={
-                                !isActualStatus || isCompleted || srv.status === 'completed'
+                                !isActualStatus ||
+                                isCompleted ||
+                                srv.status === 'completed' ||
+                                onlyAssignedTasks
                               }
                               className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm disabled:opacity-50 disabled:bg-slate-100"
                             >
@@ -683,7 +688,7 @@ export default function PlannedMaintenanceTimeline({
                             </select>
                           </div>
 
-                          {!isCompleted && srv.status !== 'completed' && (
+                          {!isCompleted && srv.status !== 'completed' && !onlyAssignedTasks && (
                             <div className="flex flex-col sm:flex-row gap-3">
                               <button
                                 type="button"
@@ -943,18 +948,20 @@ export default function PlannedMaintenanceTimeline({
                                 <i className="ph ph-arrow-right text-xl"></i>{' '}
                                 {t('planned.timeline.goToSummaryBtn', 'Przejdź do Podsumowania')}
                               </button>
-                              <button
-                                type="button"
-                                disabled={!isActualStatus}
-                                onClick={() => {
-                                  setSelectedStepOverride(2);
-                                  updatePlannedService(srv.id, { currentStep: 2 });
-                                }}
-                                className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                              >
-                                <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
-                                {t('tickets.details.change_contractor')}
-                              </button>
+                              {!onlyAssignedTasks && (
+                                <button
+                                  type="button"
+                                  disabled={!isActualStatus}
+                                  onClick={() => {
+                                    setSelectedStepOverride(2);
+                                    updatePlannedService(srv.id, { currentStep: 2 });
+                                  }}
+                                  className="bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 border border-slate-300 px-4 py-3.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <i className="ph ph-arrow-counter-clockwise text-lg"></i>{' '}
+                                  {t('tickets.details.change_contractor')}
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1563,7 +1570,7 @@ export default function PlannedMaintenanceTimeline({
         </div>
 
         {/* ==================== PRZYCISK ZAKOŃCZ SERWIS (POMIŃ KROKI) NA SAMYM DOLE — ZAWSZE AKTYWNY ==================== */}
-        {!isCompleted && srv.status !== 'completed' && (
+        {!isCompleted && srv.status !== 'completed' && !onlyAssignedTasks && (
           <div className="pt-3 border-t border-slate-200">
             <button
               type="button"
