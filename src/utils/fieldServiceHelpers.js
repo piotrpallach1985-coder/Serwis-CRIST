@@ -347,7 +347,6 @@ export const INDUSTRY_PROFILES = {
 export function isVehicleAsset(machine, industryProfile = 'industrial') {
   if (!machine) return industryProfile === 'fleet';
   if (machine.assetCategory === 'vehicle') return true;
-  if (machine.assetCategory === 'device' || machine.assetCategory === 'hvac') return false;
   if (
     machine.licensePlate ||
     machine.vinNumber ||
@@ -357,6 +356,7 @@ export function isVehicleAsset(machine, industryProfile = 'industrial') {
   ) {
     return true;
   }
+  if (machine.assetCategory === 'device' || machine.assetCategory === 'hvac') return false;
   return industryProfile === 'fleet';
 }
 

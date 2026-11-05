@@ -1,3 +1,5 @@
+import i18next from 'i18next';
+
 /**
  * Bezpiecznie parsuje datę z dowolnego formatu (Firebase Timestamp, JS Date, String, Number).
  * @param {any} dateVal Wartość daty do przetworzenia.
@@ -30,17 +32,18 @@ export const getPlannedDateRelativeInfo = (dateVal, nowRef = new Date()) => {
 
   const diffDays = Math.round((targetMidnight.getTime() - nowMidnight.getTime()) / 86400000);
 
+  const isEn = String(i18next?.language || 'pl').toLowerCase().startsWith('en');
   let label = '';
   if (diffDays > 1) {
-    label = `za ${diffDays} dni`;
+    label = isEn ? `in ${diffDays} days` : `za ${diffDays} dni`;
   } else if (diffDays === 1) {
-    label = 'za 1 dzień';
+    label = isEn ? 'in 1 day' : 'za 1 dzień';
   } else if (diffDays === 0) {
-    label = 'dzisiaj';
+    label = isEn ? 'today' : 'dzisiaj';
   } else if (diffDays === -1) {
-    label = '1 dzień po terminie';
+    label = isEn ? '1 day overdue' : '1 dzień po terminie';
   } else {
-    label = `${Math.abs(diffDays)} dni po terminie`;
+    label = isEn ? `${Math.abs(diffDays)} days overdue` : `${Math.abs(diffDays)} dni po terminie`;
   }
 
   let badgeClass = 'bg-blue-50 text-blue-700 border border-blue-200';

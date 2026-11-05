@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { safeParseDate } from '../utils/dateHelpers';
+import i18next from 'i18next';
 
 const getQrBaseUrl = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PUBLIC_APP_URL) {
@@ -78,10 +79,17 @@ export const resolveTenantDisplayName = (tenantId, branding) => {
 
 export const resolveMachineQrLocation = (machine, regions = [], fallback = '-') => {
   if (!machine) return fallback;
+  const isEn = String(i18next?.language || 'pl').toLowerCase().startsWith('en');
   let regionName = '';
   if (machine.regionId === 'main_map') {
     const isVeh = machine.assetCategory === 'vehicle' || Boolean(machine.licensePlate);
-    regionName = isVeh ? 'Cała Firma' : 'Mapa Główna';
+    regionName = isVeh
+      ? isEn
+        ? 'Entire Company'
+        : 'Cała Firma'
+      : isEn
+        ? 'Main Map'
+        : 'Mapa Główna';
   } else if (machine.regionId && Array.isArray(regions)) {
     const found = regions.find(r => r && r.id === machine.regionId);
     if (found?.name) regionName = String(found.name).trim();
