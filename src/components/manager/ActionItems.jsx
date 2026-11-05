@@ -3,8 +3,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { useManagerStore } from '../../store/managerStore';
 
 import EmptyState from '../shared/EmptyState';
+import DictationButton from '../shared/DictationButton';
 import React, { useState, useEffect, useMemo } from 'react';
-import { subscribeToActionItems, updateActionItem } from '../../services/tickets.service';
+import {
+  subscribeToActionItems,
+  updateActionItem,
+  addActionItem,
+} from '../../services/tickets.service';
 import { safeParseDate } from '../../utils/dateHelpers';
 import { exportToExcel } from '../../utils/reports/excelExport';
 import { ACTION_ITEM_STATUS, ACTION_ITEM_STATUS_LABELS } from '../../utils/constants';
@@ -22,6 +27,9 @@ export default function ActionItems() {
   const tickets = useManagerStore(state => state.tickets) || [];
   const plannedServices = useManagerStore(state => state.plannedServices) || [];
   const roles = useManagerStore(state => state.roles) || [];
+  const storeServices = useManagerStore(state => state.services) || [];
+  const storeActionItems = useManagerStore(state => state.actionItems) || [];
+  const contractorOptions = roles.length > 0 ? roles : storeServices;
   const regions = useManagerStore(state => state.regions);
   const { onlyAssignedTasks } = usePermissions(user, roles);
 
@@ -38,12 +46,22 @@ export default function ActionItems() {
   );
   const allowedMachineIds = useMemo(() => new Set(machines.map(m => m.id)), [machines]);
 
-  const [items, setItems] = useState([]);
+  const [localItems, setItems] = useState([]);
+  const items = localItems.length > 0 ? localItems : storeActionItems;
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newMachineId, setNewMachineId] = useState('');
+  const [newProblem, setNewProblem] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newContractor, setNewContractor] = useState('');
+  const [savingNewItem, setSavingNewItem] = useState(false);
+
   const handleExportExcel = () => {
     const dataToExport = filteredItems.map(item => {
       const createdDate = safeParseDate(item.createdAt);
       const dueDate = safeParseDate(item.dueDate);
       const completedDate = safeParseDate(item.completedAt);
+      const itemContractor = item.assignedService || item.contractor || item.assignedTo || '-';
       return {
         ID: item.id,
         [t('admin.action_items.created_date')]: createdDate
@@ -52,6 +70,7 @@ export default function ActionItems() {
         [t('admin.action_items.machine')]:
           item.machineName || getMachineName(item.machineId) || '-',
         [t('admin.action_items.problem_task')]: item.problem || '-',
+        [t('admin.action_items.contractor', 'Wykonawca')]: itemContractor,
         [t('admin.action_items.required_date')]: dueDate
           ? dueDate.toLocaleDateString('pl-PL')
           : '-',
@@ -116,7 +135,10 @@ export default function ActionItems() {
       )
         return false;
 
-      const machine = machines.find(m => m.id === item.machineId) || {};
+      const machine =
+        rawMachines.find(m => m.id === item.machineId) ||
+        machines.find(m => m.id === item.machineId) ||
+        {};
 
       // 2. Region Filter
       if (filterRegion && machine?.regionId !== filterRegion) return false;
@@ -129,7 +151,14 @@ export default function ActionItems() {
         const queryLower = searchQuery.toLowerCase();
         const titleMatch = item.problem?.toLowerCase().includes(queryLower);
         const machineMatch = machine?.name?.toLowerCase().includes(queryLower);
-        if (!titleMatch && !machineMatch) return false;
+        const contractorVal = (
+          item.assignedService ||
+          item.contractor ||
+          item.assignedTo ||
+          ''
+        ).toLowerCase();
+        const contractorMatch = contractorVal.includes(queryLower);
+        if (!titleMatch && !machineMatch && !contractorMatch) return false;
       }
 
       // 4. Time Filter
@@ -169,6 +198,7 @@ export default function ActionItems() {
     filterTime,
     filterRegion,
     filterMachine,
+    rawMachines,
     machines,
     searchQuery,
     onlyAssignedTasks,
@@ -177,7 +207,9 @@ export default function ActionItems() {
   ]);
 
   const getMachineName = id =>
-    machines.find(m => m.id === id)?.name || t('admin.action_items.unknown_machine');
+    rawMachines.find(m => m.id === id)?.name ||
+    machines.find(m => m.id === id)?.name ||
+    t('admin.action_items.unknown_machine');
 
   const handleStatusChange = async (id, newStatus) => {
     let confirmMsg = '';
@@ -204,6 +236,55 @@ export default function ActionItems() {
     }
   };
 
+  const handleContractorChange = async (id, newContractor) => {
+    try {
+      const updateData = {
+        assignedService: newContractor,
+        contractor: newContractor,
+        assignedTo: newContractor,
+      };
+      setItems(prev => {
+        const base = prev.length > 0 ? prev : storeActionItems;
+        return base.map(it => (it.id === id ? { ...it, ...updateData } : it));
+      });
+      await updateActionItem(id, updateData);
+    } catch (err) {
+      console.error(err);
+      alert('Błąd przypisywania wykonawcy');
+    }
+  };
+
+  const handleCreateActionItem = async e => {
+    e.preventDefault();
+    if (!newProblem.trim()) return;
+    setSavingNewItem(true);
+    try {
+      const selectedMac = rawMachines.find(m => m.id === newMachineId);
+      await addActionItem({
+        machineId: newMachineId || '',
+        machineName: selectedMac?.name || '',
+        problem: newProblem.trim(),
+        dueDate: newDueDate ? new Date(newDueDate).toISOString() : null,
+        assignedService: newContractor || '',
+        contractor: newContractor || '',
+        assignedTo: newContractor || '',
+        status: ACTION_ITEM_STATUS.PENDING,
+        createdAt: new Date().toISOString(),
+        createdBy: user?.name || 'Nieznany',
+      });
+      setIsAddModalOpen(false);
+      setNewMachineId('');
+      setNewProblem('');
+      setNewDueDate('');
+      setNewContractor('');
+    } catch (err) {
+      console.error(err);
+      alert('Błąd zapisu tematu: ' + err.message);
+    } finally {
+      setSavingNewItem(false);
+    }
+  };
+
   return (
     <div className="space-y-6 flex flex-col animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200 shrink-0">
@@ -217,6 +298,16 @@ export default function ActionItems() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+          {!onlyAssignedTasks && (
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            >
+              <i className="ph ph-plus text-base"></i>
+              {t('admin.action_items.add_btn', 'Dodaj temat')}
+            </button>
+          )}
           <button
             onClick={handleExportExcel}
             className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-green-200 transition-colors"
@@ -258,6 +349,134 @@ export default function ActionItems() {
           </div>
         </div>
       </div>
+
+      {/* MODAL DODAWANIA NOWEGO TEMATU DO REALIZACJI */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in overflow-hidden">
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50">
+              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                <i className="ph ph-clipboard-text text-blue-600 text-xl"></i>
+                {t('admin.action_items.add_modal_title', 'Nowy Temat do Realizacji')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                <i className="ph ph-x text-xl"></i>
+              </button>
+            </div>
+            <form onSubmit={handleCreateActionItem} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('admin.action_items.machine', 'Urządzenie')}
+                </label>
+                <select
+                  value={newMachineId}
+                  onChange={e => setNewMachineId(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">
+                    {t('admin.action_items.select_machine', '-- Wybierz urządzenie --')}
+                  </option>
+                  {rawMachines.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.internalId ? `(${m.internalId})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('admin.action_items.problem_task', 'Problem / Zadanie')} *
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={newProblem}
+                    onChange={e => setNewProblem(e.target.value)}
+                    placeholder={t(
+                      'admin.action_items.problem_placeholder',
+                      'np. Wymiana paska napędowego, przegląd instalacji...'
+                    )}
+                    className="w-full p-2.5 pr-12 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                    <DictationButton
+                      onResult={text => setNewProblem(prev => (prev ? prev + ' ' + text : text))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('admin.action_items.contractor', 'Wykonawca')}
+                </label>
+                <select
+                  value={newContractor}
+                  onChange={e => setNewContractor(e.target.value)}
+                  data-testid="new-action-item-contractor-select"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">
+                    {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
+                  </option>
+                  {contractorOptions.map(r => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('admin.action_items.required_date', 'Wymagany Termin')}
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={e => setNewDueDate(e.target.value)}
+                    className="flex-1 p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  {[7, 14, 30].map(days => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + days);
+                        setNewDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-bold rounded-lg border border-slate-200"
+                    >
+                      +{days} dni
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  {t('admin.action_items.cancel', 'Anuluj')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingNewItem}
+                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {t('admin.action_items.save', 'Zapisz temat')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* FILTRY */}
       <PlannedMaintenanceFilters
@@ -306,6 +525,8 @@ export default function ActionItems() {
                   : null;
                 const isCompleted = item.status === ACTION_ITEM_STATUS.COMPLETED;
                 const machineName = item.machineName || getMachineName(item.machineId);
+                const currentContractor =
+                  item.assignedService || item.contractor || item.assignedTo || '';
 
                 return (
                   <div
@@ -351,7 +572,23 @@ export default function ActionItems() {
                       </div>
                     </div>
 
-                    <div className="mt-2 flex justify-end">
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <select
+                        value={currentContractor}
+                        disabled={onlyAssignedTasks}
+                        onChange={e => handleContractorChange(item.id, e.target.value)}
+                        className="text-xs font-semibold px-2 py-1.5 rounded outline-none border border-slate-200 bg-slate-50 text-slate-700 cursor-pointer disabled:opacity-70"
+                      >
+                        <option value="">
+                          {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
+                        </option>
+                        {contractorOptions.map(r => (
+                          <option key={r.id || r.name} value={r.name}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+
                       <select
                         value={item.status}
                         onChange={e => handleStatusChange(item.id, e.target.value)}
@@ -390,6 +627,7 @@ export default function ActionItems() {
                 <th className="px-6 py-4">{t('admin.action_items.created_date')}</th>
                 <th className="px-6 py-4">{t('admin.action_items.machine')}</th>
                 <th className="px-6 py-4">{t('admin.action_items.problem_task')}</th>
+                <th className="px-6 py-4">{t('admin.action_items.contractor', 'Wykonawca')}</th>
                 <th className="px-6 py-4">{t('admin.action_items.required_date')}</th>
                 <th className="px-6 py-4">{t('admin.action_items.reporter')}</th>
                 <th className="px-6 py-4">{t('admin.action_items.status')}</th>
@@ -399,7 +637,7 @@ export default function ActionItems() {
             <tbody className="divide-y divide-slate-100 bg-white">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-0">
+                  <td colSpan="8" className="p-0">
                     <EmptyState
                       title={t('admin.action_items.no_items_title')}
                       message={t('admin.action_items.no_items_desc')}
@@ -408,79 +646,101 @@ export default function ActionItems() {
                   </td>
                 </tr>
               ) : (
-                filteredItems.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-slate-600">
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-800">
-                      {item.machineName || getMachineName(item.machineId)}
-                    </td>
-                    <td className="px-6 py-4 text-slate-700 max-w-md break-words">
-                      {item.problem}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-red-600">
-                      {item.dueDate
-                        ? new Date(item.dueDate).toLocaleDateString()
-                        : t('admin.action_items.none')}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{item.createdBy}</td>
-                    <td className="px-6 py-4">
-                      {item.status === ACTION_ITEM_STATUS.COMPLETED ? (
-                        <div className="flex flex-col gap-1 items-start">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider w-fit">
-                            <i className="ph ph-check-circle"></i>{' '}
-                            {t('admin.action_items.completed')}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            {t('admin.action_items.by')}
-                            <span className="font-bold text-slate-700">
-                              {item.completedBy || 'System'}
+                filteredItems.map(item => {
+                  const currentContractor =
+                    item.assignedService || item.contractor || item.assignedTo || '';
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-slate-600">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-800">
+                        {item.machineName || getMachineName(item.machineId)}
+                      </td>
+                      <td className="px-6 py-4 text-slate-700 max-w-md break-words">
+                        {item.problem}
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={currentContractor}
+                          disabled={onlyAssignedTasks}
+                          data-testid={`action-item-contractor-${item.id}`}
+                          onChange={e => handleContractorChange(item.id, e.target.value)}
+                          className="text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none border border-slate-200 bg-white hover:border-blue-400 focus:ring-2 focus:ring-blue-500 text-slate-700 cursor-pointer disabled:bg-slate-50 disabled:cursor-default"
+                        >
+                          <option value="">
+                            {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
+                          </option>
+                          {contractorOptions.map(r => (
+                            <option key={r.id || r.name} value={r.name}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-red-600">
+                        {item.dueDate
+                          ? new Date(item.dueDate).toLocaleDateString()
+                          : t('admin.action_items.none')}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">{item.createdBy}</td>
+                      <td className="px-6 py-4">
+                        {item.status === ACTION_ITEM_STATUS.COMPLETED ? (
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 uppercase tracking-wider w-fit">
+                              <i className="ph ph-check-circle"></i>{' '}
+                              {t('admin.action_items.completed')}
                             </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {t('admin.action_items.by')}
+                              <span className="font-bold text-slate-700">
+                                {item.completedBy || 'System'}
+                              </span>
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {t('admin.action_items.on_day')}
+                              {item.completedAt
+                                ? new Date(item.completedAt).toLocaleDateString()
+                                : '-'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
+                            <i className="ph ph-clock"></i> {t('admin.action_items.filter_pending')}
                           </span>
-                          <span className="text-[10px] text-slate-400">
-                            {t('admin.action_items.on_day')}
-                            {item.completedAt
-                              ? new Date(item.completedAt).toLocaleDateString()
-                              : '-'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
-                          <i className="ph ph-clock"></i> {t('admin.action_items.filter_pending')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <select
-                        value={item.status}
-                        onChange={e => handleStatusChange(item.id, e.target.value)}
-                        className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
-                          item.status === ACTION_ITEM_STATUS.COMPLETED
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : item.status === ACTION_ITEM_STATUS.IN_PROGRESS
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : item.status === ACTION_ITEM_STATUS.CANCELLED
-                            ? 'bg-gray-100 text-gray-500 border-gray-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
-                      >
-                        <option value={ACTION_ITEM_STATUS.PENDING}>
-                          {t('admin.action_items.status_pending')}
-                        </option>
-                        <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>
-                          {t('admin.action_items.status_in_progress')}
-                        </option>
-                        <option value={ACTION_ITEM_STATUS.COMPLETED}>
-                          {t('admin.action_items.status_confirm_completed')}
-                        </option>
-                        <option value={ACTION_ITEM_STATUS.CANCELLED}>
-                          {t('admin.action_items.status_cancelled')}
-                        </option>
-                      </select>
-                    </td>
-                  </tr>
-                ))
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <select
+                          value={item.status}
+                          onChange={e => handleStatusChange(item.id, e.target.value)}
+                          className={`text-xs font-bold px-2 py-1.5 rounded outline-none border transition-colors cursor-pointer ${
+                            item.status === ACTION_ITEM_STATUS.COMPLETED
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : item.status === ACTION_ITEM_STATUS.IN_PROGRESS
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : item.status === ACTION_ITEM_STATUS.CANCELLED
+                              ? 'bg-gray-100 text-gray-500 border-gray-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          <option value={ACTION_ITEM_STATUS.PENDING}>
+                            {t('admin.action_items.status_pending')}
+                          </option>
+                          <option value={ACTION_ITEM_STATUS.IN_PROGRESS}>
+                            {t('admin.action_items.status_in_progress')}
+                          </option>
+                          <option value={ACTION_ITEM_STATUS.COMPLETED}>
+                            {t('admin.action_items.status_confirm_completed')}
+                          </option>
+                          <option value={ACTION_ITEM_STATUS.CANCELLED}>
+                            {t('admin.action_items.status_cancelled')}
+                          </option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

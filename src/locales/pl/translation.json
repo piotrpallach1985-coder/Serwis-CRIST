@@ -1452,7 +1452,15 @@
       "none": "Brak",
       "unknown_machine": "Nieznane urządzenie",
       "no_machine": "Brak urządzenia",
-      "no_desc": "Brak opisu"
+      "no_desc": "Brak opisu",
+      "contractor": "Wykonawca",
+      "no_contractor": "-- Wybierz wykonawcę --",
+      "add_btn": "Dodaj temat",
+      "add_modal_title": "Nowy Temat do Realizacji",
+      "select_machine": "-- Wybierz urządzenie --",
+      "problem_placeholder": "np. Wymiana paska napędowego, przegląd instalacji...",
+      "cancel": "Anuluj",
+      "save": "Zapisz temat"
     },
     "master_data": {
       "config": "Konfiguracja",

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Roles from '../Roles';
 import Users from '../Users';
+import ActionItems from '../ActionItems';
 import SidebarNavUR from '../sidebar/SidebarNavUR';
 import SidebarFooter from '../sidebar/SidebarFooter';
 import TicketMainColumnStepper from '../tickets/TicketMainColumnStepper';
@@ -190,5 +191,36 @@ describe('Skondensowany model Ról i Wykonawców oraz ścisłe uprawnienia zakł
 
     expect(screen.getByRole('option', { name: 'Serwis Zewnętrzny Plazma' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Automatycy UR' })).toBeTruthy();
+  });
+
+  it('ActionItems.jsx: umożliwia wyznaczenie wykonawcy (np. Serwis Zewnętrzny Plazma) na liście tematów do realizacji oraz w oknie dodawania tematu', () => {
+    useManagerStore.getState().setActionItems([
+      {
+        id: 'ai-1',
+        machineId: 'm-1',
+        machineName: 'Przecinarka Plazmowa #1',
+        problem: 'Wymiana dyszy i kontrola chłodzenia',
+        status: 'pending',
+        createdAt: '2026-11-05T10:00:00Z',
+        createdBy: 'Admin Główny',
+        assignedService: 'Serwis Zewnętrzny Plazma',
+      },
+    ]);
+
+    render(<ActionItems />);
+
+    const rowContractorSelect = screen.getByTestId('action-item-contractor-ai-1');
+    expect(rowContractorSelect.value).toBe('Serwis Zewnętrzny Plazma');
+    expect(within(rowContractorSelect).getByText('Automatycy UR')).toBeTruthy();
+
+    // Otwarcie okna dodawania nowego tematu i sprawdzenie listy wykonawców
+    const addBtn = screen.getByRole('button', {
+      name: /admin\.action_items\.add_btn|Dodaj temat/i,
+    });
+    fireEvent.click(addBtn);
+
+    const modalContractorSelect = screen.getByTestId('new-action-item-contractor-select');
+    expect(within(modalContractorSelect).getByText('Serwis Zewnętrzny Plazma')).toBeTruthy();
+    expect(within(modalContractorSelect).getByText('Automatycy UR')).toBeTruthy();
   });
 });

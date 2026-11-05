@@ -1452,7 +1452,15 @@
       "none": "None",
       "unknown_machine": "Unknown machine",
       "no_machine": "No machine",
-      "no_desc": "No description"
+      "no_desc": "No description",
+      "contractor": "Contractor",
+      "no_contractor": "-- Select contractor --",
+      "add_btn": "Add Action Item",
+      "add_modal_title": "New Action Item",
+      "select_machine": "-- Select machine --",
+      "problem_placeholder": "e.g. Drive belt replacement, installation check...",
+      "cancel": "Cancel",
+      "save": "Save Action Item"
     },
     "master_data": {
       "config": "Configuration",

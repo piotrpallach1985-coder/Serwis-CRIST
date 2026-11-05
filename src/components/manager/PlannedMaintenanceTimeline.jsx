@@ -86,6 +86,9 @@ export default function PlannedMaintenanceTimeline({
   const [summaryCreateActionItem, setSummaryCreateActionItem] = useState(false);
   const [summaryActionItemDetails, setSummaryActionItemDetails] = useState('');
   const [summaryActionItemDueDate, setSummaryActionItemDueDate] = useState('');
+  const [summaryActionItemContractor, setSummaryActionItemContractor] = useState(
+    srv.assignedService || srv.assignedTo || ''
+  );
   const [summaryExtraParts, setSummaryExtraParts] = useState([]);
   const [summaryCreateNewPlan, setSummaryCreateNewPlan] = useState(true);
   const [isCompletingService, setIsCompletingService] = useState(false);
@@ -390,6 +393,9 @@ export default function PlannedMaintenanceTimeline({
           dueDate: summaryActionItemDueDate
             ? new Date(summaryActionItemDueDate).toISOString()
             : null,
+          assignedService: summaryActionItemContractor || '',
+          contractor: summaryActionItemContractor || '',
+          assignedTo: summaryActionItemContractor || '',
           status: 'pending',
           createdAt: new Date().toISOString(),
           createdBy: user?.name || 'Nieznany',
@@ -1446,6 +1452,26 @@ export default function PlannedMaintenanceTimeline({
                                       ))}
                                     </div>
                                   </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-blue-800 mb-1">
+                                    {t('admin.action_items.contractor', 'Wykonawca')}
+                                  </label>
+                                  <select
+                                    disabled={!isActualStatus}
+                                    value={summaryActionItemContractor}
+                                    onChange={e => setSummaryActionItemContractor(e.target.value)}
+                                    className="w-full p-2 rounded border border-blue-200 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                  >
+                                    <option value="">
+                                      {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
+                                    </option>
+                                    {(services || []).map(r => (
+                                      <option key={r.id || r.name} value={r.name}>
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
                               </div>
                             )}

@@ -21,7 +21,9 @@ export default function PlannedMaintenanceCompletionModal({
   const { t } = useTranslation();
   const { user } = useAuth();
   const machines = useManagerStore(state => state.machines || []);
-  const services = useManagerStore(state => state.services || []);
+  const storeRoles = useManagerStore(state => state.roles || []);
+  const storeServices = useManagerStore(state => state.services || []);
+  const services = storeRoles.length > 0 ? storeRoles : storeServices;
   const branding = useManagerStore(state => state.branding || {});
   const industryProfile = branding?.industryProfile || 'industrial';
   const profileConfig = getIndustryProfileConfig(industryProfile);
@@ -31,6 +33,9 @@ export default function PlannedMaintenanceCompletionModal({
   const [createActionItem, setCreateActionItem] = useState(false);
   const [actionItemProblem, setActionItemProblem] = useState('');
   const [actionItemDueDate, setActionItemDueDate] = useState('');
+  const [actionItemContractor, setActionItemContractor] = useState(
+    serviceToComplete?.assignedService || serviceToComplete?.assignedTo || ''
+  );
   const [partsUsed, setPartsUsed] = useState(false);
   const [actualManHours, setActualManHours] = useState('');
   const [extraParts, setExtraParts] = useState([]);
@@ -279,6 +284,9 @@ export default function PlannedMaintenanceCompletionModal({
           plannedServiceId: serviceToComplete.id || '',
           problem: actionItemProblem.trim(),
           dueDate: actionItemDueDate ? new Date(actionItemDueDate).toISOString() : null,
+          assignedService: actionItemContractor || '',
+          contractor: actionItemContractor || '',
+          assignedTo: actionItemContractor || '',
           status: 'pending',
           createdAt: new Date().toISOString(),
           createdBy: user?.name || 'Nieznany',
@@ -765,6 +773,25 @@ export default function PlannedMaintenanceCompletionModal({
                     </button>
                   </div>
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-blue-800 mb-1">
+                  {t('admin.action_items.contractor', 'Wykonawca')}
+                </label>
+                <select
+                  value={actionItemContractor}
+                  onChange={e => setActionItemContractor(e.target.value)}
+                  className="w-full p-2 rounded border border-blue-200 text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="">
+                    {t('admin.action_items.no_contractor', '-- Wybierz wykonawcę --')}
+                  </option>
+                  {services.map(r => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}
