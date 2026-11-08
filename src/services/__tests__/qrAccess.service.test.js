@@ -16,6 +16,7 @@ vi.mock('firebase/firestore', () => ({
 import {
   parseQrPayload,
   buildMachineQrValue,
+  buildPartQrValue,
   generateQrKey,
   getOrCreateQrKey,
   rotateQrKey,
@@ -53,6 +54,16 @@ describe('qrAccess.service', () => {
 
   it('nie myli parametru "k" z innymi (np. "bank=")', () => {
     expect(parseQrPayload('tenant=t&bank=x&machine=m').key).toBeNull();
+  });
+
+  it('poprawnie rozpoznaje kod QR części zamiennej (ustawia zarówno isPart: true, jak i isPartQr: true dla zgłoszeń anonimowych i zalogowanych)', () => {
+    const partQr = buildPartQrValue({ id: 'part-99', code: 'CZ-99' }, 'crist');
+    expect(partQr).toBe('tenant=crist&part=part-99');
+    const parsed = parseQrPayload(partQr);
+    expect(parsed.isPart).toBe(true);
+    expect(parsed.isPartQr).toBe(true);
+    expect(parsed.partId).toBe('part-99');
+    expect(parsed.machineId).toBeNull();
   });
 
   it('generuje losowy klucz URL-safe o długości >= 20', () => {

@@ -289,6 +289,7 @@ export const parseQrPayload = (rawText) => {
       partId: decodeURIComponent(partMatch[1]),
       key: keyMatch ? decodeURIComponent(keyMatch[1]) : null,
       isPart: true,
+      isPartQr: true,
       tenantName: tnMatch ? decodeURIComponent(tnMatch[1]) : null,
       itemName: pnMatch ? decodeURIComponent(pnMatch[1]) : null,
       qrDate: dtMatch ? decodeURIComponent(dtMatch[1]) : null,

@@ -43,6 +43,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setPartQrNotice(
         t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
       );
+      setStep('scan');
     }
   }, []);
 
@@ -67,12 +68,17 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   const [bindNonce, setBindNonce] = useState(0);
   const [needsQr, setNeedsQr] = useState(false);
 
-  const handleScanSuccess = async decodedText => {
+  const handleScanSuccess = async (decodedText, rawQr) => {
     setPartQrNotice(null);
-    const parsed = parseQrPayload(decodedText);
+    const rawStr = rawQr || decodedText || '';
+    const parsed = parseQrPayload(rawStr);
 
     // 1. Sprawdź czy kod QR zawiera jawny parametr części (part=...)
-    if (parsed.isPartQr) {
+    if (
+      parsed.isPart ||
+      parsed.isPartQr ||
+      /[?&#\s|^]part=([^&#\s]+)/i.test(rawStr)
+    ) {
       setPartQrNotice(
         t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
       );
@@ -81,7 +87,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       return;
     }
 
-    const mId = parsed.machineId || decodedText;
+    const mId = parsed.machineId || String(decodedText || '').trim();
     const tenantFromQr = parsed.tenantId;
 
     if (tenantFromQr && tenantFromQr !== tenantId) {
@@ -105,10 +111,10 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setBindNonce(n => n + 1);
     }
 
-    let targetMachine = findMachineByIdentifierOrPlate(machines, mId, decodedText);
+    let targetMachine = findMachineByIdentifierOrPlate(machines, mId, rawStr);
 
     if (!targetMachine && mId && tenantId) {
-      // Sprawdź w bazie czy zeskanowany identyfikator nie jest częścią zamienną (starsze naklejki QR z samym ID części)
+      // Sprawdź w bazie czy zeskanowany identyfikator nie jest częścią zamienną (starsze naklejki QR z samym ID lub kodem części)
       const storeParts = useManagerStore.getState().parts || [];
       const matchedStorePart = storeParts.find(
         p => p.id === mId || (p.code && p.code === mId)
@@ -125,6 +131,17 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       try {
         const partDoc = await getDoc(doc(db, 'tenants', tenantId, 'parts', mId));
         if (partDoc.exists()) {
+          setPartQrNotice(
+            t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
+          );
+          setSelectedMachine(null);
+          setStep('scan');
+          return;
+        }
+        const partByCodeSnap = await getDocs(
+          query(collection(db, 'tenants', tenantId, 'parts'), where('code', '==', mId), limit(1))
+        );
+        if (!partByCodeSnap.empty) {
           setPartQrNotice(
             t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
           );
@@ -158,10 +175,17 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       setSelectedMachine(targetMachine);
       setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
       setStep('form');
-    } else {
-      setSelectedMachine({ id: 'manual', name: 'Nieznane Urządzenie', manualInput: mId });
+    } else if (decodedText === 'manual') {
+      setSelectedMachine({ id: 'manual', name: '', regionId: '' });
       setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
       setStep('form');
+    } else {
+      setPartQrNotice(
+        t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
+      );
+      setSelectedMachine(null);
+      setSearchParams({ step: 'scan' }, { replace: true });
+      setStep('scan');
     }
   };
 
@@ -239,8 +263,9 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
               setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
               if (urlMachineId && !urlMachineResolvedRef.current) {
+                const loadedList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 const target = findMachineByIdentifierOrPlate(
-                  snapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+                  loadedList,
                   urlMachineId,
                   urlMachineId
                 );
@@ -248,6 +273,13 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                   setSelectedMachine(target);
                   urlMachineResolvedRef.current = true;
                   setStep('form');
+                } else if (loadedList.length > 0) {
+                  urlMachineResolvedRef.current = true;
+                  setPartQrNotice(
+                    t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
+                  );
+                  setSelectedMachine(null);
+                  setStep('scan');
                 }
               }
             },

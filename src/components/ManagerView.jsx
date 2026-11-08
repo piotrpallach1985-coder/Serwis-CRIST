@@ -294,7 +294,9 @@ function ManagerViewInner() {
               {activeTab === 'roles' && <Roles />}
               {activeTab === 'reports' && <Reports />}
               {activeTab === 'ai_stats' && <AIStats />}
-              {activeTab === 'new_ticket_scanner' && <InAppTicketScanner />}
+              {activeTab === 'new_ticket_scanner' && (
+                <InAppTicketScanner onClose={() => handleTabChange('tickets')} />
+              )}
               {activeTab === 'api_settings' && <div className="p-2 sm:p-6 max-w-5xl min-w-0 mx-auto w-full"><ApiSettingsPanel /></div>}
               {activeTab.startsWith('parts_') && <PartsLayout currentTab={activeTab} setActiveTab={setActiveTab} />}
             </>

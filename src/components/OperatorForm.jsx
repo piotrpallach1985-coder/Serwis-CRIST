@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useOperatorForm } from '../hooks/useOperatorForm';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
+import { isVehicleAsset, getMachineCounterUnit } from '../utils/fieldServiceHelpers';
 import DictationButton from './shared/DictationButton';
 import Toast from './manager/Toast';
-import { collection, doc, setDoc, serverTimestamp, getDoc, getDocs, query, where, addDoc } from 'firebase/firestore';
-import { savePhotoToIndexedDB } from '../utils/offlineStorage';
-import { db, storage } from '../firebase';
 
 export default function OperatorForm({
   machines = [],
@@ -44,8 +42,33 @@ export default function OperatorForm({
     acceptedRodo, setAcceptedRodo,
     toastConfig, hideToast,
     submitLoading, submitProgress,
+    reportedWorkHours, setReportedWorkHours,
+    isSavingMeter, meterSavedSuccess, handleSaveMeterOnly,
+    vehicleGps,
+    isCapturingVehicleGps, vehicleGpsError,
+    handleCaptureVehicleGps, handleClearVehicleGps,
     handleSubmit, handleFilesSelected
   } = useOperatorForm({ machines, selectedMachine, setSelectedMachine, regions, handleStepChange, isOnline, isInternal });
+
+  const effectiveMachine = React.useMemo(() => {
+    if (!selectedMachine) return null;
+    if (selectedMachine.id && selectedMachine.id !== 'manual') {
+      const fromList = (machines || []).find(m => m.id === selectedMachine.id);
+      return fromList ? { ...fromList, ...selectedMachine } : selectedMachine;
+    }
+    if (selectedMachine.matchedMachineId) {
+      return (
+        (machines || []).find(m => m.id === selectedMachine.matchedMachineId) || selectedMachine
+      );
+    }
+    return selectedMachine;
+  }, [machines, selectedMachine]);
+
+  const isVehicle = isVehicleAsset(effectiveMachine, branding?.industryProfile);
+  const counterUnit = getMachineCounterUnit(effectiveMachine, branding?.industryProfile);
+  const hasConcreteMachine = Boolean(
+    effectiveMachine?.id && effectiveMachine.id !== 'manual'
+  );
 
   const [isMachineDropdownOpen, setIsMachineDropdownOpen] = useState(false);
 
@@ -275,6 +298,96 @@ export default function OperatorForm({
                   </div>
                 </div>
               )}
+
+              {/* Szybkie raportowanie przebiegu (km) / motogodzin (RBG) po zeskanowaniu pojazdu lub urządzenia */}
+              {hasConcreteMachine && (
+                <div
+                  data-testid="operator-quick-meter-card"
+                  className="mt-4 pt-3.5 border-t border-blue-200/80 bg-white/95 rounded-xl p-3.5 border shadow-2xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-slate-800">
+                      <i
+                        className={`ph ${
+                          isVehicle ? 'ph-speedometer text-emerald-600' : 'ph-gauge text-blue-600'
+                        } text-lg`}
+                      ></i>
+                      <span>
+                        {isVehicle
+                          ? 'Szybkie raportowanie przebiegu pojazdu (km)'
+                          : 'Szybkie raportowanie motogodzin urządzenia (RBG)'}
+                      </span>
+                    </div>
+                    <span
+                      data-testid="operator-quick-meter-current-badge"
+                      className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"
+                    >
+                      Aktualny stan:{' '}
+                      {effectiveMachine?.currentWorkHours ?? effectiveMachine?.workHours ?? 0}{' '}
+                      {counterUnit}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-2.5">
+                    Możesz zapisać sam odczyt licznika jednym kliknięciem (bez wysyłania zgłoszenia awarii) lub podać go wraz ze zgłoszeniem poniżej.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1 flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        data-testid="operator-quick-meter-input"
+                        value={reportedWorkHours}
+                        onChange={e => setReportedWorkHours(e.target.value)}
+                        placeholder={`Wpisz aktualny stan (${counterUnit})...`}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-l-lg text-sm font-mono font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                      <span className="inline-flex items-center px-3 py-2 bg-slate-100 border border-l-0 border-slate-300 rounded-r-lg text-xs font-extrabold text-slate-600 select-none">
+                        {counterUnit}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="operator-quick-meter-save-btn"
+                      disabled={isSavingMeter || String(reportedWorkHours).trim() === ''}
+                      onClick={handleSaveMeterOnly}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                    >
+                      <i
+                        className={`ph ${
+                          isSavingMeter ? 'ph-spinner animate-spin' : 'ph-floppy-disk'
+                        } text-base`}
+                      ></i>
+                      <span>
+                        {isSavingMeter ? 'Zapisywanie...' : `Zapisz sam licznik (${counterUnit})`}
+                      </span>
+                    </button>
+                  </div>
+                  {meterSavedSuccess && (
+                    <div
+                      data-testid="operator-quick-meter-saved-banner"
+                      className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900 font-bold"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <i className="ph-fill ph-check-circle text-emerald-600 text-base"></i>
+                        Stan licznika ({reportedWorkHours} {counterUnit}) został zapisany w karcie obiektu!
+                      </span>
+                      <button
+                        type="button"
+                        data-testid="operator-quick-meter-done-btn"
+                        onClick={() => {
+                          if (stopLiveScanner) stopLiveScanner();
+                          setSelectedMachine(null);
+                          handleStepChange('scan');
+                        }}
+                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-[11px] font-extrabold transition-colors cursor-pointer"
+                      >
+                        Zakończ / Skanuj kolejny
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {!isOnline && (
@@ -420,6 +533,85 @@ export default function OperatorForm({
                 <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} className="w-5 h-5 text-red-600 rounded focus:ring-red-600" />
                 <span className="text-red-900 font-medium">Maszyna jest całkowicie unieruchomiona (Krytyczne)</span>
               </label>
+
+              {/* Opcjonalna pozycja GPS przy zgłoszeniu awarii samochodu / pojazdu */}
+              {isVehicle && (
+                <div
+                  data-testid="operator-vehicle-gps-section"
+                  className="bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 space-y-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-extrabold text-emerald-950 flex items-center gap-2">
+                      <i className="ph-fill ph-map-pin-line text-emerald-600 text-lg"></i>
+                      <span>Pozycja GPS pojazdu (opcjonalnie)</span>
+                    </h3>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Flota / Assistance
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-800 leading-snug">
+                    Przy zgłoszeniu awarii samochodu możesz opcjonalnie dołączyć bieżące współrzędne GPS pojazdu, aby serwis lub pomoc drogowa od razu widziały pinezkę na mapie.
+                  </p>
+                  {vehicleGps ? (
+                    <div
+                      data-testid="operator-vehicle-gps-captured"
+                      className="bg-white border border-emerald-300 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2 font-mono font-bold text-slate-800">
+                        <i className="ph-fill ph-check-circle text-emerald-600 text-base"></i>
+                        <span>
+                          GPS: {Number(vehicleGps.lat).toFixed(5)}, {Number(vehicleGps.lng).toFixed(5)}
+                          {vehicleGps.accuracy ? ` (±${vehicleGps.accuracy} m)` : ''}
+                        </span>
+                        <a
+                          href={`https://www.google.com/maps?q=${vehicleGps.lat},${vehicleGps.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline font-sans font-bold ml-1"
+                        >
+                          Podgląd mapy
+                        </a>
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="operator-clear-vehicle-gps-btn"
+                        onClick={handleClearVehicleGps}
+                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-xs cursor-pointer"
+                      >
+                        Usuń GPS
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        data-testid="operator-capture-vehicle-gps-btn"
+                        disabled={isCapturingVehicleGps}
+                        onClick={handleCaptureVehicleGps}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition-colors inline-flex items-center gap-2 cursor-pointer"
+                      >
+                        <i
+                          className={`ph ${
+                            isCapturingVehicleGps
+                              ? 'ph-spinner animate-spin'
+                              : 'ph-crosshair'
+                          } text-base`}
+                        ></i>
+                        <span>
+                          {isCapturingVehicleGps
+                            ? 'Pobieranie pozycji GPS...'
+                            : '📍 Pobierz pozycję GPS pojazdu (opcjonalnie)'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                  {vehicleGpsError && (
+                    <div className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg">
+                      {vehicleGpsError}
+                    </div>
+                  )}
+                </div>
+              )}
               {/* Zdjęcia */}
               <div className="bg-white p-4 rounded border border-gray-200">
                 <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">

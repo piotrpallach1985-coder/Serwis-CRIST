@@ -78,13 +78,19 @@ export default function Login({ onLogin, currentUser }) {
 
   const handleScanSuccess = async (decodedText, rawQr) => {
     setIsScanning(false);
-    const parsed = parseQrPayload(rawQr || decodedText);
+    const rawStr = rawQr || decodedText || '';
+    const parsed = parseQrPayload(rawStr);
     const storeParts = useManagerStore.getState().parts || [];
     const candidateId = parsed.partId || parsed.machineId || String(decodedText || '').trim();
     const matchedPart = storeParts.find(
       p => p.id === candidateId || (p.code && p.code === candidateId)
     );
-    if (parsed.isPartQr || matchedPart) {
+    if (
+      parsed.isPart ||
+      parsed.isPartQr ||
+      matchedPart ||
+      /[?&#\s|^]part=([^&#\s]+)/i.test(rawStr)
+    ) {
       setPartScanAlert(
         t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
       );

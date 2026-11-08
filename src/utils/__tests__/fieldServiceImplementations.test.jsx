@@ -69,6 +69,7 @@ import TicketMainColumnStepper from '../../components/manager/tickets/TicketMain
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
 import TechnicianPerformancePanel from '../../components/manager/reports/TechnicianPerformancePanel';
 import MachineCard from '../../components/manager/MachineCard';
+import InAppTicketScanner from '../../components/manager/InAppTicketScanner';
 import Login from '../../components/Login';
 import { MemoryRouter } from 'react-router-dom';
 import { useManagerStore } from '../../store/managerStore';
@@ -2600,6 +2601,166 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(isTaskAssignedToUser(ticketForRoleName, externalTechUser)).toBe(true);
       expect(isTaskAssignedToUser(serviceForRoleName, externalTechUser)).toBe(true);
       expect(isTaskAssignedToUser(unrelatedTicket, externalTechUser)).toBe(false);
+    });
+
+    it('obsługuje: (1) przycisk Cofnij/Zamknij i blokadę obcego QR w InAppTicketScanner, (2) opcjonalny GPS dla awarii samochodu oraz (3) szybkie raportowanie przebiegu/motogodzin w OperatorForm i TicketMainColumnHeader', async () => {
+      const fleetVehicle = {
+        id: 'veh-gps-1',
+        name: 'Volkswagen Crafter Serwis',
+        assetCategory: 'vehicle',
+        licensePlate: 'GD 3V975',
+        regionId: 'r-flota',
+        currentWorkHours: 142500,
+      };
+      const industrialMachine = {
+        id: 'mach-rbg-1',
+        name: 'Prasa Hydrauliczna PH-200',
+        assetCategory: 'device',
+        regionId: 'r-hala',
+        currentWorkHours: 3200,
+      };
+
+      useManagerStore.getState().setTenantId('crist');
+      useManagerStore.getState().setBranding({
+        companyName: 'CRIST S.A.',
+        industryProfile: 'industrial',
+      });
+      useManagerStore.getState().setMachines([fleetVehicle, industrialMachine]);
+      useManagerStore.getState().setRegions([
+        { id: 'r-flota', name: 'Baza Floty' },
+        { id: 'r-hala', name: 'Hala A' },
+      ]);
+
+      // 1) InAppTicketScanner posiada przycisk Zamknij oraz blokuje kod QR z innej firmy
+      const onCloseMock = vi.fn();
+      const { unmount: unmountScanner } = render(
+        <MemoryRouter>
+          <InAppTicketScanner onClose={onCloseMock} />
+        </MemoryRouter>
+      );
+
+      const closeBtn = screen.getByTestId('inapp-scanner-close-btn');
+      expect(closeBtn).toBeTruthy();
+      fireEvent.click(closeBtn);
+      expect(onCloseMock).toHaveBeenCalledTimes(1);
+
+      // Próba wpisania nieznanego / obcego kodu nie otwiera formularza, lecz wyświetla baner błędu
+      const manualToggleBtn = screen.getByTestId('operator-manual-toggle-btn');
+      fireEvent.click(manualToggleBtn);
+      const plateInput = screen.getByTestId('operator-plate-input');
+      fireEvent.change(plateInput, { target: { value: 'tenant=obca-firma&machine=m-obca' } });
+      fireEvent.click(screen.getByTestId('operator-plate-submit-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('inapp-scanner-error-banner')).toBeTruthy();
+      });
+      expect(
+        screen.getByTestId('inapp-scanner-error-banner').textContent.toLowerCase()
+      ).toContain('obca-firma');
+      unmountScanner();
+
+      // 2) OperatorForm dla pojazdu wyświetla szybkie raportowanie przebiegu (km) oraz opcjonalną pozycję GPS pojazdu
+      const mockGeolocation = {
+        getCurrentPosition: vi.fn(successCb =>
+          successCb({
+            coords: { latitude: 54.51889, longitude: 18.53054, accuracy: 12 },
+          })
+        ),
+      };
+      Object.defineProperty(global.navigator, 'geolocation', {
+        value: mockGeolocation,
+        configurable: true,
+      });
+
+      const setSelectedMachineMock = vi.fn();
+      const { unmount: unmountVehicleForm } = render(
+        <OperatorForm
+          machines={[fleetVehicle, industrialMachine]}
+          selectedMachine={fleetVehicle}
+          setSelectedMachine={setSelectedMachineMock}
+          regions={[{ id: 'r-flota', name: 'Baza Floty' }]}
+          handleStepChange={vi.fn()}
+          isOnline={true}
+          isInternal={true}
+          topicsList={['Awaria silnika']}
+        />
+      );
+
+      // Sekcja szybkiego raportowania przebiegu (km)
+      const quickMeterCard = screen.getByTestId('operator-quick-meter-card');
+      expect(quickMeterCard.textContent).toContain('Szybkie raportowanie przebiegu pojazdu (km)');
+      expect(screen.getByTestId('operator-quick-meter-current-badge').textContent).toContain(
+        '142500 km'
+      );
+
+      const meterInput = screen.getByTestId('operator-quick-meter-input');
+      expect(meterInput.value).toBe('142500');
+      fireEvent.change(meterInput, { target: { value: '142850' } });
+      expect(meterInput.value).toBe('142850');
+
+      // Sekcja opcjonalnej pozycji GPS dla samochodu
+      expect(screen.getByTestId('operator-vehicle-gps-section')).toBeTruthy();
+      fireEvent.click(screen.getByTestId('operator-capture-vehicle-gps-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('operator-vehicle-gps-captured')).toBeTruthy();
+      });
+      expect(screen.getByTestId('operator-vehicle-gps-captured').textContent).toContain(
+        '54.51889, 18.53054'
+      );
+
+      // Możliwość usunięcia pobranej pozycji GPS
+      fireEvent.click(screen.getByTestId('operator-clear-vehicle-gps-btn'));
+      expect(screen.queryByTestId('operator-vehicle-gps-captured')).toBeNull();
+      unmountVehicleForm();
+
+      // 3) OperatorForm dla maszyny przemysłowej wyświetla szybkie raportowanie motogodzin (RBG) i NIE wyświetla sekcji GPS samochodu
+      const { unmount: unmountMachineForm } = render(
+        <OperatorForm
+          machines={[fleetVehicle, industrialMachine]}
+          selectedMachine={industrialMachine}
+          setSelectedMachine={vi.fn()}
+          regions={[{ id: 'r-hala', name: 'Hala A' }]}
+          handleStepChange={vi.fn()}
+          isOnline={true}
+          isInternal={true}
+          topicsList={['Wyciek oleju']}
+        />
+      );
+      expect(screen.getByTestId('operator-quick-meter-card').textContent).toContain(
+        'Szybkie raportowanie motogodzin urządzenia (RBG)'
+      );
+      expect(screen.getByTestId('operator-quick-meter-current-badge').textContent).toContain(
+        '3200 RBG'
+      );
+      expect(screen.queryByTestId('operator-vehicle-gps-section')).toBeNull();
+      unmountMachineForm();
+
+      // 4) TicketMainColumnHeader wyświetla zgłoszony stan licznika oraz pozycję GPS pojazdu z linkiem do mapy
+      const { unmount: unmountHeader } = render(
+        <TicketMainColumnHeader
+          currentTicket={{
+            id: 't-gps-1',
+            machineId: 'veh-gps-1',
+            machineName: 'Volkswagen Crafter Serwis',
+            topic: 'Uszkodzona opona na trasie',
+            status: 1,
+            reportedBy: 'Jan Kierowca',
+            reportedWorkHours: 142850,
+            vehicleGps: { lat: 54.51889, lng: 18.53054, accuracy: 10 },
+          }}
+          STATUSES={{ 1: { label: 'Nowe', color: 'bg-red-100 text-red-800' } }}
+          machines={[fleetVehicle]}
+          regions={[{ id: 'r-flota', name: 'Baza Floty' }]}
+        />
+      );
+      expect(screen.getByTestId('ticket-reported-meter-badge').textContent).toContain(
+        '142850 km'
+      );
+      expect(screen.getByTestId('ticket-vehicle-gps-badge').textContent).toContain(
+        '54.51889, 18.53054'
+      );
+      unmountHeader();
     });
   });
 });

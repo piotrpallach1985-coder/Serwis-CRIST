@@ -8,7 +8,9 @@ import {
   resolveAnonymousReportPin,
   verifyAnonymousReportPin,
   findMachineByIdentifierOrPlate,
+  getMachineCounterUnit,
 } from '../utils/fieldServiceHelpers';
+import { updateMachineWorkHours } from '../services/machines.service';
 import { useManagerStore } from '../store/managerStore';
 
 // Spójne z limitem w firestore.rules (anonimowe zgłoszenia)
@@ -49,9 +51,30 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
   const [pendingPhotos, setPendingPhotos] = useState([]);
   const [uploadProgress, setUploadProgress] = useState('');
   const [acceptedRodo, setAcceptedRodo] = useState(false);
+
+  // Szybkie raportowanie licznika (przebieg km / motogodziny RBG)
+  const [reportedWorkHours, setReportedWorkHours] = useState('');
+  const [isSavingMeter, setIsSavingMeter] = useState(false);
+  const [meterSavedSuccess, setMeterSavedSuccess] = useState(false);
+
+  // Opcjonalna pozycja GPS dla zgłoszenia awarii pojazdu
+  const [vehicleGps, setVehicleGps] = useState(null);
+  const [isCapturingVehicleGps, setIsCapturingVehicleGps] = useState(false);
+  const [vehicleGpsError, setVehicleGpsError] = useState(null);
   
   const { toastConfig, showToast, hideToast } = useToast();
   const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    setMeterSavedSuccess(false);
+    const currentVal =
+      selectedMachine?.currentWorkHours ?? selectedMachine?.workHours ?? '';
+    setReportedWorkHours(
+      currentVal !== '' && currentVal !== null && currentVal !== undefined
+        ? String(currentVal)
+        : ''
+    );
+  }, [selectedMachine?.id, selectedMachine?.matchedMachineId]);
 
   useEffect(() => {
     return () => {
@@ -151,6 +174,8 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       reportPin: !isInternal && reportPin ? String(reportPin).trim() : '',
       isCritical,
       pendingPhotos,
+      vehicleGps,
+      reportedWorkHours,
       acceptedRodo,
       reporterDeviceId,
       isOnline,
@@ -161,6 +186,96 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     if (ok && !isInternal) {
       recordQrSubmissionTimestamp();
     }
+  };
+
+  const handleSaveMeterOnly = async () => {
+    const targetMachine =
+      selectedMachine?.id && selectedMachine.id !== 'manual'
+        ? selectedMachine
+        : selectedMachine?.matchedMachineId
+          ? (machines || []).find(m => m.id === selectedMachine.matchedMachineId)
+          : null;
+
+    if (!targetMachine || !targetMachine.id || targetMachine.id === 'manual') {
+      showToast('Wybierz konkretne urządzenie lub pojazd, aby zapisać stan licznika.', 'error');
+      return false;
+    }
+
+    const parsedVal = Number(reportedWorkHours);
+    if (String(reportedWorkHours).trim() === '' || Number.isNaN(parsedVal) || parsedVal < 0) {
+      showToast('Podaj prawidłową wartość licznika (większą lub równą 0).', 'error');
+      return false;
+    }
+
+    setIsSavingMeter(true);
+    try {
+      await updateMachineWorkHours(targetMachine.id, parsedVal, false);
+      const unit = getMachineCounterUnit(targetMachine, branding?.industryProfile);
+      if (setSelectedMachine) {
+        setSelectedMachine(prev =>
+          prev ? { ...prev, currentWorkHours: parsedVal } : prev
+        );
+      }
+      const storeState = useManagerStore.getState?.();
+      if (storeState?.setMachines && Array.isArray(storeState.machines)) {
+        storeState.setMachines(
+          storeState.machines.map(m =>
+            m.id === targetMachine.id ? { ...m, currentWorkHours: parsedVal } : m
+          )
+        );
+      }
+      setMeterSavedSuccess(true);
+      showToast(
+        `Zapisano stan licznika: ${parsedVal} ${unit} (${targetMachine.name}).`,
+        'success'
+      );
+      return true;
+    } catch (err) {
+      console.error('Błąd zapisu licznika:', err);
+      showToast('Nie udało się zapisać stanu licznika: ' + (err.message || err), 'error');
+      return false;
+    } finally {
+      setIsSavingMeter(false);
+    }
+  };
+
+  const handleCaptureVehicleGps = () => {
+    setVehicleGpsError(null);
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      const msg = 'Twoja przeglądarka lub urządzenie nie obsługuje lokalizacji GPS.';
+      setVehicleGpsError(msg);
+      showToast(msg, 'error');
+      return;
+    }
+    setIsCapturingVehicleGps(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = {
+          lat: Number(pos.coords.latitude.toFixed(6)),
+          lng: Number(pos.coords.longitude.toFixed(6)),
+          accuracy: Math.round(pos.coords.accuracy || 0),
+          timestamp: new Date().toISOString(),
+        };
+        setVehicleGps(coords);
+        setIsCapturingVehicleGps(false);
+        showToast('Pobrano współrzędne GPS pojazdu.', 'success');
+      },
+      err => {
+        setIsCapturingVehicleGps(false);
+        const msg =
+          err?.code === 1
+            ? 'Odmówiono dostępu do lokalizacji GPS. Zezwól na dostęp w przeglądarce lub kontynuuj bez GPS.'
+            : 'Nie udało się pobrać pozycji GPS pojazdu.';
+        setVehicleGpsError(msg);
+        showToast(msg, 'warning');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  const handleClearVehicleGps = () => {
+    setVehicleGps(null);
+    setVehicleGpsError(null);
   };
 
   const handleFilesSelected = async (e) => {
@@ -205,6 +320,11 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     acceptedRodo, setAcceptedRodo,
     toastConfig, hideToast,
     submitLoading, submitProgress,
+    reportedWorkHours, setReportedWorkHours,
+    isSavingMeter, meterSavedSuccess, handleSaveMeterOnly,
+    vehicleGps, setVehicleGps,
+    isCapturingVehicleGps, vehicleGpsError,
+    handleCaptureVehicleGps, handleClearVehicleGps,
     handleSubmit, handleFilesSelected
   };
 };

@@ -4,6 +4,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../firebase';
 import { savePhotoToIndexedDB } from '../utils/offlineStorage';
 import { logAudit } from '../services/audit.service';
+import { updateMachineWorkHours } from '../services/machines.service';
 import { TICKET_STATUS } from '../utils/constants';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
@@ -24,7 +25,8 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       reportPin,
       isCritical,
       pendingPhotos,
-      
+      vehicleGps,
+      reportedWorkHours,
       acceptedRodo,
       reporterDeviceId,
       isOnline,
@@ -142,6 +144,29 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       setUploadProgress('Zapisywanie zgłoszenia w chmurze (to może zająć chwilę)...');
 
       // 4. Tworzymy zgłoszenie ATOMOWO
+      const parsedMeter =
+        reportedWorkHours !== undefined &&
+        reportedWorkHours !== null &&
+        String(reportedWorkHours).trim() !== '' &&
+        !Number.isNaN(Number(reportedWorkHours)) &&
+        Number(reportedWorkHours) >= 0
+          ? Number(reportedWorkHours)
+          : null;
+
+      const validVehicleGps =
+        vehicleGps &&
+        typeof vehicleGps.lat === 'number' &&
+        typeof vehicleGps.lng === 'number' &&
+        !Number.isNaN(vehicleGps.lat) &&
+        !Number.isNaN(vehicleGps.lng)
+          ? {
+              lat: Number(vehicleGps.lat),
+              lng: Number(vehicleGps.lng),
+              accuracy: Number(vehicleGps.accuracy || 0),
+              timestamp: String(vehicleGps.timestamp || new Date().toISOString()),
+            }
+          : null;
+
       const ticketPayload = {
         machineId: finalMachineId,
         machineName: selectedMachine.name,
@@ -166,6 +191,8 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
         ...(reportPin && String(reportPin).trim()
           ? { reportPin: String(reportPin).trim() }
           : {}),
+        ...(parsedMeter !== null ? { reportedWorkHours: parsedMeter } : {}),
+        ...(validVehicleGps ? { vehicleGps: validVehicleGps } : {}),
         updates: [{
           timestamp: new Date().toISOString(),
           status: TICKET_STATUS.OPEN,
@@ -175,6 +202,11 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       };
 
       await setDoc(ticketRef, ticketPayload);
+      if (parsedMeter !== null && finalMachineId && finalMachineId !== 'manual') {
+        updateMachineWorkHours(finalMachineId, parsedMeter, false).catch(err =>
+          console.warn('Błąd aktualizacji licznika przy zgłoszeniu:', err)
+        );
+      }
       logAudit('CREATE', 'TICKET', ticketRef.id, 'Zgłoszono nową awarię: ' + selectedMachine.name);
       localStorage.setItem('last_ticket_time', Date.now().toString());
 

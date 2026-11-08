@@ -214,6 +214,38 @@ export default function TicketMainColumnHeader({
               {safeParseDate(currentTicket.createdAt)?.toLocaleString('pl-PL') ||
                 t('tickets.history.no_date')}
             </div>
+            {currentTicket.reportedWorkHours !== undefined &&
+              currentTicket.reportedWorkHours !== null && (
+                <div
+                  data-testid="ticket-reported-meter-badge"
+                  className="mt-2 text-xs font-bold text-blue-800 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 mr-2"
+                >
+                  <i className="ph ph-gauge"></i>
+                  <span>
+                    Zgłoszony stan licznika: {currentTicket.reportedWorkHours} {counterUnit}
+                  </span>
+                </div>
+              )}
+            {currentTicket.vehicleGps?.lat != null && currentTicket.vehicleGps?.lng != null && (
+              <div
+                data-testid="ticket-vehicle-gps-badge"
+                className="mt-2 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg flex flex-wrap items-center gap-2"
+              >
+                <span className="inline-flex items-center gap-1">
+                  <i className="ph-fill ph-map-pin-line text-emerald-600"></i>
+                  Pozycja GPS pojazdu: {Number(currentTicket.vehicleGps.lat).toFixed(5)},{' '}
+                  {Number(currentTicket.vehicleGps.lng).toFixed(5)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps?q=${currentTicket.vehicleGps.lat},${currentTicket.vehicleGps.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-extrabold transition-colors"
+                >
+                  <i className="ph ph-navigation-arrow"></i> Mapa GPS
+                </a>
+              </div>
+            )}
             {industryProfile !== 'industrial' && fGasSummaryStr && (
               <div className="mt-2 text-xs font-semibold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg">
                 <i className="ph ph-snowflake mr-1"></i> {fGasSummaryStr}

@@ -177,7 +177,8 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['machineId', 'machineName', 'bay', 'regionId', 'regionName', 'topic', 'description',
                                'isCritical', 'reportedBy', 'reporterPhone', 'reporterDevice', 'reporterDeviceId',
-                               'reporterUid', 'status', 'createdAt', 'photos', 'updates', 'reportPin'])
+                               'reporterUid', 'status', 'createdAt', 'photos', 'updates', 'reportPin',
+                               'vehicleGps', 'reportedWorkHours'])
         && d.keys().hasAll(['machineId', 'topic', 'description', 'status', 'reporterUid'])
         && d.status == 1
         && d.reporterUid == request.auth.uid
@@ -197,6 +198,9 @@ service cloud.firestore {
         && optString(d, 'createdAt', 40)
         && optString(d, 'reportPin', 30)
         && (!('isCritical' in d) || d.isCritical is bool)
+        && (!('reportedWorkHours' in d) || (d.reportedWorkHours is number && d.reportedWorkHours >= 0))
+        && (!('vehicleGps' in d) || (d.vehicleGps is map && d.vehicleGps.keys().hasOnly(['lat', 'lng', 'accuracy', 'timestamp'])
+              && d.vehicleGps.lat is number && d.vehicleGps.lng is number))
         && (!('photos' in d) || (d.photos is list && photosValid(d.photos, tenantId, ticketId)))
         && (!('updates' in d) || (d.updates is list && d.updates.size() <= 1
               && (d.updates.size() == 0 || (d.updates[0].status == 1 && d.updates[0].keys().hasOnly(['timestamp', 'status', 'comment', 'author'])))));
@@ -223,7 +227,11 @@ service cloud.firestore {
               && request.resource.data.name.size() < 200
               && request.resource.data.name.matches('.*[(]DO WERYFIKACJI[)]$')
               && request.resource.data.isDeleted == false);
-        allow update: if isTenantUser(tenantId);
+        allow update: if isTenantUser(tenantId)
+          || (isAnonymousInTenant(tenantId)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentWorkHours', 'lastWorkHoursUpdate'])
+              && request.resource.data.currentWorkHours is number
+              && request.resource.data.currentWorkHours >= 0);
         allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 
@@ -325,8 +333,8 @@ service cloud.firestore {
       }
       
       match /parts/{document=**} {
-        allow get: if isAnonymousInTenant(tenantId);
-        allow read, create, update: if isTenantUser(tenantId);
+        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
+        allow create, update: if isTenantUser(tenantId);
         allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 

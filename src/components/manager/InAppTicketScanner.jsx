@@ -16,12 +16,21 @@ import {
 } from '../../services/qrAccess.service';
 import { findMachineByIdentifierOrPlate } from '../../utils/fieldServiceHelpers';
 
-export default function InAppTicketScanner() {
+export default function InAppTicketScanner({ onClose }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth();
   const tenantId = getCurrentTenant();
   const { showToast, toastConfig, hideToast } = useToast();
+  const [scanErrorBanner, setScanErrorBanner] = useState(null);
+
+  const handleCloseScanner = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    } else {
+      navigate('/manager/ur/tickets');
+    }
+  };
 
   const machines = useManagerStore(state => state.machines || []);
   const regions = useManagerStore(state => state.regions || []);
@@ -46,6 +55,7 @@ export default function InAppTicketScanner() {
   const [selectedMachine, setSelectedMachine] = useState(null);
 
   const handleScanSuccess = async (decodedText, rawQr) => {
+    setScanErrorBanner(null);
     if (decodedText === 'manual') {
       setSelectedMachine({ id: 'manual', name: '', regionId: '' });
       setStep('form');
@@ -57,11 +67,18 @@ export default function InAppTicketScanner() {
     const matchedPart = parts.find(
       p => p.id === candidateId || (p.code && p.code === candidateId)
     );
-    if (parsed.isPartQr || matchedPart) {
-      showToast(
-        t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG),
-        'error'
+    if (
+      parsed.isPart ||
+      parsed.isPartQr ||
+      matchedPart ||
+      /[?&#\s|^]part=([^&#\s]+)/i.test(rawStr)
+    ) {
+      const partMsg = t(
+        'machines.toasts.scannedPartInsteadOfMachine',
+        PART_QR_IN_MACHINE_SCANNER_MSG
       );
+      setScanErrorBanner(partMsg);
+      showToast(partMsg, 'error');
       return;
     }
 
@@ -74,8 +91,18 @@ export default function InAppTicketScanner() {
     const tMatch = String(decodedText).match(/tenant=([^&#]+)/);
     if (tMatch && !tenantFromQr) tenantFromQr = tMatch[1];
 
-    if (tenantFromQr && tenantFromQr !== tenantId && user?.role !== 'superadmin') {
-      showToast(t('machines.toasts.wrongTenant', 'Ta maszyna należy do innej firmy!'), 'error');
+    if (
+      tenantFromQr &&
+      String(tenantFromQr).toLowerCase() !== String(tenantId || '').toLowerCase()
+    ) {
+      const wrongTenantMsg = t(
+        'machines.toasts.wrongTenant',
+        `Zeskanowany kod QR należy do innej firmy (${parsed.tenantName || tenantFromQr})! Nie można zgłosić awarii obcego urządzenia w firmie, w której jesteś zalogowany.`
+      );
+      setScanErrorBanner(wrongTenantMsg);
+      showToast(wrongTenantMsg, 'error');
+      setSelectedMachine(null);
+      setStep('scan');
       return;
     }
 
@@ -90,17 +117,19 @@ export default function InAppTicketScanner() {
       try {
         const partSnap = await getDoc(doc(db, 'tenants', tenantId, 'parts', machineId));
         if (partSnap.exists()) {
-          showToast(
-            t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG),
-            'error'
+          const partMsg = t(
+            'machines.toasts.scannedPartInsteadOfMachine',
+            PART_QR_IN_MACHINE_SCANNER_MSG
           );
+          setScanErrorBanner(partMsg);
+          showToast(partMsg, 'error');
           return;
         }
       } catch (err) { console.warn('[InAppTicketScanner: sprawdzenie kodu części]', err); }
 
       try {
         const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', machineId));
-        if (d.exists()) {
+        if (d.exists() && !d.data().isDeleted) {
           targetMachine = { id: d.id, ...d.data() };
         }
       } catch (err) { console.warn('[InAppTicketScanner: pobranie maszyny]', err); }
@@ -110,8 +139,14 @@ export default function InAppTicketScanner() {
       setSelectedMachine(targetMachine);
       setStep('form');
     } else {
-      setSelectedMachine({ id: 'manual', name: 'Nieznana Maszyna', manualInput: machineId });
-      setStep('form');
+      const unknownDeviceMsg = t(
+        'machines.toasts.unknownOrForeignQr',
+        'Zeskanowany kod QR nie należy do żadnego urządzenia w aktualnie zalogowanej firmie!'
+      );
+      setScanErrorBanner(unknownDeviceMsg);
+      showToast(unknownDeviceMsg, 'error');
+      setSelectedMachine(null);
+      setStep('scan');
     }
   };
 
@@ -126,10 +161,59 @@ export default function InAppTicketScanner() {
           <i className="ph ph-warning-circle text-purple-600 text-3xl"></i>
           {t('scanner.internalTitle', 'Zgłoszenie awarii')}
         </h1>
+        <div className="flex items-center gap-2">
+          {step === 'form' && (
+            <button
+              type="button"
+              data-testid="inapp-scanner-back-btn"
+              onClick={() => {
+                setSelectedMachine(null);
+                setStep('scan');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition-colors cursor-pointer"
+            >
+              <i className="ph ph-arrow-left text-base"></i>
+              <span>{t('common.back', 'Cofnij')}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="inapp-scanner-close-btn"
+            onClick={handleCloseScanner}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs sm:text-sm rounded-xl border border-red-200 transition-colors cursor-pointer"
+          >
+            <i className="ph ph-x text-base"></i>
+            <span>{t('common.close', 'Zamknij')}</span>
+          </button>
+        </div>
         {(toastConfig.show || toastConfig.visible) && (
           <Toast {...toastConfig} onClose={hideToast} />
         )}
       </div>
+
+      {scanErrorBanner && step === 'scan' && (
+        <div
+          data-testid="inapp-scanner-error-banner"
+          className="mb-4 bg-red-50 border-2 border-red-300 text-red-900 p-4 rounded-2xl shadow-sm flex items-start justify-between gap-3"
+        >
+          <div className="flex items-start gap-3">
+            <i className="ph ph-warning-octagon text-2xl text-red-600 shrink-0 mt-0.5"></i>
+            <div>
+              <div className="font-extrabold text-sm">{scanErrorBanner}</div>
+              <div className="text-xs text-red-700 mt-0.5">
+                Zeskanuj prawidłowy kod QR urządzenia należącego do aktualnie wybranej firmy lub użyj przycisku &bdquo;Zgłoś bez QR / NFC&rdquo;.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setScanErrorBanner(null)}
+            className="px-2.5 py-1 bg-white hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold shrink-0 cursor-pointer"
+          >
+            OK
+          </button>
+        </div>
+      )}
       {step === 'scan' && (
         <div className="w-full flex-1 flex flex-col">
           <OperatorScanner onScanSuccess={handleScanSuccess} machines={machines} isInternal={true} />
