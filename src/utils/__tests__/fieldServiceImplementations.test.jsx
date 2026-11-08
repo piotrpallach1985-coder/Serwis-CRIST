@@ -1819,7 +1819,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
       unmountQrModal();
 
-      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC i brak skanowania tablic (tylko Skanuj QR + Zbliżeniowe NFC)
+      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC, brak karty "Zgłoś inne urządzenie" i brak skanowania tablic (tylko Skanuj QR + Zbliżeniowe NFC)
       const onOperatorScan = vi.fn();
       const { unmount: unmountUnloggedScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={false} />
@@ -1827,11 +1827,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByText('Skanuj QR')).toBeTruthy();
       expect(screen.queryByText('Skanuj QR/Tablicę')).toBeNull();
       expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
-        )
-      ).toBeTruthy();
+      expect(screen.queryByTestId('operator-other-machine-card-desc')).toBeNull();
       expect(screen.queryByTestId('operator-report-without-qr-btn')).toBeNull();
       expect(screen.queryByTestId('operator-license-plate-section')).toBeNull();
       unmountUnloggedScanner();
@@ -2199,9 +2195,10 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       }
       const { unmount: unmountBypass } = render(<WrapperAnonForm />);
       expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
-      fireEvent.click(screen.getByText('Inne Urządzenie'));
-      // Nawet po przełączeniu na "Inne Urządzenie", sekcja PIN-u dla pierwotnego budynku A (4821) pozostaje wymagana
-      expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
+      // W trybie anonimowym (isInternal=false) przycisk "Inne Urządzenie" jest całkowicie ukryty — anonim zgłasza tylko zeskanowane urządzenie z QR/NFC
+      expect(screen.queryByText('Inne Urządzenie')).toBeNull();
+      // Natomiast podpowiedzi typu awarii (topicsList) są w pełni widoczne dla anonima
+      expect(screen.getByText('Drzwi nie domykają się')).toBeTruthy();
       unmountBypass();
 
       // 7) Hydratacja czynników chłodniczych z Firestore (branding.customRefrigerants) oraz fallback assignedAt w metrykach

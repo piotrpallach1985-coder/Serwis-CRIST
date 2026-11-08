@@ -160,11 +160,16 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       } catch (err) { console.warn('[OperatorView: wyszukanie maszyny po kodzie]', err); }
     }
 
+    const isInternalUser = Boolean(auth.currentUser && !auth.currentUser.isAnonymous);
+
     if (targetMachine) {
+      if (!isInternalUser) {
+        setMachines([targetMachine]);
+      }
       setSelectedMachine(targetMachine);
       setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
       setStep('form');
-    } else if (decodedText === 'manual') {
+    } else if (decodedText === 'manual' && isInternalUser) {
       setSelectedMachine({ id: 'manual', name: '', regionId: '' });
       setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
       setStep('form');
@@ -242,42 +247,99 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             () => {}
           );
 
-          unsubscribeMachines = onSnapshot(
-            query(
-              collection(db, 'tenants', tenantId, 'machines'),
-              where('isDeleted', '==', false)
-            ),
-            snapshot => {
-              setNeedsQr(false);
-              setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-
-              if (urlMachineId && !urlMachineResolvedRef.current) {
-                const loadedList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                const target = findMachineByIdentifierOrPlate(
-                  loadedList,
-                  urlMachineId,
-                  urlMachineId
-                );
-                if (target) {
-                  setSelectedMachine(target);
-                  urlMachineResolvedRef.current = true;
-                  setStep('form');
-                } else if (loadedList.length > 0) {
-                  urlMachineResolvedRef.current = true;
-                  setPartQrNotice(
-                    t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
-                  );
-                  setSelectedMachine(null);
-                  setStep('scan');
+          if (authUser.isAnonymous) {
+            if (urlMachineId && urlMachineId !== 'manual') {
+              unsubscribeMachines = onSnapshot(
+                doc(db, 'tenants', tenantId, 'machines', urlMachineId),
+                docSnap => {
+                  setNeedsQr(false);
+                  if (docSnap.exists() && !docSnap.data().isDeleted) {
+                    const target = { id: docSnap.id, ...docSnap.data() };
+                    setMachines([target]);
+                    setSelectedMachine(target);
+                    urlMachineResolvedRef.current = true;
+                    setStep('form');
+                  } else if (!urlMachineResolvedRef.current) {
+                    (async () => {
+                      try {
+                        const q = query(
+                          collection(db, 'tenants', tenantId, 'machines'),
+                          where('qrCode', '==', urlMachineId),
+                          limit(1)
+                        );
+                        const snap = await getDocs(q);
+                        if (!snap.empty && !snap.docs[0].data().isDeleted) {
+                          const target = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                          setMachines([target]);
+                          setSelectedMachine(target);
+                          urlMachineResolvedRef.current = true;
+                          setStep('form');
+                          return;
+                        }
+                      } catch {
+                        // ignore
+                      }
+                      urlMachineResolvedRef.current = true;
+                      setPartQrNotice(
+                        t(
+                          'machines.toasts.scannedPartInsteadOfMachine',
+                          PART_QR_IN_MACHINE_SCANNER_MSG
+                        )
+                      );
+                      setSelectedMachine(null);
+                      setStep('scan');
+                    })();
+                  }
+                },
+                error => {
+                  console.error('SNAPSHOT ERROR FOR machine doc:', error);
+                  if (error?.code === 'permission-denied') setNeedsQr(true);
                 }
-              }
-            },
-            error => {
-              console.error('SNAPSHOT ERROR FOR machines:', error);
-              if (error?.code === 'permission-denied' && auth.currentUser?.isAnonymous)
-                setNeedsQr(true);
+              );
+            } else {
+              setMachines([]);
             }
-          );
+          } else {
+            unsubscribeMachines = onSnapshot(
+              query(
+                collection(db, 'tenants', tenantId, 'machines'),
+                where('isDeleted', '==', false)
+              ),
+              snapshot => {
+                setNeedsQr(false);
+                setMachines(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+
+                if (urlMachineId && !urlMachineResolvedRef.current) {
+                  const loadedList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                  const target = findMachineByIdentifierOrPlate(
+                    loadedList,
+                    urlMachineId,
+                    urlMachineId
+                  );
+                  if (target) {
+                    setSelectedMachine(target);
+                    urlMachineResolvedRef.current = true;
+                    setStep('form');
+                  } else if (loadedList.length > 0) {
+                    urlMachineResolvedRef.current = true;
+                    setPartQrNotice(
+                      t(
+                        'machines.toasts.scannedPartInsteadOfMachine',
+                        PART_QR_IN_MACHINE_SCANNER_MSG
+                      )
+                    );
+                    setSelectedMachine(null);
+                    setStep('scan');
+                  }
+                }
+              },
+              error => {
+                console.error('SNAPSHOT ERROR FOR machines:', error);
+                if (error?.code === 'permission-denied' && auth.currentUser?.isAnonymous)
+                  setNeedsQr(true);
+              }
+            );
+          }
 
           unsubscribeTopics = onSnapshot(
             collection(db, 'tenants', tenantId, 'topics'),
@@ -478,6 +540,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
             topicsList={topicsList}
             reportersList={reportersList}
             stopLiveScanner={() => {}}
+            isInternal={Boolean(auth.currentUser && !auth.currentUser.isAnonymous)}
           />
         )}
         {step === 'success' && (

@@ -225,14 +225,10 @@ service cloud.firestore {
       }
 
       match /machines/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
-        allow create: if isTenantUser(tenantId)
-          || (isAnonymousInTenant(tenantId)
-              && request.resource.data.keys().hasOnly(['name', 'regionId', 'bay', 'currentWorkHours', 'status', 'isDeleted', 'createdAt', 'createdBy', 'description'])
-              && request.resource.data.name is string
-              && request.resource.data.name.size() < 200
-              && request.resource.data.name.matches('.*[(]DO WERYFIKACJI[)]$')
-              && request.resource.data.isDeleted == false);
+        allow get: if isAnonymousInTenant(tenantId);
+        allow list: if isAnonymousInTenant(tenantId) && request.query.limit <= 1;
+        allow read: if isTenantUser(tenantId);
+        allow create: if isTenantUser(tenantId);
         allow update: if isTenantUser(tenantId)
           || (isAnonymousInTenant(tenantId)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentWorkHours', 'lastWorkHoursUpdate'])

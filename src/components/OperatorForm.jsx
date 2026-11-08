@@ -248,11 +248,12 @@ export default function OperatorForm({
                       )}
                   </div>
                   
-                  {/* Prawa strona: Przycisk Inna Maszyna / Powrót */}
+                  {/* Prawa strona: Przycisk Inna Maszyna (tylko dla zalogowanych) / Powrót */}
                   <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto mt-3 sm:mt-0">
-                    {selectedMachine.id !== "manual" && (
+                    {isInternal && selectedMachine.id !== "manual" && (
                       <button
                         type="button"
+                        data-testid="operator-other-machine-btn"
                         onClick={() => {
                           setSelectedMachine({ 
                             id: "manual", 

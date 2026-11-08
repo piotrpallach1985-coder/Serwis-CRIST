@@ -402,7 +402,11 @@ export default function OperatorScanner({
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-left">
+            <div
+              className={`grid grid-cols-1 ${
+                isInternal ? 'md:grid-cols-3' : 'md:grid-cols-2 max-w-2xl mx-auto'
+              } gap-4 mt-6 text-left`}
+            >
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
                 <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
                   <i className="ph ph-device-mobile-camera text-4xl"></i>
@@ -443,31 +447,28 @@ export default function OperatorScanner({
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
-                <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
-                  <i className="ph ph-qr-code text-4xl"></i>
-                  <i className="ph ph-plus-circle text-lg absolute -bottom-1 -right-1 text-slate-800 bg-white rounded-full p-0.5 shadow-sm border border-slate-100"></i>
+              {isInternal && (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex gap-4 items-center transition-all hover:shadow-md">
+                  <div className="w-16 h-16 shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-700 relative border border-slate-100">
+                    <i className="ph ph-qr-code text-4xl"></i>
+                    <i className="ph ph-plus-circle text-lg absolute -bottom-1 -right-1 text-slate-800 bg-white rounded-full p-0.5 shadow-sm border border-slate-100"></i>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
+                      {t('operator.otherMachineCardTitle', 'Zgłoś inne urządzenie:')}
+                    </h3>
+                    <p
+                      data-testid="operator-other-machine-card-desc"
+                      className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug"
+                    >
+                      {t(
+                        'operator.otherMachineInternalCardDesc',
+                        'Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC'
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base text-slate-800 uppercase tracking-tight">
-                    {t('operator.otherMachineCardTitle', 'Zgłoś inne urządzenie:')}
-                  </h3>
-                  <p
-                    data-testid="operator-other-machine-card-desc"
-                    className="text-xs sm:text-sm text-slate-600 mt-1 leading-snug"
-                  >
-                    {isInternal
-                      ? t(
-                          'operator.otherMachineInternalCardDesc',
-                          'Zgłoś awarię dowolnego urządzenia z firmy, jeśli nie ma widocznego QR/NFC'
-                        )
-                      : t(
-                          'operator.otherMachineCardDesc',
-                          'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
-                        )}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
