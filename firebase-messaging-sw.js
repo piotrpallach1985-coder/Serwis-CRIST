@@ -3,10 +3,10 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 
 firebase.initializeApp({
   apiKey: "AIzaSyDhaAwJbcDNRp5wloQFweluHdAvbCiZ82U",
-  authDomain: "serwis-VexoNT.firebaseapp.com",
-  databaseURL: "https://serwis-VexoNT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "serwis-VexoNT",
-  storageBucket: "serwis-VexoNT.firebasestorage.app",
+  authDomain: "serwis-crist.firebaseapp.com",
+  databaseURL: "https://serwis-crist-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "serwis-crist",
+  storageBucket: "serwis-crist.firebasestorage.app",
   messagingSenderId: "321327519677",
   appId: "1:321327519677:web:107294ad94ad3eb45664d4"
 });
@@ -15,12 +15,12 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
+
   const notificationTitle = payload.notification?.title || 'System Awarii VexoNT';
   const notificationOptions = {
     body: payload.notification?.body,
     icon: '/pwa-192x192.png',
-    badge: '/masked-icon.svg',
+    badge: '/pwa-192x192.png',
     data: payload.data
   };
 
@@ -29,13 +29,12 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
-  // Otwieramy powiązaną awarię lub ogólny link
+
   let clickAction = '/';
   if (event.notification.data && event.notification.data.click_action) {
     clickAction = event.notification.data.click_action;
   }
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (let i = 0; i < windowClients.length; i++) {
