@@ -196,4 +196,22 @@ describe('usePermissions', () => {
     expect(result.current.canAccessTab('machines_qr')).toBe(false);
     expect(result.current.canAccessTab('parts')).toBe(false);
   });
+
+  it('should prioritize live roleConfig permissions over stale user.onlyAssignedTasks when role is edited', () => {
+    const userWithStaleFlag = {
+      role: 'role-internal-ur',
+      onlyAssignedTasks: true,
+    };
+    const updatedRoles = [
+      {
+        id: 'role-internal-ur',
+        name: 'Serwis Wewnętrzny',
+        permissions: ['tickets', 'planned_maintenance', 'machines'],
+      },
+    ];
+    const { result } = renderHook(() => usePermissions(userWithStaleFlag, updatedRoles));
+
+    expect(result.current.onlyAssignedTasks).toBe(false);
+    expect(result.current.canAccessTab('machines')).toBe(true);
+  });
 });

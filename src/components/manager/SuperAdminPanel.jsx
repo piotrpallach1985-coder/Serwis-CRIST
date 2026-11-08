@@ -251,7 +251,8 @@ export default function SuperAdminPanel({ onNavigate }) {
         planned_services: tenant.modules?.planned_services ?? true,
         kpi: tenant.modules?.kpi ?? true,
         inventory: tenant.modules?.inventory ?? false,
-        tickets: tenant.modules?.tickets ?? true
+        tickets: tenant.modules?.tickets ?? true,
+        fleet: tenant.modules?.fleet ?? (tenant.industryProfile === 'fleet')
       }
     });
     setIsEditing(true);

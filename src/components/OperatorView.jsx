@@ -138,17 +138,6 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
           setStep('scan');
           return;
         }
-        const partByCodeSnap = await getDocs(
-          query(collection(db, 'tenants', tenantId, 'parts'), where('code', '==', mId), limit(1))
-        );
-        if (!partByCodeSnap.empty) {
-          setPartQrNotice(
-            t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
-          );
-          setSelectedMachine(null);
-          setStep('scan');
-          return;
-        }
       } catch {
         // ignore permission error if not bound yet
       }

@@ -65,6 +65,7 @@ export const saveTenant = async (formData, isEditing) => {
     industrial: 'DYSPOZYTORNIA UR',
     facility: 'ZARZĄDZANIE NIERUCHOMOŚCIAMI (c-KOB)',
     hvac: 'SERWIS MOBILNY HVAC / F-GAZ',
+    fleet: 'ZARZĄDZANIE FLOTĄ POJAZDÓW',
   };
   const systemSubtitle = defaultSubtitles[industryProfile] || 'DYSPOZYTORNIA UR';
 

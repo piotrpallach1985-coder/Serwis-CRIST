@@ -65,9 +65,11 @@ export function usePermissions(user, roles = [], customModules = null) {
     );
     const onlyAssignedTasks =
       !isAdmin &&
-      (perms.includes('only_assigned_tasks') ||
-        Boolean(user.onlyAssignedTasks) ||
-        hasDedicatedService);
+      (roleConfig
+        ? perms.includes('only_assigned_tasks')
+        : perms.includes('only_assigned_tasks') ||
+          Boolean(user.onlyAssignedTasks) ||
+          hasDedicatedService);
 
     const PLANNED_TABS = ['planned_kpi', 'dashboard_planned', 'planned_maintenance', 'planned_services', 'archive_planned'];
     const ADMIN_TABS = ['users', 'roles', 'reports', 'audit', 'ai_stats', 'api_settings'];

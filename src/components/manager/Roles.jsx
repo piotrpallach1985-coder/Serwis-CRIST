@@ -65,8 +65,6 @@ export default function Roles() {
         { id: 'regions', label: t('admin.roles.perm_regions', 'Rejony i Mapy') },
         { id: 'topics', label: t('admin.roles.perm_topics', 'Tematy Zgłoszeń') },
         { id: 'delete_tech_notes', label: t('admin.roles.perm_delete_tech_notes', 'Usuwanie notatek technicznych') },
-        { id: 'users', label: t('admin.roles.perm_users', 'Użytkownicy') },
-        { id: 'roles', label: t('admin.roles.title') },
         { id: 'reports', label: t('admin.roles.perm_reports', 'Raportowanie') },
         { id: 'audit', label: t('admin.roles.perm_audit', 'Dziennik Zdarzeń (ISO 55000)') },
         { id: 'ai_stats', label: t('admin.roles.perm_ai_stats', 'Statystyki AI') },

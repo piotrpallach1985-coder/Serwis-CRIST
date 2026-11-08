@@ -979,7 +979,6 @@ export function isTaskAssignedToUser(task, user) {
     task.assignedUserId,
     task.completedBy,
     task.completionDetails?.completedBy,
-    task.reportedBy,
     task.requiredPersonnel,
   ]
     .filter(v => v && String(v).trim() !== '' && String(v).trim() !== '-')

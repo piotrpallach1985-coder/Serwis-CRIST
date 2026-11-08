@@ -231,7 +231,8 @@ service cloud.firestore {
           || (isAnonymousInTenant(tenantId)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentWorkHours', 'lastWorkHoursUpdate'])
               && request.resource.data.currentWorkHours is number
-              && request.resource.data.currentWorkHours >= 0);
+              && request.resource.data.currentWorkHours >= resource.data.get('currentWorkHours', 0)
+              && request.resource.data.currentWorkHours <= 10000000);
         allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 
@@ -333,8 +334,8 @@ service cloud.firestore {
       }
       
       match /parts/{document=**} {
-        allow read: if isTenantUser(tenantId) || isAnonymousInTenant(tenantId);
-        allow create, update: if isTenantUser(tenantId);
+        allow get: if isAnonymousInTenant(tenantId);
+        allow read, create, update: if isTenantUser(tenantId);
         allow delete: if isTenantUser(tenantId) && isAdmin();
       }
 

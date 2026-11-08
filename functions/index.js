@@ -330,7 +330,8 @@ exports.chatWithDTR = functions.region('europe-west1').https.onCall(async (data,
 exports.processDictationText = functions.region('europe-west1').https.onCall(async (data, context) => {
   const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
   const { rawText, mode, lang } = data || {};
-  if (!rawText) throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejściowego");
+  if (!rawText || typeof rawText !== 'string') throw new functions.https.HttpsError("invalid-argument", "Brak tekstu wejściowego");
+  if (rawText.length > 5000) throw new functions.https.HttpsError("invalid-argument", "Przekroczono maksymalną długość tekstu (5000 znaków)");
   
   try {
     const globalDoc = await db.collection("tenant_registry").doc("_global_secrets_").get();
@@ -375,7 +376,7 @@ Surowy tekst od mechanika: "${rawText}"`;
       result = JSON.parse(jsonMatch ? jsonMatch[0] : jsonText);
     } else {
       const language = lang || "polski";
-      const prompt = `Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika stoczni. 
+      const prompt = `Jesteś asystentem technicznym. Otrzymasz surowy tekst podyktowany przez pracownika technicznego / serwisanta. 
 1. Jeśli oryginalny tekst jest w języku ${language} (albo bardzo do niego zbliżonym), sformatuj go poprawnie (dodaj interpunkcję) i zwróć TYLKO sam sformatowany tekst.
 2. Jeśli oryginalny tekst jest w INNYM języku, przetłumacz go na ${language}. Zwróć wynik w formacie:
 [Oryginalny podyktowany tekst]

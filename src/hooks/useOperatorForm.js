@@ -165,6 +165,23 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       }
     }
     
+    const currentMeterVal = Number(
+      machineToSubmit.currentWorkHours ?? machineToSubmit.workHours ?? 0
+    );
+    const trimmedMeter = String(reportedWorkHours ?? '').trim();
+    const hasCustomMeter =
+      trimmedMeter !== '' &&
+      !Number.isNaN(Number(trimmedMeter)) &&
+      Number(trimmedMeter) !== currentMeterVal;
+
+    if (hasCustomMeter && Number(trimmedMeter) < currentMeterVal) {
+      const unit = getMachineCounterUnit(machineToSubmit, branding?.industryProfile);
+      const msg = `Podany stan licznika (${trimmedMeter} ${unit}) nie może być mniejszy niż aktualny stan w bazie (${currentMeterVal} ${unit})!`;
+      setErrorMsg(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
     const ok = await submitTicket({
       selectedMachine: machineToSubmit,
       topic,
@@ -175,7 +192,7 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       isCritical,
       pendingPhotos,
       vehicleGps,
-      reportedWorkHours,
+      reportedWorkHours: hasCustomMeter ? Number(trimmedMeter) : undefined,
       acceptedRodo,
       reporterDeviceId,
       isOnline,
@@ -189,6 +206,14 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
   };
 
   const handleSaveMeterOnly = async () => {
+    if (!isInternal && pinRequirement?.required && !verifyAnonymousReportPin(reportPin, pinRequirement.pin)) {
+      const msg =
+        'Nieprawidłowy kod PIN autoryzacji! Podaj poprawny kod PIN przypisany do tego urządzenia lub rejonu, aby zapisać stan licznika.';
+      setErrorMsg(msg);
+      showToast(msg, 'error');
+      return false;
+    }
+
     const targetMachine =
       selectedMachine?.id && selectedMachine.id !== 'manual'
         ? selectedMachine
@@ -207,10 +232,20 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       return false;
     }
 
+    const currentVal = Number(
+      targetMachine.currentWorkHours ?? targetMachine.workHours ?? 0
+    );
+    const unit = getMachineCounterUnit(targetMachine, branding?.industryProfile);
+    if (parsedVal < currentVal) {
+      const msg = `Nowy stan licznika (${parsedVal} ${unit}) nie może być mniejszy niż aktualny odczyt (${currentVal} ${unit})!`;
+      setErrorMsg(msg);
+      showToast(msg, 'error');
+      return false;
+    }
+
     setIsSavingMeter(true);
     try {
       await updateMachineWorkHours(targetMachine.id, parsedVal, false);
-      const unit = getMachineCounterUnit(targetMachine, branding?.industryProfile);
       if (setSelectedMachine) {
         setSelectedMachine(prev =>
           prev ? { ...prev, currentWorkHours: parsedVal } : prev

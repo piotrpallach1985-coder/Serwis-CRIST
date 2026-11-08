@@ -84,7 +84,7 @@ export default function Users() {
       alert(
         'Osiągnięto limit użytkowników (' +
           (limits.maxUsers || 10) +
-          '). Skontaktuj się z autorem oprogramowania.'
+          '). Skontaktuj się z Działem Obsługi Klienta VexoNT w celu rozszerzenia licencji.'
       );
       return;
     }

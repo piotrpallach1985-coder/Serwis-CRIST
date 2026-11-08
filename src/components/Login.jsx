@@ -194,13 +194,21 @@ export default function Login({ onLogin, currentUser }) {
         '',
         `?module=${targetModule}${targetTab ? '&tab=' + targetTab : ''}`
       );
+      const resolvedTenantId = userData.tenantId || getCurrentTenant();
+      if (userData.tenantId) {
+        useManagerStore.getState().setTenantId(userData.tenantId);
+      }
       onLogin({
         uid: userData.uid,
         name: userData.name || email,
+        email: userData.email || email,
         role: userData.role || 'brak',
+        roleName: userData.roleName || '',
+        dedicatedService: userData.dedicatedService || '',
+        onlyAssignedTasks: Boolean(userData.onlyAssignedTasks),
         permissions: userData.permissions || [],
         phone: userData.phone || '',
-        tenantId: getCurrentTenant(),
+        tenantId: resolvedTenantId,
       });
       setLoginModalTarget(null);
       setPartScanAlert(null);

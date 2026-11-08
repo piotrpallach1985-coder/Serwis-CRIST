@@ -16,9 +16,14 @@ service firebase.storage {
       return data != null ? data.tenantId : null;
     }
     
+    function isActiveUser() {
+      let data = getUserData();
+      return data != null && !('isDeleted' in data && data.isDeleted == true);
+    }
+
     function isSuperAdmin() {
       let data = getUserData();
-      return isSignedIn() && data != null && data.role == 'superadmin';
+      return isSignedIn() && isActiveUser() && data.role == 'superadmin';
     }
 
     function isAnonymous() {
@@ -40,7 +45,7 @@ service firebase.storage {
 
     function isTenantUser(tenantId) {
        // !isAnonymous() – anonim nie czyta users/{uid} (limit 2 dokumentów Firestore na ocenę reguł Storage)
-       return isSignedIn() && !isAnonymous() && (getTenant() == tenantId || isSuperAdmin());
+       return isSignedIn() && !isAnonymous() && isActiveUser() && (getTenant() == tenantId || isSuperAdmin());
     }
 
     function isValidSize() {

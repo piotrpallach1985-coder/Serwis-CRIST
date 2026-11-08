@@ -70,7 +70,9 @@ export function useManagerData() {
           (Array.isArray(user.dedicatedServices) && user.dedicatedServices.length > 0)
       );
       return Boolean(
-        perms.includes('only_assigned_tasks') || user.onlyAssignedTasks || hasDedicatedService
+        roleConfig
+          ? perms.includes('only_assigned_tasks')
+          : perms.includes('only_assigned_tasks') || user.onlyAssignedTasks || hasDedicatedService
       );
     };
 
