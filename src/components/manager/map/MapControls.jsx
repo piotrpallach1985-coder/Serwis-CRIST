@@ -724,7 +724,10 @@ export default function MapControls({
       </div>
 
       {/* Kontrolki powiększenia (prawy dolny róg - z-[150] nad pinezkami) */}
-      <div className="absolute bottom-[90px] lg:bottom-4 right-4 z-[150] flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl pointer-events-auto">
+      <div
+        data-testid="map-zoom-controls"
+        className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 z-[150] flex flex-col gap-1.5 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl pointer-events-auto"
+      >
         <button
           onClick={() => {
             if (isGoogleMap && onGoogleZoomStep) {
