@@ -1819,7 +1819,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(onModalScan).toHaveBeenCalledWith('veh-master', 'GD 12345');
       unmountQrModal();
 
-      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC, brak karty "Zgłoś inne urządzenie" i brak skanowania tablic (tylko Skanuj QR + Zbliżeniowe NFC)
+      // 6a) Interakcja w OperatorScanner BEZ logowania (isInternal=false) -> brak zgłaszania bez QR/NFC i brak skanowania tablic, ale widoczna informacja o możliwości zgłoszenia innego urządzenia po zeskanowaniu QR/NFC w rejonie
       const onOperatorScan = vi.fn();
       const { unmount: unmountUnloggedScanner } = render(
         <OperatorScanner onScanSuccess={onOperatorScan} machines={fleetMachines} isInternal={false} />
@@ -1827,7 +1827,11 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByText('Skanuj QR')).toBeTruthy();
       expect(screen.queryByText('Skanuj QR/Tablicę')).toBeNull();
       expect(screen.getByText('Zbliżeniowe NFC')).toBeTruthy();
-      expect(screen.queryByTestId('operator-other-machine-card-desc')).toBeNull();
+      expect(
+        screen.getByText(
+          'Zeskanuj dowolny kod QR lub NFC w swoim rejonie, i zgłoś awarię dowolnego urządzenia z firmy.'
+        )
+      ).toBeTruthy();
       expect(screen.queryByTestId('operator-report-without-qr-btn')).toBeNull();
       expect(screen.queryByTestId('operator-license-plate-section')).toBeNull();
       unmountUnloggedScanner();
@@ -2195,9 +2199,20 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       }
       const { unmount: unmountBypass } = render(<WrapperAnonForm />);
       expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
-      // W trybie anonimowym (isInternal=false) przycisk "Inne Urządzenie" jest całkowicie ukryty — anonim zgłasza tylko zeskanowane urządzenie z QR/NFC
-      expect(screen.queryByText('Inne Urządzenie')).toBeNull();
-      // Natomiast podpowiedzi typu awarii (topicsList) są w pełni widoczne dla anonima
+      // Po kliknięciu "Inne Urządzenie" użytkownik wpisuje ręcznie jakie urządzenie i gdzie (BEZ listy urządzeń i BEZ listy rejonów)
+      fireEvent.click(screen.getByText('Inne Urządzenie'));
+      expect(screen.getByTestId('operator-form-machine-input')).toBeTruthy();
+      expect(screen.getByTestId('operator-form-location-input')).toBeTruthy();
+      expect(screen.queryByTestId('operator-form-machine-dropdown-toggle')).toBeNull();
+      expect(screen.queryByTestId('operator-form-region-select')).toBeNull();
+      fireEvent.change(screen.getByTestId('operator-form-machine-input'), {
+        target: { value: 'Spawarka Kemppi' },
+      });
+      fireEvent.change(screen.getByTestId('operator-form-location-input'), {
+        target: { value: 'Hala 2 przy bramie' },
+      });
+      // Nawet po przełączeniu na "Inne Urządzenie", sekcja PIN-u dla pierwotnego budynku A (4821) pozostaje wymagana, a podpowiedzi typu awarii są widoczne
+      expect(screen.getByTestId('operator-report-pin-section')).toBeTruthy();
       expect(screen.getByText('Drzwi nie domykają się')).toBeTruthy();
       unmountBypass();
 

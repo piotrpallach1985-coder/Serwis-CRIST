@@ -100,16 +100,20 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
       let finalMachineId = selectedMachine.id;
       
       if (finalMachineId === 'manual') {
+        const cleanManualName = String(selectedMachine.name || '').trim();
+        const cleanManualBay = String(selectedMachine.bay || '').trim();
         const newMachineRef = await addDoc(collection(db, 'tenants', tenantId, 'machines'), {
-          name: selectedMachine.name + ' (DO WERYFIKACJI)',
+          name: cleanManualName + ' (DO WERYFIKACJI)',
           regionId: selectedMachine.regionId || '',
-          bay: selectedMachine.bay || '',
+          bay: cleanManualBay,
           currentWorkHours: 0,
           status: 'active',
           isDeleted: false,
           createdAt: new Date().toISOString(),
           createdBy: reporterName.trim() || 'Operator',
-          description: 'Maszyna dodana z poziomu zgłoszenia awarii. Wymaga uzupełnienia danych i wygenerowania QR.'
+          description: cleanManualBay
+            ? `Lokalizacja wpisana przez zgłaszającego: ${cleanManualBay}. Maszyna dodana z poziomu zgłoszenia awarii — wymaga weryfikacji dyspozytora i naklejenia kodu QR.`
+            : 'Maszyna dodana z poziomu zgłoszenia awarii. Wymaga uzupełnienia danych i wygenerowania QR.'
         });
         finalMachineId = newMachineRef.id;
       }
