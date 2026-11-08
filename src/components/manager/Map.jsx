@@ -841,14 +841,42 @@ export default function ShipyardMap({
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       if (hoveredPin !== pinId && e?.currentTarget) {
         const rect = e.currentTarget.getBoundingClientRect();
-        let containerRect = { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
+        let containerRect = {
+          top: 0,
+          left: 0,
+          right: window.innerWidth,
+          bottom: window.innerHeight,
+        };
         if (mapContainerRef.current) {
           containerRect = mapContainerRef.current.getBoundingClientRect();
         }
+        const pinCenterX = rect.left + rect.width / 2;
+        const pinCenterY = rect.top + rect.height / 2;
+        const distTop = pinCenterY - containerRect.top;
+        const distBottom = containerRect.bottom - pinCenterY;
+        const distLeft = pinCenterX - containerRect.left;
+        const distRight = containerRect.right - pinCenterX;
+
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        const halfTooltipW = isMobile ? 130 : 155;
+        const tooltipH = isMobile ? 190 : 225;
+
+        const isNearTop = distTop < tooltipH && distBottom > distTop;
+        const nearLeftEdge = distLeft < halfTooltipW;
+        const nearRightEdge = distRight < halfTooltipW;
+
+        let isNearLeft = false;
+        let isNearRight = false;
+        if (nearLeftEdge && !nearRightEdge) {
+          isNearLeft = true;
+        } else if (nearRightEdge && !nearLeftEdge) {
+          isNearRight = true;
+        }
+
         setTooltipPos({
-          isNearTop: rect.top - containerRect.top < 200,
-          isNearLeft: rect.left - containerRect.left < 250,
-          isNearRight: containerRect.right - rect.right < 250,
+          isNearTop,
+          isNearLeft,
+          isNearRight,
         });
       }
       setHoveredPin(pinId);
@@ -1192,9 +1220,13 @@ export default function ShipyardMap({
     ? { transform: 'none', zIndex: 0 }
     : { transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 0 };
 
+  const hasActivePinTooltip = Boolean(hoveredPin && hoveredPin !== 'unpinned_items');
   const pinsTransformStyle = isGoogleMap
-    ? { transform: 'none', zIndex: 100 }
-    : { transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`, zIndex: 100 };
+    ? { transform: 'none', zIndex: hasActivePinTooltip ? 160 : 100 }
+    : {
+        transform: `translate(${zoomPan.x}px, ${zoomPan.y}px) scale(${zoomScale})`,
+        zIndex: hasActivePinTooltip ? 160 : 100,
+      };
 
   // --- Render ---
   return (
@@ -1382,7 +1414,8 @@ export default function ShipyardMap({
             {(isGoogleMap || Boolean(currentMapUrl)) && imgBounds.width > 0 && (
               <div
                 id="map-bounds-container"
-                className="absolute pointer-events-none overflow-hidden"
+                data-testid="map-bounds-container"
+                className="absolute pointer-events-none overflow-visible"
                 style={{ width: `${imgBounds.width}px`, height: `${imgBounds.height}px` }}
               >
                 {mode === 'edit' && !isFramingGoogleMap && !draggingPin && (
@@ -1395,38 +1428,47 @@ export default function ShipyardMap({
                   </div>
                 )}
 
-                {renderedPins.map(pin => (
-                  <MapPin
-                    key={`${pin.type}-${pin.id}`}
-                    pin={pin}
-                    mode={isFramingGoogleMap ? 'view' : mode}
-                    modeType={modeType}
-                    zoomScale={isGoogleMap ? 1 : zoomScale}
-                    hoveredPin={hoveredPin}
-                    setHoveredPin={setHoveredPin}
-                    draggingPin={draggingPin}
-                    tooltipPos={tooltipPos}
-                    isFullscreen={isFullscreen}
-                    handleMouseEnter={handleMouseEnter}
-                    handleMouseLeave={handleMouseLeave}
-                    handlePointerDown={handlePointerDown}
-                    handleDeletePin={handleDeletePin}
-                    onNavigateToTickets={onNavigateToTickets}
-                    setCurrentSubmapId={setCurrentSubmapId}
-                    onOpenSubmap={(regionId, submapTabId) => {
-                      setCurrentSubmapId(regionId);
-                      setCurrentSubmapTabId(submapTabId || null);
-                      setHoveredPin(null);
-                    }}
-                    onSetupSubmap={(regionId) => {
-                      setCurrentSubmapId(regionId);
-                      setCurrentSubmapTabId(null);
-                      setMode('edit');
-                      setIsSettingsMinimized(false);
-                      setHoveredPin(null);
-                    }}
-                  />
-                ))}
+                {renderedPins.map(pin => {
+                  if (
+                    isGoogleMap &&
+                    draggingPin?.id !== pin.id &&
+                    (pin.xPercent < 0 || pin.xPercent > 100 || pin.yPercent < 0 || pin.yPercent > 100)
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <MapPin
+                      key={`${pin.type}-${pin.id}`}
+                      pin={pin}
+                      mode={isFramingGoogleMap ? 'view' : mode}
+                      modeType={modeType}
+                      zoomScale={isGoogleMap ? 1 : zoomScale}
+                      hoveredPin={hoveredPin}
+                      setHoveredPin={setHoveredPin}
+                      draggingPin={draggingPin}
+                      tooltipPos={tooltipPos}
+                      isFullscreen={isFullscreen}
+                      handleMouseEnter={handleMouseEnter}
+                      handleMouseLeave={handleMouseLeave}
+                      handlePointerDown={handlePointerDown}
+                      handleDeletePin={handleDeletePin}
+                      onNavigateToTickets={onNavigateToTickets}
+                      setCurrentSubmapId={setCurrentSubmapId}
+                      onOpenSubmap={(regionId, submapTabId) => {
+                        setCurrentSubmapId(regionId);
+                        setCurrentSubmapTabId(submapTabId || null);
+                        setHoveredPin(null);
+                      }}
+                      onSetupSubmap={(regionId) => {
+                        setCurrentSubmapId(regionId);
+                        setCurrentSubmapTabId(null);
+                        setMode('edit');
+                        setIsSettingsMinimized(false);
+                        setHoveredPin(null);
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

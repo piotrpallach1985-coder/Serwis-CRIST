@@ -41,10 +41,12 @@ export default function MapPin({
     ringColor = 'ring-amber-500/40';
   }
 
+  const fallbackNearLeft = Number(pin?.xPercent) < 28;
+  const fallbackNearRight = Number(pin?.xPercent) > 72;
   const { isNearTop, isNearLeft, isNearRight } = tooltipPos || {
     isNearTop: false,
-    isNearLeft: false,
-    isNearRight: false,
+    isNearLeft: fallbackNearLeft,
+    isNearRight: fallbackNearRight,
   };
   let tooltipPosClass = 'bottom-full left-1/2 -translate-x-1/2 mb-4';
   let arrowClass = 'top-full left-1/2 -translate-x-1/2 border-t-slate-900/95';

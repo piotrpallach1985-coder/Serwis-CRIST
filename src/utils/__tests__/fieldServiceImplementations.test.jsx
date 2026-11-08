@@ -67,6 +67,7 @@ import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdmi
 import SuperAdminTenantTable from '../../components/manager/superadmin/SuperAdminTenantTable';
 import { FALLBACK_LOGO_BASE64 } from '../reports/logoBase64';
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
+import MapPin from '../../components/manager/map/MapPin';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
 import TechnicianPerformancePanel from '../../components/manager/reports/TechnicianPerformancePanel';
@@ -2880,6 +2881,55 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(setFormDataMock).toHaveBeenCalled();
       expect(currentFormData.status).toBe('suspended');
       unmountModal();
+    });
+
+    it('nie przycina chmurek (MapPinTooltip) na mapie awarii i serwisów (overflow-visible na map-bounds-container oraz wyrównanie right-0 blisko prawej krawędzi)', () => {
+      const mapSource = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/components/manager/Map.jsx'),
+        'utf8'
+      );
+      expect(mapSource).toContain('id="map-bounds-container"');
+      expect(mapSource).toContain('pointer-events-none overflow-visible');
+      expect(mapSource).not.toContain('pointer-events-none overflow-hidden');
+
+      const rightPin = {
+        id: 'reg-right',
+        type: 'region',
+        name: 'Dok Suchy SD1',
+        status: 'critical',
+        xPercent: 78,
+        yPercent: 52,
+        machineCount: 4,
+        itemCount: 1,
+        hasSubmap: true,
+      };
+
+      const { container, unmount } = render(
+        <MapPin
+          pin={rightPin}
+          mode="view"
+          modeType="tickets"
+          zoomScale={1}
+          hoveredPin="reg-right"
+          setHoveredPin={vi.fn()}
+          draggingPin={null}
+          tooltipPos={{ isNearTop: false, isNearLeft: false, isNearRight: true }}
+          isFullscreen={false}
+          handleMouseEnter={vi.fn()}
+          handleMouseLeave={vi.fn()}
+          handlePointerDown={vi.fn()}
+          handleDeletePin={vi.fn()}
+          onNavigateToTickets={vi.fn()}
+          setCurrentSubmapId={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Dok Suchy SD1')).toBeTruthy();
+      const tooltipEl = container.querySelector('.w-52');
+      expect(tooltipEl).toBeTruthy();
+      expect(tooltipEl.className).toContain('right-0');
+      expect(tooltipEl.className).not.toContain('left-0');
+      unmount();
     });
   });
 });
