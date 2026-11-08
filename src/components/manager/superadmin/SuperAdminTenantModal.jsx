@@ -169,26 +169,47 @@ export default function SuperAdminTenantModal({
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <h4 className="font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2 text-sm">{t("dashboards.superadmin.subscription_limits", "Limity Abonamentowe")}</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">{t("dashboards.superadmin.max_users", "Max Użytkowników")}</label>
-                <input 
-                  type="number" 
-                  value={formData.maxUsers} 
-                  onChange={e => setFormData({...formData, maxUsers: e.target.value})} 
-                  className="w-full border-gray-300 rounded-lg shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1 font-semibold">{t("dashboards.superadmin.max_machines", "Max Maszyn")}</label>
-                <input 
-                  type="number" 
-                  value={formData.maxMachines} 
-                  onChange={e => setFormData({...formData, maxMachines: e.target.value})} 
-                  className="w-full border-gray-300 rounded-lg shadow-sm"
-                />
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">
+                {t("dashboards.superadmin.license_status_label", "Status Licencji / Dostępu *")}
+              </label>
+              <select
+                data-testid="superadmin-tenant-status-select"
+                value={formData.status || 'active'}
+                onChange={e => setFormData({ ...formData, status: e.target.value })}
+                className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-sm text-slate-800"
+              >
+                <option value="active">{t("dashboards.superadmin.status_option_active", "Aktywny (Pełny dostęp)")}</option>
+                <option value="trial">{t("dashboards.superadmin.status_option_trial", "Okres próbny (Trial)")}</option>
+                <option value="suspended">{t("dashboards.superadmin.status_option_suspended", "Zawieszony - brak płatności (Blokada logowania)")}</option>
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {t("dashboards.superadmin.license_status_hint", "Zawieszenie konta natychmiast blokuje logowanie pracowników firmy bez usuwania jej danych.")}
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2 text-sm">{t("dashboards.superadmin.subscription_limits", "Limity Abonamentowe")}</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1 font-semibold">{t("dashboards.superadmin.max_users", "Max Użytkowników")}</label>
+                  <input 
+                    type="number" 
+                    value={formData.maxUsers} 
+                    onChange={e => setFormData({...formData, maxUsers: e.target.value})} 
+                    className="w-full border-gray-300 rounded-lg shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1 font-semibold">{t("dashboards.superadmin.max_machines", "Max Maszyn")}</label>
+                  <input 
+                    type="number" 
+                    value={formData.maxMachines} 
+                    onChange={e => setFormData({...formData, maxMachines: e.target.value})} 
+                    className="w-full border-gray-300 rounded-lg shadow-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>

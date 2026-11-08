@@ -64,6 +64,8 @@ import {
 } from '../bulkImportHelper';
 import PlannedMaintenanceFormModal from '../../components/manager/PlannedMaintenanceFormModal';
 import SuperAdminTenantModal from '../../components/manager/superadmin/SuperAdminTenantModal';
+import SuperAdminTenantTable from '../../components/manager/superadmin/SuperAdminTenantTable';
+import { FALLBACK_LOGO_BASE64 } from '../reports/logoBase64';
 import TicketMainColumnHeader from '../../components/manager/tickets/TicketMainColumnHeader';
 import TicketMainColumnStepper from '../../components/manager/tickets/TicketMainColumnStepper';
 import PlannedMaintenanceInfo from '../../components/manager/PlannedMaintenanceInfo';
@@ -73,6 +75,7 @@ import InAppTicketScanner from '../../components/manager/InAppTicketScanner';
 import Login from '../../components/Login';
 import { MemoryRouter } from 'react-router-dom';
 import { useManagerStore } from '../../store/managerStore';
+import { getCurrentTenant } from '../tenantHelper';
 import { formatDetails } from '../../services/audit.service';
 import { isQrUnprintedNew } from '../../services/qrAccess.service';
 import plTranslations from '../../locales/pl/translation.json';
@@ -2761,6 +2764,122 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         '54.51889, 18.53054'
       );
       unmountHeader();
+    });
+  });
+
+  describe('25. Gotowość przed pierwszą sprzedażą B2B SaaS — oficjalne logo PDF VexoNT, neutralny ekran startowy oraz bezpieczne zawieszanie dostępu (suspended)', () => {
+    it('używa oficjalnego logotypu VexoNT jako FALLBACK_LOGO_BASE64 w raportach PDF', () => {
+      const pwaLogoPath = path.resolve(process.cwd(), 'public/pwa-192x192.png');
+      const expectedBase64 =
+        'data:image/png;base64,' + fs.readFileSync(pwaLogoPath).toString('base64');
+      expect(FALLBACK_LOGO_BASE64).toBe(expectedBase64);
+    });
+
+    it('wyświetla neutralny ekran startowy VexoNT bez domyślnego tenanta klienta oraz obsługuje bezpieczne zawieszanie firm (active / trial / suspended)', () => {
+      useManagerStore.getState().setTenantId(null);
+      expect(getCurrentTenant()).toBe('vexont');
+
+      const { unmount: unmountLogin } = render(
+        <MemoryRouter>
+          <Login onLogin={vi.fn()} currentUser={null} />
+        </MemoryRouter>
+      );
+      expect(screen.getByText(/VexoNT/i)).toBeTruthy();
+      expect(screen.queryByText(/CRIST/i)).toBeNull();
+      unmountLogin();
+
+      const handleToggleStatusMock = vi.fn();
+      const openEditModalMock = vi.fn();
+
+      const sampleTenants = [
+        {
+          id: 'klient-aktywny',
+          name: 'Zakład Produkcyjny Alfa',
+          industryProfile: 'industrial',
+          status: 'active',
+          modules: { planned_services: true, inventory: true },
+        },
+        {
+          id: 'klient-trial',
+          name: 'Wspólnota Mieszkaniowa Beta',
+          industryProfile: 'facility',
+          status: 'trial',
+          modules: { planned_services: true, inventory: false },
+        },
+        {
+          id: 'klient-zawieszony',
+          name: 'Serwis Floty Gamma',
+          industryProfile: 'fleet',
+          status: 'suspended',
+          modules: { planned_services: true, fleet: true },
+        },
+      ];
+
+      const { unmount: unmountTable } = render(
+        <SuperAdminTenantTable
+          tenantsWithTokens={sampleTenants}
+          loading={false}
+          openNewModal={vi.fn()}
+          openEditModal={openEditModalMock}
+          handleToggleStatus={handleToggleStatusMock}
+        />
+      );
+
+      expect(screen.getByTestId('superadmin-status-badge-klient-aktywny').textContent).toContain(
+        'Aktywny'
+      );
+      expect(screen.getByTestId('superadmin-status-badge-klient-trial').textContent).toContain(
+        'Trial'
+      );
+      expect(
+        screen.getByTestId('superadmin-status-badge-klient-zawieszony').textContent
+      ).toContain('Zawieszony');
+
+      const suspendBtn = screen.getByTestId('superadmin-toggle-status-klient-aktywny');
+      expect(suspendBtn.textContent).toContain('Zawieś');
+      fireEvent.click(suspendBtn);
+      expect(handleToggleStatusMock).toHaveBeenCalledWith(sampleTenants[0]);
+
+      const unsuspendBtn = screen.getByTestId('superadmin-toggle-status-klient-zawieszony');
+      expect(unsuspendBtn.textContent).toContain('Odblokuj');
+      fireEvent.click(unsuspendBtn);
+      expect(handleToggleStatusMock).toHaveBeenCalledWith(sampleTenants[2]);
+      unmountTable();
+
+      // Modal edycji klienta pozwala zmienić status licencji (active / trial / suspended)
+      let currentFormData = {
+        id: 'klient-aktywny',
+        name: 'Zakład Produkcyjny Alfa',
+        industryProfile: 'industrial',
+        status: 'active',
+        maxUsers: 15,
+        maxMachines: 100,
+        modules: { planned_services: true, inventory: true, fleet: false },
+      };
+      const setFormDataMock = vi.fn(updater => {
+        currentFormData = typeof updater === 'function' ? updater(currentFormData) : updater;
+      });
+
+      const { unmount: unmountModal } = render(
+        <SuperAdminTenantModal
+          isModalOpen={true}
+          setIsModalOpen={vi.fn()}
+          isEditing={true}
+          formData={currentFormData}
+          setFormData={setFormDataMock}
+          handleSave={vi.fn(e => e.preventDefault())}
+          fileInputRef={{ current: null }}
+          processCompanyLogo={vi.fn()}
+          uploadingLogo={false}
+        />
+      );
+
+      const statusSelect = screen.getByTestId('superadmin-tenant-status-select');
+      expect(statusSelect.value).toBe('active');
+      fireEvent.change(statusSelect, { target: { value: 'suspended' } });
+      expect(setFormDataMock).toHaveBeenCalled();
+      expect(currentFormData.status).toBe('suspended');
+      unmountModal();
     });
   });
 });

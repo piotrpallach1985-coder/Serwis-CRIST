@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, Plus, CheckCircle, Trash } from 'lucide-react';
+import { Crown, Plus, CheckCircle, Ban, Unlock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getIndustryProfileConfig } from '../../../utils/fieldServiceHelpers';
 
@@ -8,6 +8,7 @@ export default function SuperAdminTenantTable({
   loading,
   openNewModal,
   openEditModal,
+  handleToggleStatus,
   handleDelete,
   globalGeminiPrice = 0.60,
   globalTranscribePrice = 0.40,
@@ -88,7 +89,40 @@ export default function SuperAdminTenantTable({
                         </span>
                       </td>
                       <td className="py-2 px-3 w-48">
-                        <div className="font-bold text-slate-800 text-sm leading-tight truncate">{tenant.name}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-800 text-sm leading-tight truncate">{tenant.name}</span>
+                          {(() => {
+                            const status = tenant.status || 'active';
+                            if (status === 'suspended') {
+                              return (
+                                <span
+                                  data-testid={`superadmin-status-badge-${tenant.id}`}
+                                  className="px-1.5 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded text-[10px] font-bold inline-flex items-center gap-1"
+                                >
+                                  {t("dashboards.superadmin.status_suspended", "Zawieszony")}
+                                </span>
+                              );
+                            }
+                            if (status === 'trial') {
+                              return (
+                                <span
+                                  data-testid={`superadmin-status-badge-${tenant.id}`}
+                                  className="px-1.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold inline-flex items-center gap-1"
+                                >
+                                  {t("dashboards.superadmin.status_trial", "Okres próbny (Trial)")}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span
+                                data-testid={`superadmin-status-badge-${tenant.id}`}
+                                className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold inline-flex items-center gap-1"
+                              >
+                                {t("dashboards.superadmin.status_active", "Aktywny")}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         {(() => {
                           const prof = getIndustryProfileConfig(tenant.industryProfile);
                           return (
@@ -136,17 +170,37 @@ export default function SuperAdminTenantTable({
                         <div className="flex justify-end items-center gap-1">
                           <button 
                             onClick={() => openEditModal(tenant)}
-                            className="text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100 font-bold text-[11px] uppercase"
+                            className="text-blue-600 hover:text-blue-800 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100 font-bold text-[11px] uppercase cursor-pointer"
                             title={t("dashboards.superadmin.edit_tooltip", "Edytuj dane i licencje")}
                           >
                             {t("dashboards.superadmin.edit_btn", "Edytuj")}
                           </button>
                           <button 
-                            onClick={() => handleDelete(tenant.id)}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
-                            title={t("dashboards.superadmin.delete_tooltip", "Usuń z rejestru (zablokuj)")}
+                            type="button"
+                            data-testid={`superadmin-toggle-status-${tenant.id}`}
+                            onClick={() => (handleToggleStatus ? handleToggleStatus(tenant) : null)}
+                            className={`px-2 py-1 rounded-lg transition-colors border font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer ${
+                              tenant.status === 'suspended'
+                                ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
+                                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200'
+                            }`}
+                            title={
+                              tenant.status === 'suspended'
+                                ? t("dashboards.superadmin.unsuspend_tooltip", "Odblokuj dostęp dla pracowników firmy")
+                                : t("dashboards.superadmin.suspend_tooltip", "Zawieś dostęp (blokada bez usuwania danych)")
+                            }
                           >
-                            <Trash size={16} />
+                            {tenant.status === 'suspended' ? (
+                              <>
+                                <Unlock size={13} />
+                                {t("dashboards.superadmin.unsuspend_btn", "Odblokuj")}
+                              </>
+                            ) : (
+                              <>
+                                <Ban size={13} />
+                                {t("dashboards.superadmin.suspend_btn", "Zawieś")}
+                              </>
+                            )}
                           </button>
                         </div>
                       </td>

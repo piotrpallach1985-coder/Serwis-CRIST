@@ -69,10 +69,13 @@ export const saveTenant = async (formData, isEditing) => {
   };
   const systemSubtitle = defaultSubtitles[industryProfile] || 'DYSPOZYTORNIA UR';
 
+  const status = formData.status || 'active';
+
   const data = {
     name: formData.name.trim(),
     contactEmail: (formData.contactEmail || '').trim(),
     industryProfile,
+    status,
     limits: {
       maxUsers: parseInt(formData.maxUsers) || 10,
       maxMachines: parseInt(formData.maxMachines) || 50
@@ -86,13 +89,13 @@ export const saveTenant = async (formData, isEditing) => {
     await updateDoc(tenantRef, data);
   } else {
     data.createdAt = serverTimestamp();
-    data.status = 'active';
     await setDoc(tenantRef, data);
   }
 
   await setDoc(doc(db, 'tenants', formData.id, 'settings', 'general'), {
     limits: data.limits,
-    industryProfile
+    industryProfile,
+    status
   }, { merge: true });
 
   await setDoc(doc(db, 'tenants', formData.id, 'settings', 'branding'), {
@@ -102,6 +105,18 @@ export const saveTenant = async (formData, isEditing) => {
     companyLogoUrl: data.companyLogoUrl,
     companyLogoBase64: data.companyLogoBase64,
     modules: data.modules
+  }, { merge: true });
+};
+
+export const updateTenantStatus = async (id, status) => {
+  if (!id || !status) return;
+  await setDoc(doc(db, 'tenant_registry', id), {
+    status,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await setDoc(doc(db, 'tenants', id, 'settings', 'general'), {
+    status,
+    updatedAt: serverTimestamp()
   }, { merge: true });
 };
 

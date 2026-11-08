@@ -13,8 +13,32 @@ export const loginWithEmail = async (email, password) => {
   if (!userDoc.exists()) {
     throw new Error('USER_NO_ROLE');
   }
+
+  const userData = userDoc.data();
+
+  if (userData.isDeleted) {
+    await signOut(auth);
+    throw new Error('USER_DELETED');
+  }
+
+  if (userData.role !== 'superadmin' && userData.tenantId) {
+    try {
+      const genDoc = await getDoc(doc(db, 'tenants', userData.tenantId, 'settings', 'general'));
+      if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
+        const genData = genDoc.data();
+        if (genData && genData.status === 'suspended') {
+          await signOut(auth);
+          throw new Error('TENANT_SUSPENDED');
+        }
+      }
+    } catch (err) {
+      if (err.message === 'TENANT_SUSPENDED') {
+        throw err;
+      }
+    }
+  }
   
-  return { uid: user.uid, ...userDoc.data() };
+  return { uid: user.uid, ...userData };
 };
 
 let anonBindInFlight = null;

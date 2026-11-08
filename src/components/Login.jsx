@@ -145,6 +145,8 @@ export default function Login({ onLogin, currentUser }) {
 
   useEffect(() => {
     const currentTenantId = getCurrentTenant();
+    const isNeutralTenant =
+      !currentTenantId || currentTenantId === 'vexont' || currentTenantId === 'default';
 
     // Subskrypcja GLOBALNYCH ustawień (Logo Aplikacji - VexoNT)
     const unsub = subscribeToBranding(currentTenantId, payload => {
@@ -154,14 +156,15 @@ export default function Login({ onLogin, currentUser }) {
         const data = payload.data;
         if (data) {
           setBranding(prev => ({
-            companyName: data.companyName || currentTenantId.toUpperCase(),
+            companyName:
+              data.companyName || (isNeutralTenant ? 'VexoNT' : currentTenantId.toUpperCase()),
             systemSubtitle: data.systemSubtitle || 'MAINT SYSTEM PORTAL',
             companyLogoUrl: data.companyLogoUrl || '',
             appLogoUrl: data.appLogoUrl || prev.appLogoUrl,
           }));
         } else {
           setBranding(prev => ({
-            companyName: currentTenantId.toUpperCase(),
+            companyName: isNeutralTenant ? 'VexoNT' : currentTenantId.toUpperCase(),
             systemSubtitle: 'MAINT SYSTEM PORTAL',
             companyLogoUrl: '',
             appLogoUrl: prev.appLogoUrl,
@@ -216,6 +219,12 @@ export default function Login({ onLogin, currentUser }) {
       console.error(err);
       if (err.message === 'USER_NO_ROLE') {
         setErrorMsg('Zalogowano, ale brak przypisanej roli.');
+      } else if (err.message === 'USER_DELETED') {
+        setErrorMsg('To konto użytkownika zostało dezaktywowane przez administratora.');
+      } else if (err.message === 'TENANT_SUSPENDED') {
+        setErrorMsg(
+          'Dostęp dla tej firmy został tymczasowo zawieszony (np. brak opłaconej subskrypcji). Skontaktuj się z administratorem lub działem rozliczeń VexoNT.'
+        );
       } else if (
         err.code === 'auth/invalid-credential' ||
         err.code === 'auth/wrong-password' ||

@@ -16,9 +16,14 @@ service cloud.firestore {
       return data != null && (!('isDeleted' in data) || data.isDeleted == false);
     }
 
+    function isTenantActive(tenantId) {
+      let genPath = /databases/$(database)/documents/tenants/$(tenantId)/settings/general;
+      return !exists(genPath) || get(genPath).data.get('status', 'active') != 'suspended';
+    }
+
     function isTenantUser(tenantId) {
       let data = getUserData();
-      return isSignedIn() && isActiveUser() && (data.tenantId == tenantId || (tenantId == 'crist' && !('tenantId' in data)) || isSuperAdmin());
+      return isSignedIn() && isActiveUser() && (isSuperAdmin() || (isTenantActive(tenantId) && (data.tenantId == tenantId || (tenantId == 'crist' && !('tenantId' in data)))));
     }
 
     function isSuperAdmin() {
@@ -83,7 +88,8 @@ service cloud.firestore {
     function anonSessionValid(tenantId) {
       let sessionPath = /databases/$(database)/documents/anon_sessions/$(request.auth.uid);
       let keyPath = /databases/$(database)/documents/tenants/$(tenantId)/settings/qr_access;
-      return exists(sessionPath)
+      return isTenantActive(tenantId)
+        && exists(sessionPath)
         && get(sessionPath).data.tenantId == tenantId
         && exists(keyPath)
         && get(sessionPath).data.get('qrKey', '') == get(keyPath).data.key;
@@ -289,14 +295,14 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isSuperAdmin()
           || (isTenantUser(tenantId) && isAdmin()
-              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules'])));
+              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules', 'status'])));
       }
 
       match /settings/general {
         allow read: if true;
         allow write: if isSuperAdmin()
           || (isTenantUser(tenantId) && isAdmin()
-              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules'])));
+              && (resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['limits', 'modules', 'status'])));
       }
 
       // Klucz QR firmy: odczyt dla personelu (generowanie naklejek), utworzenie przez personel (gdy brak),

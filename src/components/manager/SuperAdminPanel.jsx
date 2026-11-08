@@ -42,6 +42,7 @@ export default function SuperAdminPanel({ onNavigate }) {
     name: '',
     contactEmail: '',
     industryProfile: 'industrial',
+    status: 'active',
     maxUsers: 10,
     maxMachines: 50,
     groqApiKey: '',
@@ -241,6 +242,7 @@ export default function SuperAdminPanel({ onNavigate }) {
       name: tenant.name || '',
       contactEmail: tenant.contactEmail || '',
       industryProfile: tenant.industryProfile || 'industrial',
+      status: tenant.status || 'active',
       maxUsers: tenant.limits?.maxUsers || 10,
       maxMachines: tenant.limits?.maxMachines || 50,
       groqApiKey: tenant.groqApiKey || '',
@@ -284,6 +286,35 @@ export default function SuperAdminPanel({ onNavigate }) {
     }
   };
 
+  const handleToggleStatus = async (tenant) => {
+    if (!tenant?.id) return;
+    const isSuspended = tenant.status === 'suspended';
+    const nextStatus = isSuspended ? 'active' : 'suspended';
+    const confirmMsg = isSuspended
+      ? t('dashboards.superadmin.unsuspend_confirm', {
+          id: tenant.name || tenant.id,
+          defaultValue: `Czy chcesz odblokować dostęp dla firmy ${tenant.name || tenant.id}?`,
+        })
+      : t('dashboards.superadmin.suspend_confirm', {
+          id: tenant.name || tenant.id,
+          defaultValue: `Czy chcesz zawiesić dostęp dla firmy ${tenant.name || tenant.id}? Logowanie pracowników zostanie zablokowane, ale wszystkie dane klienta pozostaną bezpieczne w bazie.`,
+        });
+    if (window.confirm(confirmMsg)) {
+      try {
+        const { updateTenantStatus } = await import('../../services/admin.service');
+        await updateTenantStatus(tenant.id, nextStatus);
+        showToast(
+          isSuspended
+            ? t('dashboards.superadmin.company_unsuspended', 'Dostęp dla firmy został przywrócony.')
+            : t('dashboards.superadmin.company_suspended', 'Dostęp dla firmy został zawieszony (dane zachowane).'),
+          'success'
+        );
+      } catch (err) {
+        showToast(t('dashboards.superadmin.status_update_error', 'Błąd zmiany statusu: ') + err.message, 'error');
+      }
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm(t('dashboards.superadmin.delete_confirm', { id, defaultValue: `UWAGA! Chcesz usunąć firmę ${id} z rejestru? To natychmiast odetnie dostęp jej pracownikom.` }))) {
       try {
@@ -316,6 +347,7 @@ export default function SuperAdminPanel({ onNavigate }) {
           loading={loading}
           openNewModal={openNewModal}
           openEditModal={openEditModal}
+          handleToggleStatus={handleToggleStatus}
           handleDelete={handleDelete}
           globalGeminiPrice={globalGeminiPrice}
           globalTranscribePrice={globalTranscribePrice}
