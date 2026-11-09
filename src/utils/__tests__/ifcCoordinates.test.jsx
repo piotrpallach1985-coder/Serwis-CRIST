@@ -26,6 +26,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'admin-1', name: 'Admin UR', role: 'Admin' },
+  }),
+}));
+
 vi.mock('../../firebase', () => ({
   db: {},
   storage: {},
