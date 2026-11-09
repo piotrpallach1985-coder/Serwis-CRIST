@@ -246,17 +246,37 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
 
     setIsSavingMeter(true);
     try {
-      await updateMachineWorkHours(targetMachine.id, parsedVal, false);
+      const authorName = isInternal
+        ? user?.name || user?.email || 'Pracownik (Wewnętrzny)'
+        : reporterName?.trim() || 'Szybkie Zgłoszenie (QR/NFC)';
+      const historyEntry = {
+        hours: parsedVal,
+        date: new Date().toISOString(),
+        user: authorName,
+      };
+      await updateMachineWorkHours(targetMachine.id, parsedVal, false, authorName);
       if (setSelectedMachine) {
         setSelectedMachine(prev =>
-          prev ? { ...prev, currentWorkHours: parsedVal } : prev
+          prev
+            ? {
+                ...prev,
+                currentWorkHours: parsedVal,
+                workHoursHistory: [...(prev.workHoursHistory || []), historyEntry],
+              }
+            : prev
         );
       }
       const storeState = useManagerStore.getState?.();
       if (storeState?.setMachines && Array.isArray(storeState.machines)) {
         storeState.setMachines(
           storeState.machines.map(m =>
-            m.id === targetMachine.id ? { ...m, currentWorkHours: parsedVal } : m
+            m.id === targetMachine.id
+              ? {
+                  ...m,
+                  currentWorkHours: parsedVal,
+                  workHoursHistory: [...(m.workHoursHistory || []), historyEntry],
+                }
+              : m
           )
         );
       }

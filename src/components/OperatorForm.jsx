@@ -366,7 +366,7 @@ export default function OperatorForm({
                       <span>
                         {isVehicle
                           ? 'Szybkie raportowanie przebiegu pojazdu (km)'
-                          : 'Szybkie raportowanie motogodzin urządzenia (RBG)'}
+                          : 'Szybkie raportowanie godzin pracy urządzenia (RBG)'}
                       </span>
                     </div>
                     <span

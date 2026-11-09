@@ -2764,7 +2764,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
       expect(screen.getByTestId('operator-quick-meter-card').textContent).toContain(
-        'Szybkie raportowanie motogodzin urządzenia (RBG)'
+        'Szybkie raportowanie godzin pracy urządzenia (RBG)'
       );
       expect(screen.getByTestId('operator-quick-meter-current-badge').textContent).toContain(
         '3200 RBG'

@@ -236,7 +236,7 @@ service cloud.firestore {
               && request.resource.data.isDeleted == false);
         allow update: if isTenantUser(tenantId)
           || (isAnonymousInTenant(tenantId)
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentWorkHours', 'lastWorkHoursUpdate'])
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentWorkHours', 'lastWorkHoursUpdate', 'workHoursHistory'])
               && request.resource.data.currentWorkHours is number
               && request.resource.data.currentWorkHours >= resource.data.get('currentWorkHours', 0)
               && request.resource.data.currentWorkHours <= 10000000);

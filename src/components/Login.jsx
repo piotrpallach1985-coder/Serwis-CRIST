@@ -391,12 +391,15 @@ export default function Login({ onLogin, currentUser }) {
               </h2>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] md:text-xs font-extrabold mb-2">
                 <i className="ph-fill ph-speedometer text-emerald-600 text-sm"></i>
-                {t('login.report_meter_badge', '+ Zgłaszanie motogodzin (RBG) i przebiegu (km)')}
+                {t(
+                  'login.report_meter_badge',
+                  '+ Zarejestruj godziny pracy urządzenia / przebieg'
+                )}
               </span>
               <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">
                 {t(
                   'login.report_fault_desc',
-                  'Dla pracowników. Zgłaszanie awarii oraz szybki odczyt motogodzin (RBG) i przebiegu (km) bezpośrednio ze stanowiska, bez logowania.'
+                  'Zgłoś awarię / zarejestruj godziny pracy urządzenia / przebieg bezpośrednio ze stanowiska, bez logowania.'
                 )}
               </p>
               <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">

@@ -282,7 +282,7 @@ export default function OperatorScanner({
           <span>
             {t(
               'operator.optionsMeterSubtitle',
-              'Po zeskanowaniu kodu QR lub NFC możesz zgłosić awarię albo zapisać sam stan licznika: motogodziny (RBG) / przebieg (km).'
+              'Po zeskanowaniu kodu QR lub NFC możesz zgłosić awarię albo zarejestrować godziny pracy urządzenia (RBG) / przebieg (km).'
             )}
           </span>
         </p>

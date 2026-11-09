@@ -250,7 +250,7 @@ export default function HomeDashboard({ onLogout }) {
               </h3>
             </button>
 
-            {/* ZGŁOŚ AWARIĘ + RAPORTOWANIE MOTOGODZIN / PRZEBIEGU */}
+            {/* ZGŁOŚ AWARIĘ + REJESTRACJA GODZIN PRACY URZĄDZENIA / PRZEBIEGU */}
             <button
               type="button"
               onClick={() => navigate('/manager/ur/new_ticket_scanner')}
@@ -261,9 +261,14 @@ export default function HomeDashboard({ onLogout }) {
               <h3 className="text-base sm:text-xl font-bold tracking-wide leading-tight">
                 {t('login.report_fault_btn', 'Zgłoś awarię')}
               </h3>
-              <span className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] sm:text-xs font-extrabold tracking-tight">
-                <i className="ph-fill ph-gauge text-xs"></i>
-                {t('login.report_meter_subtitle', 'Motogodziny (RBG) / Przebieg (km)')}
+              <span className="mt-1.5 inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-xl bg-white/20 text-white text-[10px] sm:text-xs font-extrabold tracking-tight leading-snug">
+                <i className="ph-fill ph-gauge text-xs shrink-0"></i>
+                <span>
+                  {t(
+                    'login.report_meter_subtitle',
+                    'Zarejestruj godziny pracy urządzenia / przebieg'
+                  )}
+                </span>
               </span>
             </button>
 

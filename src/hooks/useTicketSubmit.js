@@ -207,9 +207,32 @@ export const useTicketSubmit = ({ regions, onStepChange, showToast }) => {
 
       await setDoc(ticketRef, ticketPayload);
       if (parsedMeter !== null && finalMachineId && finalMachineId !== 'manual') {
-        updateMachineWorkHours(finalMachineId, parsedMeter, false).catch(err =>
-          console.warn('Błąd aktualizacji licznika przy zgłoszeniu:', err)
-        );
+        const meterAuthor = reporterName.trim() || 'Operator';
+        const historyEntry = {
+          hours: parsedMeter,
+          date: new Date().toISOString(),
+          user: meterAuthor,
+        };
+        updateMachineWorkHours(finalMachineId, parsedMeter, false, meterAuthor)
+          .then(() => {
+            const storeState = useManagerStore.getState?.();
+            if (storeState?.setMachines && Array.isArray(storeState.machines)) {
+              storeState.setMachines(
+                storeState.machines.map(m =>
+                  m.id === finalMachineId
+                    ? {
+                        ...m,
+                        currentWorkHours: parsedMeter,
+                        workHoursHistory: [...(m.workHoursHistory || []), historyEntry],
+                      }
+                    : m
+                )
+              );
+            }
+          })
+          .catch(err =>
+            console.warn('Błąd aktualizacji licznika przy zgłoszeniu:', err)
+          );
       }
       logAudit('CREATE', 'TICKET', ticketRef.id, 'Zgłoszono nową awarię: ' + selectedMachine.name);
       localStorage.setItem('last_ticket_time', Date.now().toString());

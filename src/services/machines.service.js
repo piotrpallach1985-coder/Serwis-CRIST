@@ -6,19 +6,30 @@ import {
   doc,
   serverTimestamp,
   increment,
+  arrayUnion,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import { logAudit } from './audit.service';
 
 /**
- * Zwiększa lub ustawia licznik roboczogodzin dla maszyny.
- * W przyszłości ta funkcja może być zintegrowana z API zewnętrznym (np. ERP/MES).
+ * Zwiększa lub ustawia licznik godzin pracy / przebiegu dla maszyny lub pojazdu
+ * i dopisuje wpis do historii aktualizacji (workHoursHistory).
  */
-export const updateMachineWorkHours = async (machineId, newHours, isDelta = false) => {
+export const updateMachineWorkHours = async (
+  machineId,
+  newHours,
+  isDelta = false,
+  updatedBy = null
+) => {
   try {
     const machineRef = doc(db, 'tenants', getCurrentTenant(), 'machines', machineId);
+    const authorName =
+      updatedBy ||
+      auth?.currentUser?.displayName ||
+      auth?.currentUser?.email ||
+      (auth?.currentUser?.isAnonymous ? 'Szybkie Zgłoszenie (QR/NFC)' : 'Operator');
 
     if (isDelta) {
       await updateDoc(machineRef, {
@@ -26,9 +37,15 @@ export const updateMachineWorkHours = async (machineId, newHours, isDelta = fals
         lastWorkHoursUpdate: serverTimestamp(),
       });
     } else {
+      const historyEntry = {
+        hours: Number(newHours),
+        date: new Date().toISOString(),
+        user: authorName,
+      };
       await updateDoc(machineRef, {
-        currentWorkHours: newHours,
+        currentWorkHours: Number(newHours),
         lastWorkHoursUpdate: serverTimestamp(),
+        workHoursHistory: arrayUnion(historyEntry),
       });
     }
 
