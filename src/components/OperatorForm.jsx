@@ -70,6 +70,33 @@ export default function OperatorForm({
     effectiveMachine?.id && effectiveMachine.id !== 'manual'
   );
 
+  const [isMachineDropdownOpen, setIsMachineDropdownOpen] = useState(false);
+
+  const sortedAvailableMachines = React.useMemo(() => {
+    if (!isInternal || !Array.isArray(machines)) return [];
+    return [...machines]
+      .filter(m => m && !m.isDeleted)
+      .sort((a, b) =>
+        String(a.name || '').localeCompare(String(b.name || ''), 'pl', {
+          numeric: true,
+          sensitivity: 'base',
+        })
+      );
+  }, [isInternal, machines]);
+
+  const filteredDropdownMachines = React.useMemo(() => {
+    if (!sortedAvailableMachines.length) return [];
+    const q = String(selectedMachine?.name || '').trim().toLowerCase();
+    if (!q) return sortedAvailableMachines;
+    const matches = sortedAvailableMachines.filter(
+      m =>
+        String(m.name || '').toLowerCase().includes(q) ||
+        String(m.licensePlate || '').toLowerCase().includes(q) ||
+        String(m.internalId || '').toLowerCase().includes(q)
+    );
+    return matches.length > 0 ? matches : sortedAvailableMachines;
+  }, [sortedAvailableMachines, selectedMachine?.name]);
+
   return (
     <div className="flex flex-col gap-4">
       {errorMsg && (
@@ -90,6 +117,133 @@ export default function OperatorForm({
                       </span>
                       {!user && <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded inline-block mb-1 ml-2">Firma: {companyName}</span>}
                     {selectedMachine.id === 'manual' ? (
+                      isInternal ? (
+                        <div className="mt-1 flex flex-col gap-2 w-full">
+                          <div className="relative w-full">
+                            <input
+                              type="text"
+                              data-testid="operator-form-machine-input"
+                              value={selectedMachine.name || ''}
+                              onFocus={() => {
+                                if (sortedAvailableMachines.length > 0) {
+                                  setIsMachineDropdownOpen(true);
+                                }
+                              }}
+                              onBlur={() => {
+                                setTimeout(() => setIsMachineDropdownOpen(false), 180);
+                              }}
+                              onChange={e => {
+                                const val = e.target.value;
+                                const exactMatch = sortedAvailableMachines.find(
+                                  m =>
+                                    String(m.name || '').toLowerCase() === val.trim().toLowerCase()
+                                );
+                                setSelectedMachine({
+                                  ...selectedMachine,
+                                  name: val,
+                                  matchedMachineId: exactMatch ? exactMatch.id : undefined,
+                                  regionId: exactMatch?.regionId
+                                    ? exactMatch.regionId
+                                    : selectedMachine.regionId || '',
+                                });
+                                if (sortedAvailableMachines.length > 0) {
+                                  setIsMachineDropdownOpen(true);
+                                }
+                              }}
+                              className="w-full p-2.5 pr-10 border border-blue-300 rounded-lg font-bold text-base sm:text-lg text-slate-800 focus:outline-none focus:border-blue-900 bg-white"
+                              placeholder="Wpisz lub wybierz urządzenie..."
+                              autoFocus
+                              list="manual-machine-list"
+                            />
+                            {sortedAvailableMachines.length > 0 && (
+                              <button
+                                type="button"
+                                data-testid="operator-form-machine-dropdown-toggle"
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  setIsMachineDropdownOpen(prev => !prev);
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-700 p-1 rounded cursor-pointer"
+                                title="Rozwiń listę urządzeń"
+                              >
+                                <i
+                                  className={`ph ${
+                                    isMachineDropdownOpen ? 'ph-caret-up' : 'ph-caret-down'
+                                  } text-lg font-bold`}
+                                ></i>
+                              </button>
+                            )}
+                            {isMachineDropdownOpen && filteredDropdownMachines.length > 0 && (
+                              <div
+                                data-testid="operator-form-machine-dropdown-list"
+                                className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto bg-white border border-blue-200 rounded-xl shadow-xl z-30 divide-y divide-slate-100"
+                              >
+                                {filteredDropdownMachines.map(m => {
+                                  const regName = regions?.find(r => r.id === m.regionId)?.name;
+                                  return (
+                                    <button
+                                      key={m.id}
+                                      type="button"
+                                      data-testid={`operator-form-machine-option-${m.id}`}
+                                      onMouseDown={e => {
+                                        e.preventDefault();
+                                        setSelectedMachine({
+                                          ...selectedMachine,
+                                          id: 'manual',
+                                          matchedMachineId: m.id,
+                                          name: m.name,
+                                          regionId: m.regionId || selectedMachine.regionId || '',
+                                        });
+                                        setIsMachineDropdownOpen(false);
+                                      }}
+                                      className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50 transition-colors flex flex-wrap items-center justify-between gap-2 cursor-pointer"
+                                    >
+                                      <div className="font-bold text-sm text-slate-800">
+                                        {m.name}
+                                        {m.licensePlate ? (
+                                          <span className="ml-1.5 text-xs font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                            {m.licensePlate}
+                                          </span>
+                                        ) : null}
+                                        {m.internalId ? (
+                                          <span className="ml-1.5 text-xs text-slate-500 font-normal">
+                                            ({m.internalId})
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      {regName && (
+                                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                          {regName}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <datalist id="manual-machine-list">
+                            {machines?.map(m => (
+                              <option key={m.id} value={m.name} />
+                            ))}
+                          </datalist>
+                          <select
+                            data-testid="operator-form-region-select"
+                            value={selectedMachine.regionId || ''}
+                            onChange={e =>
+                              setSelectedMachine({ ...selectedMachine, regionId: e.target.value })
+                            }
+                            className="w-full p-2.5 border border-blue-300 rounded-lg font-medium text-sm text-slate-700 focus:outline-none focus:border-blue-900 bg-white"
+                          >
+                            <option value="">-- Wybierz rejon / miejsce montażu --</option>
+                            {(regions || []).map(r => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
                         <div className="mt-1 flex flex-col gap-2.5 w-full">
                           <div className="w-full">
                             <label className="block text-xs font-extrabold text-slate-700 mb-1">
@@ -135,7 +289,8 @@ export default function OperatorForm({
                             Dyspozytor ustali docelowe urządzenie w bazie na podstawie Twojego opisu, a następnie zostanie na nie naklejony kod QR.
                           </p>
                         </div>
-                      ) : (
+                      )
+                    ) : (
                         <div className="font-black text-2xl sm:text-3xl text-slate-800 break-words mt-1 w-full leading-tight pr-2">
                           {selectedMachine.name}
                         </div>

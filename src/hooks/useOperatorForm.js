@@ -149,9 +149,14 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
     if (
       isInternal &&
       machineToSubmit.id === 'manual' &&
-      machineToSubmit.matchedMachineId
+      (machineToSubmit.matchedMachineId || machineToSubmit.name)
     ) {
-      const existingMachine = machines.find(m => m.id === machineToSubmit.matchedMachineId);
+      const typedName = String(machineToSubmit.name || '').trim().toLowerCase();
+      const existingMachine =
+        (machineToSubmit.matchedMachineId &&
+          machines.find(m => m.id === machineToSubmit.matchedMachineId)) ||
+        machines.find(m => String(m.name || '').toLowerCase() === typedName) ||
+        findMachineByIdentifierOrPlate(machines, machineToSubmit.name);
       if (existingMachine) {
         machineToSubmit = {
           ...existingMachine,

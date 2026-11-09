@@ -2216,6 +2216,26 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.getByText('Drzwi nie domykają się')).toBeTruthy();
       unmountBypass();
 
+      // Natomiast ZALOGOWANY użytkownik (isInternal=true) przy zgłaszaniu bez QR ("manual") widzi listę podpowiedzi urządzeń oraz listę rejonów
+      const { unmount: unmountInternalManual } = render(
+        <OperatorForm
+          machines={[elevatorInBuildingA]}
+          selectedMachine={{ id: 'manual', name: '', regionId: '' }}
+          setSelectedMachine={vi.fn()}
+          regions={testRegions}
+          handleStepChange={vi.fn()}
+          isOnline={true}
+          topicsList={['Drzwi nie domykają się']}
+          reportersList={[]}
+          isInternal={true}
+        />
+      );
+      expect(screen.getByTestId('operator-form-machine-input')).toBeTruthy();
+      expect(screen.getByTestId('operator-form-machine-dropdown-toggle')).toBeTruthy();
+      expect(screen.getByTestId('operator-form-region-select')).toBeTruthy();
+      expect(screen.queryByTestId('operator-form-location-input')).toBeNull();
+      unmountInternalManual();
+
       // 7) Hydratacja czynników chłodniczych z Firestore (branding.customRefrigerants) oraz fallback assignedAt w metrykach
       const hydrated = hydrateCustomRefrigerants({
         R513A: { code: 'R513A', name: 'R513A (Opteon XP10)', gwp: 631, isFluorinated: true, isCustom: true },
