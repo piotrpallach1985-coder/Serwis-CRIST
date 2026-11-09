@@ -16,6 +16,9 @@ import {
 import { useMapPins, isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
 import { autoDetectColumnMapping, prepareMachinesImportPreview } from '../bulkImportHelper';
 import MachineForm from '../../components/manager/MachineForm';
+import Regions from '../../components/manager/Regions';
+import { useManagerStore } from '../../store/managerStore';
+import { updateRegion } from '../../services/dictionary.service';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -31,6 +34,14 @@ vi.mock('../../firebase', () => ({
 vi.mock('../../services/machines.service', () => ({
   addMachine: vi.fn().mockResolvedValue({ id: 'new-ifc-mach' }),
   updateMachine: vi.fn().mockResolvedValue({}),
+  updateMapSettings: vi.fn().mockResolvedValue({}),
+  subscribeToMapSettings: vi.fn(() => () => {}),
+}));
+
+vi.mock('../../services/dictionary.service', () => ({
+  addRegion: vi.fn().mockResolvedValue({ id: 'new-reg' }),
+  updateRegion: vi.fn().mockResolvedValue({}),
+  checkRegionInUse: vi.fn().mockResolvedValue({ inUse: false, count: 0 }),
 }));
 
 describe('Obsługa współrzędnych BIM / IFC (ISO 16739) — Etap 1 + 3', () => {
@@ -294,6 +305,91 @@ describe('Obsługa współrzędnych BIM / IFC (ISO 16739) — Etap 1 + 3', () =>
       fireEvent.click(screen.getByTestId('machine-ifc-toggle-btn'));
       expect(screen.getByTestId('machine-ifc-section')).toBeTruthy();
       expect(screen.getByTestId('machine-ifc-global-id-input')).toBeTruthy();
+      unmount();
+    });
+
+    it('obsługuje Etap 2 w Regions.jsx — zwijana sekcja Kalibracji BIM / IFC (poziomy Z, Bounding Box oraz punkty narożne)', async () => {
+      useManagerStore.setState({
+        regions: [
+          {
+            id: 'reg-k1',
+            name: 'Hala K1',
+            description: 'Hala Kadłubowa',
+            mapType: 'image',
+            mapImageUrl: 'https://example.com/hala-k1.png',
+            submapConfigured: true,
+            submaps: [
+              {
+                id: 'default',
+                name: 'Posadzka 0.00',
+                mapType: 'image',
+                mapImageUrl: 'https://example.com/hala-k1.png',
+                submapConfigured: true,
+              },
+            ],
+          },
+        ],
+        machines: [],
+        branding: { industryProfile: 'industrial' },
+      });
+
+      const { unmount } = render(<Regions />);
+
+      // Klikamy Edytuj dla Hali K1 (drugi przycisk Edytuj, bo pierwszy to Mapa Główna)
+      const editButtons = screen.getAllByText(/admin\.regions\.edit|Edytuj/i);
+      fireEvent.click(editButtons[1]);
+
+      // Domyślnie panel kalibracji IFC jest zwinięty
+      expect(screen.queryByTestId('region-ifc-calibration-panel')).toBeNull();
+
+      // Rozwijamy sekcję Kalibracji BIM / IFC
+      fireEvent.click(screen.getByTestId('region-ifc-calibration-toggle'));
+      expect(screen.getByTestId('region-ifc-calibration-panel')).toBeTruthy();
+
+      // Uzupełniamy kondygnację, zakres Z oraz Bounding Box hali
+      fireEvent.change(screen.getByTestId('submap-ifc-storey-input'), {
+        target: { value: 'Poziom 0.00' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-minz-input'), {
+        target: { value: '-1' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-maxz-input'), {
+        target: { value: '6' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-minx-input'), {
+        target: { value: '0' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-maxx-input'), {
+        target: { value: '240' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-miny-input'), {
+        target: { value: '0' },
+      });
+      fireEvent.change(screen.getByTestId('submap-ifc-maxy-input'), {
+        target: { value: '80' },
+      });
+
+      // Zapisujemy formularz rejonu
+      fireEvent.click(screen.getByText('Zapisz zmiany'));
+
+      expect(updateRegion).toHaveBeenCalledWith(
+        'reg-k1',
+        expect.objectContaining({
+          ifcCalibration: expect.objectContaining({
+            minX: 0,
+            maxX: 240,
+            minY: 0,
+            maxY: 80,
+          }),
+          submaps: expect.arrayContaining([
+            expect.objectContaining({
+              ifcStorey: 'Poziom 0.00',
+              ifcMinZ: -1,
+              ifcMaxZ: 6,
+            }),
+          ]),
+        })
+      );
       unmount();
     });
   });

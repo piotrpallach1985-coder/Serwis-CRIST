@@ -55,6 +55,8 @@ export default function Regions() {
   const [loading, setLoading] = useState(false);
   const [showDeleted] = useState(false);
   const [mainMapSettings, setMainMapSettings] = useState(null);
+  const [showIfcCalibration, setShowIfcCalibration] = useState(false);
+  const [pickingAnchorIdx, setPickingAnchorIdx] = useState(null);
 
   useEffect(() => {
     const unsub = subscribeToMapSettings(snap => {
@@ -235,6 +237,8 @@ export default function Regions() {
     setSubmapNameInput('Podmapa 1');
     setUploadProgress(0);
     setEditingId(null);
+    setShowIfcCalibration(false);
+    setPickingAnchorIdx(null);
   };
 
   const handleSearchRegionGeo = async () => {
@@ -344,6 +348,16 @@ export default function Regions() {
             defaultPanX: Number(item.defaultPanX) || 0,
             defaultPanY: Number(item.defaultPanY) || 0,
             submapConfigured: isItemConfigured,
+            ifcStorey: (item.ifcStorey || '').trim(),
+            ifcMinZ:
+              item.ifcMinZ !== undefined && item.ifcMinZ !== '' && item.ifcMinZ !== null && Number.isFinite(Number(item.ifcMinZ))
+                ? Number(item.ifcMinZ)
+                : null,
+            ifcMaxZ:
+              item.ifcMaxZ !== undefined && item.ifcMaxZ !== '' && item.ifcMaxZ !== null && Number.isFinite(Number(item.ifcMaxZ))
+                ? Number(item.ifcMaxZ)
+                : null,
+            ifcCalibration: item.ifcCalibration || null,
           });
         }
       }
@@ -363,6 +377,7 @@ export default function Regions() {
         mapType: effectiveMapType,
         submapConfigured,
         mapImageUrl: finalImageUrl,
+        ifcCalibration: firstSub?.ifcCalibration || null,
         ...(submapConfigured && effectiveMapType === 'google'
           ? {
               googleQuery:
@@ -481,6 +496,15 @@ export default function Regions() {
     setEditingId(r.id);
     setMapImageUrl(r.mapImageUrl || '');
     setMapFile(null);
+    setPickingAnchorIdx(null);
+    setShowIfcCalibration(
+      Boolean(
+        r.ifcCalibration ||
+          existingSubmaps.some(
+            s => s.ifcCalibration || s.ifcStorey || s.ifcMinZ !== undefined || s.ifcMaxZ !== undefined
+          )
+      )
+    );
     setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1091,6 +1115,394 @@ export default function Regions() {
                                       </div>
                                     </div>
                                   )}
+
+                                  {/* Opcjonalna, zwijana sekcja Kalibracji BIM / Współrzędnych IFC (Etap 2) */}
+                                  <div className="pt-2 border-t border-slate-100">
+                                    <button
+                                      type="button"
+                                      data-testid="region-ifc-calibration-toggle"
+                                      onClick={() => {
+                                        setShowIfcCalibration(prev => !prev);
+                                        setPickingAnchorIdx(null);
+                                      }}
+                                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-200 text-left transition-colors cursor-pointer"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <i className="ph ph-cube text-indigo-600 text-base"></i>
+                                        <div>
+                                          <span className="text-xs font-extrabold text-indigo-900 uppercase tracking-wider block">
+                                            Kalibracja BIM / Współrzędne IFC (Opcjonalne)
+                                          </span>
+                                          <span className="text-[11px] text-slate-600">
+                                            Zakres współrzędnych hali (X, Y), punkty narożne lub poziom kondygnacji Z dla automatycznego rozmieszczania maszyn z BIM
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <i
+                                        className={`ph ${
+                                          showIfcCalibration ? 'ph-caret-up' : 'ph-caret-down'
+                                        } text-indigo-700 font-bold`}
+                                      ></i>
+                                    </button>
+
+                                    {showIfcCalibration && (() => {
+                                      const cal = currentDraft.ifcCalibration || {};
+                                      const anchors = Array.isArray(cal.anchors) ? cal.anchors : [];
+                                      const updateCurrentDraftIfc = patch => {
+                                        setSubmapsDraft(prev => {
+                                          const list = prev.length > 0 ? prev : effectiveDrafts;
+                                          return list.map(item =>
+                                            item.id === currentDraft.id ? { ...item, ...patch } : item
+                                          );
+                                        });
+                                      };
+                                      const updateCalField = calPatch => {
+                                        const nextCal = { ...(currentDraft.ifcCalibration || {}), ...calPatch };
+                                        updateCurrentDraftIfc({ ifcCalibration: nextCal });
+                                      };
+                                      const updateAnchorPoint = (idx, anchorPatch) => {
+                                        const nextAnchors = [0, 1, 2].map(i => ({
+                                          ...(anchors[i] || {}),
+                                          ...(i === idx ? anchorPatch : {}),
+                                        })).filter(
+                                          a =>
+                                            a.ifcX !== undefined ||
+                                            a.ifcY !== undefined ||
+                                            a.xPercent !== undefined ||
+                                            a.yPercent !== undefined
+                                        );
+                                        updateCalField({ anchors: nextAnchors });
+                                      };
+
+                                      return (
+                                        <div
+                                          data-testid="region-ifc-calibration-panel"
+                                          className="mt-2 p-3.5 rounded-xl bg-slate-50 border border-indigo-200 space-y-3"
+                                        >
+                                          {/* 1. Poziom / Kondygnacja (IfcBuildingStorey & zakres Z) */}
+                                          <div>
+                                            <div className="text-[11px] font-extrabold text-indigo-900 uppercase tracking-wider mb-1.5">
+                                              1. Kondygnacja / Poziom podmapy (oś pionowa Z)
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                                  Nazwa poziomu (IfcBuildingStorey)
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  data-testid="submap-ifc-storey-input"
+                                                  value={currentDraft.ifcStorey || ''}
+                                                  onChange={e =>
+                                                    updateCurrentDraftIfc({ ifcStorey: e.target.value })
+                                                  }
+                                                  placeholder="np. Poziom 0.00 / Suwnice +12m"
+                                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                                  Rzędna Z od [m] (ifcMinZ)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-minz-input"
+                                                  value={currentDraft.ifcMinZ ?? ''}
+                                                  onChange={e =>
+                                                    updateCurrentDraftIfc({ ifcMinZ: e.target.value })
+                                                  }
+                                                  placeholder="np. -1.0"
+                                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                                  Rzędna Z do [m] (ifcMaxZ)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-maxz-input"
+                                                  value={currentDraft.ifcMaxZ ?? ''}
+                                                  onChange={e =>
+                                                    updateCurrentDraftIfc({ ifcMaxZ: e.target.value })
+                                                  }
+                                                  placeholder="np. 6.0"
+                                                  className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* 2. Zakres współrzędnych 2D hali (Bounding Box + obrót) */}
+                                          <div className="pt-2 border-t border-slate-200">
+                                            <div className="text-[11px] font-extrabold text-indigo-900 uppercase tracking-wider mb-1.5">
+                                              2. Zakres współrzędnych rzutu 2D (Bounding Box X / Y)
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Min X (Lewa)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-minx-input"
+                                                  value={cal.minX ?? ''}
+                                                  onChange={e =>
+                                                    updateCalField({
+                                                      minX: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                    })
+                                                  }
+                                                  placeholder="np. 0"
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-mono bg-white"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Max X (Prawa)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-maxx-input"
+                                                  value={cal.maxX ?? ''}
+                                                  onChange={e =>
+                                                    updateCalField({
+                                                      maxX: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                    })
+                                                  }
+                                                  placeholder="np. 200"
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-mono bg-white"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Min Y (Dół)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-miny-input"
+                                                  value={cal.minY ?? ''}
+                                                  onChange={e =>
+                                                    updateCalField({
+                                                      minY: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                    })
+                                                  }
+                                                  placeholder="np. 0"
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-mono bg-white"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Max Y (Góra)
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-maxy-input"
+                                                  value={cal.maxY ?? ''}
+                                                  onChange={e =>
+                                                    updateCalField({
+                                                      maxY: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                    })
+                                                  }
+                                                  placeholder="np. 100"
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-mono bg-white"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Obrót [°]
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="any"
+                                                  data-testid="submap-ifc-rotation-input"
+                                                  value={cal.rotationDeg ?? ''}
+                                                  onChange={e =>
+                                                    updateCalField({
+                                                      rotationDeg:
+                                                        e.target.value !== '' ? Number(e.target.value) : 0,
+                                                    })
+                                                  }
+                                                  placeholder="0°"
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-mono bg-white"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                                  Jednostka IFC
+                                                </label>
+                                                <select
+                                                  data-testid="submap-ifc-unit-select"
+                                                  value={cal.unit || 'm'}
+                                                  onChange={e => updateCalField({ unit: e.target.value })}
+                                                  className="w-full p-1.5 border border-slate-300 rounded-md text-xs font-bold bg-white"
+                                                >
+                                                  <option value="m">Metry (m)</option>
+                                                  <option value="mm">Milimetry (mm)</option>
+                                                </select>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* 3. Kalibracja punktami narożnymi (2 lub 3 punkty kontrolne z możliwością kliknięcia na rzucie) */}
+                                          <div className="pt-2 border-t border-slate-200">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                              <span className="text-[11px] font-extrabold text-indigo-900 uppercase tracking-wider">
+                                                3. Punkty referencyjne (Narożniki hali — dla rzutów pod kątem / izometrii)
+                                              </span>
+                                              {currentDraft.mapImageUrl && (
+                                                <span className="text-[10px] text-indigo-700 font-semibold">
+                                                  Możesz wpisać % ręcznie lub kliknąć „Wskaż na rysunku”
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                              {[
+                                                { idx: 0, label: 'Punkt 1 (np. Narożnik A)' },
+                                                { idx: 1, label: 'Punkt 2 (np. Narożnik B)' },
+                                                { idx: 2, label: 'Punkt 3 (Opcjonalny — izometria)' },
+                                              ].map(({ idx, label }) => {
+                                                const pt = anchors[idx] || {};
+                                                const isPickingThis = pickingAnchorIdx === idx;
+                                                return (
+                                                  <div
+                                                    key={idx}
+                                                    className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-center bg-white p-2 rounded-lg border border-slate-200"
+                                                  >
+                                                    <span className="text-[11px] font-bold text-slate-700 col-span-2 sm:col-span-1">
+                                                      {label}
+                                                    </span>
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      data-testid={`submap-anchor-${idx}-ifcx`}
+                                                      value={pt.ifcX ?? ''}
+                                                      onChange={e =>
+                                                        updateAnchorPoint(idx, {
+                                                          ifcX: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                        })
+                                                      }
+                                                      placeholder="BIM X [m]"
+                                                      className="p-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                    />
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      data-testid={`submap-anchor-${idx}-ifcy`}
+                                                      value={pt.ifcY ?? ''}
+                                                      onChange={e =>
+                                                        updateAnchorPoint(idx, {
+                                                          ifcY: e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                        })
+                                                      }
+                                                      placeholder="BIM Y [m]"
+                                                      className="p-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                    />
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      data-testid={`submap-anchor-${idx}-xpercent`}
+                                                      value={pt.xPercent ?? ''}
+                                                      onChange={e =>
+                                                        updateAnchorPoint(idx, {
+                                                          xPercent:
+                                                            e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                        })
+                                                      }
+                                                      placeholder="Obraz X (%)"
+                                                      className="p-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                    />
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      data-testid={`submap-anchor-${idx}-ypercent`}
+                                                      value={pt.yPercent ?? ''}
+                                                      onChange={e =>
+                                                        updateAnchorPoint(idx, {
+                                                          yPercent:
+                                                            e.target.value !== '' ? Number(e.target.value) : undefined,
+                                                        })
+                                                      }
+                                                      placeholder="Obraz Y (%)"
+                                                      className="p-1.5 border border-slate-300 rounded text-xs font-mono"
+                                                    />
+                                                    {currentDraft.mapImageUrl ? (
+                                                      <button
+                                                        type="button"
+                                                        data-testid={`submap-pick-anchor-${idx}`}
+                                                        onClick={() =>
+                                                          setPickingAnchorIdx(isPickingThis ? null : idx)
+                                                        }
+                                                        className={`px-2 py-1.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                                                          isPickingThis
+                                                            ? 'bg-amber-500 text-white'
+                                                            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                                        }`}
+                                                      >
+                                                        {isPickingThis ? 'Kliknij na rzut...' : 'Wskaż na rysunku'}
+                                                      </button>
+                                                    ) : (
+                                                      <span className="text-[10px] text-slate-400 italic">
+                                                        Wgraj obraz
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+
+                                            {currentDraft.mapImageUrl && pickingAnchorIdx !== null && (
+                                              <div className="mt-2 p-2 bg-slate-900 rounded-xl border-2 border-amber-400">
+                                                <div className="text-xs font-bold text-amber-300 mb-1.5 flex items-center justify-between">
+                                                  <span>
+                                                    Kliknij na rysunku miejsce odpowiadające Punktowi {pickingAnchorIdx + 1}:
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setPickingAnchorIdx(null)}
+                                                    className="text-[11px] text-white bg-slate-700 px-2 py-0.5 rounded"
+                                                  >
+                                                    Zamknij podgląd
+                                                  </button>
+                                                </div>
+                                                <div
+                                                  data-testid="submap-calibration-image-picker"
+                                                  onClick={e => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    if (!rect.width || !rect.height) return;
+                                                    const xPct = Number(
+                                                      (((e.clientX - rect.left) / rect.width) * 100).toFixed(2)
+                                                    );
+                                                    const yPct = Number(
+                                                      (((e.clientY - rect.top) / rect.height) * 100).toFixed(2)
+                                                    );
+                                                    updateAnchorPoint(pickingAnchorIdx, {
+                                                      xPercent: xPct,
+                                                      yPercent: yPct,
+                                                    });
+                                                    setPickingAnchorIdx(null);
+                                                  }}
+                                                  className="relative w-full max-h-64 overflow-hidden rounded-lg cursor-crosshair select-none"
+                                                >
+                                                  <img
+                                                    src={currentDraft.mapImageUrl}
+                                                    alt="Kalibracja rzutu"
+                                                    className="w-full h-auto block pointer-events-none"
+                                                  />
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
                                 </div>
                               </>
                             );
