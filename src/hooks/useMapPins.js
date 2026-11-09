@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { TICKET_STATUS } from '../utils/constants';
 import { checkServiceUrgency } from '../utils/logicHelpers';
+import {
+  resolveMachineMapPosition,
+  resolveSubmapByIfcElevation,
+} from '../utils/ifcCoordinatesHelper';
 
 const LEGACY_AUTO_SUBMAP_NAME_RE =
   /^(Parter\s*\/\s*(Poziom|Podmapa)\s*\d+|Piętro\s*\d+\s*\/\s*Podmapa\s*\d+)$/i;
@@ -41,6 +45,10 @@ export function getRegionSubmaps(region) {
         defaultPanX: Number(sub.defaultPanX) || 0,
         defaultPanY: Number(sub.defaultPanY) || 0,
         submapConfigured: isConfigured,
+        ifcCalibration: sub.ifcCalibration || region.ifcCalibration || null,
+        ifcStorey: sub.ifcStorey || '',
+        ifcMinZ: sub.ifcMinZ !== undefined && sub.ifcMinZ !== '' ? Number(sub.ifcMinZ) : undefined,
+        ifcMaxZ: sub.ifcMaxZ !== undefined && sub.ifcMaxZ !== '' ? Number(sub.ifcMaxZ) : undefined,
       };
     });
   }
@@ -75,29 +83,45 @@ export function doesEntityBelongToSubmapTab(entity, submaps = [], activeTabId = 
   const otherTabIds = new Set(
     submaps.filter((_, idx) => idx !== Math.max(0, activeIdx)).map(s => s.id)
   );
-  if (isFirstTab) {
-    return !entity.submapTabId || entity.submapTabId === resolvedTabId || !otherTabIds.has(entity.submapTabId);
+  if (entity.submapTabId) {
+    if (isFirstTab) {
+      return entity.submapTabId === resolvedTabId || !otherTabIds.has(entity.submapTabId);
+    }
+    return entity.submapTabId === resolvedTabId;
   }
-  return entity.submapTabId === resolvedTabId;
+
+  // Jeśli nie przypisano ręcznie zakładki podmapy, sprawdź dopasowanie po kondygnacji / wysokości Z z IFC
+  const ifcMatchedTabId = resolveSubmapByIfcElevation(entity, submaps);
+  if (ifcMatchedTabId) {
+    return ifcMatchedTabId === resolvedTabId;
+  }
+
+  return isFirstTab;
 }
 
 export function isMachinePinnedOnSubmap(m, submapId, regions = [], submapTabId = null) {
   if (!m || !submapId) return false;
-  const hasCoords =
-    (m.xPercent !== undefined && m.xPercent !== null) ||
-    (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
+  const reg = Array.isArray(regions) ? regions.find(r => r.id === submapId) : null;
+  const regSubmaps = reg ? getRegionSubmaps(reg) : [];
+  const activeTab =
+    (submapTabId && regSubmaps.find(t => t.id === submapTabId)) || regSubmaps[0] || null;
+  const resolvedCoords = resolveMachineMapPosition(m, reg, activeTab);
+  const hasCoords = Boolean(
+    resolvedCoords &&
+      ((resolvedCoords.xPercent !== null && resolvedCoords.xPercent !== undefined) ||
+        (resolvedCoords.lat !== null &&
+          resolvedCoords.lat !== undefined &&
+          resolvedCoords.lng !== null &&
+          resolvedCoords.lng !== undefined))
+  );
   if (!hasCoords) return false;
   if (m.regionId !== submapId) return false;
   if (m.pinnedOnMap === 'main') return false;
-  if (Array.isArray(regions) && regions.length > 0) {
-    const reg = regions.find(r => r.id === submapId);
-    if (reg) {
-      const regSubmaps = getRegionSubmaps(reg);
-      const hasMap = isRegionMapConfigured(reg);
-      if (!hasMap && m.pinnedOnMap !== 'submap') return false;
-      if (submapTabId && regSubmaps.length > 0) {
-        return doesEntityBelongToSubmapTab(m, regSubmaps, submapTabId);
-      }
+  if (reg) {
+    const hasMap = isRegionMapConfigured(reg);
+    if (!hasMap && m.pinnedOnMap !== 'submap') return false;
+    if (submapTabId && regSubmaps.length > 0) {
+      return doesEntityBelongToSubmapTab(m, regSubmaps, submapTabId);
     }
   }
   return true;
@@ -203,18 +227,36 @@ export function useMapPins({
 
     const isSubmapConfigured = region => isRegionMapConfigured(region);
 
+    const hasResolvedCoords = (entity, reg = null, tab = null) => {
+      if (!entity) return false;
+      if (
+        (entity.xPercent !== undefined && entity.xPercent !== null) ||
+        (entity.lat !== undefined && entity.lat !== null && entity.lng !== undefined && entity.lng !== null)
+      ) {
+        return true;
+      }
+      const resolved = resolveMachineMapPosition(entity, reg, tab);
+      return Boolean(
+        resolved &&
+          ((resolved.xPercent !== null && resolved.xPercent !== undefined) ||
+            (resolved.lat !== null &&
+              resolved.lat !== undefined &&
+              resolved.lng !== null &&
+              resolved.lng !== undefined))
+      );
+    };
+
     const computeSubmapTabsWithStats = region => {
       if (!region) return [];
       const rawTabs = getRegionSubmaps(region);
       if (rawTabs.length === 0) return [];
-      const regMachines = validMachines.filter(
-        m =>
-          m.regionId === region.id &&
-          m.pinnedOnMap !== 'main' &&
-          ((m.xPercent !== undefined && m.xPercent !== null) ||
-            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null))
-      );
       return rawTabs.map(tab => {
+        const regMachines = validMachines.filter(
+          m =>
+            m.regionId === region.id &&
+            m.pinnedOnMap !== 'main' &&
+            hasResolvedCoords(m, region, tab)
+        );
         const tabMachines = regMachines.filter(m =>
           doesEntityBelongToSubmapTab(m, rawTabs, tab.id)
         );
@@ -274,9 +316,8 @@ export function useMapPins({
       const hasChildRegions = safeRegions.some(r => r.parentId === reg.id);
 
       const excludeMachinesWithOwnPinHere = m => {
-        const hasCoords =
-          (m.xPercent !== undefined && m.xPercent !== null) ||
-          (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
+        const mReg = safeRegions.find(r => r.id === m.regionId) || null;
+        const hasCoords = hasResolvedCoords(m, mReg, resolvedActiveTab);
         if (!hasCoords) return true;
         if (!currentSubmapId) {
           return !(m.pinnedOnMap === 'main');
@@ -314,15 +355,12 @@ export function useMapPins({
     const visibleMachines = !currentSubmapId
       ? validMachines.filter(
           m =>
-            ((m.xPercent !== undefined && m.xPercent !== null) ||
-              (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null)) &&
+            hasResolvedCoords(m, null, null) &&
             (!m.regionId || m.regionId === 'main_map' || m.pinnedOnMap === 'main')
         )
       : currentSubmapHasMap
       ? validMachines.filter(m => {
-          const hasPinCoords =
-            (m.xPercent !== undefined && m.xPercent !== null) ||
-            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
+          const hasPinCoords = hasResolvedCoords(m, currentSubmapRegion, resolvedActiveTab);
           if (m.regionId !== currentSubmapId || !hasPinCoords || m.pinnedOnMap === 'main') {
             return false;
           }
@@ -336,8 +374,14 @@ export function useMapPins({
     visibleMachines.forEach(m => {
       const isDragging =
         draggingPin && draggingPin.type === 'machine' && draggingPin.id === m.id;
-      const x = isDragging ? (draggingPin.xPercent ?? draggingPin.x ?? m.xPercent ?? 50) : (m.xPercent ?? 50);
-      const y = isDragging ? (draggingPin.yPercent ?? draggingPin.y ?? m.yPercent ?? 50) : (m.yPercent ?? 50);
+      const resolvedPos = resolveMachineMapPosition(m, currentSubmapRegion, resolvedActiveTab);
+      const baseX = m.xPercent ?? resolvedPos?.xPercent ?? 50;
+      const baseY = m.yPercent ?? resolvedPos?.yPercent ?? 50;
+      const baseLat = m.lat ?? resolvedPos?.lat;
+      const baseLng = m.lng ?? resolvedPos?.lng;
+
+      const x = isDragging ? (draggingPin.xPercent ?? draggingPin.x ?? baseX) : baseX;
+      const y = isDragging ? (draggingPin.yPercent ?? draggingPin.y ?? baseY) : baseY;
       const { status, itemCount, itemIds } = getMachineStatusAndCount(m.id);
 
       pins.push({
@@ -347,10 +391,12 @@ export function useMapPins({
         internalId: m.internalId,
         additionalDescription: m.additionalDescription,
         submapTabId: m.submapTabId || null,
+        ifcGlobalId: m.ifcGlobalId || null,
+        isIfcPositioned: Boolean(resolvedPos?.isIfcPositioned),
         xPercent: x,
         yPercent: y,
-        lat: isDragging && draggingPin.lat !== undefined ? draggingPin.lat : m.lat,
-        lng: isDragging && draggingPin.lng !== undefined ? draggingPin.lng : m.lng,
+        lat: isDragging && draggingPin.lat !== undefined ? draggingPin.lat : baseLat,
+        lng: isDragging && draggingPin.lng !== undefined ? draggingPin.lng : baseLng,
         address: m.address || '',
         status,
         itemCount,
@@ -385,8 +431,7 @@ export function useMapPins({
 
       const unpinnedMachines = validMachines.filter(m => {
         const hasPinOnMain =
-          ((m.xPercent !== undefined && m.xPercent !== null) ||
-            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null)) &&
+          hasResolvedCoords(m, null, null) &&
           (!m.regionId || m.regionId === 'main_map' || m.pinnedOnMap === 'main');
         if (hasPinOnMain) return false;
         if (!m.regionId || m.regionId === 'main_map') return true;
@@ -439,9 +484,7 @@ export function useMapPins({
       const unpinnedMachines = validMachines.filter(m => {
         if (m.regionId === currentSubmapId) {
           if (!anySubmapConfiguredOnRegion) return true;
-          const hasCoords =
-            (m.xPercent !== undefined && m.xPercent !== null) ||
-            (m.lat !== undefined && m.lat !== null && m.lng !== undefined && m.lng !== null);
+          const hasCoords = hasResolvedCoords(m, currentSubmapRegion, resolvedActiveTab);
           return !hasCoords || m.pinnedOnMap === 'main';
         }
         return unpinnedSubRegionIds.has(m.regionId);

@@ -23,6 +23,10 @@ import {
   generateRandomReportPin,
   resolveRegionReportPin,
 } from '../../utils/fieldServiceHelpers';
+import {
+  isPuwg2000CoordinatePair,
+  puwg2000ToWgs84,
+} from '../../utils/ifcCoordinatesHelper';
 
 export function formatPhoneXxx(raw) {
   const digits = String(raw || '').replace(/\D/g, '').slice(0, 9);
@@ -95,6 +99,14 @@ export default function MachineForm({
   const [ownershipType, setOwnershipType] = useState('');
   const [udtOrExtinguisherDate, setUdtOrExtinguisherDate] = useState('');
   const [reportPin, setReportPin] = useState('');
+
+  // Pola integracji BIM / współrzędnych IFC (ISO 16739) — w 100% opcjonalne
+  const [showIfcFields, setShowIfcFields] = useState(false);
+  const [ifcGlobalId, setIfcGlobalId] = useState('');
+  const [ifcX, setIfcX] = useState('');
+  const [ifcY, setIfcY] = useState('');
+  const [ifcZ, setIfcZ] = useState('');
+  const [ifcStorey, setIfcStorey] = useState('');
 
   const [loading, setLoading] = useState(false);
   const limits = useManagerStore(state => state.limits);
@@ -198,6 +210,31 @@ export default function MachineForm({
       setOwnershipType(editingMachine.ownershipType || '');
       setUdtOrExtinguisherDate(editingMachine.udtOrExtinguisherDate || '');
       setReportPin(editingMachine.reportPin || '');
+      setIfcGlobalId(editingMachine.ifcGlobalId || '');
+      setIfcX(
+        editingMachine.ifcX !== undefined && editingMachine.ifcX !== null
+          ? String(editingMachine.ifcX)
+          : ''
+      );
+      setIfcY(
+        editingMachine.ifcY !== undefined && editingMachine.ifcY !== null
+          ? String(editingMachine.ifcY)
+          : ''
+      );
+      setIfcZ(
+        editingMachine.ifcZ !== undefined && editingMachine.ifcZ !== null
+          ? String(editingMachine.ifcZ)
+          : ''
+      );
+      setIfcStorey(editingMachine.ifcStorey || '');
+      setShowIfcFields(
+        Boolean(
+          editingMachine.ifcGlobalId ||
+            (editingMachine.ifcX !== undefined && editingMachine.ifcX !== null && editingMachine.ifcX !== '') ||
+            (editingMachine.ifcY !== undefined && editingMachine.ifcY !== null && editingMachine.ifcY !== '') ||
+            editingMachine.ifcStorey
+        )
+      );
 
       setShowExtendedFields(
         isExistingHvac ||
@@ -264,6 +301,12 @@ export default function MachineForm({
       setOwnershipType('');
       setUdtOrExtinguisherDate('');
       setReportPin('');
+      setIfcGlobalId('');
+      setIfcX('');
+      setIfcY('');
+      setIfcZ('');
+      setIfcStorey('');
+      setShowIfcFields(false);
 
       if (initialParentId) {
         setParentId(initialParentId);
@@ -480,6 +523,20 @@ export default function MachineForm({
                 : null,
             requiresCroCard: effectiveRefType ? fGasCalc.requiresCroCard : false,
           }
+        : {}),
+      ifcGlobalId: ifcGlobalId.trim(),
+      ifcX: ifcX !== '' && Number.isFinite(Number(ifcX)) ? Number(ifcX) : null,
+      ifcY: ifcY !== '' && Number.isFinite(Number(ifcY)) ? Number(ifcY) : null,
+      ifcZ: ifcZ !== '' && Number.isFinite(Number(ifcZ)) ? Number(ifcZ) : null,
+      ifcStorey: ifcStorey.trim(),
+      ...(ifcX !== '' &&
+      ifcY !== '' &&
+      isPuwg2000CoordinatePair(ifcX, ifcY) &&
+      (!editingMachine || editingMachine.lat === undefined || editingMachine.lat === null)
+        ? (() => {
+            const wgs = puwg2000ToWgs84(ifcX, ifcY);
+            return wgs ? { lat: wgs.lat, lng: wgs.lng } : {};
+          })()
         : {}),
     };
 
@@ -1425,6 +1482,130 @@ export default function MachineForm({
                 )}
               </div>
             )}
+
+            {/* Opcjonalna, zwijana sekcja Integracji BIM / Współrzędnych IFC (ISO 16739) */}
+            <div className="mt-4 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                data-testid="machine-ifc-toggle-btn"
+                onClick={() => setShowIfcFields(prev => !prev)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <i className="ph ph-cube text-indigo-600 text-lg"></i>
+                  <div>
+                    <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">
+                      Integracja BIM / Współrzędne IFC (Opcjonalne)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Identyfikator IfcGlobalId oraz współrzędne 3D (X, Y, Z / PUWG 2000) do automatycznego pozycjonowania na mapie
+                    </span>
+                  </div>
+                </div>
+                <i
+                  className={`ph ${
+                    showIfcFields ? 'ph-caret-up' : 'ph-caret-down'
+                  } text-slate-500 font-bold`}
+                ></i>
+              </button>
+
+              {showIfcFields && (
+                <div
+                  data-testid="machine-ifc-section"
+                  className="mt-2 p-4 rounded-xl bg-indigo-50/40 border border-indigo-200 space-y-3"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        IfcGlobalId (GUID obiektu w modelu BIM)
+                      </label>
+                      <input
+                        type="text"
+                        data-testid="machine-ifc-global-id-input"
+                        value={ifcGlobalId}
+                        onChange={e => setIfcGlobalId(e.target.value)}
+                        placeholder="np. 2O2Fr$t4X7Zf8NOew3FLOH"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Kondygnacja / Poziom BIM (IfcBuildingStorey)
+                      </label>
+                      <input
+                        type="text"
+                        data-testid="machine-ifc-storey-input"
+                        value={ifcStorey}
+                        onChange={e => setIfcStorey(e.target.value)}
+                        placeholder="np. Poziom 0.00 / Pomost suwnicy +12m"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Współrzędna X (IFC / PUWG 2000 [m])
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        data-testid="machine-ifc-x-input"
+                        value={ifcX}
+                        onChange={e => setIfcX(e.target.value)}
+                        placeholder="np. 124.50 lub 6045120.5"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Współrzędna Y (IFC / PUWG 2000 [m])
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        data-testid="machine-ifc-y-input"
+                        value={ifcY}
+                        onChange={e => setIfcY(e.target.value)}
+                        placeholder="np. 48.20 lub 6535410.2"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Rzędna wysokości Z (Elevation [m])
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        data-testid="machine-ifc-z-input"
+                        value={ifcZ}
+                        onChange={e => setIfcZ(e.target.value)}
+                        placeholder="np. 0.00 lub 12.50"
+                        className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {ifcX !== '' && ifcY !== '' && isPuwg2000CoordinatePair(ifcX, ifcY) && (
+                    <div
+                      data-testid="machine-ifc-puwg-preview"
+                      className="text-[11px] font-bold text-indigo-800 bg-indigo-100/80 px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                    >
+                      <i className="ph ph-globe-hemisphere-east text-sm"></i>
+                      <span>
+                        Wykryto układ geodezyjny PUWG 2000 — przeliczono na GPS:{' '}
+                        {(() => {
+                          const wgs = puwg2000ToWgs84(ifcX, ifcY);
+                          return wgs ? `${wgs.lat}, ${wgs.lng} (strefa ${wgs.zone})` : '—';
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {editingMachine && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mt-4 text-yellow-800 text-sm">

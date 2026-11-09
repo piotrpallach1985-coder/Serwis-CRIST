@@ -1,6 +1,7 @@
 /**
  * Helpery do masowego importu Urządzeń/Pojazdów (wraz z podzespołami parentId) oraz Części Magazynowych z plików Excel (.xlsx/.xls) i CSV.
  */
+import { isPuwg2000CoordinatePair, puwg2000ToWgs84 } from './ifcCoordinatesHelper';
 
 export const MACHINE_IMPORT_FIELDS = [
   {
@@ -128,6 +129,50 @@ export const MACHINE_IMPORT_FIELDS = [
     requirementBadge: 'OPCJONALNE',
     legendDesc:
       'Wpisz TAK, jeśli mimo podanego rejonu urządzenie ma trafić do bazy jako (DO WERYFIKACJI) bez generowania kodu QR.',
+  },
+  {
+    key: 'ifcGlobalId',
+    label: 'IfcGlobalId (GUID obiektu BIM / IFC)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (BIM / IFC)',
+    legendDesc:
+      'Unikalny 22-znakowy identyfikator obiektu z modelu BIM (standard ISO 16739 IFC) do synchronizacji i aktualizacji.',
+  },
+  {
+    key: 'ifcX',
+    label: 'Współrzędna X (IFC / PUWG 2000 [m])',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (BIM / IFC)',
+    legendDesc:
+      'Współrzędna X obiektu w modelu BIM (w metrach) lub w układzie geodezyjnym PUWG 2000 (automatyczne przeliczenie na mapę).',
+  },
+  {
+    key: 'ifcY',
+    label: 'Współrzędna Y (IFC / PUWG 2000 [m])',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (BIM / IFC)',
+    legendDesc:
+      'Współrzędna Y obiektu w modelu BIM (w metrach) lub w układzie geodezyjnym PUWG 2000 (automatyczne przeliczenie na mapę).',
+  },
+  {
+    key: 'ifcZ',
+    label: 'Rzędna wysokości Z (IFC Elevation [m])',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (BIM / IFC)',
+    legendDesc:
+      'Rzędna wysokości Z obiektu w modelu BIM (w metrach) — pozwala automatycznie przypisać maszynę do poziomu podmapy.',
+  },
+  {
+    key: 'ifcStorey',
+    label: 'Kondygnacja / Poziom BIM (IfcBuildingStorey)',
+    required: false,
+    requirementLevel: 'optional',
+    requirementBadge: 'OPCJONALNE (BIM / IFC)',
+    legendDesc: 'Nazwa kondygnacji lub poziomu z modelu IFC (np. Poziom 0.00, Pomost +12m).',
   },
 ];
 
@@ -354,6 +399,28 @@ const MACHINE_HEADER_ALIASES = {
     'status',
     'verify',
     'needs verification',
+  ],
+  ifcGlobalId: [
+    'ifcglobalid',
+    'globalid',
+    'ifc global id',
+    'ifc guid',
+    'bim guid',
+    'bim id',
+    'guid bim',
+    'id bim',
+  ],
+  ifcX: ['ifcx', 'ifc x', 'współrzędna x', 'wspolrzedna x', 'bim x', 'x (ifc)', 'easting', 'x [m]'],
+  ifcY: ['ifcy', 'ifc y', 'współrzędna y', 'wspolrzedna y', 'bim y', 'y (ifc)', 'northing', 'y [m]'],
+  ifcZ: ['ifcz', 'ifc z', 'współrzędna z', 'wspolrzedna z', 'rzędna z', 'rzedna z', 'bim z', 'elevation', 'z [m]'],
+  ifcStorey: [
+    'ifcstorey',
+    'ifcbuildingstorey',
+    'kondygnacja bim',
+    'poziom bim',
+    'kondygnacja ifc',
+    'storey',
+    'floor',
   ],
 };
 
@@ -754,6 +821,14 @@ export function prepareMachinesImportPreview(
     const techInspectionDate = getVal('techInspectionDate');
     const insuranceExpiryDate = getVal('insuranceExpiryDate');
     const rawVerifyFlag = getVal('needsVerification').toLowerCase();
+    const ifcGlobalId = getVal('ifcGlobalId');
+    const rawIfcX = getVal('ifcX');
+    const rawIfcY = getVal('ifcY');
+    const rawIfcZ = getVal('ifcZ');
+    const ifcStorey = getVal('ifcStorey');
+    const ifcX = rawIfcX !== '' ? parseNumericValue(rawIfcX, null) : null;
+    const ifcY = rawIfcY !== '' ? parseNumericValue(rawIfcY, null) : null;
+    const ifcZ = rawIfcZ !== '' ? parseNumericValue(rawIfcZ, null) : null;
 
     // Rozpoznanie rejonu (własnego lub odziedziczonego po urządzeniu nadrzędnym)
     let resolvedRegionId = '';
@@ -820,6 +895,9 @@ export function prepareMachinesImportPreview(
     const cleanBaseName = rawName.replace(/\(DO WERYFIKACJI\)/gi, '').trim().toLowerCase();
 
     const duplicateMachine = activeMachines.find(m => {
+      if (ifcGlobalId && m.ifcGlobalId) {
+        if (String(m.ifcGlobalId).trim() === ifcGlobalId.trim()) return true;
+      }
       if (cleanPlate && m.licensePlate) {
         const mPlate = String(m.licensePlate).toUpperCase().replace(/[\s-]/g, '');
         if (mPlate === cleanPlate) return true;
@@ -837,6 +915,11 @@ export function prepareMachinesImportPreview(
       return false;
     });
 
+    const autoWgs =
+      ifcX !== null && ifcY !== null && isPuwg2000CoordinatePair(ifcX, ifcY)
+        ? puwg2000ToWgs84(ifcX, ifcY)
+        : null;
+
     const payload = {
       name: finalName,
       regionId: resolvedRegionId,
@@ -852,6 +935,12 @@ export function prepareMachinesImportPreview(
       productionYear: assetCategory === 'vehicle' ? productionYear : '',
       techInspectionDate: assetCategory === 'vehicle' ? techInspectionDate : '',
       insuranceExpiryDate: assetCategory === 'vehicle' ? insuranceExpiryDate : '',
+      ...(ifcGlobalId ? { ifcGlobalId } : {}),
+      ...(ifcX !== null ? { ifcX } : {}),
+      ...(ifcY !== null ? { ifcY } : {}),
+      ...(ifcZ !== null ? { ifcZ } : {}),
+      ...(ifcStorey ? { ifcStorey } : {}),
+      ...(autoWgs ? { lat: autoWgs.lat, lng: autoWgs.lng } : {}),
       needsVerification: isIncomplete,
       isDeleted: false,
     };
