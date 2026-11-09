@@ -357,7 +357,11 @@ service cloud.firestore {
       }
 
       match /audit_logs/{document=**} {
-        allow create: if isTenantUser(tenantId);
+        allow create: if isTenantUser(tenantId)
+          || (isAnonymousInTenant(tenantId)
+              && request.resource.data.keys().hasOnly(['timestamp', 'userId', 'userName', 'action', 'entityType', 'entityId', 'details'])
+              && request.resource.data.details is string
+              && request.resource.data.details.size() <= 1000);
         allow read: if isTenantUser(tenantId) && isStaff();
         allow update: if false;
         allow delete: if isSuperAdmin();

@@ -49,6 +49,7 @@ export const updateMachineWorkHours = async (
       });
     }
 
+    logAudit('UPDATE', 'MACHINE', machineId, { currentWorkHours: Number(newHours) });
     return true;
   } catch (error) {
     console.error('Błąd aktualizacji roboczogodzin maszyny:', error);

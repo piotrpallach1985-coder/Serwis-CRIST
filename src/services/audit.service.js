@@ -39,7 +39,7 @@ const FIELD_TRANSLATION_MAP = {
   etr: 'Planowany czas zakończenia (ETR)',
   isManuallyArchived: 'Przeniesiono do archiwum',
   targetWorkHours: 'RBG Docelowe',
-  currentWorkHours: 'Licznik RBG',
+  currentWorkHours: 'Licznik godzin pracy / przebieg',
   nextDate: 'Następna Data',
   category: 'Kategoria',
   triggerType: 'Typ wyzwalacza',
@@ -266,7 +266,7 @@ export const normalizeAuditLogDetails = (log, storeState = null) => {
 export const logAudit = async (action, entityType, entityId, details = '') => {
   try {
     const tenantId = getCurrentTenant();
-    if (!tenantId || auth?.currentUser?.isAnonymous) return;
+    if (!tenantId) return;
 
     let contextStr = '';
     if (entityId) {
@@ -338,7 +338,11 @@ export const logAudit = async (action, entityType, entityId, details = '') => {
     await addDoc(collection(db, 'tenants', tenantId, 'audit_logs'), {
       timestamp: serverTimestamp(),
       userId: user ? user.uid : 'public',
-      userName: user ? (user.displayName || user.email || 'Użytkownik') : 'Zgłaszający ze skanera',
+      userName: user
+        ? user.isAnonymous
+          ? 'Zgłaszający (QR/NFC)'
+          : user.displayName || user.email || 'Użytkownik'
+        : 'Zgłaszający ze skanera',
       action,
       entityType,
       entityId,
