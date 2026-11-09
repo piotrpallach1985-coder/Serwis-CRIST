@@ -174,7 +174,7 @@ function ManagerViewInner() {
           </>
         )}
 
-        <div className="flex-1 p-2 sm:p-4 bg-gray-50 pb-20 lg:pb-6 flex flex-col">
+        <div className={`flex-1 ${activeTab === 'new_ticket_scanner' ? 'p-1.5 sm:p-4' : 'p-2 sm:p-4'} bg-gray-50 pb-20 lg:pb-6 flex flex-col`}>
           {!canAccessTab(activeTab) ? (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-lg mx-auto my-12 text-center">
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">

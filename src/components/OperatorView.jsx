@@ -427,7 +427,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
         </div>
       </header>
 
-      <main className="flex-1 p-3 sm:p-6 w-full max-w-5xl mx-auto mt-2 flex flex-col">
+      <main className="flex-1 p-1.5 sm:p-6 w-full max-w-5xl mx-auto mt-1 flex flex-col">
         {partQrNotice && (
           <div className="mb-4 bg-amber-50 border-2 border-amber-400 text-amber-950 p-4 sm:p-5 rounded-2xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">

@@ -274,9 +274,18 @@ export default function OperatorScanner({
   return (
     <div className="w-full max-w-4xl mx-auto flex-1 bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200 text-center flex flex-col justify-between">
       <div>
-        <h2 className="text-xl font-black mb-6 uppercase tracking-wider text-slate-800">
+        <h2 className="text-xl font-black mb-2 uppercase tracking-wider text-slate-800">
           {t('operator.optionsTitle', 'OPCJE ZGŁOSZEŃ')}
         </h2>
+        <p className="text-xs sm:text-sm text-slate-600 font-semibold mb-6 flex items-center justify-center gap-1.5 flex-wrap">
+          <i className="ph-fill ph-speedometer text-emerald-600 text-base"></i>
+          <span>
+            {t(
+              'operator.optionsMeterSubtitle',
+              'Po zeskanowaniu kodu QR lub NFC możesz zgłosić awarię albo zapisać sam stan licznika: motogodziny (RBG) / przebieg (km).'
+            )}
+          </span>
+        </p>
 
         {errorMsg && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-200 rounded-lg text-sm font-bold">

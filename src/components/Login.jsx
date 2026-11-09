@@ -386,13 +386,17 @@ export default function Login({ onLogin, currentUser }) {
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-2 md:mb-4 bg-yellow-50 text-yellow-500 animate-pulse">
                 <i className="ph-fill ph-warning text-2xl md:text-3xl"></i>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-3 text-gray-800">
+              <h2 className="text-xl md:text-2xl font-bold mb-1.5 text-gray-800">
                 {t('login.report_fault_title', 'Zgłoszenie Awarii')}
               </h2>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] md:text-xs font-extrabold mb-2">
+                <i className="ph-fill ph-speedometer text-emerald-600 text-sm"></i>
+                {t('login.report_meter_badge', '+ Zgłaszanie motogodzin (RBG) i przebiegu (km)')}
+              </span>
               <p className="text-gray-500 text-xs md:text-sm mb-3 md:mb-4">
                 {t(
                   'login.report_fault_desc',
-                  'Dla pracowników. Zgłoszenia bezpośrednio ze stanowiska, bez logowania.'
+                  'Dla pracowników. Zgłaszanie awarii oraz szybki odczyt motogodzin (RBG) i przebiegu (km) bezpośrednio ze stanowiska, bez logowania.'
                 )}
               </p>
               <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 md:py-3 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">

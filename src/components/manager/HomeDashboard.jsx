@@ -250,16 +250,21 @@ export default function HomeDashboard({ onLogout }) {
               </h3>
             </button>
 
-            {/* ZGŁOŚ AWARIĘ */}
+            {/* ZGŁOŚ AWARIĘ + RAPORTOWANIE MOTOGODZIN / PRZEBIEGU */}
             <button
               type="button"
               onClick={() => navigate('/manager/ur/new_ticket_scanner')}
-              className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden"
+              className="w-full group flex flex-col items-center justify-center p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
             >
-              <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
-              <h3 className="text-base sm:text-xl font-bold tracking-wide">
+              <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-2 sm:mb-4 group-hover:scale-110 transition-transform font-light"></i>
+              <i className="ph ph-speedometer text-xl sm:text-2xl absolute top-5 right-5 sm:top-6 sm:right-6 opacity-70"></i>
+              <h3 className="text-base sm:text-xl font-bold tracking-wide leading-tight">
                 {t('login.report_fault_btn', 'Zgłoś awarię')}
               </h3>
+              <span className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] sm:text-xs font-extrabold tracking-tight">
+                <i className="ph-fill ph-gauge text-xs"></i>
+                {t('login.report_meter_subtitle', 'Motogodziny (RBG) / Przebieg (km)')}
+              </span>
             </button>
 
             {/* PANEL UR */}

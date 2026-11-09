@@ -78,9 +78,9 @@ export default function OperatorForm({
           {errorMsg}
         </div>
       )}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
             {/* Karta szczegółów wybranej maszyny */}
-            <div className="bg-blue-50/70 p-5 border-b border-blue-100">
+            <div className="bg-blue-50/70 p-3.5 sm:p-5 border-b border-blue-100">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   
                   {/* Lewa strona: Nazwa / Input */}
@@ -304,7 +304,7 @@ export default function OperatorForm({
               </div>
             )}
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-5 sm:space-y-6">
               {!isInternal && pinRequirement?.required && (
                 <div
                   data-testid="operator-report-pin-section"

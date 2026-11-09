@@ -155,37 +155,25 @@ export default function InAppTicketScanner({ onClose }) {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col p-3 sm:p-6 animate-fade-in">
-      <div className="mb-4 sm:mb-6 flex flex-wrap justify-between items-center gap-4">
-        <h1 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
-          <i className="ph ph-warning-circle text-purple-600 text-3xl"></i>
+    <div className="w-full flex-1 flex flex-col p-0 sm:p-4 animate-fade-in">
+      <div className="mb-2 sm:mb-4 px-1 sm:px-0 flex justify-between items-center gap-2">
+        <h1 className="text-lg sm:text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+          <i className="ph ph-warning-circle text-purple-600 text-2xl sm:text-3xl"></i>
           {t('scanner.internalTitle', 'Zgłoszenie awarii')}
         </h1>
-        <div className="flex items-center gap-2">
-          {step === 'form' && (
+        {step !== 'form' && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              data-testid="inapp-scanner-back-btn"
-              onClick={() => {
-                setSelectedMachine(null);
-                setStep('scan');
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition-colors cursor-pointer"
+              data-testid="inapp-scanner-close-btn"
+              onClick={handleCloseScanner}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs sm:text-sm rounded-xl border border-red-200 transition-colors cursor-pointer"
             >
-              <i className="ph ph-arrow-left text-base"></i>
-              <span>{t('common.back', 'Cofnij')}</span>
+              <i className="ph ph-x text-base"></i>
+              <span>{t('common.close', 'Zamknij')}</span>
             </button>
-          )}
-          <button
-            type="button"
-            data-testid="inapp-scanner-close-btn"
-            onClick={handleCloseScanner}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs sm:text-sm rounded-xl border border-red-200 transition-colors cursor-pointer"
-          >
-            <i className="ph ph-x text-base"></i>
-            <span>{t('common.close', 'Zamknij')}</span>
-          </button>
-        </div>
+          </div>
+        )}
         {(toastConfig.show || toastConfig.visible) && (
           <Toast {...toastConfig} onClose={hideToast} />
         )}
@@ -221,11 +209,7 @@ export default function InAppTicketScanner({ onClose }) {
       )}
 
       {step === 'form' && (
-        <div className="w-full flex-1 bg-white p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
-            <i className="ph ph-file-text text-blue-600 text-xl"></i>{' '}
-            {t('scanner.formTitle', 'Formularz zgłoszenia')}
-          </h2>
+        <div className="w-full flex-1">
           <OperatorForm
             machines={machines}
             selectedMachine={selectedMachine}
