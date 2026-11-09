@@ -62,7 +62,7 @@ export const MACHINE_IMPORT_FIELDS = [
     required: false,
     requirementLevel: 'optional',
     requirementBadge: 'OPCJONALNE',
-    legendDesc: 'Początkowy stan licznika roboczogodzin (RBG) lub przebiegu (km). Domyślnie 0.',
+    legendDesc: 'Początkowy stan licznika czasu pracy urządzenia (RBG) lub przebiegu (km). Domyślnie 0.',
   },
   {
     key: 'counterUnit',

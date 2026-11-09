@@ -187,17 +187,17 @@ export const checkAndTriggerDueServices = async (machinesMap) => {
           }
         }
 
-        // Sprawdzanie dla triggera LICZNIKOWEGO (roboczogodziny)
+        // Sprawdzanie dla triggera LICZNIKOWEGO (czas pracy urządzenia / przebieg)
         if (!shouldAlert && (data.triggerType === 'hours' || data.triggerType === 'mixed')) {
           if (data.targetWorkHours && machine.currentWorkHours != null) {
             const hoursLeft = data.targetWorkHours - machine.currentWorkHours;
-            // Alert jeśli pozostało mniej niż próg roboczogodzin lub termin został przekroczony
+            // Alert jeśli pozostało mniej niż próg czasu pracy lub termin został przekroczony
             if (hoursLeft <= TIME_THRESHOLDS.CRITICAL_HOURS_WARNING) {
               shouldAlert = true;
               alertMessage =
                 hoursLeft < 0
-                  ? `Przekroczono termin przeglądu liczonego w roboczogodzinach "${data.name}" (o ${Math.abs(hoursLeft)} rbg).`
-                  : `Zbliża się termin przeglądu liczonego w roboczogodzinach "${data.name}" (zostało ${hoursLeft} rbg).`;
+                  ? `Przekroczono termin przeglądu liczonego wg czasu pracy "${data.name}" (o ${Math.abs(hoursLeft)} rbg).`
+                  : `Zbliża się termin przeglądu liczonego wg czasu pracy "${data.name}" (zostało ${hoursLeft} rbg).`;
             }
           }
         }

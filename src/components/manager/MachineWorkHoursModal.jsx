@@ -21,7 +21,7 @@ export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
   const handleSubmit = async e => {
     e.preventDefault();
     if (Number(newHours) < 0) {
-      setErrorMsg(isKm ? 'Przebieg nie może być ujemny.' : 'Roboczogodziny nie mogą być ujemne.');
+      setErrorMsg(isKm ? 'Przebieg nie może być ujemny.' : 'Czas pracy nie może być ujemny.');
       return;
     }
 
@@ -64,7 +64,7 @@ export default function MachineWorkHoursModal({ isOpen, onClose, machine }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] sm:max-w-md overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-3 sm:p-4 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-base sm:text-lg font-extrabold text-gray-800 leading-tight pr-2">
-            {isKm ? 'Aktualizacja Przebiegu Pojazdu (km)' : 'Aktualizacja Roboczogodzin (RBG)'}
+            {isKm ? 'Aktualizacja Przebiegu Pojazdu (km)' : 'Aktualizacja Czasu Pracy Urządzenia (RBG)'}
           </h2>
           <button
             onClick={onClose}

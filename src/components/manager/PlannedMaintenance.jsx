@@ -393,7 +393,7 @@ export default function PlannedMaintenance({
       setNewRbgValue('');
     } catch (err) {
       console.error(err);
-      alert('Błąd aktualizacji roboczogodzin');
+      alert('Błąd aktualizacji czasu pracy urządzenia');
     }
   };
 

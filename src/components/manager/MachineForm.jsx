@@ -894,7 +894,7 @@ export default function MachineForm({
                       className="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="km">Kilometry (km) — Samochody / Busy</option>
-                      <option value="RBG">Roboczogodziny (RBG) — Wózki / Sprzęt</option>
+                      <option value="RBG">Czas pracy urządzenia (RBG) — Wózki / Sprzęt</option>
                     </select>
                   </div>
                   <div>

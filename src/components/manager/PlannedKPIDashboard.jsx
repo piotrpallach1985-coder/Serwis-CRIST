@@ -73,7 +73,7 @@ export default function PlannedKPIDashboard() {
 
   const typeChartData = [
     { name: t('planned.dashboard.types.calendar', 'Kalendarz'), value: typeCounts.calendar || 0, color: '#3b82f6' },
-    { name: t('planned.dashboard.types.hours', 'Motogodziny'), value: typeCounts.hours || 0, color: '#f59e0b' },
+    { name: t('planned.dashboard.types.hours', 'Czas pracy (RBG)'), value: typeCounts.hours || 0, color: '#f59e0b' },
     { name: t('planned.dashboard.types.mixed', 'Mieszane'), value: typeCounts.mixed || 0, color: '#10b981' },
   ].filter(d => d.value > 0);
 

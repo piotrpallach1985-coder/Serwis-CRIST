@@ -292,7 +292,7 @@ export default function TicketMainColumnHeader({
               </div>
               <div className="bg-white p-2.5 rounded-lg border border-slate-200">
                 <span className="text-slate-400 font-bold uppercase block text-[10px]">
-                  Licznik motogodzin (RBG)
+                  Czas pracy urządzenia (RBG)
                 </span>
                 <span className="font-extrabold text-slate-800 mt-0.5 block">
                   {machineObj?.currentWorkHours ?? machineObj?.operatingHours ?? 0} RBG

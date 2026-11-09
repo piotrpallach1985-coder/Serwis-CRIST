@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 /**
- * PlannedMaintenanceRbgModal — Modal aktualizacji licznika roboczogodzin / przebiegu (km).
+ * PlannedMaintenanceRbgModal — Modal aktualizacji licznika czasu pracy (RBG) / przebiegu (km).
  */
 export default function PlannedMaintenanceRbgModal({
   rbgUpdateModal,
@@ -22,7 +22,7 @@ export default function PlannedMaintenanceRbgModal({
         <h3 className="text-lg font-bold text-slate-800 mb-4">
           {isKm
             ? t('planned.update_vehicle_mileage', 'Aktualizacja przebiegu pojazdu (km)')
-            : t('planned.update_machine_counter', 'Aktualizacja licznika roboczogodzin (RBG)')}
+            : t('planned.update_machine_counter', 'Aktualizacja licznika czasu pracy (RBG)')}
         </h3>
         <p className="text-sm text-slate-600 mb-4">{rbgUpdateModal.name}</p>
         <div className="mb-6">

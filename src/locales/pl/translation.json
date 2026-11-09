@@ -845,7 +845,7 @@
       },
       "types": {
         "calendar": "Kalendarz",
-        "hours": "Motogodziny",
+        "hours": "Czas pracy (RBG)",
         "mixed": "Mieszane"
       },
       "summaryTile": "Podsumowanie wskaźników serwisów",
@@ -890,7 +890,7 @@
     "archive_title": "Archiwum Serwisów",
     "archive_subtitle": "Historia zakończonych prac prewencyjnych",
     "main_title": "Serwis Planowany",
-    "main_subtitle": "Konserwacja prewencyjna, harmonogramy i liczniki roboczogodzin",
+    "main_subtitle": "Konserwacja prewencyjna, harmonogramy i liczniki czasu pracy urządzeń",
     "export_excel": "Eksport Excel",
     "view_list": "Lista",
     "view_calendar": "Kalendarz",
@@ -1033,7 +1033,7 @@
     "tab_list": "Planowane Serwisy",
     "tab_tasks": "Tematy do realizacji",
     "tab_archive": "Archiwum Serwis?w",
-    "update_machine_counter": "Aktualizacja licznika roboczogodzin (RBG)",
+    "update_machine_counter": "Aktualizacja licznika czasu pracy (RBG)",
     "update_vehicle_mileage": "Aktualizacja przebiegu pojazdu (km)",
     "new_counter_state": "Nowy stan licznika (RBG):",
     "new_mileage_state": "Nowy stan licznika (km):",
