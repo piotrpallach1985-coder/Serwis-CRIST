@@ -28,7 +28,7 @@ export default function InAppTicketScanner({ onClose }) {
     if (typeof onClose === 'function') {
       onClose();
     } else {
-      navigate('/manager/ur/tickets');
+      navigate('/manager/home/home');
     }
   };
 
