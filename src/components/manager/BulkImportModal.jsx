@@ -15,6 +15,7 @@ import {
   getSampleTemplateRows,
   getImportLegendRows,
 } from '../../utils/bulkImportHelper';
+import { parseIfcFileContent } from '../../utils/ifcCoordinatesHelper';
 
 export default function BulkImportModal({
   isOpen,
@@ -134,6 +135,35 @@ export default function BulkImportModal({
     if (!file) return;
     setParseError('');
     setFileName(file.name);
+
+    const isIfcFile =
+      mode === 'machines' && /\.ifc$/i.test(String(file.name || '').trim());
+
+    if (isIfcFile) {
+      const textReader = new FileReader();
+      textReader.onload = evt => {
+        try {
+          const textContent = String(evt.target.result || '');
+          const ifcParsed = parseIfcFileContent(textContent);
+          if (!ifcParsed.rows || ifcParsed.rows.length === 0) {
+            setParseError(
+              'Nie znaleziono żadnych obiektów wyposażenia/urządzeń (IfcFlowTerminal, IfcElectricAppliance, IfcBuildingElementProxy itp.) w pliku IFC.'
+            );
+            return;
+          }
+          const headers = Object.keys(ifcParsed.rows[0] || {});
+          const detectedMap = autoDetectColumnMapping(headers, mode);
+          setRawHeaders(headers);
+          setRawRows(ifcParsed.rows);
+          setColumnMap(detectedMap);
+          setStep(2);
+        } catch (err) {
+          setParseError('Błąd odczytu pliku IFC: ' + (err?.message || String(err)));
+        }
+      };
+      textReader.readAsText(file, 'utf-8');
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = evt => {
@@ -614,10 +644,14 @@ export default function BulkImportModal({
               <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-6 text-center bg-slate-50/50 transition-colors">
                 <i className="ph ph-upload-simple text-4xl text-blue-600 mb-2 inline-block"></i>
                 <h3 className="text-base font-extrabold text-slate-800">
-                  Wgraj wypełniony arkusz Excel (.xlsx, .xls) lub plik CSV
+                  {mode === 'machines'
+                    ? 'Wgraj wypełniony arkusz Excel (.xlsx, .xls), plik CSV lub model BIM (.ifc)'
+                    : 'Wgraj wypełniony arkusz Excel (.xlsx, .xls) lub plik CSV'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 mb-3">
-                  Możesz użyć naszego szablonu albo dowolnego eksportu z systemu ERP / SAP — w kolejnym kroku dopasujesz kolumny.
+                  {mode === 'machines'
+                    ? 'Możesz użyć naszego szablonu, eksportu z systemu ERP / SAP albo wgrać bezpośrednio plik .IFC (ISO 16739) ze współrzędnymi 3D.'
+                    : 'Możesz użyć naszego szablonu albo dowolnego eksportu z systemu ERP / SAP — w kolejnym kroku dopasujesz kolumny.'}
                 </p>
                 <label className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md cursor-pointer transition-colors">
                   <i className="ph ph-folder-open text-lg"></i>
@@ -625,7 +659,7 @@ export default function BulkImportModal({
                   <input
                     type="file"
                     data-testid="bulk-import-file-input"
-                    accept=".xlsx,.xls,.csv"
+                    accept={mode === 'machines' ? '.xlsx,.xls,.csv,.ifc' : '.xlsx,.xls,.csv'}
                     onChange={handleFileChange}
                     className="hidden"
                   />

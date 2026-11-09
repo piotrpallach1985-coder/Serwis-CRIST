@@ -588,3 +588,353 @@ export function resolveMachineMapPosition(entity, region = null, activeSubmapTab
     isIfcPositioned,
   };
 }
+
+/**
+ * Dekoduje ciągi znaków ze standardu STEP ISO-10303-21 (\X2\...\X0\ UTF-16 hex oraz \X\XX ISO-8859-1).
+ */
+export function decodeIfcString(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let str = raw.trim();
+  if (str === '$') return '';
+  if (str.startsWith("'") && str.endsWith("'")) {
+    str = str.slice(1, -1);
+  }
+  str = str.replace(/''/g, "'");
+  // \X2\014200F3\X0\ -> UTF-16 hex
+  str = str.replace(/\\X2\\([0-9A-Fa-f]+)\\X0\\/g, (_, hex) => {
+    let out = '';
+    for (let i = 0; i < hex.length; i += 4) {
+      const code = parseInt(hex.slice(i, i + 4), 16);
+      if (!isNaN(code)) out += String.fromCharCode(code);
+    }
+    return out;
+  });
+  // \X\XX -> 1-byte hex
+  str = str.replace(/\\X\\([0-9A-Fa-f]{2})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+  return str.trim();
+}
+
+function splitTopLevelStepArgs(argsStr) {
+  const result = [];
+  let current = '';
+  let depth = 0;
+  let inString = false;
+
+  for (let i = 0; i < argsStr.length; i++) {
+    const ch = argsStr[i];
+    if (ch === "'") {
+      if (inString && argsStr[i + 1] === "'") {
+        current += "''";
+        i++;
+        continue;
+      }
+      inString = !inString;
+      current += ch;
+    } else if (!inString) {
+      if (ch === '(') {
+        depth++;
+        current += ch;
+      } else if (ch === ')') {
+        depth = Math.max(0, depth - 1);
+        current += ch;
+      } else if (ch === ',' && depth === 0) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim().length > 0) {
+    result.push(current.trim());
+  }
+  return result;
+}
+
+const IFC_EQUIPMENT_PREFIXES = [
+  'IFCFLOW',
+  'IFCDISTRIBUTION',
+  'IFCELECTRIC',
+  'IFCENERGY',
+  'IFCUNITARY',
+  'IFCPUMP',
+  'IFCFAN',
+  'IFCCOMPRESSOR',
+  'IFCBOILER',
+  'IFCCHILLER',
+  'IFCHEAT',
+  'IFCCOIL',
+  'IFCAIR',
+  'IFCVALVE',
+  'IFCFILTER',
+  'IFCTANK',
+  'IFCTRANSPORT',
+  'IFCDISCRETEACCESSORY',
+  'IFCBUILDINGELEMENTPROXY',
+  'IFCACTUATOR',
+  'IFCSENSOR',
+  'IFCALARM',
+  'IFCCONTROLLER',
+  'IFCFURNISHINGELEMENT',
+  'IFCSYSTEMFURNITUREELEMENT',
+];
+
+/**
+ * Parsuje zawartość pliku tekstowego .IFC (ISO 16739 STEP) i wyciąga listę urządzeń/obiektów
+ * wraz z ich IfcGlobalId, nazwą, kondygnacją (IfcBuildingStorey), budynkiem (IfcBuilding)
+ * oraz przeliczonymi współrzędnymi 3D (X, Y, Z w metrach).
+ */
+export function parseIfcFileContent(ifcText = '') {
+  const text = String(ifcText || '');
+  if (!text.trim()) {
+    return { rows: [], unit: 'm', mapConversion: null, buildingName: '' };
+  }
+
+  const cartesianPoints = new Map();
+  const directions = new Map();
+  const axis2Placements = new Map();
+  const localPlacements = new Map();
+  const storeys = new Map();
+  const spaces = new Map();
+  const buildings = new Map();
+  const elementToStructure = new Map();
+  const rawEquipmentEntities = [];
+
+  let unit = 'm';
+  let mapConversion = null;
+
+  // Łączenie instrukcji wielowierszowych STEP (#id = TYPE(...);)
+  const statements = text.match(/#\d+\s*=\s*[A-Z0-9_]+\s*\([\s\S]*?\)\s*;/gi) || [];
+
+  for (const stmt of statements) {
+    const match = stmt.match(/^#(\d+)\s*=\s*([A-Z0-9_]+)\s*\(([\s\S]*)\)\s*;$/i);
+    if (!match) continue;
+    const id = `#${match[1]}`;
+    const type = match[2].toUpperCase();
+    const argsRaw = match[3];
+
+    if (type === 'IFCSIUNIT') {
+      if (/\.LENGTHUNIT\./i.test(argsRaw) && /\.MILLI\./i.test(argsRaw)) {
+        unit = 'mm';
+      } else if (/\.LENGTHUNIT\./i.test(argsRaw) && /\.CENTI\./i.test(argsRaw)) {
+        unit = 'cm';
+      }
+      continue;
+    }
+
+    if (type === 'IFCMAPCONVERSION') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      mapConversion = {
+        eastings: Number(args[2]) || 0,
+        northings: Number(args[3]) || 0,
+        orthogonalHeight: Number(args[4]) || 0,
+        xAxisAbscissa: args[5] && args[5] !== '$' ? Number(args[5]) : 1,
+        xAxisOrdinate: args[6] && args[6] !== '$' ? Number(args[6]) : 0,
+        scale: args[7] && args[7] !== '$' ? Number(args[7]) : 1,
+      };
+      continue;
+    }
+
+    if (type === 'IFCCARTESIANPOINT') {
+      const coordsMatch = argsRaw.match(/\(\s*([^)]+)\s*\)/);
+      if (coordsMatch) {
+        const nums = coordsMatch[1].split(',').map(v => Number(v.trim()) || 0);
+        cartesianPoints.set(id, {
+          x: nums[0] || 0,
+          y: nums[1] || 0,
+          z: nums[2] || 0,
+        });
+      }
+      continue;
+    }
+
+    if (type === 'IFCDIRECTION') {
+      const coordsMatch = argsRaw.match(/\(\s*([^)]+)\s*\)/);
+      if (coordsMatch) {
+        const nums = coordsMatch[1].split(',').map(v => Number(v.trim()) || 0);
+        directions.set(id, {
+          dx: nums[0] ?? 1,
+          dy: nums[1] ?? 0,
+          dz: nums[2] ?? 0,
+        });
+      }
+      continue;
+    }
+
+    if (type === 'IFCAXIS2PLACEMENT3D' || type === 'IFCAXIS2PLACEMENT2D') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      axis2Placements.set(id, {
+        locationId: args[0] || null,
+        axisId: args[1] || null,
+        refDirId: args[2] || null,
+      });
+      continue;
+    }
+
+    if (type === 'IFCLOCALPLACEMENT') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      localPlacements.set(id, {
+        parentPlacementId: args[0] && args[0] !== '$' ? args[0] : null,
+        relativePlacementId: args[1] && args[1] !== '$' ? args[1] : null,
+      });
+      continue;
+    }
+
+    if (type === 'IFCBUILDING') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      const bName = decodeIfcString(args[2]) || decodeIfcString(args[7]) || '';
+      buildings.set(id, { name: bName });
+      continue;
+    }
+
+    if (type === 'IFCBUILDINGSTOREY') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      const sName = decodeIfcString(args[2]) || decodeIfcString(args[7]) || '';
+      const elev = args[9] && args[9] !== '$' ? Number(args[9]) : null;
+      storeys.set(id, { name: sName, elevation: elev });
+      continue;
+    }
+
+    if (type === 'IFCSPACE') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      const spName = decodeIfcString(args[7]) || decodeIfcString(args[2]) || '';
+      spaces.set(id, { name: spName });
+      continue;
+    }
+
+    if (type === 'IFCRELCONTAINEDINSPATIALSTRUCTURE') {
+      const args = splitTopLevelStepArgs(argsRaw);
+      const listRaw = args[4] || '';
+      const structureId = args[5] || '';
+      const elemRefs = listRaw.match(/#\d+/g) || [];
+      elemRefs.forEach(refId => {
+        elementToStructure.set(refId, structureId);
+      });
+      continue;
+    }
+
+    if (IFC_EQUIPMENT_PREFIXES.some(prefix => type.startsWith(prefix))) {
+      const args = splitTopLevelStepArgs(argsRaw);
+      const globalId = decodeIfcString(args[0]);
+      const name = decodeIfcString(args[2]);
+      const description = decodeIfcString(args[3]);
+      const objectType = decodeIfcString(args[4]);
+      const placementId = args[5] && args[5] !== '$' ? args[5] : null;
+      const tag = decodeIfcString(args[7]);
+
+      rawEquipmentEntities.push({
+        stepId: id,
+        ifcClass: type,
+        ifcGlobalId: globalId,
+        name: name || objectType || tag || `${type} ${id}`,
+        description,
+        objectType,
+        placementId,
+        tag,
+      });
+    }
+  }
+
+  // Wyliczenie globalnego położenia 3D z łańcucha IFCLOCALPLACEMENT
+  const resolveAbsoluteCoords = (placementId, visited = new Set()) => {
+    if (!placementId || !localPlacements.has(placementId) || visited.has(placementId)) {
+      return { x: 0, y: 0, z: 0, cos: 1, sin: 0 };
+    }
+    visited.add(placementId);
+    const lp = localPlacements.get(placementId);
+    const parent = lp.parentPlacementId
+      ? resolveAbsoluteCoords(lp.parentPlacementId, visited)
+      : { x: 0, y: 0, z: 0, cos: 1, sin: 0 };
+
+    let relX = 0;
+    let relY = 0;
+    let relZ = 0;
+    let localCos = 1;
+    let localSin = 0;
+
+    if (lp.relativePlacementId && axis2Placements.has(lp.relativePlacementId)) {
+      const ax = axis2Placements.get(lp.relativePlacementId);
+      if (ax.locationId && cartesianPoints.has(ax.locationId)) {
+        const pt = cartesianPoints.get(ax.locationId);
+        relX = pt.x;
+        relY = pt.y;
+        relZ = pt.z;
+      }
+      if (ax.refDirId && directions.has(ax.refDirId)) {
+        const dir = directions.get(ax.refDirId);
+        const norm = Math.hypot(dir.dx, dir.dy);
+        if (norm > 1e-9) {
+          localCos = dir.dx / norm;
+          localSin = dir.dy / norm;
+        }
+      }
+    }
+
+    const worldX = parent.x + (relX * parent.cos - relY * parent.sin);
+    const worldY = parent.y + (relX * parent.sin + relY * parent.cos);
+    const worldZ = parent.z + relZ;
+    const worldCos = parent.cos * localCos - parent.sin * localSin;
+    const worldSin = parent.sin * localCos + parent.cos * localSin;
+
+    return { x: worldX, y: worldY, z: worldZ, cos: worldCos, sin: worldSin };
+  };
+
+  const defaultBuildingName =
+    Array.from(buildings.values()).find(b => b.name)?.name || '';
+
+  const rows = rawEquipmentEntities.map(item => {
+    const rawCoords = resolveAbsoluteCoords(item.placementId);
+    let xMeters = normalizeIfcUnit(rawCoords.x, unit) ?? 0;
+    let yMeters = normalizeIfcUnit(rawCoords.y, unit) ?? 0;
+    let zMeters = normalizeIfcUnit(rawCoords.z, unit) ?? 0;
+
+    if (mapConversion) {
+      const conv = applyIfcMapConversion(xMeters, yMeters, zMeters, mapConversion);
+      // W układzie geodezyjnym PUWG 2000 zachowujemy Northing/Easting
+      xMeters = conv.easting;
+      yMeters = conv.northing;
+      zMeters = conv.elevation;
+    }
+
+    const structId = elementToStructure.get(item.stepId);
+    let storeyName = '';
+    let bayName = '';
+    let regionName = defaultBuildingName;
+
+    if (structId) {
+      if (storeys.has(structId)) {
+        storeyName = storeys.get(structId).name || '';
+      } else if (spaces.has(structId)) {
+        bayName = spaces.get(structId).name || '';
+      } else if (buildings.has(structId)) {
+        regionName = buildings.get(structId).name || regionName;
+      }
+    }
+
+    return {
+      'Nazwa urządzenia': item.name,
+      'Miejsce montażu': regionName,
+      'Stanowisko / Nawa': bayName,
+      'Nr wewnętrzny': item.tag || '',
+      'Dodatkowy opis': [item.description, item.objectType, `Klasa IFC: ${item.ifcClass}`]
+        .filter(Boolean)
+        .join(' | '),
+      IfcGlobalId: item.ifcGlobalId,
+      'Współrzędna X': String(Number(xMeters.toFixed(3))),
+      'Współrzędna Y': String(Number(yMeters.toFixed(3))),
+      'Rzędna Z': String(Number(zMeters.toFixed(3))),
+      'Kondygnacja BIM': storeyName,
+    };
+  });
+
+  return {
+    rows,
+    unit,
+    mapConversion,
+    buildingName: defaultBuildingName,
+  };
+}

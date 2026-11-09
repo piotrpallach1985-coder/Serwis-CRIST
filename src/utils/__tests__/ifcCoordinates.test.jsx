@@ -12,6 +12,8 @@ import {
   ifcToMapPercent,
   resolveSubmapByIfcElevation,
   resolveMachineMapPosition,
+  decodeIfcString,
+  parseIfcFileContent,
 } from '../ifcCoordinatesHelper';
 import { useMapPins, isMachinePinnedOnSubmap } from '../../hooks/useMapPins';
 import { autoDetectColumnMapping, prepareMachinesImportPreview } from '../bulkImportHelper';
@@ -397,6 +399,78 @@ describe('Obsługa współrzędnych BIM / IFC (ISO 16739) — Etap 1 + 3', () =>
         })
       );
       unmount();
+    });
+
+    it('obsługuje Etap 4 — bezpośredni parser plików .IFC (STEP ISO-10303-21, dekodowanie polskich znaków, łańcuch IFCLOCALPLACEMENT i konwersję jednostek mm -> m)', () => {
+      // Test dekodowania znaków UTF-16 ze standardu STEP (\X2\00F30142\X0\ -> "ół")
+      expect(decodeIfcString("'P\\X2\\00F30142\\X0\\automat spawalniczy'")).toBe(
+        'Półautomat spawalniczy'
+      );
+
+      const sampleIfcStepFile = `
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('Hala_K1_CRIST.ifc','2026-11-09T20:00:00',('Inzynier BIM'),('CRIST'),'','','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#10 = IFCSIUNIT(*, .LENGTHUNIT., .MILLI., .METRE.);
+#20 = IFCCARTESIANPOINT((100000., 50000., 0.));
+#21 = IFCAXIS2PLACEMENT3D(#20, $, $);
+#22 = IFCLOCALPLACEMENT($, #21);
+#30 = IFCBUILDING('1xS3BCk291UvhgP2a6efl1', #1, 'Hala K1', 'Hala Kadlubowa', $, #22, $, $, .ELEMENT., $, $, $);
+#40 = IFCCARTESIANPOINT((0., 0., 12000.));
+#41 = IFCAXIS2PLACEMENT3D(#40, $, $);
+#42 = IFCLOCALPLACEMENT(#22, #41);
+#50 = IFCBUILDINGSTOREY('2xS3BCk291UvhgP2a6efl2', #1, 'Pomost Suwnic +12m', $, $, #42, $, $, .ELEMENT., 12000.);
+#60 = IFCCARTESIANPOINT((25000., 10000., 500.));
+#61 = IFCAXIS2PLACEMENT3D(#60, $, $);
+#62 = IFCLOCALPLACEMENT(#42, #61);
+#70 = IFCTRANSPORTELEMENT('3vB2$9t4X7Zf8NOew3CRAN', #1, 'Suwnica pomostowa 50T', 'Suwnica glowna nawy A', 'CRANE', #62, $, 'SUW-K1-01', .CRANEWAY.);
+#80 = IFCCARTESIANPOINT((5000., 8000., 0.));
+#81 = IFCAXIS2PLACEMENT3D(#80, $, $);
+#82 = IFCLOCALPLACEMENT(#22, #81);
+#90 = IFCELECTRICAPPLIANCE('2O2Fr$t4X7Zf8NOew3WELD', #1, 'P\\X2\\00F30142\\X0\\automat spawalniczy Kemppi', 'Spawarka MIG/MAG', 'WELDER', #82, $, 'SPW-K1-14', .USERDEFINED.);
+#100 = IFCRELCONTAINEDINSPATIALSTRUCTURE('4xS3BCk291UvhgP2a6efl9', #1, $, $, (#70), #50);
+ENDSEC;
+END-ISO-10303-21;
+      `;
+
+      const parsedIfc = parseIfcFileContent(sampleIfcStepFile);
+      expect(parsedIfc.unit).toBe('mm');
+      expect(parsedIfc.buildingName).toBe('Hala K1');
+      expect(parsedIfc.rows).toHaveLength(2);
+
+      // Suwnica: Building (100m, 50m, 0m) + Storey (0m, 0m, 12m) + Local (25m, 10m, 0.5m) = (125m, 60m, 12.5m)
+      const craneRow = parsedIfc.rows.find(r => r.IfcGlobalId === '3vB2$9t4X7Zf8NOew3CRAN');
+      expect(craneRow).toBeTruthy();
+      expect(craneRow['Nazwa urządzenia']).toBe('Suwnica pomostowa 50T');
+      expect(craneRow['Miejsce montażu']).toBe('Hala K1');
+      expect(craneRow['Nr wewnętrzny']).toBe('SUW-K1-01');
+      expect(craneRow['Kondygnacja BIM']).toBe('Pomost Suwnic +12m');
+      expect(Number(craneRow['Współrzędna X'])).toBeCloseTo(125, 3);
+      expect(Number(craneRow['Współrzędna Y'])).toBeCloseTo(60, 3);
+      expect(Number(craneRow['Rzędna Z'])).toBeCloseTo(12.5, 3);
+
+      // Spawarka: zdekodowana polska nazwa + pozycja (105m, 58m, 0m)
+      const welderRow = parsedIfc.rows.find(r => r.IfcGlobalId === '2O2Fr$t4X7Zf8NOew3WELD');
+      expect(welderRow['Nazwa urządzenia']).toBe('Półautomat spawalniczy Kemppi');
+      expect(Number(welderRow['Współrzędna X'])).toBeCloseTo(105, 3);
+      expect(Number(welderRow['Współrzędna Y'])).toBeCloseTo(58, 3);
+      expect(Number(welderRow['Rzędna Z'])).toBeCloseTo(0, 3);
+
+      // Przekazanie wierszy z parsera .IFC prosto do kreatora importu VexoNT
+      const colMap = autoDetectColumnMapping(Object.keys(parsedIfc.rows[0]), 'machines');
+      const preview = prepareMachinesImportPreview(parsedIfc.rows, colMap, {
+        existingMachines: [],
+        existingRegions: [{ id: 'reg-k1', name: 'Hala K1' }],
+      });
+      expect(preview.summary.readyWithQrCount).toBe(2);
+      expect(preview.rows[0].payload.ifcGlobalId).toBe('3vB2$9t4X7Zf8NOew3CRAN');
+      expect(preview.rows[0].payload.ifcX).toBe(125);
+      expect(preview.rows[0].payload.ifcY).toBe(60);
+      expect(preview.rows[0].payload.ifcZ).toBe(12.5);
     });
   });
 });
