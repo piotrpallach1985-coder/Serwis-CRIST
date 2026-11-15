@@ -1575,9 +1575,10 @@
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
-    "report_fault_title": "Report Breakdown",
+    "report_fault_title": "Report Breakdown / Register Hours",
     "report_fault_desc": "Report breakdown / register Operating hours / mileage directly from your workstation, without logging in.",
     "report_fault_btn": "Report breakdown",
+    "report_fault_tile": "Report breakdown / Register hours",
     "report_meter_subtitle": "Register Operating hours / mileage",
     "report_meter_badge": "+ Register Operating hours / mileage",
     "maintenance_title": "Maintenance Department",

@@ -1575,9 +1575,10 @@
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
-    "report_fault_title": "Zgłoszenie Awarii",
+    "report_fault_title": "Zgłoszenie Awarii / Zarejestruj godziny",
     "report_fault_desc": "Zgłoś awarię / zarejestruj godziny pracy urządzenia / przebieg bezpośrednio ze stanowiska, bez logowania.",
     "report_fault_btn": "Zgłoś awarię",
+    "report_fault_tile": "Zgłoś awarię / Zarejestruj godziny",
     "report_meter_subtitle": "Zarejestruj godziny pracy urządzenia / przebieg",
     "report_meter_badge": "+ Zarejestruj godziny pracy urządzenia / przebieg",
     "maintenance_title": "Utrzymanie Ruchu",

@@ -137,6 +137,11 @@ describe('useTicketSubmit', () => {
         },
       })
     );
-    expect(mockUpdateMachineWorkHours).toHaveBeenCalledWith('veh-101', 158400, false);
+    expect(mockUpdateMachineWorkHours).toHaveBeenCalledWith(
+      'veh-101',
+      158400,
+      false,
+      'Piotr Kierowca'
+    );
   });
 });

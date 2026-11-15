@@ -166,17 +166,21 @@ export default function HomeDashboard({ onLogout }) {
             <h2 className="text-xl sm:text-2xl font-black text-center mb-6 text-slate-800">
               {t('login.select_scan_method', 'Wybierz metodę skanowania')}
             </h2>
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-stretch">
               <button
                 onClick={() => {
                   setIsScannerSelectOpen(false);
                   setScannerMode('qr');
                   setIsScanning(true);
                 }}
-                className="flex-1 py-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
+                className="flex-1 py-6 px-3 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
-                <i className="ph ph-qr-code text-5xl"></i>
-                {t('login.camera_qr', 'Skanuj QR/Tablicę')}
+                <span className="h-14 flex items-center justify-center shrink-0">
+                  <i className="ph ph-qr-code text-5xl"></i>
+                </span>
+                <span className="min-h-[2.5rem] flex items-center justify-center text-center leading-tight">
+                  {t('login.camera_qr', 'Skanuj QR/Tablicę')}
+                </span>
               </button>
               <button
                 onClick={() => {
@@ -184,10 +188,14 @@ export default function HomeDashboard({ onLogout }) {
                   setScannerMode('nfc');
                   setIsScanning(true);
                 }}
-                className="flex-1 py-6 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
+                className="flex-1 py-6 px-3 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
-                <i className="ph ph-waves text-5xl"></i>
-                {t('login.contactless_nfc', 'Zbliżeniowe NFC')}
+                <span className="h-14 flex items-center justify-center shrink-0">
+                  <i className="ph ph-waves text-5xl"></i>
+                </span>
+                <span className="min-h-[2.5rem] flex items-center justify-center text-center leading-tight">
+                  {t('login.contactless_nfc', 'Zbliżeniowe NFC')}
+                </span>
               </button>
             </div>
           </div>
@@ -241,35 +249,26 @@ export default function HomeDashboard({ onLogout }) {
               onClick={() => {
                 setIsScannerSelectOpen(true);
               }}
-              className="w-full group flex flex-col items-center justify-center p-5 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
+              className="w-full group flex flex-col items-center justify-center p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
             >
-              <i className="ph ph-magnifying-glass text-5xl sm:text-7xl mb-3 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
-              <i className="ph ph-qr-code text-2xl absolute top-6 right-6 opacity-50"></i>
-              <h3 className="text-base sm:text-lg font-bold tracking-wide">
+              <i className="ph ph-magnifying-glass text-5xl sm:text-7xl mb-2.5 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
+              <i className="ph ph-qr-code text-2xl absolute top-5 right-5 sm:top-6 sm:right-6 opacity-50"></i>
+              <h3 className="text-[15px] sm:text-lg font-bold tracking-wide leading-snug min-h-[3.25rem] sm:min-h-[3.5rem] flex items-center justify-center">
                 {t('login.quick_search_machine', 'Szybkie szukanie urządzenia')}
               </h3>
             </button>
 
-            {/* ZGŁOŚ AWARIĘ + REJESTRACJA GODZIN PRACY URZĄDZENIA / PRZEBIEGU */}
+            {/* ZGŁOŚ AWARIĘ / ZAREJESTRUJ GODZINY */}
             <button
               type="button"
               onClick={() => navigate('/manager/ur/new_ticket_scanner')}
               className="w-full group flex flex-col items-center justify-center p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 text-white rounded-3xl sm:rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-300 text-center cursor-pointer aspect-square sm:aspect-auto sm:min-h-[220px] transform hover:-translate-y-1 overflow-hidden relative"
             >
-              <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-2 sm:mb-4 group-hover:scale-110 transition-transform font-light"></i>
-              <i className="ph ph-speedometer text-xl sm:text-2xl absolute top-5 right-5 sm:top-6 sm:right-6 opacity-70"></i>
-              <h3 className="text-base sm:text-xl font-bold tracking-wide leading-tight">
-                {t('login.report_fault_btn', 'Zgłoś awarię')}
+              <i className="ph ph-warning-circle text-5xl sm:text-7xl mb-2.5 sm:mb-5 group-hover:scale-110 transition-transform font-light"></i>
+              <i className="ph ph-speedometer text-2xl absolute top-5 right-5 sm:top-6 sm:right-6 opacity-50"></i>
+              <h3 className="text-[15px] sm:text-lg font-bold tracking-wide leading-snug min-h-[3.25rem] sm:min-h-[3.5rem] flex items-center justify-center">
+                {t('login.report_fault_tile', 'Zgłoś awarię / Zarejestruj godziny')}
               </h3>
-              <span className="mt-1.5 inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-xl bg-white/20 text-white text-[10px] sm:text-xs font-extrabold tracking-tight leading-snug">
-                <i className="ph-fill ph-gauge text-xs shrink-0"></i>
-                <span>
-                  {t(
-                    'login.report_meter_subtitle',
-                    'Zarejestruj godziny pracy urządzenia / przebieg'
-                  )}
-                </span>
-              </span>
             </button>
 
             {/* PANEL UR */}
