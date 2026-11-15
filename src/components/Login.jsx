@@ -26,8 +26,15 @@ export default function Login({ onLogin, currentUser }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [partScanAlert, setPartScanAlert] = useState(null);
+  const [suspendedAlert, setSuspendedAlert] = useState(null);
+  const [isTenantSuspended, setIsTenantSuspended] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [loginModalTarget, setLoginModalTarget] = useState(null);
+
+  const suspendedMessage = t(
+    'login.account_suspended_msg',
+    'Konto zawieszone - skontaktuj się z administratorem systemu VexoNT.'
+  );
 
   const currentLang = (i18n.language || 'pl').startsWith('pl') ? 'pl' : 'en';
   const toggleLanguage = () => {
@@ -62,6 +69,12 @@ export default function Login({ onLogin, currentUser }) {
         try {
           await loginAnon(finalTenant, qrKey);
         } catch (e) {
+          if (e && e.message === 'TENANT_SUSPENDED') {
+            setIsTenantSuspended(true);
+            setSuspendedAlert(suspendedMessage);
+            setErrorMsg(suspendedMessage);
+            return;
+          }
           console.warn('Anonymous sign-in failed', e);
         }
         onLogin({
@@ -109,6 +122,12 @@ export default function Login({ onLogin, currentUser }) {
     try {
       await loginAnon(finalTenant, parsed.key);
     } catch (e) {
+      if (e && e.message === 'TENANT_SUSPENDED') {
+        setIsTenantSuspended(true);
+        setSuspendedAlert(suspendedMessage);
+        setErrorMsg(suspendedMessage);
+        return;
+      }
       console.warn('Anonymous sign-in failed', e);
     }
 
@@ -133,15 +152,35 @@ export default function Login({ onLogin, currentUser }) {
   });
 
   useEffect(() => {
+    try {
+      if (sessionStorage.getItem('vexont_suspended_notice') === '1') {
+        sessionStorage.removeItem('vexont_suspended_notice');
+        setSuspendedAlert(suspendedMessage);
+        setErrorMsg(suspendedMessage);
+      }
+    } catch {
+      // ignore
+    }
+  }, [suspendedMessage]);
+
+  useEffect(() => {
     const currentTenantId = getCurrentTenant();
     const unsub = subscribeToGeneralSettings(currentTenantId, d => {
       setModSettings({
         enableTickets: d.enableTickets !== false,
         enablePlanned: d.enablePlanned !== false,
       });
+      const suspended = d?.status === 'suspended';
+      setIsTenantSuspended(suspended);
+      if (suspended) {
+        setSuspendedAlert(suspendedMessage);
+        setErrorMsg(suspendedMessage);
+      } else {
+        setSuspendedAlert(null);
+      }
     });
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, suspendedMessage]);
 
   useEffect(() => {
     const currentTenantId = getCurrentTenant();
@@ -215,16 +254,24 @@ export default function Login({ onLogin, currentUser }) {
       });
       setLoginModalTarget(null);
       setPartScanAlert(null);
+      setSuspendedAlert(null);
     } catch (err) {
       console.error(err);
+      try {
+        sessionStorage.removeItem('vexont_suspended_notice');
+      } catch {
+        // ignore
+      }
       if (err.message === 'USER_NO_ROLE') {
         setErrorMsg('Zalogowano, ale brak przypisanej roli.');
-      } else if (err.message === 'USER_DELETED') {
-        setErrorMsg('To konto użytkownika zostało dezaktywowane przez administratora.');
-      } else if (err.message === 'TENANT_SUSPENDED') {
-        setErrorMsg(
-          'Dostęp dla tej firmy został tymczasowo zawieszony (np. brak opłaconej subskrypcji). Skontaktuj się z administratorem lub działem rozliczeń VexoNT.'
-        );
+      } else if (
+        err.message === 'TENANT_SUSPENDED' ||
+        err.message === 'USER_DELETED' ||
+        err.message === 'ACCOUNT_SUSPENDED' ||
+        err.code === 'auth/user-disabled'
+      ) {
+        setErrorMsg(suspendedMessage);
+        setSuspendedAlert(suspendedMessage);
       } else if (
         err.code === 'auth/invalid-credential' ||
         err.code === 'auth/wrong-password' ||
@@ -240,9 +287,20 @@ export default function Login({ onLogin, currentUser }) {
   };
 
   const handleOperatorBypass = async () => {
+    if (isTenantSuspended) {
+      setSuspendedAlert(suspendedMessage);
+      setErrorMsg(suspendedMessage);
+      return;
+    }
     try {
-      await loginAnon();
+      await loginAnon(getCurrentTenant());
     } catch (e) {
+      if (e && e.message === 'TENANT_SUSPENDED') {
+        setIsTenantSuspended(true);
+        setSuspendedAlert(suspendedMessage);
+        setErrorMsg(suspendedMessage);
+        return;
+      }
       console.warn('Anonymous sign-in failed', e);
     }
     navigate('/operator');
@@ -290,6 +348,27 @@ export default function Login({ onLogin, currentUser }) {
               EN
             </span>
           </button>
+        </div>
+      )}
+
+      {suspendedAlert && (
+        <div
+          data-testid="account-suspended-banner"
+          className="w-full max-w-2xl mt-3 bg-red-50 border-2 border-red-400 text-red-900 px-4 py-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 z-40"
+        >
+          <div className="flex items-center gap-2.5 text-sm font-bold">
+            <i className="ph-fill ph-prohibit text-2xl text-red-600 shrink-0"></i>
+            <span>{suspendedAlert}</span>
+          </div>
+          {!isTenantSuspended && (
+            <button
+              type="button"
+              onClick={() => setSuspendedAlert(null)}
+              className="text-red-700 hover:text-red-950 font-bold p-1 cursor-pointer"
+            >
+              <i className="ph ph-x text-lg"></i>
+            </button>
+          )}
         </div>
       )}
 
@@ -592,8 +671,12 @@ export default function Login({ onLogin, currentUser }) {
                 />
               </div>
               {errorMsg && (
-                <div className="text-red-500 text-sm font-bold text-center mt-2 bg-red-50 py-2 rounded-lg">
-                  {errorMsg}
+                <div
+                  data-testid="login-modal-error"
+                  className="text-red-700 text-sm font-bold text-center mt-2 bg-red-50 border border-red-200 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2"
+                >
+                  <i className="ph-fill ph-prohibit text-lg text-red-600 shrink-0"></i>
+                  <span>{errorMsg}</span>
                 </div>
               )}
               <button

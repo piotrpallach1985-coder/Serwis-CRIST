@@ -16,7 +16,12 @@ export const loginWithEmail = async (email, password) => {
 
   const userData = userDoc.data();
 
-  if (userData.isDeleted) {
+  if (userData.isDeleted || userData.status === 'suspended' || userData.isBlocked) {
+    try {
+      sessionStorage.setItem('vexont_suspended_notice', '1');
+    } catch {
+      // ignore
+    }
     await signOut(auth);
     throw new Error('USER_DELETED');
   }
@@ -27,6 +32,11 @@ export const loginWithEmail = async (email, password) => {
       if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
         const genData = genDoc.data();
         if (genData && genData.status === 'suspended') {
+          try {
+            sessionStorage.setItem('vexont_suspended_notice', '1');
+          } catch {
+            // ignore
+          }
           await signOut(auth);
           throw new Error('TENANT_SUSPENDED');
         }
@@ -55,6 +65,21 @@ export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) =
     if (!qrKey) return prev; // wywołanie z kluczem (skan QR) wykonujemy po zakończeniu poprzedniego
   }
   anonBindInFlight = (async () => {
+    if (targetTenantId) {
+      try {
+        const genDoc = await getDoc(doc(db, 'tenants', targetTenantId, 'settings', 'general'));
+        if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
+          const genData = genDoc.data();
+          if (genData && genData.status === 'suspended') {
+            throw new Error('TENANT_SUSPENDED');
+          }
+        }
+      } catch (err) {
+        if (err && err.message === 'TENANT_SUSPENDED') {
+          throw err;
+        }
+      }
+    }
     let user = auth.currentUser;
     if (!user) {
       await signInAnonymously(auth);

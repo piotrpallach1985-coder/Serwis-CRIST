@@ -25,7 +25,39 @@ export const AuthProvider = ({ children }) => {
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const userData = userDoc.data();
+              if (userData.isDeleted || userData.status === 'suspended' || userData.isBlocked) {
+                try {
+                  sessionStorage.setItem('vexont_suspended_notice', '1');
+                } catch {
+                  // ignore
+                }
+                await signOut(auth);
+                setUser(null);
+                setIsAuthLoading(false);
+                return;
+              }
               const tId = userData.tenantId || getCurrentTenant();
+              if (userData.role !== 'superadmin' && tId) {
+                try {
+                  const genDoc = await getDoc(doc(db, 'tenants', tId, 'settings', 'general'));
+                  if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
+                    const genData = genDoc.data();
+                    if (genData && genData.status === 'suspended') {
+                      try {
+                        sessionStorage.setItem('vexont_suspended_notice', '1');
+                      } catch {
+                        // ignore
+                      }
+                      await signOut(auth);
+                      setUser(null);
+                      setIsAuthLoading(false);
+                      return;
+                    }
+                  }
+                } catch {
+                  // ignore
+                }
+              }
               useManagerStore.getState().setTenantId(tId);
               setUser({
                 ...userData,
@@ -62,7 +94,11 @@ export const AuthProvider = ({ children }) => {
     if (userData?.tenantId) { useManagerStore.getState().setTenantId(userData.tenantId); }
   };
 
-  const logout = async () => {
+  const logout = async (options = {}) => {
+    const hadSuspendedNotice =
+      options?.preserveSuspendedNotice === true ||
+      (typeof sessionStorage !== 'undefined' &&
+        sessionStorage.getItem('vexont_suspended_notice') === '1');
     try {
       await signOut(auth);
     } catch(err) {
@@ -70,6 +106,13 @@ export const AuthProvider = ({ children }) => {
     }
     localStorage.clear();
     sessionStorage.clear();
+    if (hadSuspendedNotice) {
+      try {
+        sessionStorage.setItem('vexont_suspended_notice', '1');
+      } catch {
+        // ignore
+      }
+    }
     useManagerStore.getState().setTenantId(null);
     setUser(null);
   };

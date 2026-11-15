@@ -67,6 +67,12 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [bindNonce, setBindNonce] = useState(0);
   const [needsQr, setNeedsQr] = useState(false);
+  const [isTenantSuspended, setIsTenantSuspended] = useState(false);
+
+  const suspendedMessage = t(
+    'login.account_suspended_msg',
+    'Konto zawieszone - skontaktuj się z administratorem systemu VexoNT.'
+  );
 
   const handleScanSuccess = async (decodedText, rawQr) => {
     setPartQrNotice(null);
@@ -106,9 +112,16 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
 
     // Kod QR z kluczem firmy -> powiązanie sesji operatora z firmą
     if (parsed.key && tenantId && auth.currentUser?.isAnonymous) {
-      await ensureAnonSessionForTenant(tenantId, parsed.key);
-      setNeedsQr(false);
-      setBindNonce(n => n + 1);
+      try {
+        await ensureAnonSessionForTenant(tenantId, parsed.key);
+        setNeedsQr(false);
+        setBindNonce(n => n + 1);
+      } catch (err) {
+        if (err && err.message === 'TENANT_SUSPENDED') {
+          setIsTenantSuspended(true);
+          return;
+        }
+      }
     }
 
     let targetMachine = findMachineByIdentifierOrPlate(machines, mId, rawStr);
@@ -216,8 +229,15 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       authUnsub = onAuthStateChanged(auth, async authUser => {
         if (authUser) {
           if (authUser.isAnonymous && tenantId) {
-            const boundUser = await ensureAnonSessionForTenant(tenantId);
-            if (boundUser && boundUser.uid !== authUser.uid) return;
+            try {
+              const boundUser = await ensureAnonSessionForTenant(tenantId);
+              if (boundUser && boundUser.uid !== authUser.uid) return;
+            } catch (err) {
+              if (err && err.message === 'TENANT_SUSPENDED') {
+                setIsTenantSuspended(true);
+                return;
+              }
+            }
           }
           if (cancelled) return;
           unsubscribeMachines();
@@ -428,6 +448,20 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       </header>
 
       <main className="flex-1 p-1.5 sm:p-6 w-full max-w-5xl mx-auto mt-1 flex flex-col">
+        {isTenantSuspended ? (
+          <div
+            data-testid="operator-account-suspended-card"
+            className="bg-red-50 border-2 border-red-400 text-red-900 p-6 sm:p-10 rounded-3xl shadow-md flex flex-col items-center justify-center text-center my-6"
+          >
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+              <i className="ph-fill ph-prohibit text-4xl"></i>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-red-900 mb-2">
+              {suspendedMessage}
+            </h2>
+          </div>
+        ) : (
+          <>
         {partQrNotice && (
           <div className="mb-4 bg-amber-50 border-2 border-amber-400 text-amber-950 p-4 sm:p-5 rounded-2xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -568,6 +602,8 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
               Zgłoś kolejną awarię
             </button>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

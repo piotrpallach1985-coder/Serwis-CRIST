@@ -1575,6 +1575,7 @@
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
+    "account_suspended_msg": "Account suspended - please contact the VexoNT system administrator.",
     "report_fault_title": "Report Breakdown / Register Hours",
     "report_fault_desc": "Report breakdown / register Operating hours / mileage directly from your workstation, without logging in.",
     "report_fault_btn": "Report breakdown",

@@ -1575,6 +1575,7 @@
   },
   "login": {
     "system_title": "MAINTENANCE SYSTEM",
+    "account_suspended_msg": "Konto zawieszone - skontaktuj się z administratorem systemu VexoNT.",
     "report_fault_title": "Zgłoszenie Awarii / Zarejestruj godziny",
     "report_fault_desc": "Zgłoś awarię / zarejestruj godziny pracy urządzenia / przebieg bezpośrednio ze stanowiska, bez logowania.",
     "report_fault_btn": "Zgłoś awarię",

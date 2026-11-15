@@ -2819,6 +2819,17 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(screen.queryByText(/CRIST/i)).toBeNull();
       unmountLogin();
 
+      sessionStorage.setItem('vexont_suspended_notice', '1');
+      const { unmount: unmountSuspendedLogin } = render(
+        <MemoryRouter>
+          <Login onLogin={vi.fn()} currentUser={null} />
+        </MemoryRouter>
+      );
+      expect(screen.getByTestId('account-suspended-banner').textContent).toContain(
+        'Konto zawieszone - skontaktuj się z administratorem systemu VexoNT.'
+      );
+      unmountSuspendedLogin();
+
       const handleToggleStatusMock = vi.fn();
       const openEditModalMock = vi.fn();
 

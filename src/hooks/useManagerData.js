@@ -18,11 +18,14 @@ import {
 export function useManagerData() {
   const tenantId = useManagerStore(state => state.tenantId);
   let user = null;
+  let logoutFn = null;
   try {
     const authCtx = useAuth();
     user = authCtx?.user || null;
+    logoutFn = authCtx?.logout || null;
   } catch {
     user = null;
+    logoutFn = null;
   }
 
   const { 
@@ -123,6 +126,17 @@ export function useManagerData() {
     const unsubSettings = onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        if (data.status === 'suspended' && user && user.role !== 'superadmin') {
+          try {
+            sessionStorage.setItem('vexont_suspended_notice', '1');
+          } catch {
+            // ignore
+          }
+          if (typeof logoutFn === 'function') {
+            logoutFn({ preserveSuspendedNotice: true });
+          }
+          return;
+        }
         if (data.allowTicketDeletion !== undefined) setAllowTicketDeletion(data.allowTicketDeletion);
         if (data.plannedWarningDays !== undefined) setPlannedWarningDays(data.plannedWarningDays);
         if (data.limits !== undefined) setLimits(data.limits);
