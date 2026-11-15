@@ -8,6 +8,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import QRScannerModal from '../shared/QRScannerModal';
 import {
   parseQrPayload,
+  isExplicitMachineQr,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../../services/qrAccess.service';
 import { findMachineByIdentifierOrPlate } from '../../utils/fieldServiceHelpers';
@@ -44,12 +45,14 @@ export default function HomeDashboard({ onLogout }) {
   const handleScanSuccess = (machineId, rawQr) => {
     setIsScanning(false);
 
-    const parsed = parseQrPayload(rawQr || machineId);
+    const rawStr = rawQr || machineId || '';
+    const parsed = parseQrPayload(rawStr);
+    const explicitMachineQr = isExplicitMachineQr(rawStr);
     const candidateId = parsed.partId || parsed.machineId || String(machineId || '').trim();
-    const matchedPart = parts.find(
-      p => p.id === candidateId || (p.code && p.code === candidateId)
-    );
-    if (parsed.isPartQr || matchedPart) {
+    const matchedPart = !explicitMachineQr
+      ? parts.find(p => p.id === candidateId || (p.code && p.code === candidateId))
+      : null;
+    if (parsed.isPart || parsed.isPartQr || matchedPart) {
       alert(t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG));
       return;
     }

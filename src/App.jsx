@@ -28,14 +28,22 @@ export default function App() {
   useEffect(() => {
     if (user && (location.pathname === '/' || location.pathname === '/login')) {
       if (user.role === USER_ROLES.OPERATOR) {
-        navigate('/operator');
+        const realParams =
+          typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const hashParams = new URLSearchParams(location.search || '');
+        const mId = hashParams.get('machine') || realParams?.get('machine');
+        if (mId) {
+          navigate(`/operator?step=form&machine=${encodeURIComponent(mId)}`);
+        } else {
+          navigate('/operator');
+        }
       } else if (user.role === 'superadmin' || user.role === USER_ROLES.SUPERADMIN) {
         navigate('/manager/system_admin/superadmin');
       } else {
         navigate('/manager/home/home');
       }
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, location.pathname, location.search, navigate]);
 
   const handleLogin = (userData) => {
     login(userData);

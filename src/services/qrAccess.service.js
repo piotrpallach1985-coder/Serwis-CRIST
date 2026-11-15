@@ -28,6 +28,7 @@ export const getCachedQrKey = (tenantId) => {
 
 export const saveOperatorQrKey = (tenantId, key) => {
   if (!tenantId || !key) return;
+  qrKeyMemoryCache.set(tenantId, key);
   try {
     localStorage.setItem(`${STORAGE_PREFIX}${tenantId}`, key);
     localStorage.setItem('vexont_last_anon_tenant', tenantId);
@@ -265,6 +266,14 @@ export const buildPartQrValue = (partOrTenantId, arg2, _meta = {}) => {
   ];
 
   return params.join('&');
+};
+
+export const isExplicitMachineQr = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') return false;
+  const text = rawText.trim();
+  const hasPart = /[?&=#\s|^]part=([^&#\s]+)/i.test(text) || /^part=([^&#\s]+)/i.test(text);
+  if (hasPart) return false;
+  return /[?&=#\s|^]machine=([^&#\s]+)/i.test(text) || /^machine=([^&#\s]+)/i.test(text);
 };
 
 export const parseQrPayload = (rawText) => {

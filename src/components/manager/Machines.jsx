@@ -55,6 +55,7 @@ import {
   resolveMachineQrLocation,
   formatQrDate,
   parseQrPayload,
+  isExplicitMachineQr,
   PART_QR_IN_MACHINE_SCANNER_MSG,
   markEntitiesQrPrinted,
 } from '../../services/qrAccess.service';
@@ -575,12 +576,13 @@ export default function Machines({
 
     const rawText = rawQr || (typeof decoded === 'string' ? decoded.trim() : String(decoded));
     const parsed = parseQrPayload(rawText);
+    const explicitMachineQr = isExplicitMachineQr(rawText);
     const storeParts = useManagerStore.getState().parts || [];
     const candidatePartId = parsed.partId || parsed.machineId || String(decoded).trim();
-    const matchedPart = storeParts.find(
-      p => p.id === candidatePartId || (p.code && p.code === candidatePartId)
-    );
-    if (parsed.isPartQr || matchedPart) {
+    const matchedPart = !explicitMachineQr
+      ? storeParts.find(p => p.id === candidatePartId || (p.code && p.code === candidatePartId))
+      : null;
+    if (parsed.isPart || parsed.isPartQr || matchedPart) {
       showToast(
         t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG),
         'error'

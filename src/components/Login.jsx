@@ -11,6 +11,8 @@ import {
 } from '../services/auth.service';
 import {
   parseQrPayload,
+  isExplicitMachineQr,
+  saveOperatorQrKey,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../services/qrAccess.service';
 
@@ -93,11 +95,12 @@ export default function Login({ onLogin, currentUser }) {
     setIsScanning(false);
     const rawStr = rawQr || decodedText || '';
     const parsed = parseQrPayload(rawStr);
+    const explicitMachineQr = isExplicitMachineQr(rawStr);
     const storeParts = useManagerStore.getState().parts || [];
     const candidateId = parsed.partId || parsed.machineId || String(decodedText || '').trim();
-    const matchedPart = storeParts.find(
-      p => p.id === candidateId || (p.code && p.code === candidateId)
-    );
+    const matchedPart = !explicitMachineQr
+      ? storeParts.find(p => p.id === candidateId || (p.code && p.code === candidateId))
+      : null;
     if (
       parsed.isPart ||
       parsed.isPartQr ||
@@ -119,6 +122,9 @@ export default function Login({ onLogin, currentUser }) {
       useManagerStore.getState().setTenantId(tenantFromQr);
     }
     const finalTenant = tenantFromQr || getCurrentTenant();
+    if (parsed.key && finalTenant) {
+      saveOperatorQrKey(finalTenant, parsed.key);
+    }
     try {
       await loginAnon(finalTenant, parsed.key);
     } catch (e) {
@@ -137,7 +143,7 @@ export default function Login({ onLogin, currentUser }) {
       uid: 'anon',
       tenantId: finalTenant,
     });
-    navigate('/operator?machine=' + encodeURIComponent(mId));
+    navigate('/operator?step=form&machine=' + encodeURIComponent(mId));
   };
 
   const [, setModSettings] = useState({ enableTickets: true, enablePlanned: true });

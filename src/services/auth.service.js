@@ -52,6 +52,9 @@ export const loginWithEmail = async (email, password) => {
 };
 
 let anonBindInFlight = null;
+let anonSessionRotating = false;
+
+export const isAnonSessionRotating = () => anonSessionRotating;
 
 /**
  * Zapewnia, że anonimowa sesja (operator QR) jest powiązana z daną firmą (anon_sessions/{uid}).
@@ -60,6 +63,9 @@ let anonBindInFlight = null;
  * Zwraca aktualnego użytkownika Firebase Auth (może mieć inne uid niż przed wywołaniem).
  */
 export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) => {
+  if (targetTenantId && qrKey) {
+    saveOperatorQrKey(targetTenantId, qrKey);
+  }
   while (anonBindInFlight) {
     const prev = await anonBindInFlight.catch(() => null);
     if (!qrKey) return prev; // wywołanie z kluczem (skan QR) wykonujemy po zakończeniu poprzedniego
@@ -94,9 +100,14 @@ export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) =
         if (s.tenantId === targetTenantId && (!key || s.qrKey === key)) return user;
         if (!key) return user; // brak klucza – nie da się przepiąć, reguły odmówią dostępu
         // Inna firma lub nowy klucz -> nowa sesja anonimowa (sesji nie można edytować)
-        await signOut(auth);
-        await signInAnonymously(auth);
-        user = auth.currentUser;
+        anonSessionRotating = true;
+        try {
+          await signOut(auth);
+          await signInAnonymously(auth);
+          user = auth.currentUser;
+        } finally {
+          anonSessionRotating = false;
+        }
       }
       if (!key) return user; // operator musi zeskanować kod QR firmy
       await setDoc(doc(db, 'anon_sessions', user.uid), {

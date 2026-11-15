@@ -120,6 +120,7 @@ export default function OperatorScanner({
 
   const nfcAbortControllerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
+  const scanHandledRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -136,6 +137,7 @@ export default function OperatorScanner({
 
   useEffect(() => {
     if (isLiveScanning) {
+      scanHandledRef.current = false;
       setTimeout(() => {
         try {
           html5QrcodeRef.current = new Html5Qrcode('qr-reader');
@@ -144,6 +146,8 @@ export default function OperatorScanner({
               { facingMode: 'environment' },
               { fps: 10, qrbox: { width: 250, height: 250 } },
               decodedText => {
+                if (scanHandledRef.current) return;
+                scanHandledRef.current = true;
                 stopLiveScanner();
                 onScanSuccess(decodedText);
               },

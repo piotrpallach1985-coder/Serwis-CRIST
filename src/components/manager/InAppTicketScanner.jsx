@@ -12,6 +12,7 @@ import { db } from '../../firebase';
 import { getCurrentTenant } from '../../utils/tenantHelper';
 import {
   parseQrPayload,
+  isExplicitMachineQr,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../../services/qrAccess.service';
 import { findMachineByIdentifierOrPlate } from '../../utils/fieldServiceHelpers';
@@ -63,10 +64,11 @@ export default function InAppTicketScanner({ onClose }) {
     }
     const rawStr = rawQr || decodedText || '';
     const parsed = parseQrPayload(rawStr);
+    const explicitMachineQr = isExplicitMachineQr(rawStr);
     const candidateId = parsed.partId || parsed.machineId || String(decodedText || '').trim();
-    const matchedPart = parts.find(
-      p => p.id === candidateId || (p.code && p.code === candidateId)
-    );
+    const matchedPart = !explicitMachineQr
+      ? parts.find(p => p.id === candidateId || (p.code && p.code === candidateId))
+      : null;
     if (
       parsed.isPart ||
       parsed.isPartQr ||
@@ -113,26 +115,32 @@ export default function InAppTicketScanner({ onClose }) {
     );
 
     if (!targetMachine && machineId) {
-      // Sprawdź czy w Firestore nie jest to część zamienna
-      try {
-        const partSnap = await getDoc(doc(db, 'tenants', tenantId, 'parts', machineId));
-        if (partSnap.exists()) {
-          const partMsg = t(
-            'machines.toasts.scannedPartInsteadOfMachine',
-            PART_QR_IN_MACHINE_SCANNER_MSG
-          );
-          setScanErrorBanner(partMsg);
-          showToast(partMsg, 'error');
-          return;
-        }
-      } catch (err) { console.warn('[InAppTicketScanner: sprawdzenie kodu części]', err); }
-
       try {
         const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', machineId));
         if (d.exists() && !d.data().isDeleted) {
           targetMachine = { id: d.id, ...d.data() };
         }
-      } catch (err) { console.warn('[InAppTicketScanner: pobranie maszyny]', err); }
+      } catch (err) {
+        console.warn('[InAppTicketScanner: pobranie maszyny]', err);
+      }
+
+      // Sprawdź czy w Firestore nie jest to część zamienna (wyłącznie gdy kod nie ma jawnego machine=...)
+      if (!targetMachine && !explicitMachineQr) {
+        try {
+          const partSnap = await getDoc(doc(db, 'tenants', tenantId, 'parts', machineId));
+          if (partSnap.exists() && !partSnap.data()?.isDeleted) {
+            const partMsg = t(
+              'machines.toasts.scannedPartInsteadOfMachine',
+              PART_QR_IN_MACHINE_SCANNER_MSG
+            );
+            setScanErrorBanner(partMsg);
+            showToast(partMsg, 'error');
+            return;
+          }
+        } catch (err) {
+          console.warn('[InAppTicketScanner: sprawdzenie kodu części]', err);
+        }
+      }
     }
 
     if (targetMachine) {

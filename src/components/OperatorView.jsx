@@ -18,7 +18,9 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ensureAnonSessionForTenant } from '../services/auth.service';
 import {
   parseQrPayload,
+  isExplicitMachineQr,
   saveOperatorQrKey,
+  getOperatorQrKey,
   getLastAnonTenant,
   PART_QR_IN_MACHINE_SCANNER_MSG,
 } from '../services/qrAccess.service';
@@ -32,6 +34,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   const { t, i18n } = useTranslation();
   const { logout: onLogout } = useAuth();
   const [partQrNotice, setPartQrNotice] = useState(null);
+  const storeTenantId = useManagerStore(state => state.tenantId);
 
   useEffect(() => {
     const realParams = new URLSearchParams(window.location.search);
@@ -47,7 +50,12 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
     }
   }, []);
 
-  const tenantId = getCurrentTenant();
+  const urlTenantParam =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tenant')
+      : null;
+  const tenantId =
+    storeTenantId || urlTenantParam || getLastAnonTenant() || getCurrentTenant();
   const [machines, setMachines] = useState([]);
   const [regions, setRegions] = useState([]);
   const [topicsList, setTopicsList] = useState([]);
@@ -55,8 +63,19 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlMachineId = searchParams.get('machine') || initialMachineId;
   const urlMachineResolvedRef = useRef(false);
+  const lastResolvedMachineIdRef = useRef(null);
+  const scanInFlightRef = useRef(false);
 
   useEffect(() => {
+    if (!urlMachineId) {
+      urlMachineResolvedRef.current = false;
+      lastResolvedMachineIdRef.current = null;
+      return;
+    }
+    if (lastResolvedMachineIdRef.current === urlMachineId) {
+      urlMachineResolvedRef.current = true;
+      return;
+    }
     urlMachineResolvedRef.current = false;
   }, [urlMachineId]);
 
@@ -75,64 +94,21 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
   );
 
   const handleScanSuccess = async (decodedText, rawQr) => {
-    setPartQrNotice(null);
-    const rawStr = rawQr || decodedText || '';
-    const parsed = parseQrPayload(rawStr);
+    if (scanInFlightRef.current) return;
+    scanInFlightRef.current = true;
+    try {
+      setPartQrNotice(null);
+      setErrorMsg(null);
+      const rawStr = rawQr || decodedText || '';
+      const parsed = parseQrPayload(rawStr);
+      const explicitMachineQr = isExplicitMachineQr(rawStr);
 
-    // 1. Sprawdź czy kod QR zawiera jawny parametr części (part=...)
-    if (
-      parsed.isPart ||
-      parsed.isPartQr ||
-      /[?&#\s|^]part=([^&#\s]+)/i.test(rawStr)
-    ) {
-      setPartQrNotice(
-        t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
-      );
-      setSelectedMachine(null);
-      setStep('scan');
-      return;
-    }
-
-    const mId = parsed.machineId || String(decodedText || '').trim();
-    const tenantFromQr = parsed.tenantId;
-
-    if (tenantFromQr && tenantFromQr !== tenantId) {
-      if (parsed.key) saveOperatorQrKey(tenantFromQr, parsed.key);
-      useManagerStore.getState().setTenantId(tenantFromQr);
-      const base = window.location.pathname;
-      window.location.replace(
-        base +
-          '?tenant=' +
-          tenantFromQr +
-          '#/operator?step=form&machine=' +
-          encodeURIComponent(mId)
-      );
-      return;
-    }
-
-    // Kod QR z kluczem firmy -> powiązanie sesji operatora z firmą
-    if (parsed.key && tenantId && auth.currentUser?.isAnonymous) {
-      try {
-        await ensureAnonSessionForTenant(tenantId, parsed.key);
-        setNeedsQr(false);
-        setBindNonce(n => n + 1);
-      } catch (err) {
-        if (err && err.message === 'TENANT_SUSPENDED') {
-          setIsTenantSuspended(true);
-          return;
-        }
-      }
-    }
-
-    let targetMachine = findMachineByIdentifierOrPlate(machines, mId, rawStr);
-
-    if (!targetMachine && mId && tenantId) {
-      // Sprawdź w bazie czy zeskanowany identyfikator nie jest częścią zamienną (starsze naklejki QR z samym ID lub kodem części)
-      const storeParts = useManagerStore.getState().parts || [];
-      const matchedStorePart = storeParts.find(
-        p => p.id === mId || (p.code && p.code === mId)
-      );
-      if (matchedStorePart) {
+      // 1. Sprawdź czy kod QR zawiera jawny parametr części (part=...)
+      if (
+        parsed.isPart ||
+        parsed.isPartQr ||
+        /[?&#\s|^]part=([^&#\s]+)/i.test(rawStr)
+      ) {
         setPartQrNotice(
           t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
         );
@@ -141,64 +117,178 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
         return;
       }
 
-      try {
-        const partDoc = await getDoc(doc(db, 'tenants', tenantId, 'parts', mId));
-        if (partDoc.exists()) {
-          setPartQrNotice(
-            t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
-          );
-          setSelectedMachine(null);
-          setStep('scan');
-          return;
-        }
-      } catch {
-        // ignore permission error if not bound yet
+      const mId = parsed.machineId || String(decodedText || '').trim();
+      const tenantFromQr = parsed.tenantId;
+      const effectiveTenantId = tenantFromQr || tenantId;
+
+      if (parsed.key && effectiveTenantId) {
+        saveOperatorQrKey(effectiveTenantId, parsed.key);
       }
 
-      try {
-        const d = await getDoc(doc(db, 'tenants', tenantId, 'machines', mId));
-        if (d.exists() && !d.data().isDeleted) {
-          targetMachine = { id: d.id, ...d.data() };
-        } else {
-          const q = query(
-            collection(db, 'tenants', tenantId, 'machines'),
-            where('qrCode', '==', decodedText),
-            limit(1)
+      if (tenantFromQr && tenantFromQr !== tenantId) {
+        useManagerStore.getState().setTenantId(tenantFromQr);
+        try {
+          const base = window.location.pathname;
+          window.history.replaceState(
+            null,
+            '',
+            `${base}?tenant=${encodeURIComponent(tenantFromQr)}${window.location.hash || '#/operator'}`
           );
-          const snap = await getDocs(q);
-          if (!snap.empty && !snap.docs[0].data().isDeleted) {
-            targetMachine = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        } catch {
+          // ignore history error
+        }
+      }
+
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.warn('Anonymous login error during scan:', e);
+        }
+      }
+
+      const effectiveKey = parsed.key || getOperatorQrKey(effectiveTenantId);
+      // Kod QR z kluczem firmy (lub zapisanym kluczem) -> powiązanie sesji operatora z firmą
+      if (effectiveKey && effectiveTenantId && (!auth.currentUser || auth.currentUser.isAnonymous)) {
+        try {
+          await ensureAnonSessionForTenant(effectiveTenantId, effectiveKey);
+          setNeedsQr(false);
+        } catch (err) {
+          if (err && err.message === 'TENANT_SUSPENDED') {
+            setIsTenantSuspended(true);
+            return;
           }
         }
-      } catch (err) { console.warn('[OperatorView: wyszukanie maszyny po kodzie]', err); }
-    }
-
-    const isInternalUser = Boolean(auth.currentUser && !auth.currentUser.isAnonymous);
-
-    if (targetMachine) {
-      if (!isInternalUser) {
-        setMachines([targetMachine]);
       }
-      setSelectedMachine(targetMachine);
-      setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
-      setStep('form');
-    } else if (decodedText === 'manual' && isInternalUser) {
-      setSelectedMachine({ id: 'manual', name: '', regionId: '' });
-      setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
-      setStep('form');
-    } else {
-      setPartQrNotice(
-        t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
-      );
-      setSelectedMachine(null);
-      setSearchParams({ step: 'scan' }, { replace: true });
-      setStep('scan');
+
+      const storeMachines = useManagerStore.getState().machines || [];
+      const candidatePool =
+        !tenantFromQr || tenantFromQr === tenantId
+          ? [...machines, ...storeMachines]
+          : machines;
+      let targetMachine = findMachineByIdentifierOrPlate(candidatePool, mId, rawStr);
+
+      if (!targetMachine && mId && effectiveTenantId) {
+        // Sprawdź w bazie czy zeskanowany identyfikator nie jest częścią zamienną
+        // WYŁĄCZNIE wtedy, gdy kod QR nie ma jawnego parametru machine=...
+        if (!explicitMachineQr) {
+          const storeParts = useManagerStore.getState().parts || [];
+          const matchedStorePart = storeParts.find(
+            p => p.id === mId || (p.code && p.code === mId)
+          );
+          if (matchedStorePart) {
+            setPartQrNotice(
+              t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
+            );
+            setSelectedMachine(null);
+            setStep('scan');
+            return;
+          }
+
+          try {
+            const partDoc = await getDoc(doc(db, 'tenants', effectiveTenantId, 'parts', mId));
+            if (partDoc.exists() && !partDoc.data()?.isDeleted) {
+              setPartQrNotice(
+                t('machines.toasts.scannedPartInsteadOfMachine', PART_QR_IN_MACHINE_SCANNER_MSG)
+              );
+              setSelectedMachine(null);
+              setStep('scan');
+              return;
+            }
+          } catch {
+            // ignore permission error if not bound yet
+          }
+        }
+
+        try {
+          const d = await getDoc(doc(db, 'tenants', effectiveTenantId, 'machines', mId));
+          if (d.exists() && !d.data().isDeleted) {
+            targetMachine = { id: d.id, ...d.data() };
+          } else {
+            const qrCandidates = Array.from(
+              new Set([decodedText, rawStr, mId].map(v => String(v || '').trim()).filter(Boolean))
+            );
+            for (const qrCand of qrCandidates) {
+              const q = query(
+                collection(db, 'tenants', effectiveTenantId, 'machines'),
+                where('qrCode', '==', qrCand),
+                limit(1)
+              );
+              const snap = await getDocs(q);
+              if (!snap.empty && !snap.docs[0].data().isDeleted) {
+                targetMachine = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                break;
+              }
+            }
+            if (!targetMachine) {
+              const qInternal = query(
+                collection(db, 'tenants', effectiveTenantId, 'machines'),
+                where('internalId', '==', mId),
+                limit(1)
+              );
+              const snapInternal = await getDocs(qInternal);
+              if (!snapInternal.empty && !snapInternal.docs[0].data().isDeleted) {
+                targetMachine = { id: snapInternal.docs[0].id, ...snapInternal.docs[0].data() };
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[OperatorView: wyszukanie maszyny po kodzie]', err);
+        }
+      }
+
+      const isInternalUser = Boolean(auth.currentUser && !auth.currentUser.isAnonymous);
+
+      if (targetMachine) {
+        lastResolvedMachineIdRef.current = targetMachine.id;
+        urlMachineResolvedRef.current = true;
+        setPartQrNotice(null);
+        setErrorMsg(null);
+        if (!isInternalUser) {
+          setMachines(prev => {
+            const others = (prev || []).filter(m => m && m.id !== targetMachine.id);
+            return [targetMachine, ...others];
+          });
+        }
+        setSelectedMachine(targetMachine);
+        setStep('form');
+        setSearchParams({ step: 'form', machine: targetMachine.id }, { replace: true });
+        setBindNonce(n => n + 1);
+      } else if (decodedText === 'manual' && isInternalUser) {
+        lastResolvedMachineIdRef.current = 'manual';
+        urlMachineResolvedRef.current = true;
+        setSelectedMachine({ id: 'manual', name: '', regionId: '' });
+        setStep('form');
+        setSearchParams({ step: 'form', machine: 'manual' }, { replace: true });
+      } else {
+        setSelectedMachine(null);
+        setSearchParams({ step: 'scan' }, { replace: true });
+        setStep('scan');
+        if (!isInternalUser && !effectiveKey) {
+          setNeedsQr(true);
+        } else {
+          setErrorMsg(
+            t(
+              'machines.toasts.machineNotFoundOrInactive',
+              `Nie znaleziono urządzenia (${mId}) w bazie wybranej firmy lub kod QR jest nieaktualny.`
+            )
+          );
+        }
+      }
+    } finally {
+      scanInFlightRef.current = false;
     }
   };
 
   const handleStepChange = newStep => {
     setStep(newStep);
-    setSearchParams({ step: newStep, machine: urlMachineId || '' }, { replace: true });
+    if (newStep === 'scan') {
+      lastResolvedMachineIdRef.current = null;
+      urlMachineResolvedRef.current = false;
+      setSearchParams({ step: 'scan' }, { replace: true });
+    } else {
+      setSearchParams({ step: newStep, machine: urlMachineId || '' }, { replace: true });
+    }
   };
 
   useEffect(() => {
@@ -275,11 +365,20 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                   setNeedsQr(false);
                   if (docSnap.exists() && !docSnap.data().isDeleted) {
                     const target = { id: docSnap.id, ...docSnap.data() };
-                    setMachines([target]);
-                    setSelectedMachine(target);
+                    lastResolvedMachineIdRef.current = target.id;
                     urlMachineResolvedRef.current = true;
+                    setPartQrNotice(null);
+                    setErrorMsg(null);
+                    setMachines(prev => {
+                      const others = (prev || []).filter(m => m && m.id !== target.id);
+                      return [target, ...others];
+                    });
+                    setSelectedMachine(target);
                     setStep('form');
                   } else if (!urlMachineResolvedRef.current) {
+                    if (docSnap.metadata?.fromCache) {
+                      return;
+                    }
                     (async () => {
                       try {
                         const q = query(
@@ -290,22 +389,49 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                         const snap = await getDocs(q);
                         if (!snap.empty && !snap.docs[0].data().isDeleted) {
                           const target = { id: snap.docs[0].id, ...snap.docs[0].data() };
-                          setMachines([target]);
-                          setSelectedMachine(target);
+                          lastResolvedMachineIdRef.current = target.id;
                           urlMachineResolvedRef.current = true;
+                          setPartQrNotice(null);
+                          setErrorMsg(null);
+                          setMachines(prev => {
+                            const others = (prev || []).filter(m => m && m.id !== target.id);
+                            return [target, ...others];
+                          });
+                          setSelectedMachine(target);
                           setStep('form');
                           return;
                         }
                       } catch {
                         // ignore
                       }
+                      if (urlMachineResolvedRef.current) return;
+                      let isActuallyPart = false;
+                      try {
+                        const partSnap = await getDoc(
+                          doc(db, 'tenants', tenantId, 'parts', urlMachineId)
+                        );
+                        if (partSnap.exists() && !partSnap.data()?.isDeleted) {
+                          isActuallyPart = true;
+                        }
+                      } catch {
+                        // ignore
+                      }
                       urlMachineResolvedRef.current = true;
-                      setPartQrNotice(
-                        t(
-                          'machines.toasts.scannedPartInsteadOfMachine',
-                          PART_QR_IN_MACHINE_SCANNER_MSG
-                        )
-                      );
+                      if (isActuallyPart) {
+                        setPartQrNotice(
+                          t(
+                            'machines.toasts.scannedPartInsteadOfMachine',
+                            PART_QR_IN_MACHINE_SCANNER_MSG
+                          )
+                        );
+                      } else {
+                        setErrorMsg(
+                          t(
+                            'machines.toasts.machineNotFoundOrInactive',
+                            `Nie znaleziono urządzenia (${urlMachineId}) w bazie wybranej firmy lub kod QR jest nieaktualny.`
+                          )
+                        );
+                      }
                       setSelectedMachine(null);
                       setStep('scan');
                     })();
@@ -316,8 +442,6 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                   if (error?.code === 'permission-denied') setNeedsQr(true);
                 }
               );
-            } else {
-              setMachines([]);
             }
           } else {
             unsubscribeMachines = onSnapshot(
@@ -337,17 +461,33 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
                     urlMachineId
                   );
                   if (target) {
+                    lastResolvedMachineIdRef.current = target.id;
+                    urlMachineResolvedRef.current = true;
+                    setPartQrNotice(null);
+                    setErrorMsg(null);
                     setSelectedMachine(target);
-                    urlMachineResolvedRef.current = true;
                     setStep('form');
-                  } else if (loadedList.length > 0) {
+                  } else if (loadedList.length > 0 && !snapshot.metadata?.fromCache) {
                     urlMachineResolvedRef.current = true;
-                    setPartQrNotice(
-                      t(
-                        'machines.toasts.scannedPartInsteadOfMachine',
-                        PART_QR_IN_MACHINE_SCANNER_MSG
-                      )
+                    const storeParts = useManagerStore.getState().parts || [];
+                    const matchedPart = storeParts.find(
+                      p => p.id === urlMachineId || (p.code && p.code === urlMachineId)
                     );
+                    if (matchedPart) {
+                      setPartQrNotice(
+                        t(
+                          'machines.toasts.scannedPartInsteadOfMachine',
+                          PART_QR_IN_MACHINE_SCANNER_MSG
+                        )
+                      );
+                    } else {
+                      setErrorMsg(
+                        t(
+                          'machines.toasts.machineNotFoundOrInactive',
+                          `Nie znaleziono urządzenia (${urlMachineId}) w bazie wybranej firmy.`
+                        )
+                      );
+                    }
                     setSelectedMachine(null);
                     setStep('scan');
                   }
@@ -400,7 +540,7 @@ export default function OperatorView({ initialMachineId, onSwitchView }) {
       unsubscribeMapSettings();
       if (authUnsub) authUnsub();
     };
-  }, [urlMachineId, bindNonce]);
+  }, [tenantId, urlMachineId, bindNonce]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col relative">

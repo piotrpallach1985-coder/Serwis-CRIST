@@ -15,6 +15,7 @@ vi.mock('firebase/firestore', () => ({
 
 import {
   parseQrPayload,
+  isExplicitMachineQr,
   buildMachineQrValue,
   buildPartQrValue,
   generateQrKey,
@@ -92,5 +93,14 @@ describe('qrAccess.service', () => {
       { path: 'tenants/tenant_test_qr/settings/qr_access' },
       { key: rotatedKey, createdAt: 'SERVER_TS' }
     );
+  });
+
+  it('isExplicitMachineQr jednoznacznie odróżnia kod QR maszyny (machine=...) od kodu części (part=...) i surowego ID', () => {
+    expect(isExplicitMachineQr('tenant=crist&machine=m123&k=abc_DEF-123')).toBe(true);
+    expect(isExplicitMachineQr('https://app.vexont.pl/?tenant=crist#/operator?machine=m123&k=K1')).toBe(true);
+    expect(isExplicitMachineQr('machine=m123')).toBe(true);
+    expect(isExplicitMachineQr('tenant=crist&part=part-99')).toBe(false);
+    expect(isExplicitMachineQr('m123')).toBe(false);
+    expect(isExplicitMachineQr('')).toBe(false);
   });
 });

@@ -24,6 +24,7 @@ export default function QRScannerModal({
   const [showManualInput, setShowManualInput] = useState(false);
   const html5QrcodeRef = useRef(null);
   const autoAnprBusyRef = useRef(false);
+  const scanHandledRef = useRef(false);
 
   const machines = useManagerStore(state => state.machines || []);
 
@@ -113,6 +114,7 @@ export default function QRScannerModal({
     const abortController = new AbortController();
 
     if (isOpen && mode === 'qr') {
+      scanHandledRef.current = false;
       const timer = setTimeout(() => {
         if (!isMounted) return;
         try {
@@ -124,6 +126,7 @@ export default function QRScannerModal({
               { facingMode: 'environment' },
               { fps: 10, qrbox: { width: 250, height: 250 } },
               decodedText => {
+                if (scanHandledRef.current) return;
                 let machineId = decodedText;
                 let tenantFromQr = null;
 
@@ -148,7 +151,10 @@ export default function QRScannerModal({
                 }
 
                 machineId = typeof machineId === 'string' ? machineId.trim() : machineId;
-                if (isMounted) onScanSuccess(machineId, decodedText);
+                if (isMounted) {
+                  scanHandledRef.current = true;
+                  onScanSuccess(machineId, decodedText);
+                }
               },
               () => {}
             )
