@@ -390,45 +390,6 @@ export default function OperatorScanner({
               </button>
             </div>
             <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[280px]"></div>
-            {isInternal && (
-              <div className="mt-3 flex flex-col items-center gap-2">
-                <div
-                  data-testid="operator-auto-anpr-badge"
-                  className="w-full py-1.5 px-3 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (AI ANPR)</span>
-                </div>
-                <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    data-testid="operator-capture-plate-btn"
-                    onClick={handleCapturePlateFromCamera}
-                    disabled={isRecognizingPlate}
-                    className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <i
-                      className={`ph ${
-                        isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-sparkle'
-                      } text-lg`}
-                    ></i>
-                    {isRecognizingPlate
-                      ? 'Analiza tablicy przez AI...'
-                      : '🤖 Odczytaj tablicę z kamery (AI)'}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="operator-photo-plate-btn"
-                    onClick={() => platePhotoInputRef.current?.click()}
-                    disabled={isRecognizingPlate}
-                    className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <i className="ph ph-camera text-lg"></i>
-                    <span>📸 Zrób ostre zdjęcie tablicy (AI)</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-6 w-full">
@@ -600,7 +561,7 @@ export default function OperatorScanner({
                   } text-sm`}
                 ></i>
                 <span>
-                  {isRecognizingPlate ? 'Analizuję tablicę (AI)...' : '📸 Zrób zdjęcie tablicy (AI)'}
+                  {isRecognizingPlate ? 'Analizuję tablicę (AI)...' : 'Zrób zdjęcie tablicy (AI)'}
                 </span>
               </button>
             </div>
