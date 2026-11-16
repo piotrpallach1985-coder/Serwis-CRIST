@@ -14,6 +14,7 @@ export default function OperatorForm({
   regions,
   initialMachineId,
   handleStepChange,
+  onCloseAfterMeterSave,
   isOnline,
   topicsList,
   reportersList,
@@ -72,10 +73,29 @@ export default function OperatorForm({
 
   const [isMachineDropdownOpen, setIsMachineDropdownOpen] = useState(false);
   const [isMeterExpanded, setIsMeterExpanded] = useState(false);
+  const [isMeterModalDismissed, setIsMeterModalDismissed] = useState(false);
 
   React.useEffect(() => {
     setIsMeterExpanded(false);
+    setIsMeterModalDismissed(false);
   }, [selectedMachine?.id, selectedMachine?.matchedMachineId]);
+
+  React.useEffect(() => {
+    if (meterSavedSuccess) {
+      setIsMeterModalDismissed(false);
+    }
+  }, [meterSavedSuccess]);
+
+  const handleCloseAllAfterMeter = () => {
+    setIsMeterModalDismissed(true);
+    if (stopLiveScanner) stopLiveScanner();
+    setSelectedMachine(null);
+    if (typeof onCloseAfterMeterSave === 'function') {
+      onCloseAfterMeterSave();
+    } else {
+      handleStepChange('scan');
+    }
+  };
 
   const sortedAvailableMachines = React.useMemo(() => {
     if (!isInternal || !Array.isArray(machines)) return [];
@@ -425,7 +445,10 @@ export default function OperatorForm({
                           type="button"
                           data-testid="operator-quick-meter-save-btn"
                           disabled={isSavingMeter || String(reportedWorkHours).trim() === ''}
-                          onClick={handleSaveMeterOnly}
+                          onClick={() => {
+                            setIsMeterModalDismissed(false);
+                            handleSaveMeterOnly();
+                          }}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                         >
                           <i
@@ -450,17 +473,63 @@ export default function OperatorForm({
                           <button
                             type="button"
                             data-testid="operator-quick-meter-done-btn"
-                            onClick={() => {
-                              if (stopLiveScanner) stopLiveScanner();
-                              setSelectedMachine(null);
-                              handleStepChange('scan');
-                            }}
+                            onClick={handleCloseAllAfterMeter}
                             className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-[11px] font-extrabold transition-colors cursor-pointer"
                           >
-                            Zakończ / Skanuj kolejny
+                            To już wszystko (Zamknij)
                           </button>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {meterSavedSuccess && !isMeterModalDismissed && (
+                    <div
+                      data-testid="operator-meter-saved-modal"
+                      className="fixed inset-0 z-[9999] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+                    >
+                      <div className="bg-white rounded-3xl shadow-2xl border border-emerald-200 max-w-md w-full p-6 sm:p-7 text-center flex flex-col items-center">
+                        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-inner">
+                          <i className="ph-fill ph-check-circle text-4xl"></i>
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-1.5">
+                          Zapisano stan licznika!
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 mb-2">
+                          Nowy odczyt{' '}
+                          <span className="font-mono font-black text-emerald-700">
+                            {reportedWorkHours} {counterUnit}
+                          </span>{' '}
+                          dla <span className="font-bold text-slate-800">{effectiveMachine?.name}</span>{' '}
+                          został zapisany w bazie.
+                        </p>
+                        <p className="text-sm font-extrabold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 w-full mb-5">
+                          Czy to już wszystko, czy chcesz dodatkowo zgłosić awarię?
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2.5 w-full">
+                          <button
+                            type="button"
+                            data-testid="operator-meter-modal-finish-btn"
+                            onClick={handleCloseAllAfterMeter}
+                            className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <i className="ph-bold ph-check text-base"></i>
+                            <span>To już wszystko (Zamknij)</span>
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="operator-meter-modal-report-fault-btn"
+                            onClick={() => {
+                              setIsMeterModalDismissed(true);
+                              setIsMeterExpanded(false);
+                            }}
+                            className="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <i className="ph-bold ph-warning-circle text-base"></i>
+                            <span>Zgłoś dodatkowo awarię</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

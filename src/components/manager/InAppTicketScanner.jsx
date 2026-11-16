@@ -224,6 +224,7 @@ export default function InAppTicketScanner({ onClose }) {
             setSelectedMachine={setSelectedMachine}
             regions={regions}
             handleStepChange={handleStepChange}
+            onCloseAfterMeterSave={handleCloseScanner}
             isOnline={true}
             isInternal={true}
             topicsList={topicsList}

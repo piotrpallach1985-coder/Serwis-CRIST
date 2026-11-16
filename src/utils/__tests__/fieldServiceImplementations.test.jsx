@@ -79,6 +79,7 @@ import { useManagerStore } from '../../store/managerStore';
 import { getCurrentTenant } from '../tenantHelper';
 import { formatDetails } from '../../services/audit.service';
 import { isQrUnprintedNew } from '../../services/qrAccess.service';
+import * as machinesService from '../../services/machines.service';
 import plTranslations from '../../locales/pl/translation.json';
 import enTranslations from '../../locales/en/translation.json';
 
@@ -2708,7 +2709,11 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         configurable: true,
       });
 
+      const updateHoursSpy = vi
+        .spyOn(machinesService, 'updateMachineWorkHours')
+        .mockResolvedValue(true);
       const setSelectedMachineMock = vi.fn();
+      const onCloseAfterMeterSaveMock = vi.fn();
       const { unmount: unmountVehicleForm } = render(
         <OperatorForm
           machines={[fleetVehicle, industrialMachine]}
@@ -2716,6 +2721,7 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
           setSelectedMachine={setSelectedMachineMock}
           regions={[{ id: 'r-flota', name: 'Baza Floty' }]}
           handleStepChange={vi.fn()}
+          onCloseAfterMeterSave={onCloseAfterMeterSaveMock}
           isOnline={true}
           isInternal={true}
           topicsList={['Awaria silnika']}
@@ -2736,6 +2742,44 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
       expect(meterInput.value).toBe('142500');
       fireEvent.change(meterInput, { target: { value: '142850' } });
       expect(meterInput.value).toBe('142850');
+
+      fireEvent.click(screen.getByTestId('operator-quick-meter-save-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('operator-meter-saved-modal')).toBeTruthy();
+      });
+      expect(screen.getByTestId('operator-meter-saved-modal').textContent).toContain(
+        'Czy to już wszystko, czy chcesz dodatkowo zgłosić awarię?'
+      );
+      // Kliknięcie "Zgłoś dodatkowo awarię" zamyka modal i zwija sekcję licznika
+      fireEvent.click(screen.getByTestId('operator-meter-modal-report-fault-btn'));
+      expect(screen.queryByTestId('operator-meter-saved-modal')).toBeNull();
+      expect(screen.queryByTestId('operator-quick-meter-input')).toBeNull();
+
+      // Ponowny zapis i kliknięcie "To już wszystko (Zamknij)" zamyka okno formularza
+      fireEvent.click(screen.getByTestId('operator-quick-meter-toggle'));
+      fireEvent.change(screen.getByTestId('operator-quick-meter-input'), {
+        target: { value: '142900' },
+      });
+      fireEvent.click(screen.getByTestId('operator-quick-meter-save-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('operator-meter-saved-modal')).toBeTruthy();
+      });
+      fireEvent.click(screen.getByTestId('operator-meter-modal-finish-btn'));
+      expect(onCloseAfterMeterSaveMock).toHaveBeenCalledTimes(1);
+      updateHoursSpy.mockRestore();
+
+      // Sprawdzenie rozpoznawania tablicy przez AI Vision (Gemini Flash)
+      const aiPlateRes = await recognizeLicensePlateFromVideoFrame(
+        null,
+        [fleetVehicle, industrialMachine],
+        null,
+        {
+          imageBase64: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+          aiCallable: vi.fn().mockResolvedValue({ data: { plate: 'GD 3V975' } }),
+        }
+      );
+      expect(aiPlateRes.source).toBe('ai');
+      expect(aiPlateRes.matchedMachine?.id).toBe('veh-gps-1');
 
       // Sekcja opcjonalnej pozycji GPS dla samochodu
       expect(screen.getByTestId('operator-vehicle-gps-section')).toBeTruthy();

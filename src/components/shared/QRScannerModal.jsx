@@ -25,6 +25,7 @@ export default function QRScannerModal({
   const html5QrcodeRef = useRef(null);
   const autoAnprBusyRef = useRef(false);
   const scanHandledRef = useRef(false);
+  const platePhotoInputRef = useRef(null);
 
   const machines = useManagerStore(state => state.machines || []);
 
@@ -332,8 +333,58 @@ export default function QRScannerModal({
       setShowManualInput(true);
       setOcrStatusMsg(
         res.error ||
-          'Nie wykryto tablicy w kadrze — przybliż aparat do tablicy rejestracyjnej lub wpisz numer poniżej.'
+          'Nie wykryto tablicy w kadrze — użyj przycisku "Zrób zdjęcie tablicy (AI)" lub wpisz numer poniżej.'
       );
+    } finally {
+      setIsCapturingPlate(false);
+    }
+  };
+
+  const handlePlatePhotoFileSelected = async e => {
+    const file = e.target?.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file) return;
+    setIsCapturingPlate(true);
+    setOcrStatusMsg('');
+    try {
+      const base64DataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = err => reject(err);
+        reader.readAsDataURL(file);
+      });
+      const res = await recognizeLicensePlateFromVideoFrame(null, machines, null, {
+        imageBase64: base64DataUrl,
+        mimeType: file.type || 'image/jpeg',
+      });
+      if (res.matchedMachine) {
+        onScanSuccess(
+          res.matchedMachine.id,
+          res.matchedMachine.licensePlate || res.matchedMachine.id
+        );
+        return;
+      }
+      if (res.plate) {
+        const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
+        if (fallbackMatch) {
+          onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
+          return;
+        }
+        setPlateQuery(res.plate);
+        setShowManualInput(true);
+        setOcrStatusMsg(
+          `AI rozpoznało tablicę "${res.plate}", ale nie znaleziono takiego pojazdu w bazie tej firmy. Sprawdź numer poniżej lub wybierz pojazd z listy.`
+        );
+        return;
+      }
+      setShowManualInput(true);
+      setOcrStatusMsg(
+        res.error ||
+          'AI nie wykryło tablicy na zdjęciu — zrób zdjęcie z bliższej odległości lub wpisz numer poniżej.'
+      );
+    } catch {
+      setShowManualInput(true);
+      setOcrStatusMsg('Błąd analizy zdjęcia tablicy przez AI.');
     } finally {
       setIsCapturingPlate(false);
     }
@@ -380,27 +431,48 @@ export default function QRScannerModal({
                 ></div>
                 {enableLicensePlateScan && (
                   <div className="mt-2.5 flex flex-col gap-1.5">
+                    <input
+                      ref={platePhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      data-testid="scanner-photo-plate-input"
+                      onChange={handlePlatePhotoFileSelected}
+                      className="hidden"
+                    />
                     <div
                       data-testid="scanner-auto-anpr-badge"
                       className="px-3 py-1.5 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
                     >
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                      <span>Auto-detekcja QR + Tablic rejestracyjnych (ANPR) aktywna</span>
+                      <span>Auto-detekcja QR + Tablic rejestracyjnych (AI ANPR) aktywna</span>
                     </div>
-                    <button
-                      type="button"
-                      data-testid="scanner-capture-plate-btn"
-                      disabled={isCapturingPlate}
-                      onClick={handleCapturePlateFromCamera}
-                      className="w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <i className="ph ph-camera text-base"></i>
-                      <span>
-                        {isCapturingPlate
-                          ? 'Odczytywanie tablicy...'
-                          : 'Wymuś odczyt tablicy rejestracyjnej z kadru (ANPR)'}
-                      </span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        data-testid="scanner-capture-plate-btn"
+                        disabled={isCapturingPlate}
+                        onClick={handleCapturePlateFromCamera}
+                        className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <i className="ph ph-sparkle text-base"></i>
+                        <span>
+                          {isCapturingPlate
+                            ? 'Analiza AI...'
+                            : '🤖 Odczytaj z kamery (AI)'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="scanner-photo-plate-btn"
+                        disabled={isCapturingPlate}
+                        onClick={() => platePhotoInputRef.current?.click()}
+                        className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <i className="ph ph-camera text-base"></i>
+                        <span>📸 Zrób zdjęcie tablicy (AI)</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

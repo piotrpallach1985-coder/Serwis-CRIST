@@ -244,6 +244,7 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
       return false;
     }
 
+    setMeterSavedSuccess(false);
     setIsSavingMeter(true);
     try {
       const authorName = isInternal
@@ -254,7 +255,10 @@ export const useOperatorForm = ({ machines, selectedMachine, setSelectedMachine,
         date: new Date().toISOString(),
         user: authorName,
       };
-      await updateMachineWorkHours(targetMachine.id, parsedVal, false, authorName);
+      await Promise.race([
+        updateMachineWorkHours(targetMachine.id, parsedVal, false, authorName),
+        new Promise(resolve => setTimeout(resolve, 1200)),
+      ]);
       if (setSelectedMachine) {
         setSelectedMachine(prev =>
           prev

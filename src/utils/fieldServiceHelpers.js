@@ -1944,7 +1944,7 @@ async function getBrowserOcrWorker() {
       if (worker && typeof worker.setParameters === 'function') {
         await worker.setParameters({
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -',
-          tessedit_pageseg_mode: '7',
+          tessedit_pageseg_mode: '6',
         });
       }
       return worker;
@@ -2013,8 +2013,8 @@ export function detectLicensePlateBoundingBox(videoEl) {
         const b = sData[idx + 2];
         const lum = 0.299 * r + 0.587 * g + 0.114 * b;
         const sat = Math.max(r, g, b) - Math.min(r, g, b);
-        const isWhite = lum > 150 && sat < 60;
-        const isDark = lum < 105;
+        const isWhite = lum > 115 && sat < 75;
+        const isDark = lum < 110;
 
         if (isWhite) {
           if (curX1 === -1 || x - lastWhiteX > maxCharGap) {
@@ -2035,10 +2035,10 @@ export function detectLicensePlateBoundingBox(videoEl) {
         if (curX1 !== -1 && lastWhiteX > curX1) {
           const span = lastWhiteX - curX1 + 1;
           if (
-            span >= scanW * 0.16 &&
-            span <= scanW * 0.86 &&
-            transitions >= 8 &&
-            whiteCount >= span * 0.34
+            span >= scanW * 0.14 &&
+            span <= scanW * 0.88 &&
+            transitions >= 6 &&
+            whiteCount >= span * 0.30
           ) {
             const score = transitions * (whiteCount / span);
             if (score > bestSegScore) {
@@ -2224,8 +2224,104 @@ function buildPlateCanvasFromVideo(videoEl, mode = 'crop_gray') {
   return canvas;
 }
 
+let lastBackgroundAiCallMs = 0;
+
+function captureFrameAsJpegBase64(videoEl) {
+  if (typeof document === 'undefined' || !videoEl) return null;
+  const vw = Number(videoEl.videoWidth || videoEl.naturalWidth || videoEl.width) || 0;
+  const vh = Number(videoEl.videoHeight || videoEl.naturalHeight || videoEl.height) || 0;
+  if (vw <= 0 || vh <= 0) return null;
+
+  const targetW = Math.min(960, Math.max(480, vw));
+  const scale = targetW / vw;
+  const targetH = Math.max(1, Math.round(vh * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return null;
+
+  try {
+    ctx.drawImage(videoEl, 0, 0, vw, vh, 0, 0, targetW, targetH);
+    const sample = ctx.getImageData(0, 0, Math.min(64, targetW), Math.min(64, targetH)).data;
+    let maxLum = 0;
+    for (let i = 0; i < sample.length; i += 16) {
+      const lum = sample[i] + sample[i + 1] + sample[i + 2];
+      if (lum > maxLum) maxLum = lum;
+    }
+    if (maxLum === 0) {
+      // Pusty canvas w środowisku testowym jsdom — pomijamy wywołanie sieciowe AI
+      return null;
+    }
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+    if (!dataUrl || !dataUrl.includes(',')) return null;
+    return dataUrl.split(',')[1];
+  } catch {
+    return null;
+  }
+}
+
+export async function recognizeLicensePlateWithAI(
+  imageBase64,
+  machines = [],
+  options = {}
+) {
+  const cleanB64 =
+    typeof imageBase64 === 'string' && imageBase64.includes(',')
+      ? imageBase64.split(',')[1]
+      : imageBase64;
+  if (!cleanB64) return null;
+
+  const knownPlates = Array.isArray(machines)
+    ? machines
+        .filter(m => m && !m.isDeleted && m.licensePlate)
+        .map(m => String(m.licensePlate).trim().toUpperCase())
+        .filter(Boolean)
+        .slice(0, 250)
+    : [];
+
+  const tenantId =
+    options?.tenantId ||
+    useManagerStore.getState?.()?.tenantId ||
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tenant')
+      : null) ||
+    'default';
+
+  let aiCallable = options?.aiCallable;
+  if (typeof aiCallable !== 'function') {
+    const [{ functions }, { httpsCallable }] = await Promise.all([
+      import('../firebase'),
+      import('firebase/functions'),
+    ]);
+    aiCallable = httpsCallable(functions, 'recognizeLicensePlateAI');
+  }
+
+  const res = await aiCallable({
+    imageBase64: cleanB64,
+    mimeType: options?.mimeType || 'image/jpeg',
+    knownPlates,
+    tenantId,
+  });
+
+  const aiPlateRaw = String(res?.data?.plate || '').trim();
+  if (!aiPlateRaw) return null;
+
+  const extracted = extractLicensePlateFromOcrText(aiPlateRaw, machines);
+  if (extracted.matchedMachine || extracted.plate) {
+    return { ...extracted, source: 'ai' };
+  }
+  const directMatch = findMachineByIdentifierOrPlate(machines, aiPlateRaw, aiPlateRaw);
+  return {
+    plate: directMatch?.licensePlate || aiPlateRaw.toUpperCase(),
+    matchedMachine: directMatch || null,
+    source: 'ai',
+  };
+}
+
 /**
- * Przechwytuje klatkę z elementu <video> skanera i odczytuje tablicę rejestracyjną (ANPR / OCR).
+ * Przechwytuje klatkę z elementu <video> skanera i odczytuje tablicę rejestracyjną (AI Gemini Vision + ANPR / OCR).
  */
 export async function recognizeLicensePlateFromVideoFrame(
   videoEl,
@@ -2233,7 +2329,7 @@ export async function recognizeLicensePlateFromVideoFrame(
   customDetector = null,
   options = {}
 ) {
-  if (!videoEl && !customDetector) {
+  if (!videoEl && !customDetector && !options?.imageBase64) {
     return { plate: '', matchedMachine: null, error: 'Brak aktywnego obrazu z kamery.' };
   }
 
@@ -2249,6 +2345,15 @@ export async function recognizeLicensePlateFromVideoFrame(
       return extractLicensePlateFromOcrText(rawText, machines);
     }
 
+    if (options?.imageBase64) {
+      try {
+        const aiDirect = await recognizeLicensePlateWithAI(options.imageBase64, machines, options);
+        if (aiDirect && aiDirect.plate) return aiDirect;
+      } catch (aiErr) {
+        console.warn('[ANPR AI direct image fallback]:', aiErr);
+      }
+    }
+
     if (typeof window !== 'undefined' && 'TextDetector' in window && videoEl) {
       const detector = new window.TextDetector();
       const blocks = await detector.detect(videoEl);
@@ -2257,7 +2362,6 @@ export async function recognizeLicensePlateFromVideoFrame(
       if (res.plate) return res;
     }
 
-    // Fallback uniwersalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
     const isRealDomVideo =
       videoEl &&
       typeof videoEl.tagName === 'string' &&
@@ -2267,7 +2371,35 @@ export async function recognizeLicensePlateFromVideoFrame(
 
     if (isRealDomVideo) {
       const plateBox = detectLicensePlateBoundingBox(videoEl);
-      // W pętli tła nie uruchamiamy ciężkiego OCR, dopóki w kadrze nie pojawi się prostokąt tablicy rejestracyjnej
+
+      // 1. Rozpoznawanie przez AI Vision (Gemini Flash):
+      //    - Zawsze przy ręcznym kliknięciu przycisku (!options.isBackground)
+      //    - W pętli tła (co min. 3.5 s), gdy w kadrze widoczny jest kandydat na tablicę
+      const nowMs = Date.now();
+      const canRunAiInBackground =
+        options?.isBackground &&
+        plateBox &&
+        !plateBox.isMockBlank &&
+        nowMs - lastBackgroundAiCallMs >= 3500;
+
+      if (!options?.isBackground || canRunAiInBackground) {
+        const frameB64 = captureFrameAsJpegBase64(videoEl);
+        if (frameB64) {
+          if (options?.isBackground) {
+            lastBackgroundAiCallMs = nowMs;
+          }
+          try {
+            const aiRes = await recognizeLicensePlateWithAI(frameB64, machines, options);
+            if (aiRes && (aiRes.matchedMachine || aiRes.plate)) {
+              return aiRes;
+            }
+          } catch (aiErr) {
+            console.warn('[ANPR AI Vision fallback to local OCR]:', aiErr);
+          }
+        }
+      }
+
+      // 2. Fallback lokalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
       if (!plateBox && options?.isBackground) {
         return { plate: '', matchedMachine: null };
       }

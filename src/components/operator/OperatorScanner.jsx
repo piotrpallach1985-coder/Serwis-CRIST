@@ -28,6 +28,7 @@ export default function OperatorScanner({
   const [ocrNotice, setOcrNotice] = useState(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const autoAnprBusyRef = useRef(false);
+  const platePhotoInputRef = useRef(null);
 
   const fleetSuggestions = useMemo(() => {
     const vehicles = activeMachines.filter(
@@ -110,9 +111,64 @@ export default function OperatorScanner({
       } else {
         setOcrNotice(
           result.error ||
-            'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy lub wpisz numer ręcznie.'
+            'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy, użyj przycisku "Zrób ostre zdjęcie tablicy (AI)" lub wpisz numer ręcznie.'
         );
       }
+    } finally {
+      setIsRecognizingPlate(false);
+    }
+  };
+
+  const handlePlatePhotoFileSelected = async e => {
+    const file = e.target?.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file || !isInternal) return;
+    setErrorMsg(null);
+    setOcrNotice(null);
+    setIsRecognizingPlate(true);
+    try {
+      const base64DataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = err => reject(err);
+        reader.readAsDataURL(file);
+      });
+      const result = await recognizeLicensePlateFromVideoFrame(null, activeMachines, null, {
+        imageBase64: base64DataUrl,
+        mimeType: file.type || 'image/jpeg',
+      });
+      if (result.matchedMachine) {
+        stopLiveScanner();
+        onScanSuccess(
+          result.matchedMachine.id,
+          result.matchedMachine.licensePlate || result.plate
+        );
+        return;
+      }
+      if (result.plate) {
+        setPlateQuery(result.plate);
+        setShowManualInput(true);
+        const fallbackMatch = findMachineByIdentifierOrPlate(
+          activeMachines,
+          result.plate,
+          result.plate
+        );
+        if (fallbackMatch) {
+          stopLiveScanner();
+          onScanSuccess(fallbackMatch.id, result.plate);
+          return;
+        }
+        setOcrNotice(
+          `AI rozpoznało tablicę "${result.plate}", ale nie znaleziono takiego pojazdu w bazie wybranej firmy. Sprawdź lub zatwierdź ręcznie poniżej.`
+        );
+      } else {
+        setOcrNotice(
+          result.error ||
+            'AI nie wykryło tablicy rejestracyjnej na zdjęciu. Spróbuj ponownie z bliższej odległości lub wpisz numer ręcznie.'
+        );
+      }
+    } catch {
+      setOcrNotice('Nie udało się przeanalizować zdjęcia tablicy przez AI.');
     } finally {
       setIsRecognizingPlate(false);
     }
@@ -341,24 +397,36 @@ export default function OperatorScanner({
                   className="w-full py-1.5 px-3 rounded-lg bg-emerald-950/90 text-emerald-200 border border-emerald-700 text-[11px] font-bold flex items-center justify-center gap-1.5"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (ANPR)</span>
+                  <span>Auto-skanowanie: Kod QR + Tablica rejestracyjna (AI ANPR)</span>
                 </div>
-                <button
-                  type="button"
-                  data-testid="operator-capture-plate-btn"
-                  onClick={handleCapturePlateFromCamera}
-                  disabled={isRecognizingPlate}
-                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <i
-                    className={`ph ${
-                      isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-car-profile'
-                    } text-lg`}
-                  ></i>
-                  {isRecognizingPlate
-                    ? 'Odczytywanie tablicy rejestracyjnej...'
-                    : '📷 Wymuś odczyt tablicy rejestracyjnej z kadru (ANPR)'}
-                </button>
+                <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    data-testid="operator-capture-plate-btn"
+                    onClick={handleCapturePlateFromCamera}
+                    disabled={isRecognizingPlate}
+                    className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <i
+                      className={`ph ${
+                        isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-sparkle'
+                      } text-lg`}
+                    ></i>
+                    {isRecognizingPlate
+                      ? 'Analiza tablicy przez AI...'
+                      : '🤖 Odczytaj tablicę z kamery (AI)'}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="operator-photo-plate-btn"
+                    onClick={() => platePhotoInputRef.current?.click()}
+                    disabled={isRecognizingPlate}
+                    className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <i className="ph ph-camera text-lg"></i>
+                    <span>📸 Zrób ostre zdjęcie tablicy (AI)</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -500,10 +568,42 @@ export default function OperatorScanner({
 
         {/* ROZWIJANE WYSZUKIWANIE RĘCZNE PO TABLICY REJESTRACYJNEJ / VIN / NAZWIE — WYŁĄCZNIE DLA ZALOGOWANYCH */}
         {isInternal && (
+          <>
+            <input
+              ref={platePhotoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              data-testid="operator-photo-plate-input"
+              onChange={handlePlatePhotoFileSelected}
+              className="hidden"
+            />
           <div
             data-testid="operator-license-plate-section"
             className="mt-6 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden text-left"
           >
+            <div className="p-3 bg-purple-50/70 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                <i className="ph-fill ph-sparkle text-purple-600 text-base"></i>
+                <span>Szybki odczyt tablicy rejestracyjnej przez AI</span>
+              </span>
+              <button
+                type="button"
+                data-testid="operator-quick-ai-plate-photo-btn"
+                disabled={isRecognizingPlate}
+                onClick={() => platePhotoInputRef.current?.click()}
+                className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <i
+                  className={`ph ${
+                    isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-camera'
+                  } text-sm`}
+                ></i>
+                <span>
+                  {isRecognizingPlate ? 'Analizuję tablicę (AI)...' : '📸 Zrób zdjęcie tablicy (AI)'}
+                </span>
+              </button>
+            </div>
             <button
               type="button"
               data-testid="operator-manual-toggle-btn"
@@ -586,6 +686,7 @@ export default function OperatorScanner({
               </div>
             )}
           </div>
+          </>
         )}
       </div>
     </div>

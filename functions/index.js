@@ -436,6 +436,112 @@ exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, 
   return { success: true };
 });
 
+exports.recognizeLicensePlateAI = functions.region('europe-west1').https.onCall(async (data, context) => {
+  const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
+  const { imageBase64, mimeType, knownPlates } = data || {};
+  if (!imageBase64 || typeof imageBase64 !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Brak obrazu z kamery.');
+  }
+  const cleanBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+  if (cleanBase64.length > 10 * 1024 * 1024) {
+    throw new functions.https.HttpsError('invalid-argument', 'Obraz przekracza dopuszczalny rozmiar.');
+  }
+
+  try {
+    const globalDoc = await db.collection('tenant_registry').doc('_global_secrets_').get();
+    const actualModel =
+      globalDoc.exists && globalDoc.data().geminiModel
+        ? globalDoc.data().geminiModel
+        : 'gemini-2.5-flash';
+
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'serwis-crist';
+    const vertex_ai = new VertexAI({ project: projectId, location: 'europe-central2' });
+    const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
+
+    const safeKnown = Array.isArray(knownPlates)
+      ? knownPlates
+          .slice(0, 250)
+          .map(p => String(p || '').trim().toUpperCase())
+          .filter(Boolean)
+      : [];
+    const fleetContext =
+      safeKnown.length > 0
+        ? `\nZnane tablice rejestracyjne w bazie floty tej firmy: ${safeKnown.join(', ')}. Jeśli odczytana z tablicy rejestracja różni się maksymalnie 1 znakiem (np. z powodu kąta, cienia, śruby lub nalepki legalizacyjnej: O/0, I/1, S/5, B/8, Z/2, V/Y), zwróć dokładny numer z tej listy.`
+        : '';
+
+    const prompt = `Jesteś precyzyjnym systemem ANPR (Automatic Number Plate Recognition) odczytującym tablice rejestracyjne pojazdów ze zdjęć z kamery telefonu.
+Zadanie:
+1. Znajdź na zdjęciu tablicę rejestracyjną pojazdu (samochodu, wózka widłowego, ciągnika, maszyny) i odczytaj jej numer rejestracyjny (np. "GD 3V975", "GA 12345", "WE 9876A").
+2. Zignoruj napisy reklamowe na ramce pod tablicą (np. "PLICHTA", nazwy dealerów, adresy stron WWW, telefony), naklejkę legalizacyjną pośrodku tablicy oraz symbol kraju "PL" na niebieskim pasku z lewej strony.
+3. Sformatuj polską tablicę ze spacją po wyróżniku powiatu (2 lub 3 litery, spacja, reszta znaków, np. "GD 3V975").${fleetContext}
+4. Jeśli na zdjęciu nie widać żadnej tablicy rejestracyjnej, ustaw "plate": "".
+
+Zwróć WYŁĄCZNIE czysty obiekt JSON bez bloków markdown:
+{"plate": "GD 3V975"}`;
+
+    const req = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || 'image/jpeg',
+                data: cleanBase64,
+              },
+            },
+            { text: prompt },
+          ],
+        },
+      ],
+    };
+
+    const resp = await generativeModel.generateContent(req);
+    const rawOut = resp?.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const tokens = resp?.response?.usageMetadata?.totalTokenCount || 0;
+
+    if (tokens > 0 && verifiedTenantId) {
+      const geminiPrice =
+        globalDoc.exists && globalDoc.data().geminiPrice ? globalDoc.data().geminiPrice : 0.6;
+      await db
+        .collection('tenants')
+        .doc(verifiedTenantId)
+        .collection('stats')
+        .doc('ai_usage')
+        .set(
+          {
+            vertexTokens: FieldValue.increment(tokens),
+            vertexCost: FieldValue.increment((tokens / 1000000) * geminiPrice),
+            vertexCalls: FieldValue.increment(1),
+          },
+          { merge: true }
+        );
+    }
+
+    let plate = '';
+    const cleanedJson = rawOut.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const jsonMatch = cleanedJson.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        plate = String(parsed.plate || '').trim().toUpperCase();
+      } catch {
+        plate = '';
+      }
+    } else {
+      plate = cleanedJson.replace(/[^A-Z0-9\s-]/gi, '').trim().toUpperCase();
+    }
+
+    return { plate, tokens };
+  } catch (err) {
+    console.error('AI Plate Recognition error:', err);
+    throw new functions.https.HttpsError(
+      'internal',
+      err.message || 'Błąd rozpoznawania tablicy przez AI'
+    );
+  }
+});
+
 // --- Skalowalność: Automatyczne przeglądy planowane (Cron o 2:00 w nocy) ---
 exports.scheduledCheckPlannedMaintenance = functions.region('europe-west1').pubsub.schedule('0 2 * * *')
   .timeZone('Europe/Warsaw')
