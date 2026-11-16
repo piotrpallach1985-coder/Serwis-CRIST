@@ -71,6 +71,11 @@ export default function OperatorForm({
   );
 
   const [isMachineDropdownOpen, setIsMachineDropdownOpen] = useState(false);
+  const [isMeterExpanded, setIsMeterExpanded] = useState(false);
+
+  React.useEffect(() => {
+    setIsMeterExpanded(false);
+  }, [selectedMachine?.id, selectedMachine?.matchedMachineId]);
 
   const sortedAvailableMachines = React.useMemo(() => {
     if (!isInternal || !Array.isArray(machines)) return [];
@@ -350,18 +355,24 @@ export default function OperatorForm({
                 </div>
               )}
 
-              {/* Szybkie raportowanie przebiegu (km) / motogodzin (RBG) po zeskanowaniu pojazdu lub urządzenia */}
+              {/* Szybkie raportowanie przebiegu (km) / motogodzin (RBG) po zeskanowaniu pojazdu lub urządzenia — domyślnie zwinięte */}
               {hasConcreteMachine && (
                 <div
                   data-testid="operator-quick-meter-card"
-                  className="mt-4 pt-3.5 border-t border-blue-200/80 bg-white/95 rounded-xl p-3.5 border shadow-2xs"
+                  className="mt-4 border-t border-blue-200/80 bg-white/95 rounded-xl border shadow-2xs overflow-hidden"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <button
+                    type="button"
+                    data-testid="operator-quick-meter-toggle"
+                    aria-expanded={isMeterExpanded}
+                    onClick={() => setIsMeterExpanded(prev => !prev)}
+                    className="w-full p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2 text-left hover:bg-slate-50/90 transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-slate-800">
                       <i
                         className={`ph ${
                           isVehicle ? 'ph-speedometer text-emerald-600' : 'ph-gauge text-blue-600'
-                        } text-lg`}
+                        } text-lg shrink-0`}
                       ></i>
                       <span>
                         {isVehicle
@@ -369,72 +380,87 @@ export default function OperatorForm({
                           : 'Szybkie raportowanie godzin pracy urządzenia (RBG)'}
                       </span>
                     </div>
-                    <span
-                      data-testid="operator-quick-meter-current-badge"
-                      className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"
-                    >
-                      Aktualny stan:{' '}
-                      {effectiveMachine?.currentWorkHours ?? effectiveMachine?.workHours ?? 0}{' '}
-                      {counterUnit}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mb-2.5">
-                    Możesz zapisać sam odczyt licznika jednym kliknięciem (bez wysyłania zgłoszenia awarii) lub podać go wraz ze zgłoszeniem poniżej.
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="relative flex-1 flex items-center">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        data-testid="operator-quick-meter-input"
-                        value={reportedWorkHours}
-                        onChange={e => setReportedWorkHours(e.target.value)}
-                        placeholder={`Wpisz aktualny stan (${counterUnit})...`}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-l-lg text-sm font-mono font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      />
-                      <span className="inline-flex items-center px-3 py-2 bg-slate-100 border border-l-0 border-slate-300 rounded-r-lg text-xs font-extrabold text-slate-600 select-none">
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span
+                        data-testid="operator-quick-meter-current-badge"
+                        className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"
+                      >
+                        Aktualny stan:{' '}
+                        {effectiveMachine?.currentWorkHours ?? effectiveMachine?.workHours ?? 0}{' '}
                         {counterUnit}
                       </span>
+                      <span className="text-xs font-bold text-blue-700 inline-flex items-center gap-1">
+                        {isMeterExpanded ? 'Zwiń' : 'Rozwiń'}
+                        <i
+                          className={`ph ${
+                            isMeterExpanded ? 'ph-caret-up' : 'ph-caret-down'
+                          } text-sm`}
+                        ></i>
+                      </span>
                     </div>
-                    <button
-                      type="button"
-                      data-testid="operator-quick-meter-save-btn"
-                      disabled={isSavingMeter || String(reportedWorkHours).trim() === ''}
-                      onClick={handleSaveMeterOnly}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-                    >
-                      <i
-                        className={`ph ${
-                          isSavingMeter ? 'ph-spinner animate-spin' : 'ph-floppy-disk'
-                        } text-base`}
-                      ></i>
-                      <span>
-                        {isSavingMeter ? 'Zapisywanie...' : `Zapisz sam licznik (${counterUnit})`}
-                      </span>
-                    </button>
-                  </div>
-                  {meterSavedSuccess && (
-                    <div
-                      data-testid="operator-quick-meter-saved-banner"
-                      className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900 font-bold"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <i className="ph-fill ph-check-circle text-emerald-600 text-base"></i>
-                        Stan licznika ({reportedWorkHours} {counterUnit}) został zapisany w karcie obiektu!
-                      </span>
-                      <button
-                        type="button"
-                        data-testid="operator-quick-meter-done-btn"
-                        onClick={() => {
-                          if (stopLiveScanner) stopLiveScanner();
-                          setSelectedMachine(null);
-                          handleStepChange('scan');
-                        }}
-                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-[11px] font-extrabold transition-colors cursor-pointer"
-                      >
-                        Zakończ / Skanuj kolejny
-                      </button>
+                  </button>
+
+                  {isMeterExpanded && (
+                    <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-100">
+                      <p className="text-[11px] text-slate-500 mb-2.5">
+                        Możesz zapisać sam odczyt licznika jednym kliknięciem (bez wysyłania zgłoszenia awarii) lub podać go wraz ze zgłoszeniem poniżej.
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="relative flex-1 flex items-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            data-testid="operator-quick-meter-input"
+                            value={reportedWorkHours}
+                            onChange={e => setReportedWorkHours(e.target.value)}
+                            placeholder={`Wpisz aktualny stan (${counterUnit})...`}
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-l-lg text-sm font-mono font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                          />
+                          <span className="inline-flex items-center px-3 py-2 bg-slate-100 border border-l-0 border-slate-300 rounded-r-lg text-xs font-extrabold text-slate-600 select-none">
+                            {counterUnit}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="operator-quick-meter-save-btn"
+                          disabled={isSavingMeter || String(reportedWorkHours).trim() === ''}
+                          onClick={handleSaveMeterOnly}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <i
+                            className={`ph ${
+                              isSavingMeter ? 'ph-spinner animate-spin' : 'ph-floppy-disk'
+                            } text-base`}
+                          ></i>
+                          <span>
+                            {isSavingMeter ? 'Zapisywanie...' : `Zapisz sam licznik (${counterUnit})`}
+                          </span>
+                        </button>
+                      </div>
+                      {meterSavedSuccess && (
+                        <div
+                          data-testid="operator-quick-meter-saved-banner"
+                          className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900 font-bold"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <i className="ph-fill ph-check-circle text-emerald-600 text-base"></i>
+                            Stan licznika ({reportedWorkHours} {counterUnit}) został zapisany w karcie obiektu!
+                          </span>
+                          <button
+                            type="button"
+                            data-testid="operator-quick-meter-done-btn"
+                            onClick={() => {
+                              if (stopLiveScanner) stopLiveScanner();
+                              setSelectedMachine(null);
+                              handleStepChange('scan');
+                            }}
+                            className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-[11px] font-extrabold transition-colors cursor-pointer"
+                          >
+                            Zakończ / Skanuj kolejny
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

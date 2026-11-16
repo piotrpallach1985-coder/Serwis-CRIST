@@ -2722,12 +2722,15 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
 
-      // Sekcja szybkiego raportowania przebiegu (km)
+      // Sekcja szybkiego raportowania przebiegu (km) — domyślnie zwinięta, rozwijana po kliknięciu
       const quickMeterCard = screen.getByTestId('operator-quick-meter-card');
       expect(quickMeterCard.textContent).toContain('Szybkie raportowanie przebiegu pojazdu (km)');
       expect(screen.getByTestId('operator-quick-meter-current-badge').textContent).toContain(
         '142500 km'
       );
+      expect(screen.queryByTestId('operator-quick-meter-input')).toBeNull();
+
+      fireEvent.click(screen.getByTestId('operator-quick-meter-toggle'));
 
       const meterInput = screen.getByTestId('operator-quick-meter-input');
       expect(meterInput.value).toBe('142500');
