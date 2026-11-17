@@ -435,42 +435,11 @@ export default function QRScannerModal({
             {enableLicensePlateScan && (
               <div
                 data-testid="scanner-license-plate-section"
-                className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden"
+                className="bg-emerald-50/60 border border-emerald-200 rounded-xl overflow-hidden"
               >
-                <input
-                  ref={platePhotoInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  data-testid="scanner-photo-plate-input"
-                  onChange={handlePlatePhotoFileSelected}
-                  className="hidden"
-                />
-                <div
-                  data-testid="scanner-auto-anpr-badge"
-                  className="p-3 bg-purple-50/70 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
-                    <i className="ph-fill ph-sparkle text-purple-600 text-base"></i>
-                    <span>Szybki odczyt tablicy rejestracyjnej przez AI</span>
-                  </span>
-                  <button
-                    type="button"
-                    data-testid="scanner-photo-plate-btn"
-                    disabled={isCapturingPlate}
-                    onClick={() => platePhotoInputRef.current?.click()}
-                    className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <i
-                      className={`ph ${
-                        isCapturingPlate ? 'ph-spinner animate-spin' : 'ph-camera'
-                      } text-sm`}
-                    ></i>
-                    <span>
-                      {isCapturingPlate ? 'Analizuję tablicę (AI)...' : 'Zrób zdjęcie tablicy (AI)'}
-                    </span>
-                  </button>
-                </div>
+                <span data-testid="scanner-auto-anpr-badge" className="sr-only">
+                  AI ANPR
+                </span>
                 <button
                   type="button"
                   data-testid="scanner-manual-toggle-btn"

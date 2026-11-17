@@ -67,27 +67,25 @@ export default function Login({ onLogin, currentUser }) {
         useManagerStore.getState().setTenantId(tId);
       }
       const finalTenant = tId || getCurrentTenant();
-      const autoBypass = async () => {
-        try {
-          await loginAnon(finalTenant, qrKey);
-        } catch (e) {
-          if (e && e.message === 'TENANT_SUSPENDED') {
-            setIsTenantSuspended(true);
-            setSuspendedAlert(suspendedMessage);
-            setErrorMsg(suspendedMessage);
-            return;
-          }
-          console.warn('Anonymous sign-in failed', e);
+      if (qrKey && finalTenant) {
+        saveOperatorQrKey(finalTenant, qrKey);
+      }
+      onLogin({
+        name: 'Nieznany Zgłaszający',
+        role: USER_ROLES.OPERATOR,
+        uid: 'anon',
+        tenantId: finalTenant,
+      });
+      navigate('/operator?step=form&machine=' + encodeURIComponent(mId));
+      loginAnon(finalTenant, qrKey).catch(e => {
+        if (e && e.message === 'TENANT_SUSPENDED') {
+          setIsTenantSuspended(true);
+          setSuspendedAlert(suspendedMessage);
+          setErrorMsg(suspendedMessage);
+          return;
         }
-        onLogin({
-          name: 'Nieznany Zgłaszający',
-          role: USER_ROLES.OPERATOR,
-          uid: 'anon',
-          tenantId: finalTenant,
-        });
-        navigate('/operator?machine=' + mId);
-      };
-      autoBypass();
+        console.warn('Anonymous sign-in failed', e);
+      });
     }
   }, []);
 
@@ -292,15 +290,22 @@ export default function Login({ onLogin, currentUser }) {
     }
   };
 
-  const handleOperatorBypass = async () => {
+  const handleOperatorBypass = () => {
     if (isTenantSuspended) {
       setSuspendedAlert(suspendedMessage);
       setErrorMsg(suspendedMessage);
       return;
     }
-    try {
-      await loginAnon(getCurrentTenant());
-    } catch (e) {
+    const targetTenant = getCurrentTenant();
+    // Natychmiastowe przejście do ekranu zgłoszenia awarii bez blokowania UI na autoryzację sieciową
+    onLogin({
+      name: 'Nieznany Zgłaszający',
+      role: USER_ROLES.OPERATOR,
+      uid: 'anon',
+      tenantId: targetTenant,
+    });
+    navigate('/operator');
+    loginAnon(targetTenant).catch(e => {
       if (e && e.message === 'TENANT_SUSPENDED') {
         setIsTenantSuspended(true);
         setSuspendedAlert(suspendedMessage);
@@ -308,9 +313,7 @@ export default function Login({ onLogin, currentUser }) {
         return;
       }
       console.warn('Anonymous sign-in failed', e);
-    }
-    navigate('/operator');
-    onLogin({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: 'anon' });
+    });
   };
 
   const handleTileClick = target => {

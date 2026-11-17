@@ -6,9 +6,9 @@ import { USER_ROLES } from './utils/constants';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { useManagerStore } from './store/managerStore';
+import OperatorView from './components/OperatorView';
 
 const ManagerView = lazy(() => import('./components/ManagerView'));
-const OperatorView = lazy(() => import('./components/OperatorView'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">

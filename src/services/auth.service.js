@@ -53,8 +53,9 @@ export const loginWithEmail = async (email, password) => {
 
 let anonBindInFlight = null;
 let anonSessionRotating = false;
+let boundAnonCache = { uid: null, tenantId: null, qrKey: null };
 
-export const isAnonSessionRotating = () => anonSessionRotating;
+export const isAnonSessionRotating = () => anonSessionRotating || Boolean(anonBindInFlight);
 
 /**
  * Zapewnia, że anonimowa sesja (operator QR) jest powiązana z daną firmą (anon_sessions/{uid}).
@@ -66,38 +67,51 @@ export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) =
   if (targetTenantId && qrKey) {
     saveOperatorQrKey(targetTenantId, qrKey);
   }
+  const effectiveKey = qrKey || getOperatorQrKey(targetTenantId);
+  if (
+    auth.currentUser &&
+    auth.currentUser.isAnonymous &&
+    boundAnonCache.uid === auth.currentUser.uid &&
+    boundAnonCache.tenantId === targetTenantId &&
+    (!effectiveKey || boundAnonCache.qrKey === effectiveKey)
+  ) {
+    return auth.currentUser;
+  }
   while (anonBindInFlight) {
     const prev = await anonBindInFlight.catch(() => null);
     if (!qrKey) return prev; // wywołanie z kluczem (skan QR) wykonujemy po zakończeniu poprzedniego
   }
   anonBindInFlight = (async () => {
-    if (targetTenantId) {
-      try {
-        const genDoc = await getDoc(doc(db, 'tenants', targetTenantId, 'settings', 'general'));
-        if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
-          const genData = genDoc.data();
-          if (genData && genData.status === 'suspended') {
-            throw new Error('TENANT_SUSPENDED');
-          }
-        }
-      } catch (err) {
-        if (err && err.message === 'TENANT_SUSPENDED') {
-          throw err;
-        }
-      }
+    const [, generalCheckErr] = await Promise.all([
+      !auth.currentUser ? signInAnonymously(auth).catch(() => null) : Promise.resolve(),
+      targetTenantId
+        ? getDoc(doc(db, 'tenants', targetTenantId, 'settings', 'general'))
+            .then(genDoc => {
+              if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
+                const genData = genDoc.data();
+                if (genData && genData.status === 'suspended') {
+                  return new Error('TENANT_SUSPENDED');
+                }
+              }
+              return null;
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    if (generalCheckErr) {
+      throw generalCheckErr;
     }
     let user = auth.currentUser;
-    if (!user) {
-      await signInAnonymously(auth);
-      user = auth.currentUser;
-    }
     if (!user || !user.isAnonymous || !targetTenantId) return user;
     const key = qrKey || getOperatorQrKey(targetTenantId);
     try {
       const snap = await getDoc(doc(db, 'anon_sessions', user.uid));
       if (snap.exists()) {
         const s = snap.data();
-        if (s.tenantId === targetTenantId && (!key || s.qrKey === key)) return user;
+        if (s.tenantId === targetTenantId && (!key || s.qrKey === key)) {
+          boundAnonCache = { uid: user.uid, tenantId: targetTenantId, qrKey: s.qrKey || key };
+          return user;
+        }
         if (!key) return user; // brak klucza – nie da się przepiąć, reguły odmówią dostępu
         // Inna firma lub nowy klucz -> nowa sesja anonimowa (sesji nie można edytować)
         anonSessionRotating = true;
@@ -109,13 +123,17 @@ export const ensureAnonSessionForTenant = async (targetTenantId, qrKey = null) =
           anonSessionRotating = false;
         }
       }
-      if (!key) return user; // operator musi zeskanować kod QR firmy
+      if (!key) {
+        boundAnonCache = { uid: user.uid, tenantId: targetTenantId, qrKey: null };
+        return user; // operator musi zeskanować kod QR firmy
+      }
       await setDoc(doc(db, 'anon_sessions', user.uid), {
         tenantId: targetTenantId,
         qrKey: key,
         createdAt: serverTimestamp()
       });
       saveOperatorQrKey(targetTenantId, key);
+      boundAnonCache = { uid: user.uid, tenantId: targetTenantId, qrKey: key };
     } catch (e) {
       console.warn('Could not bind anon session:', e);
     }

@@ -2370,34 +2370,24 @@ export async function recognizeLicensePlateFromVideoFrame(
       Number(videoEl.videoHeight || videoEl.naturalHeight) > 0;
 
     if (isRealDomVideo) {
-      const plateBox = detectLicensePlateBoundingBox(videoEl);
-
-      // 1. Rozpoznawanie przez AI Vision (Gemini Flash):
-      //    - Zawsze przy ręcznym kliknięciu przycisku (!options.isBackground)
-      //    - W pętli tła (co min. 3.5 s), gdy w kadrze widoczny jest kandydat na tablicę
+      // 1. Rozpoznawanie przez AI Vision (Gemini Flash) bezpośrednio z klatki kamery na żywo (w tle i ręcznie):
       const nowMs = Date.now();
-      const canRunAiInBackground =
-        options?.isBackground &&
-        plateBox &&
-        !plateBox.isMockBlank &&
-        nowMs - lastBackgroundAiCallMs >= 3500;
-
-      if (!options?.isBackground || canRunAiInBackground) {
-        const frameB64 = captureFrameAsJpegBase64(videoEl);
-        if (frameB64) {
-          if (options?.isBackground) {
-            lastBackgroundAiCallMs = nowMs;
+      const frameB64 = captureFrameAsJpegBase64(videoEl);
+      if (frameB64 && (!options?.isBackground || nowMs - lastBackgroundAiCallMs >= 1600)) {
+        if (options?.isBackground) {
+          lastBackgroundAiCallMs = nowMs;
+        }
+        try {
+          const aiRes = await recognizeLicensePlateWithAI(frameB64, machines, options);
+          if (aiRes && (aiRes.matchedMachine || aiRes.plate)) {
+            return aiRes;
           }
-          try {
-            const aiRes = await recognizeLicensePlateWithAI(frameB64, machines, options);
-            if (aiRes && (aiRes.matchedMachine || aiRes.plate)) {
-              return aiRes;
-            }
-          } catch (aiErr) {
-            console.warn('[ANPR AI Vision fallback to local OCR]:', aiErr);
-          }
+        } catch (aiErr) {
+          console.warn('[ANPR AI Vision fallback to local OCR]:', aiErr);
         }
       }
+
+      const plateBox = detectLicensePlateBoundingBox(videoEl);
 
       // 2. Fallback lokalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
       if (!plateBox && options?.isBackground) {
