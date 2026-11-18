@@ -438,7 +438,7 @@ exports.logAIUsage = functions.region('europe-west1').https.onCall(async (data, 
 
 exports.recognizeLicensePlateAI = functions.region('europe-west1').https.onCall(async (data, context) => {
   const verifiedTenantId = await verifyTenantAccess(context, data?.tenantId, { allowAnonymous: true });
-  const { imageBase64, mimeType, knownPlates } = data || {};
+  const { imageBase64, mimeType } = data || {};
   if (!imageBase64 || typeof imageBase64 !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'Brak obrazu z kamery.');
   }
@@ -456,28 +456,21 @@ exports.recognizeLicensePlateAI = functions.region('europe-west1').https.onCall(
 
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'serwis-crist';
     const vertex_ai = new VertexAI({ project: projectId, location: 'europe-central2' });
-    const generativeModel = vertex_ai.preview.getGenerativeModel({ model: actualModel });
+    const generativeModel = vertex_ai.preview.getGenerativeModel({
+      model: actualModel,
+      generationConfig: {
+        temperature: 0,
+      },
+    });
 
-    const safeKnown = Array.isArray(knownPlates)
-      ? knownPlates
-          .slice(0, 250)
-          .map(p => String(p || '').trim().toUpperCase())
-          .filter(Boolean)
-      : [];
-    const fleetContext =
-      safeKnown.length > 0
-        ? `\nZnane tablice rejestracyjne w bazie floty tej firmy: ${safeKnown.join(', ')}. Jeśli odczytana z tablicy rejestracja różni się maksymalnie 1 znakiem (np. z powodu kąta, cienia, śruby lub nalepki legalizacyjnej: O/0, I/1, S/5, B/8, Z/2, V/Y), zwróć dokładny numer z tej listy.`
-        : '';
+    const prompt = `Jesteś rygorystycznym systemem ANPR (Automatic Number Plate Recognition) odczytującym tablice rejestracyjne pojazdów ze zdjęć.
+Zasady krytyczne (ZAKAZ ZGADYWANIA):
+1. Najpierw oceń, czy na zdjęciu faktycznie widać fizyczną tablicę rejestracyjną pojazdu z wyraźnymi, czytelnymi znakami alfanumerycznymi.
+2. Jeśli na zdjęciu widać podłogę, ścianę, ciemny/rozmazany obraz, wnętrze pomieszczenia lub nie widać wyraźnej tablicy rejestracyjnej, MUSISZ zwrócić: {"plateVisible": false, "plate": ""}. NIGDY nie zgaduj i nie wymyślaj numeru rejestracyjnego!
+3. Tylko wtedy, gdy fizyczna tablica rejestracyjna jest jednoznacznie widoczna i czytelna na zdjęciu, ustaw "plateVisible": true i wpisz odczytane znaki z samej tablicy (ignorując napisy na ramce pod tablicą, naklejkę legalizacyjną oraz symbol kraju "PL" na niebieskim pasku).
 
-    const prompt = `Jesteś precyzyjnym systemem ANPR (Automatic Number Plate Recognition) odczytującym tablice rejestracyjne pojazdów ze zdjęć z kamery telefonu.
-Zadanie:
-1. Znajdź na zdjęciu tablicę rejestracyjną pojazdu (samochodu, wózka widłowego, ciągnika, maszyny) i odczytaj jej numer rejestracyjny (np. "GD 3V975", "GA 12345", "WE 9876A").
-2. Zignoruj napisy reklamowe na ramce pod tablicą (np. "PLICHTA", nazwy dealerów, adresy stron WWW, telefony), naklejkę legalizacyjną pośrodku tablicy oraz symbol kraju "PL" na niebieskim pasku z lewej strony.
-3. Sformatuj polską tablicę ze spacją po wyróżniku powiatu (2 lub 3 litery, spacja, reszta znaków, np. "GD 3V975").${fleetContext}
-4. Jeśli na zdjęciu nie widać żadnej tablicy rejestracyjnej, ustaw "plate": "".
-
-Zwróć WYŁĄCZNIE czysty obiekt JSON bez bloków markdown:
-{"plate": "GD 3V975"}`;
+Zwróć WYŁĄCZNIE czysty obiekt JSON bez bloków markdown.
+Przykład gdy brak tablicy: {"plateVisible": false, "plate": ""}`;
 
     const req = {
       contents: [
@@ -524,12 +517,14 @@ Zwróć WYŁĄCZNIE czysty obiekt JSON bez bloków markdown:
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
-        plate = String(parsed.plate || '').trim().toUpperCase();
+        if (parsed.plateVisible === false) {
+          plate = '';
+        } else {
+          plate = String(parsed.plate || '').trim().toUpperCase();
+        }
       } catch {
         plate = '';
       }
-    } else {
-      plate = cleanedJson.replace(/[^A-Z0-9\s-]/gi, '').trim().toUpperCase();
     }
 
     return { plate, tokens };

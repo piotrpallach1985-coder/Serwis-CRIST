@@ -2273,14 +2273,6 @@ export async function recognizeLicensePlateWithAI(
       : imageBase64;
   if (!cleanB64) return null;
 
-  const knownPlates = Array.isArray(machines)
-    ? machines
-        .filter(m => m && !m.isDeleted && m.licensePlate)
-        .map(m => String(m.licensePlate).trim().toUpperCase())
-        .filter(Boolean)
-        .slice(0, 250)
-    : [];
-
   const tenantId =
     options?.tenantId ||
     useManagerStore.getState?.()?.tenantId ||
@@ -2301,12 +2293,13 @@ export async function recognizeLicensePlateWithAI(
   const res = await aiCallable({
     imageBase64: cleanB64,
     mimeType: options?.mimeType || 'image/jpeg',
-    knownPlates,
     tenantId,
   });
 
   const aiPlateRaw = String(res?.data?.plate || '').trim();
-  if (!aiPlateRaw) return null;
+  if (!aiPlateRaw) {
+    return { plate: '', matchedMachine: null, source: 'ai', emptyFromAi: true };
+  }
 
   const extracted = extractLicensePlateFromOcrText(aiPlateRaw, machines);
   if (extracted.matchedMachine || extracted.plate) {
@@ -2399,6 +2392,15 @@ export async function recognizeLicensePlateFromVideoFrame(
               });
             }
             return aiRes;
+          }
+          if (aiRes && aiRes.emptyFromAi) {
+            // AI jednoznacznie stwierdziło brak tablicy na obrazie — nie uruchamiamy lokalnego OCR na szumie tła/podłogi
+            return {
+              plate: '',
+              matchedMachine: null,
+              error:
+                'Nie wykryto tablicy rejestracyjnej w kadrze — skieruj kamerę na tablicę pojazdu i naciśnij "Skanuj tablicę".',
+            };
           }
         } catch (aiErr) {
           console.warn('[ANPR AI Vision fallback to local OCR]:', aiErr);
