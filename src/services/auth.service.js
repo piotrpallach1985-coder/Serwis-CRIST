@@ -1,54 +1,171 @@
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, signInAnonymously, signOut } from 'firebase/auth';
+import * as firestoreModule from 'firebase/firestore';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { getOperatorQrKey, saveOperatorQrKey } from './qrAccess.service';
+
+const USER_PROFILE_CACHE_KEY = 'vexont_cached_user_profile';
+const inFlightUserFetches = new Map();
+const recentUserProfileMemCache = new Map();
+const tenantGeneralStatusCache = new Map();
+
+export const getCachedUserProfile = (uid = null) => {
+  if (uid && recentUserProfileMemCache.has(uid)) {
+    const entry = recentUserProfileMemCache.get(uid);
+    if (Date.now() - entry.ts < 15000) {
+      return entry.profile;
+    }
+  }
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(USER_PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.uid) return null;
+    if (uid && parsed.uid !== uid) return null;
+    if (parsed.isDeleted || parsed.status === 'suspended' || parsed.isBlocked) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+export const saveCachedUserProfile = profile => {
+  if (!profile || !profile.uid) return;
+  recentUserProfileMemCache.set(profile.uid, { profile, ts: Date.now() });
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(USER_PROFILE_CACHE_KEY, JSON.stringify(profile));
+    }
+  } catch {
+    // ignore storage errors
+  }
+};
+
+export const clearCachedUserProfile = () => {
+  recentUserProfileMemCache.clear();
+  inFlightUserFetches.clear();
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(USER_PROFILE_CACHE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+};
+
+const tryGetDocCacheFirst = async (docRef, preferCache = false) => {
+  if (preferCache && typeof firestoreModule.getDocFromCache === 'function') {
+    try {
+      const cachedSnap = await firestoreModule.getDocFromCache(docRef);
+      if (cachedSnap && typeof cachedSnap.exists === 'function' && cachedSnap.exists()) {
+        return cachedSnap;
+      }
+    } catch {
+      // Cache miss -> fallback to server getDoc
+    }
+  }
+  return getDoc(docRef);
+};
+
+/**
+ * Współdzielony (deduplikowany) odczyt i weryfikacja profilu użytkownika oraz statusu firmy.
+ * Zapobiega podwójnym zapytaniom z loginWithEmail() i onAuthStateChanged() w tej samej chwili.
+ */
+export const resolveVerifiedUserProfile = async (
+  uid,
+  { preferCache = false, fallbackEmail = '' } = {}
+) => {
+  if (!uid) return null;
+
+  if (!preferCache && recentUserProfileMemCache.has(uid)) {
+    const cached = recentUserProfileMemCache.get(uid);
+    if (Date.now() - cached.ts < 8000) {
+      return cached.profile;
+    }
+  }
+
+  if (inFlightUserFetches.has(uid)) {
+    return inFlightUserFetches.get(uid);
+  }
+
+  const fetchPromise = (async () => {
+    const userDocRef = doc(db, 'users', uid);
+    const userDoc = await tryGetDocCacheFirst(userDocRef, preferCache);
+
+    if (!userDoc || typeof userDoc.exists !== 'function' || !userDoc.exists()) {
+      clearCachedUserProfile();
+      throw new Error('USER_NO_ROLE');
+    }
+
+    const userData = userDoc.data();
+
+    if (userData.isDeleted || userData.status === 'suspended' || userData.isBlocked) {
+      clearCachedUserProfile();
+      try {
+        sessionStorage.setItem('vexont_suspended_notice', '1');
+      } catch {
+        // ignore
+      }
+      await signOut(auth);
+      throw new Error('USER_DELETED');
+    }
+
+    if (userData.role !== 'superadmin' && userData.tenantId) {
+      const tId = userData.tenantId;
+      let genData = tenantGeneralStatusCache.get(tId) || null;
+
+      if (!genData) {
+        try {
+          const genRef = doc(db, 'tenants', tId, 'settings', 'general');
+          const genDoc = await tryGetDocCacheFirst(genRef, true);
+          if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
+            genData = genDoc.data();
+            if (genData) tenantGeneralStatusCache.set(tId, genData);
+          }
+        } catch (err) {
+          if (err && err.message === 'TENANT_SUSPENDED') {
+            throw err;
+          }
+        }
+      }
+
+      if (genData && genData.status === 'suspended') {
+        clearCachedUserProfile();
+        try {
+          sessionStorage.setItem('vexont_suspended_notice', '1');
+        } catch {
+          // ignore
+        }
+        await signOut(auth);
+        throw new Error('TENANT_SUSPENDED');
+      }
+    }
+
+    const profile = {
+      uid,
+      ...userData,
+      email: userData.email || fallbackEmail || '',
+    };
+    saveCachedUserProfile(profile);
+    return profile;
+  })();
+
+  inFlightUserFetches.set(uid, fetchPromise);
+  try {
+    return await fetchPromise;
+  } finally {
+    inFlightUserFetches.delete(uid);
+  }
+};
 
 export const loginWithEmail = async (email, password) => {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
-  
-  const userDocRef = doc(db, 'users', user.uid);
-  const userDoc = await getDoc(userDocRef);
-  
-  if (!userDoc.exists()) {
-    throw new Error('USER_NO_ROLE');
-  }
-
-  const userData = userDoc.data();
-
-  if (userData.isDeleted || userData.status === 'suspended' || userData.isBlocked) {
-    try {
-      sessionStorage.setItem('vexont_suspended_notice', '1');
-    } catch {
-      // ignore
-    }
-    await signOut(auth);
-    throw new Error('USER_DELETED');
-  }
-
-  if (userData.role !== 'superadmin' && userData.tenantId) {
-    try {
-      const genDoc = await getDoc(doc(db, 'tenants', userData.tenantId, 'settings', 'general'));
-      if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
-        const genData = genDoc.data();
-        if (genData && genData.status === 'suspended') {
-          try {
-            sessionStorage.setItem('vexont_suspended_notice', '1');
-          } catch {
-            // ignore
-          }
-          await signOut(auth);
-          throw new Error('TENANT_SUSPENDED');
-        }
-      }
-    } catch (err) {
-      if (err.message === 'TENANT_SUSPENDED') {
-        throw err;
-      }
-    }
-  }
-  
-  return { uid: user.uid, ...userData };
+  return resolveVerifiedUserProfile(user.uid, {
+    preferCache: false,
+    fallbackEmail: user.email || email,
+  });
 };
 
 let anonBindInFlight = null;
@@ -151,7 +268,11 @@ export const loginAnon = async (targetTenantId, qrKey = null) => ensureAnonSessi
 export const subscribeToGeneralSettings = (tenantId, callback) => {
   return onSnapshot(doc(db, 'tenants', tenantId, 'settings', 'general'), (snap) => {
     if (snap.exists()) {
-      callback(snap.data());
+      const data = snap.data();
+      if (tenantId && data) {
+        tenantGeneralStatusCache.set(tenantId, data);
+      }
+      callback(data);
     }
   }, (err) => { console.warn(err) });
 };

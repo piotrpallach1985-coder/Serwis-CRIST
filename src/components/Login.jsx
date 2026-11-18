@@ -218,6 +218,13 @@ export default function Login({ onLogin, currentUser }) {
     return () => unsub();
   }, [tenantId]);
 
+  // Prefetch widoków po zalogowaniu (ManagerView + HomeDashboard), gdy użytkownik otworzy okno logowania
+  useEffect(() => {
+    if (!loginModalTarget) return;
+    import('./ManagerView').catch(() => {});
+    import('./manager/HomeDashboard').catch(() => {});
+  }, [loginModalTarget]);
+
   const handleEmailSubmit = async e => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;

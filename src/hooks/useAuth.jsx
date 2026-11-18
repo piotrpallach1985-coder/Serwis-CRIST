@@ -1,18 +1,54 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth } from '../firebase';
 import { useManagerStore } from '../store/managerStore';
 import { getCurrentTenant } from '../utils/tenantHelper';
 import { USER_ROLES } from '../utils/constants';
 import { getLastAnonTenant } from '../services/qrAccess.service';
-import { isAnonSessionRotating } from '../services/auth.service';
+import {
+  isAnonSessionRotating,
+  getCachedUserProfile,
+  saveCachedUserProfile,
+  clearCachedUserProfile,
+  resolveVerifiedUserProfile,
+} from '../services/auth.service';
 
 const AuthContext = createContext(null);
 
+const formatUserObject = (userData, firebaseUser = null) => {
+  const uid = userData.uid || firebaseUser?.uid || '';
+  const tId = userData.tenantId || getCurrentTenant();
+  return {
+    ...userData,
+    uid,
+    email: userData.email || firebaseUser?.email || '',
+    name: userData.name || firebaseUser?.email || '',
+    role: userData.role || 'brak',
+    permissions: userData.permissions || [],
+    phone: userData.phone || '',
+    licenseNumber: userData.licenseNumber || '',
+    assignedService: userData.assignedService || '',
+    onlyAssignedTasks: Boolean(userData.onlyAssignedTasks || userData.assignedService),
+    tenantId: tId,
+  };
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    const cached = getCachedUserProfile();
+    if (cached && cached.uid && cached.role && cached.role !== USER_ROLES.OPERATOR) {
+      const formatted = formatUserObject(cached);
+      if (formatted.tenantId) {
+        useManagerStore.getState().setTenantId(formatted.tenantId);
+      }
+      return formatted;
+    }
+    return null;
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(() => {
+    const cached = getCachedUserProfile();
+    return !(cached && cached.uid && cached.role && cached.role !== USER_ROLES.OPERATOR);
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -29,74 +65,56 @@ export const AuthProvider = ({ children }) => {
             getCurrentTenant();
           useManagerStore.getState().setTenantId(tIdAnon);
           setUser({ name: 'Nieznany Zgłaszający', role: USER_ROLES.OPERATOR, uid: firebaseUser.uid, tenantId: tIdAnon });
+          setIsAuthLoading(false);
         } else {
+          // 1. Natychmiastowe użycie lokalnego cache (Cache-First < 50ms) przed pełną odpowiedzią sieciową
+          const cachedProfile = getCachedUserProfile(firebaseUser.uid);
+          if (cachedProfile) {
+            const formattedCached = formatUserObject(cachedProfile, firebaseUser);
+            useManagerStore.getState().setTenantId(formattedCached.tenantId);
+            setUser(formattedCached);
+            setIsAuthLoading(false);
+          }
+
+          // 2. Weryfikacja / odświeżenie profilu (współdzielone z loginWithEmail bez dublowania zapytań)
           try {
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              if (userData.isDeleted || userData.status === 'suspended' || userData.isBlocked) {
-                try {
-                  sessionStorage.setItem('vexont_suspended_notice', '1');
-                } catch {
-                  // ignore
-                }
-                await signOut(auth);
-                setUser(null);
-                setIsAuthLoading(false);
-                return;
-              }
-              const tId = userData.tenantId || getCurrentTenant();
-              if (userData.role !== 'superadmin' && tId) {
-                try {
-                  const genDoc = await getDoc(doc(db, 'tenants', tId, 'settings', 'general'));
-                  if (genDoc && typeof genDoc.exists === 'function' && genDoc.exists()) {
-                    const genData = genDoc.data();
-                    if (genData && genData.status === 'suspended') {
-                      try {
-                        sessionStorage.setItem('vexont_suspended_notice', '1');
-                      } catch {
-                        // ignore
-                      }
-                      await signOut(auth);
-                      setUser(null);
-                      setIsAuthLoading(false);
-                      return;
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-              useManagerStore.getState().setTenantId(tId);
-              setUser({
-                ...userData,
-                uid: firebaseUser.uid,
-                email: userData.email || firebaseUser.email || '',
-                name: userData.name || firebaseUser.email,
-                role: userData.role || 'brak',
-                permissions: userData.permissions || [],
-                phone: userData.phone || "",
-                licenseNumber: userData.licenseNumber || "",
-                assignedService: userData.assignedService || "",
-                onlyAssignedTasks: Boolean(userData.onlyAssignedTasks || userData.assignedService),
-                tenantId: tId
-              });
+            const verifiedData = await resolveVerifiedUserProfile(firebaseUser.uid, {
+              preferCache: Boolean(cachedProfile),
+              fallbackEmail: firebaseUser.email || '',
+            });
+            if (verifiedData) {
+              const formatted = formatUserObject(verifiedData, firebaseUser);
+              useManagerStore.getState().setTenantId(formatted.tenantId);
+              setUser(formatted);
             } else {
+              clearCachedUserProfile();
               setUser(null);
             }
           } catch (e) {
-            console.error('Błąd weryfikacji roli:', e);
-            setUser(null);
+            if (
+              e?.message === 'USER_DELETED' ||
+              e?.message === 'TENANT_SUSPENDED' ||
+              e?.message === 'USER_NO_ROLE'
+            ) {
+              clearCachedUserProfile();
+              setUser(null);
+            } else {
+              console.error('Błąd weryfikacji roli:', e);
+              if (!cachedProfile) {
+                setUser(null);
+              }
+            }
           }
+          setIsAuthLoading(false);
         }
       } else {
         if (isAnonSessionRotating()) {
           return;
         }
+        clearCachedUserProfile();
         setUser(null);
+        setIsAuthLoading(false);
       }
-      setIsAuthLoading(false);
     });
 
     return () => unsubscribe();
@@ -104,7 +122,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => {
     setUser(userData);
-    if (userData?.tenantId) { useManagerStore.getState().setTenantId(userData.tenantId); }
+    if (userData?.tenantId) {
+      useManagerStore.getState().setTenantId(userData.tenantId);
+    }
+    if (userData && userData.uid && userData.uid !== 'anon' && userData.role !== USER_ROLES.OPERATOR) {
+      saveCachedUserProfile(userData);
+    }
   };
 
   const logout = async (options = {}) => {
@@ -131,6 +154,7 @@ export const AuthProvider = ({ children }) => {
     } catch(err) {
       console.error(err);
     }
+    clearCachedUserProfile();
     localStorage.clear();
     sessionStorage.clear();
     try {
