@@ -28,11 +28,9 @@ export default function OperatorScanner({
   const [ocrNotice, setOcrNotice] = useState(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [anprProgress, setAnprProgress] = useState({
-    stage: 'scanning',
-    message: 'Inicjalizacja kamery i modułu AI...',
+    stage: 'idle',
+    message: '',
   });
-  const autoAnprBusyRef = useRef(false);
-  const platePhotoInputRef = useRef(null);
 
   const fleetSuggestions = useMemo(() => {
     const vehicles = activeMachines.filter(
@@ -86,9 +84,21 @@ export default function OperatorScanner({
     }
 
     setIsRecognizingPlate(true);
+    setAnprProgress({
+      stage: 'ai_analyzing',
+      message: 'Analiza tablicy rejestracyjnej przez AI...',
+    });
     try {
-      const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines);
+      const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines, null, {
+        onProgress: info => {
+          if (info) setAnprProgress(info);
+        },
+      });
       if (result.matchedMachine) {
+        setAnprProgress({
+          stage: 'matched',
+          message: `Rozpoznano pojazd: ${result.matchedMachine.licensePlate || result.matchedMachine.name}`,
+        });
         stopLiveScanner();
         onScanSuccess(
           result.matchedMachine.id,
@@ -105,74 +115,25 @@ export default function OperatorScanner({
           result.plate
         );
         if (fallbackMatch) {
+          setAnprProgress({
+            stage: 'matched',
+            message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || result.plate}`,
+          });
           stopLiveScanner();
           onScanSuccess(fallbackMatch.id, result.plate);
           return;
         }
+        setAnprProgress({ stage: 'idle', message: '' });
         setOcrNotice(
           `Rozpoznano tablicę "${result.plate}", ale nie znaleziono takiego pojazdu w bazie wybranej firmy. Sprawdź lub zatwierdź ręcznie poniżej.`
         );
       } else {
+        setAnprProgress({ stage: 'idle', message: '' });
         setOcrNotice(
           result.error ||
-            'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy, użyj przycisku "Zrób ostre zdjęcie tablicy (AI)" lub wpisz numer ręcznie.'
+            'Nie wykryto wyraźnej tablicy rejestracyjnej w kadrze. Zbliż kamerę do tablicy i naciśnij "Skanuj tablicę" ponownie lub wpisz numer ręcznie.'
         );
       }
-    } finally {
-      setIsRecognizingPlate(false);
-    }
-  };
-
-  const handlePlatePhotoFileSelected = async e => {
-    const file = e.target?.files?.[0];
-    if (e.target) e.target.value = '';
-    if (!file || !isInternal) return;
-    setErrorMsg(null);
-    setOcrNotice(null);
-    setIsRecognizingPlate(true);
-    try {
-      const base64DataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = err => reject(err);
-        reader.readAsDataURL(file);
-      });
-      const result = await recognizeLicensePlateFromVideoFrame(null, activeMachines, null, {
-        imageBase64: base64DataUrl,
-        mimeType: file.type || 'image/jpeg',
-      });
-      if (result.matchedMachine) {
-        stopLiveScanner();
-        onScanSuccess(
-          result.matchedMachine.id,
-          result.matchedMachine.licensePlate || result.plate
-        );
-        return;
-      }
-      if (result.plate) {
-        setPlateQuery(result.plate);
-        setShowManualInput(true);
-        const fallbackMatch = findMachineByIdentifierOrPlate(
-          activeMachines,
-          result.plate,
-          result.plate
-        );
-        if (fallbackMatch) {
-          stopLiveScanner();
-          onScanSuccess(fallbackMatch.id, result.plate);
-          return;
-        }
-        setOcrNotice(
-          `AI rozpoznało tablicę "${result.plate}", ale nie znaleziono takiego pojazdu w bazie wybranej firmy. Sprawdź lub zatwierdź ręcznie poniżej.`
-        );
-      } else {
-        setOcrNotice(
-          result.error ||
-            'AI nie wykryło tablicy rejestracyjnej na zdjęciu. Spróbuj ponownie z bliższej odległości lub wpisz numer ręcznie.'
-        );
-      }
-    } catch {
-      setOcrNotice('Nie udało się przeanalizować zdjęcia tablicy przez AI.');
     } finally {
       setIsRecognizingPlate(false);
     }
@@ -236,98 +197,15 @@ export default function OperatorScanner({
     }
   }, [isLiveScanning]);
 
-  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery (wyłącznie dla zalogowanych użytkowników)
-  useEffect(() => {
-    if (!isLiveScanning || !isInternal) return undefined;
-    let active = true;
-    setAnprProgress({
-      stage: 'scanning',
-      message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-    });
-    const intervalId = setInterval(async () => {
-      if (!active || autoAnprBusyRef.current) return;
-      const container = document.getElementById('qr-reader');
-      const videoEl = container ? container.querySelector('video') : null;
-      if (!videoEl || (videoEl.readyState !== undefined && videoEl.readyState < 2)) return;
-
-      autoAnprBusyRef.current = true;
-      setAnprProgress({
-        stage: 'ai_analyzing',
-        message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
-      });
-      try {
-        const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines, null, {
-          isBackground: true,
-          onProgress: info => {
-            if (active && info) setAnprProgress(info);
-          },
-        });
-        if (!active) return;
-        if (result.matchedMachine) {
-          setAnprProgress({
-            stage: 'matched',
-            message: `Rozpoznano pojazd: ${result.matchedMachine.licensePlate || result.matchedMachine.name}`,
-          });
-          stopLiveScanner();
-          onScanSuccess(
-            result.matchedMachine.id,
-            result.matchedMachine.licensePlate || result.plate
-          );
-        } else if (result.plate) {
-          const fallbackMatch = findMachineByIdentifierOrPlate(
-            activeMachines,
-            result.plate,
-            result.plate
-          );
-          if (fallbackMatch) {
-            setAnprProgress({
-              stage: 'matched',
-              message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || result.plate}`,
-            });
-            stopLiveScanner();
-            onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || result.plate);
-          } else {
-            setAnprProgress({
-              stage: 'scanning',
-              message: `Odczytano "${result.plate}" (brak w bazie) — ponawianie skanowania AI...`,
-            });
-            setPlateQuery(result.plate);
-            setShowManualInput(true);
-            setOcrNotice(
-              `Wykryto tablicę "${result.plate}" — brak pojazdu o tym numerze w bazie firmy. Skieruj kamerę dokładniej na tablicę lub zatwierdź numer poniżej.`
-            );
-          }
-        } else {
-          setAnprProgress({
-            stage: 'scanning',
-            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-          });
-        }
-      } catch {
-        if (active) {
-          setAnprProgress({
-            stage: 'scanning',
-            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-          });
-        }
-      } finally {
-        autoAnprBusyRef.current = false;
-      }
-    }, 1200);
-
-    return () => {
-      active = false;
-      clearInterval(intervalId);
-    };
-  }, [isLiveScanning, isInternal, activeMachines, onScanSuccess]);
-
   const startLiveScanner = () => {
     setIsLiveScanning(true);
     setErrorMsg(null);
+    setAnprProgress({ stage: 'idle', message: '' });
   };
 
   const stopLiveScanner = () => {
     setIsLiveScanning(false);
+    setAnprProgress({ stage: 'idle', message: '' });
   };
 
   const startNfcLive = async () => {
@@ -428,49 +306,60 @@ export default function OperatorScanner({
             </div>
             <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[280px]"></div>
             {isInternal && (
-              <div
-                data-testid="operator-anpr-progress-bar"
-                className={`mt-3 px-3.5 py-2.5 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
-                  anprProgress.stage === 'ai_analyzing' || anprProgress.stage === 'ocr_analyzing'
-                    ? 'bg-indigo-950/90 border-indigo-500/80 text-indigo-100'
-                    : anprProgress.stage === 'matched'
-                      ? 'bg-emerald-950/90 border-emerald-500 text-emerald-100'
-                      : 'bg-slate-800/90 border-slate-700 text-slate-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-left">
-                    {anprProgress.stage === 'ai_analyzing' ||
-                    anprProgress.stage === 'ocr_analyzing' ? (
-                      <i className="ph ph-spinner animate-spin text-base text-indigo-300 shrink-0"></i>
-                    ) : anprProgress.stage === 'matched' ? (
-                      <i className="ph-fill ph-check-circle text-base text-emerald-400 shrink-0"></i>
-                    ) : (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-                    )}
-                    <span>{anprProgress.message}</span>
-                  </div>
-                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/90 font-extrabold shrink-0">
-                    {anprProgress.stage === 'ai_analyzing' ||
-                    anprProgress.stage === 'ocr_analyzing'
-                      ? 'Analiza AI'
-                      : anprProgress.stage === 'matched'
-                        ? 'Gotowe'
-                        : 'Czuwanie AI'}
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  data-testid="operator-capture-plate-btn"
+                  onClick={handleCapturePlateFromCamera}
+                  disabled={isRecognizingPlate}
+                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i
+                    className={`ph ${
+                      isRecognizingPlate ? 'ph-spinner animate-spin' : 'ph-car-profile'
+                    } text-lg`}
+                  ></i>
+                  <span>
+                    {isRecognizingPlate ? 'Skanowanie tablicy (AI)...' : 'Skanuj tablicę'}
                   </span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-950/80 rounded-full overflow-hidden">
+                </button>
+                {(isRecognizingPlate || anprProgress.stage === 'matched') && (
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      anprProgress.stage === 'ai_analyzing' ||
-                      anprProgress.stage === 'ocr_analyzing'
-                        ? 'w-3/4 bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 animate-pulse'
-                        : anprProgress.stage === 'matched'
-                          ? 'w-full bg-emerald-400'
-                          : 'w-1/3 bg-slate-500 animate-pulse'
+                    data-testid="operator-anpr-progress-bar"
+                    className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
+                      anprProgress.stage === 'matched'
+                        ? 'bg-emerald-950/90 border-emerald-500 text-emerald-100'
+                        : 'bg-indigo-950/90 border-indigo-500/80 text-indigo-100'
                     }`}
-                  ></div>
-                </div>
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-left">
+                        {anprProgress.stage === 'matched' ? (
+                          <i className="ph-fill ph-check-circle text-base text-emerald-400 shrink-0"></i>
+                        ) : (
+                          <i className="ph ph-spinner animate-spin text-base text-indigo-300 shrink-0"></i>
+                        )}
+                        <span>
+                          {anprProgress.message || 'Analiza tablicy rejestracyjnej przez AI...'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/90 font-extrabold shrink-0">
+                        {anprProgress.stage === 'matched' ? 'Gotowe' : 'Analiza AI'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-950/80 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          anprProgress.stage === 'matched'
+                            ? 'w-full bg-emerald-400'
+                            : anprProgress.stage === 'capturing'
+                              ? 'w-1/3 bg-indigo-400 animate-pulse'
+                              : 'w-3/4 bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 animate-pulse'
+                        }`}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -2333,6 +2333,11 @@ export async function recognizeLicensePlateFromVideoFrame(
     return { plate: '', matchedMachine: null, error: 'Brak aktywnego obrazu z kamery.' };
   }
 
+  // Odczyt tablicy rejestracyjnej i wywołanie AI odbywa się WYŁĄCZNIE na żądanie (po naciśnięciu przycisku "Skanuj tablicę")
+  if (options?.isBackground) {
+    return { plate: '', matchedMachine: null };
+  }
+
   try {
     if (typeof customDetector === 'function') {
       const rawText = await customDetector(videoEl);
@@ -2370,17 +2375,18 @@ export async function recognizeLicensePlateFromVideoFrame(
       Number(videoEl.videoHeight || videoEl.naturalHeight) > 0;
 
     if (isRealDomVideo) {
-      // 1. Rozpoznawanie przez AI Vision (Gemini Flash) bezpośrednio z klatki kamery na żywo (w tle i ręcznie):
-      const nowMs = Date.now();
+      if (typeof options?.onProgress === 'function') {
+        options.onProgress({
+          stage: 'capturing',
+          message: 'Przechwytywanie kadru z kamery...',
+        });
+      }
       const frameB64 = captureFrameAsJpegBase64(videoEl);
-      if (frameB64 && (!options?.isBackground || nowMs - lastBackgroundAiCallMs >= 1600)) {
-        if (options?.isBackground) {
-          lastBackgroundAiCallMs = nowMs;
-        }
+      if (frameB64) {
         if (typeof options?.onProgress === 'function') {
           options.onProgress({
             stage: 'ai_analyzing',
-            message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
+            message: 'Analiza tablicy rejestracyjnej przez AI...',
           });
         }
         try {
@@ -2401,21 +2407,10 @@ export async function recognizeLicensePlateFromVideoFrame(
 
       const plateBox = detectLicensePlateBoundingBox(videoEl);
 
-      // 2. Fallback lokalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
-      if (!plateBox && options?.isBackground) {
-        if (typeof options?.onProgress === 'function') {
-          options.onProgress({
-            stage: 'scanning',
-            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-          });
-        }
-        return { plate: '', matchedMachine: null };
-      }
-
       if (typeof options?.onProgress === 'function') {
         options.onProgress({
           stage: 'ocr_analyzing',
-          message: 'Wykryto tablicę w kadrze — odczytywanie znaków...',
+          message: 'Dodatkowa analiza znaków tablicy...',
         });
       }
 

@@ -23,13 +23,11 @@ export default function QRScannerModal({
   const [isCapturingPlate, setIsCapturingPlate] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [anprProgress, setAnprProgress] = useState({
-    stage: 'scanning',
-    message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+    stage: 'idle',
+    message: '',
   });
   const html5QrcodeRef = useRef(null);
-  const autoAnprBusyRef = useRef(false);
   const scanHandledRef = useRef(false);
-  const platePhotoInputRef = useRef(null);
 
   const machines = useManagerStore(state => state.machines || []);
 
@@ -63,88 +61,9 @@ export default function QRScannerModal({
       setOcrStatusMsg('');
       setIsCapturingPlate(false);
       setShowManualInput(false);
-      autoAnprBusyRef.current = false;
+      setAnprProgress({ stage: 'idle', message: '' });
     }
   }, [isOpen]);
-
-  // Automatyczne rozpoznawanie tablic rejestracyjnych (ANPR) w tle podczas działania kamery
-  useEffect(() => {
-    if (!isOpen || mode !== 'qr' || !enableLicensePlateScan) return undefined;
-    let active = true;
-    setAnprProgress({
-      stage: 'scanning',
-      message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-    });
-    const intervalId = setInterval(async () => {
-      if (!active || autoAnprBusyRef.current) return;
-      const container = document.getElementById('unified-qr-reader');
-      const videoEl = container ? container.querySelector('video') : null;
-      if (!videoEl || (videoEl.readyState !== undefined && videoEl.readyState < 2)) return;
-
-      autoAnprBusyRef.current = true;
-      setAnprProgress({
-        stage: 'ai_analyzing',
-        message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
-      });
-      try {
-        const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines, null, {
-          isBackground: true,
-          onProgress: info => {
-            if (active && info) setAnprProgress(info);
-          },
-        });
-        if (!active) return;
-        if (res.matchedMachine) {
-          setAnprProgress({
-            stage: 'matched',
-            message: `Rozpoznano pojazd: ${res.matchedMachine.licensePlate || res.matchedMachine.name}`,
-          });
-          onScanSuccess(
-            res.matchedMachine.id,
-            res.matchedMachine.licensePlate || res.matchedMachine.id
-          );
-        } else if (res.plate) {
-          const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
-          if (fallbackMatch) {
-            setAnprProgress({
-              stage: 'matched',
-              message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || res.plate}`,
-            });
-            onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
-          } else {
-            setAnprProgress({
-              stage: 'scanning',
-              message: `Odczytano "${res.plate}" (brak w bazie) — ponawianie skanowania AI...`,
-            });
-            setPlateQuery(res.plate);
-            setShowManualInput(true);
-            setOcrStatusMsg(
-              `Wykryto tablicę "${res.plate}", której nie ma jeszcze w bazie pojazdów tej firmy. Skieruj aparat dokładniej na tablicę lub wybierz pojazd poniżej.`
-            );
-          }
-        } else {
-          setAnprProgress({
-            stage: 'scanning',
-            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-          });
-        }
-      } catch {
-        if (active) {
-          setAnprProgress({
-            stage: 'scanning',
-            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
-          });
-        }
-      } finally {
-        autoAnprBusyRef.current = false;
-      }
-    }, 900);
-
-    return () => {
-      active = false;
-      clearInterval(intervalId);
-    };
-  }, [isOpen, mode, enableLicensePlateScan, machines, onScanSuccess]);
 
   useEffect(() => {
     let isMounted = true;
@@ -345,21 +264,38 @@ export default function QRScannerModal({
   const handleCapturePlateFromCamera = async () => {
     setIsCapturingPlate(true);
     setOcrStatusMsg('');
+    setAnprProgress({
+      stage: 'ai_analyzing',
+      message: 'Analiza tablicy rejestracyjnej przez AI...',
+    });
     try {
       const container = document.getElementById('unified-qr-reader');
       const videoEl = container ? container.querySelector('video') : null;
-      const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines);
+      const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines, null, {
+        onProgress: info => {
+          if (info) setAnprProgress(info);
+        },
+      });
 
       if (res.matchedMachine) {
+        setAnprProgress({
+          stage: 'matched',
+          message: `Rozpoznano pojazd: ${res.matchedMachine.licensePlate || res.matchedMachine.name}`,
+        });
         onScanSuccess(res.matchedMachine.id, res.matchedMachine.licensePlate || res.matchedMachine.id);
         return;
       }
       if (res.plate) {
         const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
         if (fallbackMatch) {
+          setAnprProgress({
+            stage: 'matched',
+            message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || res.plate}`,
+          });
           onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
           return;
         }
+        setAnprProgress({ stage: 'idle', message: '' });
         setPlateQuery(res.plate);
         setShowManualInput(true);
         setOcrStatusMsg(
@@ -367,61 +303,12 @@ export default function QRScannerModal({
         );
         return;
       }
+      setAnprProgress({ stage: 'idle', message: '' });
       setShowManualInput(true);
       setOcrStatusMsg(
         res.error ||
-          'Nie wykryto tablicy w kadrze — użyj przycisku "Zrób zdjęcie tablicy (AI)" lub wpisz numer poniżej.'
+          'Nie wykryto tablicy w kadrze — zbliż kamerę do tablicy i kliknij "Skanuj tablicę" ponownie lub wpisz numer poniżej.'
       );
-    } finally {
-      setIsCapturingPlate(false);
-    }
-  };
-
-  const handlePlatePhotoFileSelected = async e => {
-    const file = e.target?.files?.[0];
-    if (e.target) e.target.value = '';
-    if (!file) return;
-    setIsCapturingPlate(true);
-    setOcrStatusMsg('');
-    try {
-      const base64DataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = err => reject(err);
-        reader.readAsDataURL(file);
-      });
-      const res = await recognizeLicensePlateFromVideoFrame(null, machines, null, {
-        imageBase64: base64DataUrl,
-        mimeType: file.type || 'image/jpeg',
-      });
-      if (res.matchedMachine) {
-        onScanSuccess(
-          res.matchedMachine.id,
-          res.matchedMachine.licensePlate || res.matchedMachine.id
-        );
-        return;
-      }
-      if (res.plate) {
-        const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
-        if (fallbackMatch) {
-          onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
-          return;
-        }
-        setPlateQuery(res.plate);
-        setShowManualInput(true);
-        setOcrStatusMsg(
-          `AI rozpoznało tablicę "${res.plate}", ale nie znaleziono takiego pojazdu w bazie tej firmy. Sprawdź numer poniżej lub wybierz pojazd z listy.`
-        );
-        return;
-      }
-      setShowManualInput(true);
-      setOcrStatusMsg(
-        res.error ||
-          'AI nie wykryło tablicy na zdjęciu — zrób zdjęcie z bliższej odległości lub wpisz numer poniżej.'
-      );
-    } catch {
-      setShowManualInput(true);
-      setOcrStatusMsg('Błąd analizy zdjęcia tablicy przez AI.');
     } finally {
       setIsCapturingPlate(false);
     }
@@ -467,50 +354,60 @@ export default function QRScannerModal({
                   className="w-full rounded-2xl overflow-hidden bg-black min-h-[260px] shadow-inner"
                 ></div>
                 {enableLicensePlateScan && (
-                  <div
-                    data-testid="scanner-anpr-progress-bar"
-                    className={`mt-2.5 px-3 py-2 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
-                      anprProgress.stage === 'ai_analyzing' ||
-                      anprProgress.stage === 'ocr_analyzing'
-                        ? 'bg-indigo-50 border-indigo-300 text-indigo-950'
-                        : anprProgress.stage === 'matched'
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
-                          : 'bg-slate-100 border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-left">
-                        {anprProgress.stage === 'ai_analyzing' ||
-                        anprProgress.stage === 'ocr_analyzing' ? (
-                          <i className="ph ph-spinner animate-spin text-base text-indigo-600 shrink-0"></i>
-                        ) : anprProgress.stage === 'matched' ? (
-                          <i className="ph-fill ph-check-circle text-base text-emerald-600 shrink-0"></i>
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
-                        )}
-                        <span>{anprProgress.message}</span>
-                      </div>
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-extrabold shrink-0">
-                        {anprProgress.stage === 'ai_analyzing' ||
-                        anprProgress.stage === 'ocr_analyzing'
-                          ? 'Analiza AI'
-                          : anprProgress.stage === 'matched'
-                            ? 'Gotowe'
-                            : 'Czuwanie AI'}
+                  <div className="mt-2.5 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      data-testid="scanner-capture-plate-btn"
+                      disabled={isCapturingPlate}
+                      onClick={handleCapturePlateFromCamera}
+                      className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <i
+                        className={`ph ${
+                          isCapturingPlate ? 'ph-spinner animate-spin' : 'ph-car-profile'
+                        } text-base`}
+                      ></i>
+                      <span>
+                        {isCapturingPlate ? 'Skanowanie tablicy (AI)...' : 'Skanuj tablicę'}
                       </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    </button>
+                    {(isCapturingPlate || anprProgress.stage === 'matched') && (
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          anprProgress.stage === 'ai_analyzing' ||
-                          anprProgress.stage === 'ocr_analyzing'
-                            ? 'w-3/4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400 animate-pulse'
-                            : anprProgress.stage === 'matched'
-                              ? 'w-full bg-emerald-500'
-                              : 'w-1/3 bg-slate-400 animate-pulse'
+                        data-testid="scanner-anpr-progress-bar"
+                        className={`px-3 py-2 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
+                          anprProgress.stage === 'matched'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                            : 'bg-indigo-50 border-indigo-300 text-indigo-950'
                         }`}
-                      ></div>
-                    </div>
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-left">
+                            {anprProgress.stage === 'matched' ? (
+                              <i className="ph-fill ph-check-circle text-base text-emerald-600 shrink-0"></i>
+                            ) : (
+                              <i className="ph ph-spinner animate-spin text-base text-indigo-600 shrink-0"></i>
+                            )}
+                            <span>
+                              {anprProgress.message || 'Analiza tablicy rejestracyjnej przez AI...'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-extrabold shrink-0">
+                            {anprProgress.stage === 'matched' ? 'Gotowe' : 'Analiza AI'}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              anprProgress.stage === 'matched'
+                                ? 'w-full bg-emerald-500'
+                                : anprProgress.stage === 'capturing'
+                                  ? 'w-1/3 bg-indigo-500 animate-pulse'
+                                  : 'w-3/4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400 animate-pulse'
+                            }`}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
