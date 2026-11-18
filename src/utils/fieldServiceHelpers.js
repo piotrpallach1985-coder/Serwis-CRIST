@@ -2377,9 +2377,21 @@ export async function recognizeLicensePlateFromVideoFrame(
         if (options?.isBackground) {
           lastBackgroundAiCallMs = nowMs;
         }
+        if (typeof options?.onProgress === 'function') {
+          options.onProgress({
+            stage: 'ai_analyzing',
+            message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
+          });
+        }
         try {
           const aiRes = await recognizeLicensePlateWithAI(frameB64, machines, options);
           if (aiRes && (aiRes.matchedMachine || aiRes.plate)) {
+            if (typeof options?.onProgress === 'function') {
+              options.onProgress({
+                stage: 'matched',
+                message: `Rozpoznano tablicę: ${aiRes.matchedMachine?.licensePlate || aiRes.plate}`,
+              });
+            }
             return aiRes;
           }
         } catch (aiErr) {
@@ -2391,7 +2403,20 @@ export async function recognizeLicensePlateFromVideoFrame(
 
       // 2. Fallback lokalnego silnika OCR (Tesseract.js + lokalizacja prostokąta tablicy na Canvasie)
       if (!plateBox && options?.isBackground) {
+        if (typeof options?.onProgress === 'function') {
+          options.onProgress({
+            stage: 'scanning',
+            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+          });
+        }
         return { plate: '', matchedMachine: null };
+      }
+
+      if (typeof options?.onProgress === 'function') {
+        options.onProgress({
+          stage: 'ocr_analyzing',
+          message: 'Wykryto tablicę w kadrze — odczytywanie znaków...',
+        });
       }
 
       const wasmRes = await runWithOcrMutex(async () => {

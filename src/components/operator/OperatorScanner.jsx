@@ -27,6 +27,10 @@ export default function OperatorScanner({
   const [isRecognizingPlate, setIsRecognizingPlate] = useState(false);
   const [ocrNotice, setOcrNotice] = useState(null);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [anprProgress, setAnprProgress] = useState({
+    stage: 'scanning',
+    message: 'Inicjalizacja kamery i modułu AI...',
+  });
   const autoAnprBusyRef = useRef(false);
   const platePhotoInputRef = useRef(null);
 
@@ -236,6 +240,10 @@ export default function OperatorScanner({
   useEffect(() => {
     if (!isLiveScanning || !isInternal) return undefined;
     let active = true;
+    setAnprProgress({
+      stage: 'scanning',
+      message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+    });
     const intervalId = setInterval(async () => {
       if (!active || autoAnprBusyRef.current) return;
       const container = document.getElementById('qr-reader');
@@ -243,12 +251,23 @@ export default function OperatorScanner({
       if (!videoEl || (videoEl.readyState !== undefined && videoEl.readyState < 2)) return;
 
       autoAnprBusyRef.current = true;
+      setAnprProgress({
+        stage: 'ai_analyzing',
+        message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
+      });
       try {
         const result = await recognizeLicensePlateFromVideoFrame(videoEl, activeMachines, null, {
           isBackground: true,
+          onProgress: info => {
+            if (active && info) setAnprProgress(info);
+          },
         });
         if (!active) return;
         if (result.matchedMachine) {
+          setAnprProgress({
+            stage: 'matched',
+            message: `Rozpoznano pojazd: ${result.matchedMachine.licensePlate || result.matchedMachine.name}`,
+          });
           stopLiveScanner();
           onScanSuccess(
             result.matchedMachine.id,
@@ -261,18 +280,36 @@ export default function OperatorScanner({
             result.plate
           );
           if (fallbackMatch) {
+            setAnprProgress({
+              stage: 'matched',
+              message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || result.plate}`,
+            });
             stopLiveScanner();
             onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || result.plate);
           } else {
+            setAnprProgress({
+              stage: 'scanning',
+              message: `Odczytano "${result.plate}" (brak w bazie) — ponawianie skanowania AI...`,
+            });
             setPlateQuery(result.plate);
             setShowManualInput(true);
             setOcrNotice(
               `Wykryto tablicę "${result.plate}" — brak pojazdu o tym numerze w bazie firmy. Skieruj kamerę dokładniej na tablicę lub zatwierdź numer poniżej.`
             );
           }
+        } else {
+          setAnprProgress({
+            stage: 'scanning',
+            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+          });
         }
       } catch {
-        // ignore background frame OCR errors
+        if (active) {
+          setAnprProgress({
+            stage: 'scanning',
+            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+          });
+        }
       } finally {
         autoAnprBusyRef.current = false;
       }
@@ -390,6 +427,52 @@ export default function OperatorScanner({
               </button>
             </div>
             <div id="qr-reader" className="w-full rounded-lg overflow-hidden bg-black min-h-[280px]"></div>
+            {isInternal && (
+              <div
+                data-testid="operator-anpr-progress-bar"
+                className={`mt-3 px-3.5 py-2.5 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
+                  anprProgress.stage === 'ai_analyzing' || anprProgress.stage === 'ocr_analyzing'
+                    ? 'bg-indigo-950/90 border-indigo-500/80 text-indigo-100'
+                    : anprProgress.stage === 'matched'
+                      ? 'bg-emerald-950/90 border-emerald-500 text-emerald-100'
+                      : 'bg-slate-800/90 border-slate-700 text-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-left">
+                    {anprProgress.stage === 'ai_analyzing' ||
+                    anprProgress.stage === 'ocr_analyzing' ? (
+                      <i className="ph ph-spinner animate-spin text-base text-indigo-300 shrink-0"></i>
+                    ) : anprProgress.stage === 'matched' ? (
+                      <i className="ph-fill ph-check-circle text-base text-emerald-400 shrink-0"></i>
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
+                    )}
+                    <span>{anprProgress.message}</span>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/90 font-extrabold shrink-0">
+                    {anprProgress.stage === 'ai_analyzing' ||
+                    anprProgress.stage === 'ocr_analyzing'
+                      ? 'Analiza AI'
+                      : anprProgress.stage === 'matched'
+                        ? 'Gotowe'
+                        : 'Czuwanie AI'}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-950/80 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      anprProgress.stage === 'ai_analyzing' ||
+                      anprProgress.stage === 'ocr_analyzing'
+                        ? 'w-3/4 bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 animate-pulse'
+                        : anprProgress.stage === 'matched'
+                          ? 'w-full bg-emerald-400'
+                          : 'w-1/3 bg-slate-500 animate-pulse'
+                    }`}
+                  ></div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6 w-full">

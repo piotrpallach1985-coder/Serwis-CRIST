@@ -2728,6 +2728,11 @@ describe('Rozszerzenia Field Service (HVAC / F-Gazy) oraz Facility Management (O
         />
       );
 
+      // Przy nazwie pojazdu na ekranie zgłaszania awarii widoczny jest numer rejestracyjny
+      expect(screen.getByTestId('operator-form-machine-license-plate').textContent).toContain(
+        'GD 3V975'
+      );
+
       // Sekcja szybkiego raportowania przebiegu (km) — domyślnie zwinięta, rozwijana po kliknięciu
       const quickMeterCard = screen.getByTestId('operator-quick-meter-card');
       expect(quickMeterCard.textContent).toContain('Szybkie raportowanie przebiegu pojazdu (km)');

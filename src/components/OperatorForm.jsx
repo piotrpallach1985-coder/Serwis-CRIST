@@ -316,8 +316,21 @@ export default function OperatorForm({
                         </div>
                       )
                     ) : (
-                        <div className="font-black text-2xl sm:text-3xl text-slate-800 break-words mt-1 w-full leading-tight pr-2">
-                          {selectedMachine.name}
+                        <div className="font-black text-2xl sm:text-3xl text-slate-800 break-words mt-1 w-full leading-tight pr-2 flex flex-wrap items-center gap-2.5">
+                          <span>{selectedMachine.name}</span>
+                          {(effectiveMachine?.licensePlate || selectedMachine?.licensePlate) && (
+                            <span
+                              data-testid="operator-form-machine-license-plate"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-700 text-white font-mono font-black text-sm sm:text-base tracking-wider shadow-xs border border-blue-800"
+                            >
+                              <span className="text-[10px] bg-blue-900 px-1.5 py-0.5 rounded font-extrabold">
+                                PL
+                              </span>
+                              <span>
+                                {effectiveMachine?.licensePlate || selectedMachine?.licensePlate}
+                              </span>
+                            </span>
+                          )}
                         </div>
                       )}
                   </div>

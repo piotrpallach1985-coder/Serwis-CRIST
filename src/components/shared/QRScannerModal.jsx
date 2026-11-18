@@ -22,6 +22,10 @@ export default function QRScannerModal({
   const [ocrStatusMsg, setOcrStatusMsg] = useState('');
   const [isCapturingPlate, setIsCapturingPlate] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [anprProgress, setAnprProgress] = useState({
+    stage: 'scanning',
+    message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+  });
   const html5QrcodeRef = useRef(null);
   const autoAnprBusyRef = useRef(false);
   const scanHandledRef = useRef(false);
@@ -67,6 +71,10 @@ export default function QRScannerModal({
   useEffect(() => {
     if (!isOpen || mode !== 'qr' || !enableLicensePlateScan) return undefined;
     let active = true;
+    setAnprProgress({
+      stage: 'scanning',
+      message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+    });
     const intervalId = setInterval(async () => {
       if (!active || autoAnprBusyRef.current) return;
       const container = document.getElementById('unified-qr-reader');
@@ -74,12 +82,23 @@ export default function QRScannerModal({
       if (!videoEl || (videoEl.readyState !== undefined && videoEl.readyState < 2)) return;
 
       autoAnprBusyRef.current = true;
+      setAnprProgress({
+        stage: 'ai_analyzing',
+        message: 'Analiza obrazu przez AI (rozpoznawanie tablicy rejestracyjnej)...',
+      });
       try {
         const res = await recognizeLicensePlateFromVideoFrame(videoEl, machines, null, {
           isBackground: true,
+          onProgress: info => {
+            if (active && info) setAnprProgress(info);
+          },
         });
         if (!active) return;
         if (res.matchedMachine) {
+          setAnprProgress({
+            stage: 'matched',
+            message: `Rozpoznano pojazd: ${res.matchedMachine.licensePlate || res.matchedMachine.name}`,
+          });
           onScanSuccess(
             res.matchedMachine.id,
             res.matchedMachine.licensePlate || res.matchedMachine.id
@@ -87,17 +106,35 @@ export default function QRScannerModal({
         } else if (res.plate) {
           const fallbackMatch = findMachineByIdentifierOrPlate(machines, res.plate, res.plate);
           if (fallbackMatch) {
+            setAnprProgress({
+              stage: 'matched',
+              message: `Rozpoznano pojazd: ${fallbackMatch.licensePlate || res.plate}`,
+            });
             onScanSuccess(fallbackMatch.id, fallbackMatch.licensePlate || res.plate);
           } else {
+            setAnprProgress({
+              stage: 'scanning',
+              message: `Odczytano "${res.plate}" (brak w bazie) — ponawianie skanowania AI...`,
+            });
             setPlateQuery(res.plate);
             setShowManualInput(true);
             setOcrStatusMsg(
               `Wykryto tablicę "${res.plate}", której nie ma jeszcze w bazie pojazdów tej firmy. Skieruj aparat dokładniej na tablicę lub wybierz pojazd poniżej.`
             );
           }
+        } else {
+          setAnprProgress({
+            stage: 'scanning',
+            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+          });
         }
       } catch {
-        // ignore frame OCR errors in background loop
+        if (active) {
+          setAnprProgress({
+            stage: 'scanning',
+            message: 'Skanowanie kadru — skieruj kamerę na tablicę rejestracyjną lub kod QR...',
+          });
+        }
       } finally {
         autoAnprBusyRef.current = false;
       }
@@ -429,6 +466,53 @@ export default function QRScannerModal({
                   id="unified-qr-reader"
                   className="w-full rounded-2xl overflow-hidden bg-black min-h-[260px] shadow-inner"
                 ></div>
+                {enableLicensePlateScan && (
+                  <div
+                    data-testid="scanner-anpr-progress-bar"
+                    className={`mt-2.5 px-3 py-2 rounded-xl border text-xs font-bold flex flex-col gap-1.5 transition-all ${
+                      anprProgress.stage === 'ai_analyzing' ||
+                      anprProgress.stage === 'ocr_analyzing'
+                        ? 'bg-indigo-50 border-indigo-300 text-indigo-950'
+                        : anprProgress.stage === 'matched'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                          : 'bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-left">
+                        {anprProgress.stage === 'ai_analyzing' ||
+                        anprProgress.stage === 'ocr_analyzing' ? (
+                          <i className="ph ph-spinner animate-spin text-base text-indigo-600 shrink-0"></i>
+                        ) : anprProgress.stage === 'matched' ? (
+                          <i className="ph-fill ph-check-circle text-base text-emerald-600 shrink-0"></i>
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+                        )}
+                        <span>{anprProgress.message}</span>
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-extrabold shrink-0">
+                        {anprProgress.stage === 'ai_analyzing' ||
+                        anprProgress.stage === 'ocr_analyzing'
+                          ? 'Analiza AI'
+                          : anprProgress.stage === 'matched'
+                            ? 'Gotowe'
+                            : 'Czuwanie AI'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          anprProgress.stage === 'ai_analyzing' ||
+                          anprProgress.stage === 'ocr_analyzing'
+                            ? 'w-3/4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400 animate-pulse'
+                            : anprProgress.stage === 'matched'
+                              ? 'w-full bg-emerald-500'
+                              : 'w-1/3 bg-slate-400 animate-pulse'
+                        }`}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
