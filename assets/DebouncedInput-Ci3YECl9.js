@@ -1,1 +1,0 @@
-import{j as m}from"./index-w70DXs40.js";import{r as o}from"./react-vendor-BJrELXHn.js";function p({value:t,onChange:n,debounce:s=300,...a}){const[e,u]=o.useState(t||"");return o.useEffect(()=>{u(t||"")},[t]),o.useEffect(()=>{const r=setTimeout(()=>{n(e)},s);return()=>clearTimeout(r)},[e,s]),m.jsx("input",{...a,value:e,onChange:r=>u(r.target.value)})}export{p as D};
